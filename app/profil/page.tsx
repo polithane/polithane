@@ -1,26 +1,36 @@
 'use client'
 
+import { useState } from 'react'
 import Navbar from '../components/Navbar'
 import PostCard from '../components/PostCard'
-import { mockUsers, mockPosts } from '../lib/mockData'
-import { UserRole } from '../types'
+import CreatePostModal from '../components/CreatePostModal'
+import { useStore } from '../store/useStore'
 import { getRoleDisplayName } from '../lib/permissions'
+import { Toaster } from 'react-hot-toast'
 
 export default function ProfilPage() {
-  // Mock current user - in real app, get from auth context
-  const userProfile = mockUsers[0] // Ahmet Yılmaz - Milletvekili
-  const userPosts = mockPosts.filter(p => p.authorId === userProfile.id)
+  const { posts, currentUser } = useStore()
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  
+  // Use current user or default to first mock user
+  const userProfile = currentUser || useStore.getState().posts[0]?.author
+  const userPosts = posts.filter(p => p.authorId === userProfile?.id)
 
-  const currentUser = {
-    id: userProfile.id,
-    name: userProfile.name,
-    username: userProfile.username,
-    role: userProfile.role,
+  const currentUserForNavbar = currentUser ? {
+    id: currentUser.id,
+    name: currentUser.name,
+    username: currentUser.username,
+    role: currentUser.role,
+  } : undefined
+
+  if (!userProfile) {
+    return <div>Kullanıcı bulunamadı</div>
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar currentUser={currentUser} />
+      <Toaster position="top-right" />
+      <Navbar currentUser={currentUserForNavbar} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Profile Header */}
@@ -36,9 +46,17 @@ export default function ProfilPage() {
               <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-4xl border-4 border-white shadow-lg">
                 {userProfile.name.charAt(0)}
               </div>
-              <button className="mt-4 px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors shadow-sm">
-                Takip Et
-              </button>
+              <div className="flex space-x-2 mt-4">
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                >
+                  Paylaş
+                </button>
+                <button className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors shadow-sm">
+                  Takip Et
+                </button>
+              </div>
             </div>
             
             <div className="mb-4">
@@ -86,39 +104,6 @@ export default function ProfilPage() {
                 <span className="text-gray-600 ml-2">PolitPuan</span>
               </div>
             </div>
-
-            {/* Milletvekili Özel Bilgiler */}
-            {userProfile.role === UserRole.MILLETVEKILI && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <h3 className="font-semibold text-gray-900 mb-2">Milletvekili Bilgileri</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  {userProfile.secimBolgesi && (
-                    <div>
-                      <span className="text-gray-600">Seçim Bölgesi:</span>
-                      <span className="ml-2 font-medium text-gray-900">{userProfile.secimBolgesi}</span>
-                    </div>
-                  )}
-                  {userProfile.partiKademesi && (
-                    <div>
-                      <span className="text-gray-600">Parti Kademesi:</span>
-                      <span className="ml-2 font-medium text-gray-900">{userProfile.partiKademesi}</span>
-                    </div>
-                  )}
-                  {userProfile.gorevler && userProfile.gorevler.length > 0 && (
-                    <div className="md:col-span-2">
-                      <span className="text-gray-600">Görevler:</span>
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {userProfile.gorevler.map((gorev, idx) => (
-                          <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                            {gorev}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -148,11 +133,22 @@ export default function ProfilPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
               <div className="text-6xl mb-4">📭</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Henüz paylaşım yok</h3>
-              <p className="text-gray-600">Bu kullanıcı henüz içerik paylaşmamış.</p>
+              <p className="text-gray-600 mb-4">Bu kullanıcı henüz içerik paylaşmamış.</p>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+              >
+                İlk Paylaşımı Yap
+              </button>
             </div>
           )}
         </div>
       </main>
+
+      <CreatePostModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   )
 }

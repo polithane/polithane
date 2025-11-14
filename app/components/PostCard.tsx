@@ -1,9 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import { Post } from '../types'
 import { getRoleDisplayName } from '../lib/permissions'
 import { formatDistanceToNow } from 'date-fns'
 import { tr } from 'date-fns/locale'
+import { useStore } from '../store/useStore'
+import { motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 
 interface PostCardProps {
   post: Post
@@ -11,6 +15,14 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, showDetailedAnalysis = false }: PostCardProps) {
+  const { likePost, unlikePost, repost, likedPosts, repostedPosts, currentUser } = useStore()
+  const [showComments, setShowComments] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [isLiking, setIsLiking] = useState(false)
+
+  const isLiked = likedPosts.has(post.id)
+  const isReposted = repostedPosts.has(post.id)
+
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
@@ -47,18 +59,58 @@ export default function PostCard({ post, showDetailedAnalysis = false }: PostCar
     return emojis[topic] || '📌'
   }
 
+  const handleLike = async () => {
+    if (isLiking) return
+    setIsLiking(true)
+    
+    try {
+      if (isLiked) {
+        unlikePost(post.id)
+        toast.success('Beğeni kaldırıldı')
+      } else {
+        likePost(post.id)
+        toast.success('Beğenildi ❤️')
+      }
+    } catch (error) {
+      toast.error('Bir hata oluştu')
+    } finally {
+      setTimeout(() => setIsLiking(false), 300)
+    }
+  }
+
+  const handleRepost = () => {
+    repost(post.id)
+    toast.success(isReposted ? 'Paylaşım kaldırıldı' : 'Paylaşıldı 🔄')
+  }
+
+  const handleComment = () => {
+    if (!commentText.trim()) {
+      toast.error('Lütfen yorum yazın')
+      return
+    }
+    toast.success('Yorum eklendi 💬')
+    setCommentText('')
+    setShowComments(false)
+  }
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200"
+    >
       {/* Header */}
       <div className="p-6 pb-4">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3 flex-1">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 cursor-pointer hover:scale-110 transition-transform">
               {post.author.name.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-2 flex-wrap">
-                <h3 className="font-semibold text-gray-900">{post.author.name}</h3>
+                <h3 className="font-semibold text-gray-900 cursor-pointer hover:text-primary-600 transition-colors">
+                  {post.author.name}
+                </h3>
                 {post.author.verified && (
                   <span className="text-blue-500 text-sm" title="Doğrulanmış">✓</span>
                 )}
@@ -72,7 +124,7 @@ export default function PostCard({ post, showDetailedAnalysis = false }: PostCar
                 )}
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1 flex-wrap">
-                <span>@{post.author.username}</span>
+                <span className="cursor-pointer hover:text-primary-600">@{post.author.username}</span>
                 {post.location && (
                   <>
                     <span>·</span>
@@ -84,7 +136,7 @@ export default function PostCard({ post, showDetailedAnalysis = false }: PostCar
               </div>
             </div>
           </div>
-          <button className="text-gray-400 hover:text-gray-600 p-1">
+          <button className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
             </svg>
@@ -94,13 +146,13 @@ export default function PostCard({ post, showDetailedAnalysis = false }: PostCar
 
       {/* Content */}
       <div className="px-6 pb-4">
-        <p className="text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
+        <p className="text-gray-800 leading-relaxed whitespace-pre-wrap break-words text-base">
           {post.content}
         </p>
         {post.hashtags && post.hashtags.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">
             {post.hashtags.map((tag, idx) => (
-              <span key={idx} className="text-primary-600 hover:text-primary-700 font-medium text-sm">
+              <span key={idx} className="text-primary-600 hover:text-primary-700 font-medium text-sm cursor-pointer">
                 #{tag}
               </span>
             ))}
@@ -119,38 +171,7 @@ export default function PostCard({ post, showDetailedAnalysis = false }: PostCar
         <div className="px-3 py-1.5 rounded-full text-sm bg-orange-100 text-orange-700 font-medium">
           {getSentimentEmoji(post.sentiment)} {post.sentiment.replace('_', ' ').toUpperCase()}
         </div>
-        {post.aiAnalysis && (
-          <div className="px-3 py-1.5 rounded-full text-xs bg-gray-100 text-gray-700">
-            Gerilim: {post.aiAnalysis.gerilimDerecesi}% | Viral: {post.aiAnalysis.viralPotansiyel}%
-          </div>
-        )}
       </div>
-
-      {/* AI Analysis Details */}
-      {showDetailedAnalysis && post.aiAnalysis && (
-        <div className="px-6 pb-4 border-t border-gray-100 pt-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">AI Analiz Detayları</h4>
-          <div className="grid grid-cols-2 gap-4 text-xs">
-            <div>
-              <span className="text-gray-600">Partizanlık Skoru:</span>
-              <span className="ml-2 font-medium">{post.aiAnalysis.partizanlikSkoru}%</span>
-            </div>
-            <div>
-              <span className="text-gray-600">Viral Potansiyel:</span>
-              <span className="ml-2 font-medium">{post.aiAnalysis.viralPotansiyel}%</span>
-            </div>
-            <div className="col-span-2">
-              <span className="text-gray-600">Duygu Analizi:</span>
-              <div className="mt-1 flex space-x-4">
-                <span>😊 {post.aiAnalysis.duyguAnalizi.mutluluk}%</span>
-                <span>😠 {post.aiAnalysis.duyguAnalizi.ofke}%</span>
-                <span>😰 {post.aiAnalysis.duyguAnalizi.endise}%</span>
-                <span>✨ {post.aiAnalysis.duyguAnalizi.umut}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Stats & Actions */}
       <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
@@ -159,25 +180,90 @@ export default function PostCard({ post, showDetailedAnalysis = false }: PostCar
             <span className="text-lg group-hover:scale-110 transition-transform">👁️</span>
             <span className="text-sm font-medium">{formatNumber(post.stats.views)}</span>
           </button>
-          <button className="flex items-center space-x-2 hover:text-primary-600 transition-colors group">
+          
+          <button
+            onClick={() => setShowComments(!showComments)}
+            className="flex items-center space-x-2 hover:text-primary-600 transition-colors group"
+          >
             <span className="text-lg group-hover:scale-110 transition-transform">💬</span>
             <span className="text-sm font-medium">{formatNumber(post.stats.comments)}</span>
           </button>
-          <button className="flex items-center space-x-2 hover:text-primary-600 transition-colors group">
-            <span className="text-lg group-hover:scale-110 transition-transform">🔄</span>
+          
+          <button
+            onClick={handleRepost}
+            className={`flex items-center space-x-2 transition-colors group ${
+              isReposted ? 'text-green-600' : 'hover:text-primary-600'
+            }`}
+          >
+            <motion.span
+              animate={{ rotate: isReposted ? 360 : 0 }}
+              transition={{ duration: 0.3 }}
+              className="text-lg group-hover:scale-110 transition-transform"
+            >
+              🔄
+            </motion.span>
             <span className="text-sm font-medium">{formatNumber(post.stats.reposts)}</span>
           </button>
-          <button className="flex items-center space-x-2 hover:text-red-500 transition-colors group">
-            <span className="text-lg group-hover:scale-110 transition-transform">❤️</span>
+          
+          <button
+            onClick={handleLike}
+            disabled={isLiking}
+            className={`flex items-center space-x-2 transition-colors group ${
+              isLiked ? 'text-red-500' : 'hover:text-red-500'
+            }`}
+          >
+            <motion.span
+              animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
+              transition={{ duration: 0.3 }}
+              className="text-lg group-hover:scale-110 transition-transform"
+            >
+              {isLiked ? '❤️' : '🤍'}
+            </motion.span>
             <span className="text-sm font-medium">{formatNumber(post.stats.likes)}</span>
           </button>
         </div>
-        <button className="text-gray-400 hover:text-gray-600 p-1">
+        
+        <button className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors">
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
           </svg>
         </button>
       </div>
-    </div>
+
+      {/* Comments Section */}
+      {showComments && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="border-t border-gray-100 px-6 py-4 bg-gray-50"
+        >
+          <div className="space-y-3 mb-4">
+            {/* Comment input */}
+            <div className="flex space-x-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                {currentUser?.name.charAt(0) || 'U'}
+              </div>
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleComment()}
+                  placeholder="Yorum yaz..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                onClick={handleComment}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+              >
+                Gönder
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
   )
 }

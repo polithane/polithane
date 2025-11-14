@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import Navbar from './components/Navbar'
 import PostCard from './components/PostCard'
+import CreatePostModal from './components/CreatePostModal'
 import { FeedType } from './types'
-import { mockPosts, mockUsers } from './lib/mockData'
+import { useStore } from './store/useStore'
 import { UserRole } from './types'
+import { Toaster } from 'react-hot-toast'
 
 const feedTypes = [
   { id: FeedType.GENEL_GUNDEM, label: 'Genel Gündem', icon: '🌐' },
@@ -18,36 +20,49 @@ const feedTypes = [
 ]
 
 export default function Home() {
+  const { posts, currentUser } = useStore()
   const [activeFeed, setActiveFeed] = useState<FeedType>(FeedType.GENEL_GUNDEM)
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false)
-
-  // Mock current user
-  const currentUser = {
-    id: '3',
-    name: mockUsers[2].name,
-    username: mockUsers[2].username,
-    role: UserRole.VATANDAS_DOGRULANMIS,
-  }
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Filter posts based on feed type
   const getFilteredPosts = () => {
+    let filtered = [...posts]
+    
     switch (activeFeed) {
       case FeedType.PARTI_GUNDEMI:
-        return mockPosts.filter(p => p.author.party)
+        filtered = filtered.filter(p => p.author.party)
+        break
       case FeedType.TREND_OLAYLAR:
-        return [...mockPosts].sort((a, b) => b.politPuan - a.politPuan)
+        filtered = filtered.sort((a, b) => b.politPuan - a.politPuan)
+        break
       case FeedType.MEDYA_AKISI:
-        return mockPosts.filter(p => p.author.role === UserRole.GAZETECI)
+        filtered = filtered.filter(p => p.author.role === UserRole.GAZETECI)
+        break
+      case FeedType.TAKIP_EDILENLER:
+        // In real app, filter by following list
+        filtered = filtered.slice(0, 5)
+        break
       default:
-        return mockPosts
+        break
     }
+    
+    return filtered
   }
 
   const filteredPosts = getFilteredPosts()
 
+  const currentUserForNavbar = currentUser ? {
+    id: currentUser.id,
+    name: currentUser.name,
+    username: currentUser.username,
+    role: currentUser.role,
+  } : undefined
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar currentUser={currentUser} />
+      <Toaster position="top-right" />
+      <Navbar currentUser={currentUserForNavbar} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Feed Header */}
@@ -59,10 +74,17 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-2">
               <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors shadow-md hover:shadow-lg flex items-center space-x-2"
+              >
+                <span className="text-xl">✏️</span>
+                <span>Paylaş</span>
+              </button>
+              <button
                 onClick={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors text-sm"
               >
-                {showDetailedAnalysis ? '📊 Basit Görünüm' : '📊 Detaylı Analiz'}
+                {showDetailedAnalysis ? '📊 Basit' : '📊 Detaylı'}
               </button>
             </div>
           </div>
@@ -76,7 +98,7 @@ export default function Home() {
                   onClick={() => setActiveFeed(feed.id)}
                   className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-200 ${
                     activeFeed === feed.id
-                      ? 'bg-primary-600 text-white shadow-md'
+                      ? 'bg-primary-600 text-white shadow-md scale-105'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -90,23 +112,25 @@ export default function Home() {
 
         {/* Stats Bar */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
             <div className="text-2xl font-bold text-primary-600">{filteredPosts.length}</div>
             <div className="text-sm text-gray-600 mt-1">Toplam Paylaşım</div>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
             <div className="text-2xl font-bold text-green-600">
-              {Math.round(filteredPosts.reduce((sum, p) => sum + p.politPuan, 0) / filteredPosts.length || 0)}
+              {filteredPosts.length > 0 
+                ? Math.round(filteredPosts.reduce((sum, p) => sum + p.politPuan, 0) / filteredPosts.length)
+                : 0}
             </div>
             <div className="text-sm text-gray-600 mt-1">Ortalama PolitPuan</div>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
             <div className="text-2xl font-bold text-orange-600">
               {filteredPosts.reduce((sum, p) => sum + p.stats.views, 0).toLocaleString()}
             </div>
             <div className="text-sm text-gray-600 mt-1">Toplam Görüntüleme</div>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
             <div className="text-2xl font-bold text-purple-600">
               {filteredPosts.reduce((sum, p) => sum + p.stats.likes, 0).toLocaleString()}
             </div>
@@ -128,7 +152,13 @@ export default function Home() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
               <div className="text-6xl mb-4">📭</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Henüz içerik yok</h3>
-              <p className="text-gray-600">Bu feed türü için henüz paylaşım bulunmuyor.</p>
+              <p className="text-gray-600 mb-4">Bu feed türü için henüz paylaşım bulunmuyor.</p>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+              >
+                İlk Paylaşımı Yap
+              </button>
             </div>
           )}
         </div>
@@ -136,12 +166,18 @@ export default function Home() {
         {/* Load More */}
         {filteredPosts.length > 0 && (
           <div className="mt-8 text-center">
-            <button className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm">
+            <button className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm hover:shadow-md">
               Daha Fazla Yükle
             </button>
           </div>
         )}
       </main>
+
+      {/* Create Post Modal */}
+      <CreatePostModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   )
 }

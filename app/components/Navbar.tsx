@@ -73,11 +73,7 @@ export default function Navbar({ currentUser }: NavbarProps) {
               </div>
             </div>
 
-            {/* Post Button */}
-            <button className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors shadow-sm hover:shadow-md hidden sm:flex items-center space-x-2">
-              <span>✏️</span>
-              <span className="hidden md:inline">Paylaş</span>
-            </button>
+            {/* Post Button - handled by parent pages */}
 
             {/* Notifications */}
             <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
