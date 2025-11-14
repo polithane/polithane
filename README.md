@@ -85,6 +85,17 @@ PolitPlatform, **Twitter + LinkedIn + e-Devlet + Parti Teşkilat Yapısı + Poli
    - Seçim gecesi modülü
    - AR/VR entegrasyonu
 
+### Ek Dokümantasyon Dosyaları
+
+Ayrıca proje kök dizininde şu ek dokümantasyon dosyaları da mevcuttur:
+
+- **[BLUEPRINT.md](./BLUEPRINT.md)** - Ana mimari dokümantasyonu
+- **[POLITPUAN_ALGORITHM.md](./POLITPUAN_ALGORITHM.md)** - PolitPuan algoritması detayları
+- **[DATA_MODELS.md](./DATA_MODELS.md)** - Veri modeli dokümantasyonu
+- **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** - API dokümantasyonu
+- **[IMPLEMENTATION_EXAMPLES.md](./IMPLEMENTATION_EXAMPLES.md)** - Kod örnekleri
+- **[ORGANIZATION_MAP_MODULE.md](./ORGANIZATION_MAP_MODULE.md)** - Teşkilat ve harita modülü
+
 ## 🛠️ Teknoloji Stack'i
 
 ### Frontend
@@ -186,8 +197,8 @@ PolitPlatform, **Twitter + LinkedIn + e-Devlet + Parti Teşkilat Yapısı + Poli
 
 ```bash
 # Clone repository
-git clone https://github.com/yourorg/politplatform.git
-cd politplatform
+git clone https://github.com/ikonuniforma/polithane.git
+cd polithane
 
 # Install dependencies
 npm install
@@ -230,6 +241,26 @@ OPENAI_API_KEY=your-openai-key
 EDEVLET_API_KEY=your-edevlet-key
 TUIK_API_KEY=your-tuik-key
 ```
+
+## 🔒 Güvenlik
+
+- JWT tabanlı kimlik doğrulama
+- TC Kimlik No şifreleme (AES-256)
+- Role-Based Access Control (RBAC)
+- API rate limiting
+- Input validation
+- SQL injection koruması
+- XSS koruması
+- CSRF koruması
+
+## 📈 Ölçeklenebilirlik
+
+- Mikroservis mimarisi
+- Horizontal scaling
+- Database read replicas
+- Redis caching
+- CDN kullanımı
+- Message queue ile async işlemler
 
 ## 🤝 Katkıda Bulunma
 
