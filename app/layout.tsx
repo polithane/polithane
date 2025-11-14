@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
+import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'PolitPlatform',
-  description: 'Mega Siyasi Sosyal Medya Platformu',
+  title: 'PolitPlatform - Mega Siyasi Sosyal Medya Platformu',
+  description: 'Twitter + LinkedIn + e-Devlet + Parti Teşkilat Yapısı + Politik Analitik',
 }
 
 export default function RootLayout({
@@ -12,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
-      <body>{children}</body>
+      <body className="bg-gray-50 min-h-screen">{children}</body>
     </html>
   )
 }
