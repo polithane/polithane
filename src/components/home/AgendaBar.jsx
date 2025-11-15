@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { Badge } from '../common/Badge';
 import { formatNumber } from '../../utils/formatters';
 
 export const AgendaBar = ({ agendas = [] }) => {
@@ -19,14 +18,14 @@ export const AgendaBar = ({ agendas = [] }) => {
           <button
             key={agenda.agenda_id}
             onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full whitespace-nowrap transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg whitespace-nowrap transition-all duration-200 shadow-sm hover:shadow-md"
           >
-            <span className="text-sm font-medium text-gray-800">
-              #{agenda.agenda_title}
+            <span className="text-sm font-medium">
+              {agenda.agenda_title}
             </span>
-            <Badge variant="primary" size="small">
+            <span className="text-xs bg-gray-100 hover:bg-white hover:text-primary-blue px-2 py-0.5 rounded-full font-semibold transition-colors">
               {formatNumber(agenda.total_polit_score)}
-            </Badge>
+            </span>
           </button>
         ))}
       </div>

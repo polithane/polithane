@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { HeroSlider } from '../components/home/HeroSlider';
 import { ParliamentBar } from '../components/home/ParliamentBar';
 import { AgendaBar } from '../components/home/AgendaBar';
-import { PostCard } from '../components/post/PostCard';
-import { mockPosts } from '../mock/posts';
+import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
+import { HorizontalScroll } from '../components/common/HorizontalScroll';
+import { MediaSidebar } from '../components/media/MediaSidebar';
+import { mockPosts, generateMockPosts, getCategoryPosts } from '../mock/posts';
 import { mockParties } from '../mock/parties';
 import { mockAgendas } from '../mock/agendas';
 
@@ -15,22 +17,19 @@ export const HomePage = () => {
   useEffect(() => {
     // Mock data loading simulation
     setTimeout(() => {
-      setPosts(mockPosts);
+      const allPosts = generateMockPosts(200);
+      setPosts(allPosts);
       setParties(mockParties);
       setAgendas(mockAgendas);
     }, 100);
   }, []);
   
-  // Kategorilere göre post filtreleme
-  const mpPosts = posts.filter(p => p.user?.user_type === 'politician' && p.user?.politician_type === 'mp');
-  const organizationPosts = posts.filter(p => 
-    p.user?.user_type === 'politician' && 
-    p.user?.politician_type !== 'mp' && 
-    p.user?.politician_type !== 'party_chair'
-  );
-  const citizenPosts = posts.filter(p => p.user?.user_type === 'normal');
-  const exPoliticianPosts = posts.filter(p => p.user?.user_type === 'ex_politician');
-  const mediaPosts = posts.filter(p => p.user?.user_type === 'media');
+  // Kategorilere göre post filtreleme - her kategori için 20 örnek
+  const mpPosts = getCategoryPosts('mps', posts);
+  const organizationPosts = getCategoryPosts('organization', posts);
+  const citizenPosts = getCategoryPosts('citizens', posts);
+  const exPoliticianPosts = getCategoryPosts('experience', posts);
+  const mediaPosts = getCategoryPosts('media', posts);
   const featuredPosts = posts.filter(p => p.is_featured).slice(0, 5);
   
   return (
@@ -57,16 +56,20 @@ export const HomePage = () => {
                   Tümünü Gör
                 </a>
               </div>
-              <div className="space-y-4">
-                {mpPosts.slice(0, 5).map(post => (
-                  <PostCard 
+              <HorizontalScroll 
+                autoScroll={true} 
+                scrollInterval={5000}
+                itemsPerView={{ desktop: 5, mobile: 2 }}
+              >
+                {mpPosts.map(post => (
+                  <PostCardHorizontal 
                     key={post.post_id} 
                     post={post}
                     showCity={true}
                     showPartyLogo={true}
                   />
                 ))}
-              </div>
+              </HorizontalScroll>
             </section>
             
             {/* TEŞKİLAT KONUŞUYOR */}
@@ -77,16 +80,19 @@ export const HomePage = () => {
                   Tümünü Gör
                 </a>
               </div>
-              <div className="space-y-4">
-                {organizationPosts.slice(0, 5).map(post => (
-                  <PostCard 
+              <HorizontalScroll 
+                autoScroll={true} 
+                scrollInterval={5000}
+                itemsPerView={{ desktop: 5, mobile: 2 }}
+              >
+                {organizationPosts.map(post => (
+                  <PostCardHorizontal 
                     key={post.post_id} 
                     post={post}
-                    showPosition={true}
                     showPartyLogo={true}
                   />
                 ))}
-              </div>
+              </HorizontalScroll>
             </section>
             
             {/* VATANDAŞ KONUŞUYOR */}
@@ -97,15 +103,18 @@ export const HomePage = () => {
                   Tümünü Gör
                 </a>
               </div>
-              <div className="space-y-4">
-                {citizenPosts.slice(0, 5).map(post => (
-                  <PostCard 
+              <HorizontalScroll 
+                autoScroll={true} 
+                scrollInterval={5000}
+                itemsPerView={{ desktop: 5, mobile: 2 }}
+              >
+                {citizenPosts.map(post => (
+                  <PostCardHorizontal 
                     key={post.post_id} 
                     post={post}
-                    showPartyMemberBadge={post.user?.user_type === 'party_member'}
                   />
                 ))}
-              </div>
+              </HorizontalScroll>
             </section>
             
             {/* DENEYİM KONUŞUYOR */}
@@ -116,15 +125,18 @@ export const HomePage = () => {
                   Tümünü Gör
                 </a>
               </div>
-              <div className="space-y-4">
-                {exPoliticianPosts.slice(0, 5).map(post => (
-                  <PostCard 
+              <HorizontalScroll 
+                autoScroll={true} 
+                scrollInterval={5000}
+                itemsPerView={{ desktop: 5, mobile: 2 }}
+              >
+                {exPoliticianPosts.map(post => (
+                  <PostCardHorizontal 
                     key={post.post_id} 
                     post={post}
-                    showPreviousPosition={true}
                   />
                 ))}
-              </div>
+              </HorizontalScroll>
             </section>
           </div>
           
@@ -132,15 +144,7 @@ export const HomePage = () => {
           <aside className="hidden lg:block">
             <div className="sticky top-20">
               <h2 className="text-lg font-bold text-gray-900 mb-4">MEDYA KONUŞUYOR</h2>
-              <div className="space-y-4">
-                {mediaPosts.slice(0, 5).map(post => (
-                  <PostCard 
-                    key={post.post_id} 
-                    post={post}
-                    className="compact"
-                  />
-                ))}
-              </div>
+              <MediaSidebar posts={posts} />
             </div>
           </aside>
         </div>

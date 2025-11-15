@@ -24,8 +24,8 @@ export const mockPosts = [
     user: mockUsers[1],
     content_type: 'video',
     content_text: 'Gençlerimizle buluşmamızdan kareler',
-    media_url: '/assets/mock/videos/video1.mp4',
-    thumbnail_url: '/assets/mock/thumbnails/video1-thumb.jpg',
+    media_url: 'https://picsum.photos/800/600?random=2',
+    thumbnail_url: 'https://picsum.photos/800/600?random=2',
     media_duration: 180,
     agenda_tag: 'gençlik',
     polit_score: 42300,
@@ -42,7 +42,7 @@ export const mockPosts = [
     user: mockUsers[5],
     content_type: 'image',
     content_text: 'İstanbul\'da yaptığımız çalışma ziyaretinden görüntüler',
-    media_url: '/assets/mock/images/post1.jpg',
+    media_url: 'https://picsum.photos/800/600?random=3',
     agenda_tag: 'yerel yönetim',
     polit_score: 3200,
     view_count: 15000,
@@ -103,7 +103,7 @@ export const mockPosts = [
     user: mockUsers[7],
     content_type: 'image',
     content_text: 'Parti etkinliğimizden kareler',
-    media_url: '/assets/mock/images/post2.jpg',
+    media_url: 'https://picsum.photos/800/600?random=7',
     agenda_tag: 'parti faaliyetleri',
     polit_score: 650,
     view_count: 2500,
@@ -134,8 +134,8 @@ export const mockPosts = [
     user: mockUsers[3],
     content_type: 'video',
     content_text: 'Genel Başkan olarak yaptığım açıklama',
-    media_url: '/assets/mock/videos/video2.mp4',
-    thumbnail_url: '/assets/mock/thumbnails/video2-thumb.jpg',
+    media_url: 'https://picsum.photos/800/600?random=9',
+    thumbnail_url: 'https://picsum.photos/800/600?random=9',
     media_duration: 240,
     agenda_tag: 'siyaset',
     polit_score: 18900,
@@ -163,8 +163,8 @@ export const mockPosts = [
   }
 ];
 
-// Daha fazla post için helper
-export const generateMockPosts = (count = 90, users = mockUsers) => {
+// Daha fazla post için helper - her kategori için 20 örnek oluştur
+export const generateMockPosts = (count = 90, users = mockUsers, parties = mockParties) => {
   const contentTypes = ['text', 'image', 'video', 'audio'];
   const agendas = ['ekonomi', 'eğitim', 'sağlık', 'güvenlik', 'çevre', 'teknoloji', 'kültür', 'spor', 'turizm', 'tarım'];
   const sampleTexts = [
@@ -172,7 +172,12 @@ export const generateMockPosts = (count = 90, users = mockUsers) => {
     'Halkımızla birlikte çalışmaya devam ediyoruz.',
     'Yeni projelerimiz hakkında bilgi paylaşımı.',
     'Etkinliklerimizden görüntüler.',
-    'Görüş ve önerilerinizi bekliyoruz.'
+    'Görüş ve önerilerinizi bekliyoruz.',
+    'Ülkemizin geleceği için çalışıyoruz.',
+    'Şeffaflık ve hesap verebilirlik ilkelerimizden taviz vermiyoruz.',
+    'Gençlerimizle buluşmalarımız devam ediyor.',
+    'Yerel yönetimlerle işbirliği içindeyiz.',
+    'Vatandaşlarımızın sorunlarını çözmek için çalışıyoruz.'
   ];
   
   const posts = [...mockPosts];
@@ -186,7 +191,10 @@ export const generateMockPosts = (count = 90, users = mockUsers) => {
     const post = {
       post_id: i,
       user_id: user.user_id,
-      user: user,
+      user: {
+        ...user,
+        party: user.party_id ? parties.find(p => p.party_id === user.party_id) : null
+      },
       content_type: contentType,
       content_text: text,
       agenda_tag: agenda,
@@ -200,13 +208,13 @@ export const generateMockPosts = (count = 90, users = mockUsers) => {
     };
     
     if (contentType === 'image') {
-      post.media_url = `/assets/mock/images/post${i}.jpg`;
+      post.media_url = `https://picsum.photos/800/600?random=${i}`;
     } else if (contentType === 'video') {
-      post.media_url = `/assets/mock/videos/video${i}.mp4`;
-      post.thumbnail_url = `/assets/mock/thumbnails/video${i}-thumb.jpg`;
+      post.media_url = `https://picsum.photos/800/600?random=${i}`;
+      post.thumbnail_url = `https://picsum.photos/800/600?random=${i}`;
       post.media_duration = Math.floor(Math.random() * 300) + 60;
     } else if (contentType === 'audio') {
-      post.media_url = `/assets/mock/audio/audio${i}.mp3`;
+      post.media_url = `https://picsum.photos/400/400?random=${i}`;
       post.media_duration = Math.floor(Math.random() * 600) + 120;
     }
     
@@ -214,4 +222,21 @@ export const generateMockPosts = (count = 90, users = mockUsers) => {
   }
   
   return posts;
+};
+
+// Her kategori için 20 örnek post oluştur
+export const getCategoryPosts = (category, allPosts = generateMockPosts(200)) => {
+  const categoryMap = {
+    'mps': (p) => p.user?.user_type === 'politician' && p.user?.politician_type === 'mp',
+    'organization': (p) => p.user?.user_type === 'politician' && p.user?.politician_type !== 'mp' && p.user?.politician_type !== 'party_chair',
+    'citizens': (p) => p.user?.user_type === 'normal',
+    'experience': (p) => p.user?.user_type === 'ex_politician',
+    'media': (p) => p.user?.user_type === 'media'
+  };
+  
+  const filter = categoryMap[category];
+  if (!filter) return [];
+  
+  const filtered = allPosts.filter(filter);
+  return filtered.slice(0, 20);
 };

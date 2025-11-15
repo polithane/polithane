@@ -12,6 +12,12 @@ export const Avatar = ({
   const sizeNum = parseInt(size);
   const badgeSize = sizeNum * 0.3;
   
+  const getAvatarUrl = (url) => {
+    if (url && !url.includes('placeholder') && !url.includes('pravatar')) return url;
+    const userId = url?.match(/\d+/)?.[0] || Math.floor(Math.random() * 70) + 1;
+    return `https://i.pravatar.cc/150?img=${userId}`;
+  };
+
   return (
     <div 
       className={clsx('relative inline-block', onClick && 'cursor-pointer', className)}
@@ -19,11 +25,11 @@ export const Avatar = ({
       onClick={onClick}
     >
       <img
-        src={src || '/assets/default-avatar.png'}
+        src={getAvatarUrl(src) || 'https://i.pravatar.cc/150?img=1'}
         alt={alt}
         className="w-full h-full rounded-full object-cover border-2 border-gray-200"
         onError={(e) => {
-          e.target.src = '/assets/default-avatar.png';
+          e.target.src = 'https://i.pravatar.cc/150?img=1';
         }}
       />
       {verified && (
