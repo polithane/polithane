@@ -79,7 +79,7 @@ export const PostDetailPage = () => {
             {/* Gündem */}
             {post.agenda_tag && (
               <Badge variant="primary" className="mb-4">
-                #{post.agenda_tag}
+                {post.agenda_tag}
               </Badge>
             )}
             
