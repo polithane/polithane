@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Search, Bell, MessageCircle, User, LogIn } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
+import { AnimatedSlogan } from '../common/AnimatedSlogan';
 import { useNavigate } from 'react-router-dom';
 
 export const Header = () => {
@@ -13,14 +14,12 @@ export const Header = () => {
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-200 h-[60px]">
       <div className="container-main h-full flex items-center justify-between">
-        {/* Logo */}
+        {/* Logo ve Slogan */}
         <div 
           className="cursor-pointer flex items-center"
           onClick={() => navigate('/')}
         >
-          <div className="text-2xl font-bold text-primary-blue">
-            POLITHANE
-          </div>
+          <AnimatedSlogan />
         </div>
         
         {/* Sağ Aksiyonlar */}
