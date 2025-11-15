@@ -35,7 +35,7 @@ export const AgendaDetailPage = () => {
         {/* Gündem Header */}
         <div className="card mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold">#{agenda.agenda_title}</h1>
+            <h1 className="text-3xl font-bold">{agenda.agenda_title}</h1>
             <Button variant="outline">Takip Et</Button>
           </div>
           

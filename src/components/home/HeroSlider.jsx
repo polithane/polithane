@@ -45,7 +45,7 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
             <div>
               <div className="font-semibold text-sm">{currentPost.user?.full_name}</div>
               <Badge variant="primary" size="small" className="mt-1">
-                #{currentPost.agenda_tag}
+                {currentPost.agenda_tag}
               </Badge>
             </div>
           </div>

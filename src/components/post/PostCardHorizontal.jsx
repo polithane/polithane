@@ -142,7 +142,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       {post.agenda_tag && (
         <div className="mb-2">
           <Badge variant="primary" size="small">
-            #{post.agenda_tag}
+            {post.agenda_tag}
           </Badge>
         </div>
       )}

@@ -127,7 +127,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
       {post.agenda_tag && (
         <div className="mb-3">
           <Badge variant="primary" size="small">
-            #{post.agenda_tag}
+            {post.agenda_tag}
           </Badge>
         </div>
       )}
