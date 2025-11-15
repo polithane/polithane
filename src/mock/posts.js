@@ -192,7 +192,19 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
     'Vatandaşlarımızın sorunlarını çözmek için çalışıyoruz.'
   ];
   
-  const posts = [...mockPosts];
+  // İlk 10 post'u mockPosts'tan al ve user referanslarını doldur
+  const initialPosts = mockPosts.map(post => {
+    const user = users.find(u => u.user_id === post.user_id) || users[0];
+    return {
+      ...post,
+      user: {
+        ...user,
+        party: user.party_id ? parties.find(p => p.party_id === user.party_id) : null
+      }
+    };
+  });
+  
+  const posts = [...initialPosts];
   
   for (let i = 11; i <= count; i++) {
     const contentType = contentTypes[Math.floor(Math.random() * contentTypes.length)];
