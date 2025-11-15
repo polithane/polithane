@@ -45,7 +45,7 @@ export const HomePage = () => {
         <AgendaBar agendas={agendas} />
         
         {/* Ana İçerik Alanı */}
-        <div className="grid grid-cols-1 lg:grid-cols-[800px_175px] gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[800px_175px] gap-8 lg:pr-0">
           {/* Sol Ana Kolon */}
           <div className="space-y-8">
             {/* VEKİLLER KONUŞUYOR */}
@@ -141,7 +141,7 @@ export const HomePage = () => {
           </div>
           
           {/* Sağ Medya Sidebar */}
-          <aside className="hidden lg:block">
+          <aside className="hidden lg:block lg:mr-0">
             <div className="sticky top-20">
               <h2 className="text-lg font-bold text-gray-900 mb-4">MEDYA KONUŞUYOR</h2>
               <MediaSidebar posts={posts} />
