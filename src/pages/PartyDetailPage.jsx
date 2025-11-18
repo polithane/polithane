@@ -50,14 +50,21 @@ export const PartyDetailPage = () => {
         />
         <div className="container-main py-6">
           <div className="flex items-start gap-6">
-            <img 
-              src={party.party_logo} 
-              alt={party.party_name}
-              className="w-24 h-24 object-contain"
-            />
+            {/* Parti Logosu - TAM BOYUT 200x200px */}
+            <div className="w-52 h-52 bg-white rounded-xl border-2 border-gray-200 shadow-md flex items-center justify-center p-4 flex-shrink-0">
+              <img 
+                src={party.party_logo} 
+                alt={party.party_name}
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div class="text-gray-400 text-center text-sm">Logo yüklenemedi</div>';
+                }}
+              />
+            </div>
             <div className="flex-1">
               <h1 className="text-3xl font-bold mb-2">{party.party_name}</h1>
-              <p className="text-gray-600 mb-4">({party.party_short_name})</p>
+              <p className="text-gray-600 mb-4 text-xl">({party.party_short_name})</p>
               <p className="text-sm text-gray-500">
                 Kuruluş: {formatDate(party.foundation_date)}
               </p>
