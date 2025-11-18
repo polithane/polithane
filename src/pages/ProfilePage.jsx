@@ -43,15 +43,15 @@ export const ProfilePage = () => {
               partyLogo={user.party_id ? user.party?.party_logo : null}
             />
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <h1 className="text-3xl font-bold">{user.full_name}</h1>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <h1 className="text-2xl md:text-3xl font-bold break-words">{user.full_name}</h1>
                 {user.verification_badge && <Badge variant="primary">Doğrulanmış</Badge>}
                 {user.party_id && user.party?.party_short_name && (
                   <Badge variant="secondary">{user.party.party_short_name}</Badge>
                 )}
               </div>
-              <p className="text-gray-600 mb-2">@{user.username}</p>
-              {user.bio && <p className="text-gray-800 mb-4">{user.bio}</p>}
+              <p className="text-gray-600 mb-2 break-words">@{user.username}</p>
+              {user.bio && <p className="text-gray-800 mb-4 break-words">{user.bio}</p>}
               
               {/* İstatistikler */}
               <div className="flex gap-8 mt-4">

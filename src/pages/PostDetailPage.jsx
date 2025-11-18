@@ -48,13 +48,13 @@ export const PostDetailPage = () => {
                 partyLogo={post.user?.party_id ? post.user?.party?.party_logo : null}
               />
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-lg">{post.user?.full_name}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-lg break-words">{post.user?.full_name}</h3>
                   {post.user?.party_id && post.user?.party?.party_short_name && (
                     <Badge variant="secondary" size="small">{post.user.party.party_short_name}</Badge>
                   )}
                 </div>
-                <p className="text-sm text-gray-500">{formatDate(post.created_at)}</p>
+                <p className="text-sm text-gray-500 break-words">{formatDate(post.created_at)}</p>
               </div>
               <Button variant="outline" onClick={() => navigate(`/profile/${post.user_id}`)}>
                 Takip Et

@@ -53,21 +53,21 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             partyLogo={post.user?.party_id ? post.user?.party?.party_logo : null}
           />
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-sm text-gray-900 truncate">
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="font-semibold text-sm text-gray-900 break-words">
                 {post.user?.full_name}
               </span>
               {showPartyLogo && post.user?.party_id && (
-                <span className="text-xs text-gray-600">
+                <span className="text-xs text-gray-600 flex-shrink-0">
                   {post.user?.party?.party_short_name}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
+            <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
               {showCity && post.user?.city_code && (
-                <span>{post.user.city_code}</span>
+                <span className="flex-shrink-0">{post.user.city_code}</span>
               )}
-              <span>{formatTimeAgo(post.created_at)}</span>
+              <span className="flex-shrink-0">{formatTimeAgo(post.created_at)}</span>
             </div>
           </div>
         </div>

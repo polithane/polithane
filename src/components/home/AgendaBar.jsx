@@ -13,17 +13,17 @@ export const AgendaBar = ({ agendas = [] }) => {
   const secondRow = trendingAgendas.slice(5, 10);
   
   const AgendaButton = ({ agenda, index }) => {
-    // İlk 3 gündem için ateş ikonu
+    // İlk 3 gündem için ateş ikonu - FARKLI HIZ ANİMASYONLARI
     let fireIcon = null;
     if (index === 0) {
-      // 1. en sıcak - büyük ateş (20px)
-      fireIcon = <Flame className="w-5 h-5 text-red-500 animate-pulse" fill="currentColor" />;
+      // 1. en sıcak - büyük ateş - ÇOK HIZLI yanıp sönme (0.5s)
+      fireIcon = <Flame className="w-5 h-5 text-red-500" fill="currentColor" style={{animation: 'pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     } else if (index === 1) {
-      // 2. orta sıcak - orta ateş (birincinin biraz küçüğü - 17px)
-      fireIcon = <Flame className="w-[17px] h-[17px] text-red-500 animate-pulse" fill="currentColor" />;
+      // 2. orta sıcak - orta ateş - ORTA HIZLI (1s)
+      fireIcon = <Flame className="w-[17px] h-[17px] text-red-500" fill="currentColor" style={{animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     } else if (index === 2) {
-      // 3. hafif sıcak - küçük ateş (14px)
-      fireIcon = <Flame className="w-3.5 h-3.5 text-yellow-500 animate-pulse" fill="currentColor" />;
+      // 3. hafif sıcak - küçük ateş - YAVAŞ (1.5s)
+      fireIcon = <Flame className="w-3.5 h-3.5 text-yellow-500" fill="currentColor" style={{animation: 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     }
     
     return (
@@ -58,8 +58,24 @@ export const AgendaBar = ({ agendas = [] }) => {
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-gray-700">GÜNDEM</h3>
       </div>
-      <div className="space-y-2">
-        {/* İlk Satır - 5 gündem, buton yok */}
+      
+      {/* MOBİL İÇİN: Yatay kaydırılabilir tek satır */}
+      <div className="md:hidden">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+          {trendingAgendas.map((agenda, index) => (
+            <div key={agenda.agenda_id} className="snap-start flex-shrink-0 w-[85%]">
+              <AgendaButton agenda={agenda} index={index} />
+            </div>
+          ))}
+          <div className="snap-start flex-shrink-0">
+            <AllAgendasButton />
+          </div>
+        </div>
+      </div>
+      
+      {/* DESKTOP İÇİN: 2 satır grid */}
+      <div className="hidden md:block space-y-2">
+        {/* İlk Satır - 5 gündem */}
         <div className="flex gap-2 pb-2">
           {firstRow.map((agenda, index) => (
             <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index} />

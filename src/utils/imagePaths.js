@@ -83,9 +83,27 @@ export const getPartyLogoPath = (partyShortName = null, partyId = null) => {
     return '/assets/default/party_logo.png';
   }
   
-  // Parti kısa adını dosya adına çevir
-  const fileName = partyShortName 
-    ? partyShortName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '.png'
+  // Parti kısa adı mapping (dosya isimleriyle tam eşleşme)
+  const partyFileMap = {
+    'AK PARTİ': 'ak_parti',
+    'CHP': 'chp',
+    'DEM Parti': 'dem_parti',
+    'MHP': 'mhp',
+    'İYİ PARTİ': 'iyi_parti',
+    'YENİ YOL': 'yeni_yol',
+    'YRP': 'yrp',
+    'HÜRDAVA': 'hurdava',
+    'TİP': 'tip',
+    'DBP': 'dbp',
+    'EMEP': 'emep',
+    'SAADET': 'saadet',
+    'DSP': 'dsp',
+    'DP': 'dp',
+    'BAĞIMSIZ': 'bagimsiz'
+  };
+  
+  const fileName = partyShortName && partyFileMap[partyShortName]
+    ? partyFileMap[partyShortName] + '.png'
     : `party_${partyId}.png`;
   
   return `/assets/parties/logos/${fileName}`;

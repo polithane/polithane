@@ -7,7 +7,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   if (!parliamentData || parliamentData.length === 0) return null;
   
   return (
-    <div className="mb-4">
+    <div className="mb-4 hidden md:block">
       <h3 className="text-sm font-semibold text-gray-700 mb-2">MECLİS DAĞILIMI</h3>
       <div className="flex h-24 overflow-hidden rounded-lg border border-gray-300 w-full">
         {parliamentData.map((party, index) => {
