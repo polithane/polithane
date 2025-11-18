@@ -54,7 +54,7 @@ export const HomePage = () => {
         {agendas.length > 0 && <AgendaBar agendas={agendas} />}
         
         {/* Ana İçerik Alanı */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_170px] gap-4 lg:pr-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-4 lg:pr-0">
           {/* Sol Ana Kolon */}
           <div className="space-y-8 min-w-0">
             {/* VEKİLLER KONUŞUYOR */}

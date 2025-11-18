@@ -14,7 +14,7 @@ export default {
         'neutral-anthracite': '#2B2B2B',
       },
       maxWidth: {
-        'content': '1030px',
+        'content': '1230px',
       },
       spacing: {
         '4': '4px',

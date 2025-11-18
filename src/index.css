@@ -19,7 +19,7 @@
 
 @layer components {
   .container-main {
-    @apply max-w-[1030px] mx-auto px-4 lg:px-4;
+    @apply max-w-[1230px] mx-auto px-4 lg:px-4;
   }
   
   .btn-primary {
