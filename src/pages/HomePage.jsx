@@ -9,6 +9,7 @@ import { mockPosts, generateMockPosts, getCategoryPosts } from '../mock/posts';
 import { mockParties } from '../mock/parties';
 import { mockAgendas } from '../mock/agendas';
 import { mockUsers } from '../mock/users';
+import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 
 export const HomePage = () => {
   const [posts, setPosts] = useState([]);
@@ -49,8 +50,8 @@ export const HomePage = () => {
         {/* Manşet Slayt */}
         {featuredPosts.length > 0 && <HeroSlider posts={featuredPosts} />}
         
-        {/* Parti Bayrakları */}
-        {parties.length > 0 && <ParliamentBar parties={parties} totalSeats={600} />}
+        {/* Parti Bayrakları - Meclis Dağılımı */}
+        <ParliamentBar parliamentData={currentParliamentDistribution} totalSeats={totalSeats} />
         
         {/* Gündem Bar */}
         {agendas.length > 0 && <AgendaBar agendas={agendas} />}
