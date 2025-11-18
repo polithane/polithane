@@ -185,7 +185,21 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
   
   // İlk 10 post'u mockPosts'tan al ve user referanslarını doldur
   const initialPosts = mockPosts.map(post => {
-    const user = users.find(u => u.user_id === post.user_id) || users[0];
+    // user_id'yi doğru şekilde bul
+    let user = users.find(u => u.user_id === post.user_id);
+    // Eğer bulunamazsa, geçerli bir user seç
+    if (!user) {
+      // Milletvekili kullanıcılarından birini seç
+      const mpUsers = users.filter(u => u.user_type === 'politician' && u.politician_type === 'mp');
+      user = mpUsers.length > 0 ? mpUsers[Math.floor(Math.random() * mpUsers.length)] : users[0] || null;
+    }
+    if (!user) {
+      // Fallback: boş bir user objesi
+      return {
+        ...post,
+        user: null
+      };
+    }
     return {
       ...post,
       user: {
