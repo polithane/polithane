@@ -37,29 +37,19 @@ export const HorizontalScroll = ({
       const containerWidth = containerRef.current.clientWidth;
       const gap = 16; // gap-4 = 16px
       const totalGaps = (targetItems - 1) * gap;
-      const availableWidth = containerWidth - totalGaps;
+      const calculatedWidth = (containerWidth - totalGaps) / targetItems;
       
-      // Kaç kart sığacağını hesapla
-      const testItemWidth = 200; // yaklaşık bir kart genişliği
-      const itemsThatFit = Math.floor((containerWidth + gap) / (testItemWidth + gap));
-      
-      // Eğer hedef sayıdan fazla sığıyorsa, tam sayıya yuvarla
-      let actualItems = targetItems;
-      if (itemsThatFit < targetItems) {
-        actualItems = Math.max(1, Math.floor(itemsThatFit));
-      }
-      
-      // Kart genişliğini hesapla - tüm alanı doldur
-      const actualGaps = (actualItems - 1) * gap;
-      const calculatedWidth = (containerWidth - actualGaps) / actualItems;
-      
-      setActualItemsCount(actualItems);
       setItemWidth(calculatedWidth);
     };
     
-    calculateItemWidth();
+    // İlk hesaplama
+    const timeoutId = setTimeout(calculateItemWidth, 0);
+    
     window.addEventListener('resize', calculateItemWidth);
-    return () => window.removeEventListener('resize', calculateItemWidth);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', calculateItemWidth);
+    };
   }, [itemsPerView]);
 
   useEffect(() => {

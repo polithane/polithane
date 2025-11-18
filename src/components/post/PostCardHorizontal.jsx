@@ -40,7 +40,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   return (
     <div 
       className={`card-hover ${fullWidth ? 'p-3 w-full flex-shrink' : 'p-4 flex-shrink-0'} cursor-pointer flex flex-col min-h-[400px]`}
-      style={fullWidth ? {} : { scrollSnapAlign: 'start' }}
+      style={fullWidth ? {} : { scrollSnapAlign: 'start', flexShrink: 0 }}
       onClick={() => navigate(`/post/${post.post_id}`)}
     >
       {/* Üst Bilgi */}
