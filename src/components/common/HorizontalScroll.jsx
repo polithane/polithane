@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { cloneElement } from 'react';
 
 export const HorizontalScroll = ({ 
   children, 
@@ -12,6 +13,28 @@ export const HorizontalScroll = ({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [screenSize, setScreenSize] = useState('desktop');
+  const [currentItemsPerView, setCurrentItemsPerView] = useState(itemsPerView.desktop);
+
+  // Ekran boyutunu tespit et
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width < 768) {
+        setScreenSize('mobile');
+        setCurrentItemsPerView(itemsPerView.mobile);
+      } else if (width < 1024) {
+        setScreenSize('tablet');
+        setCurrentItemsPerView(itemsPerView.tablet);
+      } else {
+        setScreenSize('desktop');
+        setCurrentItemsPerView(itemsPerView.desktop);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [itemsPerView]);
 
   useEffect(() => {
     const checkScroll = () => {
@@ -36,10 +59,7 @@ export const HorizontalScroll = ({
     const interval = setInterval(() => {
       if (scrollRef.current) {
         const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-        const items = screenSize === 'desktop' ? itemsPerView.desktop : 
-                     screenSize === 'tablet' ? itemsPerView.tablet : 
-                     itemsPerView.mobile;
-        const itemWidth = clientWidth / items;
+        const itemWidth = clientWidth / currentItemsPerView;
         const gap = 16;
         const scrollAmount = itemWidth + gap;
         const nextScroll = scrollLeft + scrollAmount;
@@ -53,15 +73,16 @@ export const HorizontalScroll = ({
     }, scrollInterval);
 
     return () => clearInterval(interval);
-  }, [autoScroll, scrollInterval, screenSize, itemsPerView]);
+  }, [autoScroll, scrollInterval, currentItemsPerView]);
 
   const scroll = (direction) => {
     if (!scrollRef.current) return;
-    const items = screenSize === 'desktop' ? itemsPerView.desktop : 
-                 screenSize === 'tablet' ? itemsPerView.tablet : 
-                 itemsPerView.mobile;
-    const itemWidth = scrollRef.current.clientWidth / items;
+
+    // TAM KART genişliğini hesapla
+    const containerWidth = scrollRef.current.clientWidth;
     const gap = 16;
+    const totalGapWidth = (currentItemsPerView - 1) * gap;
+    const itemWidth = (containerWidth - totalGapWidth) / currentItemsPerView;
     const scrollAmount = itemWidth + gap;
     
     scrollRef.current.scrollBy({
@@ -69,6 +90,16 @@ export const HorizontalScroll = ({
       behavior: 'smooth'
     });
   };
+
+  // Children'a itemsPerView prop'unu ekle
+  const childrenWithProps = Array.isArray(children) 
+    ? children.map((child, index) => 
+        cloneElement(child, { 
+          key: index, 
+          itemsPerView: currentItemsPerView 
+        })
+      )
+    : cloneElement(children, { itemsPerView: currentItemsPerView });
 
   return (
     <div className={`relative ${className}`}>
@@ -91,7 +122,7 @@ export const HorizontalScroll = ({
           scrollSnapType: 'x mandatory',
         }}
       >
-        {children}
+        {childrenWithProps}
       </div>
 
       {canScrollRight && (
