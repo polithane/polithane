@@ -39,7 +39,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   
   return (
     <div 
-      className={`card-hover ${fullWidth ? 'p-3 w-full flex-shrink' : 'p-4 flex-shrink-0 w-[calc((100%-48px)/2)] md:w-[calc((100%-64px)/3)] lg:w-[calc((100%-96px)/5)]'} cursor-pointer flex flex-col min-h-[400px]`}
+      className={`card-hover ${fullWidth ? 'p-3 w-full flex-shrink' : 'p-4 flex-shrink-0'} cursor-pointer flex flex-col min-h-[400px]`}
       style={fullWidth ? {} : { scrollSnapAlign: 'start' }}
       onClick={() => navigate(`/post/${post.post_id}`)}
     >
