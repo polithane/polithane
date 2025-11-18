@@ -40,7 +40,7 @@ export const HorizontalScroll = ({
       
       // Container genişliğini al ve kart genişliğini hesapla
       const containerWidth = containerRef.current.clientWidth;
-      const gap = 16;
+      const gap = 12; // gap-3 = 12px
       const totalGaps = (items - 1) * gap;
       const itemWidth = (containerWidth - totalGaps) / items;
       setCalculatedItemWidth(itemWidth);
@@ -84,7 +84,7 @@ export const HorizontalScroll = ({
       if (scrollRef.current) {
         const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
         const itemWidth = clientWidth / currentItemsPerView;
-        const gap = 16;
+        const gap = 12; // gap-3 = 12px
         const scrollAmount = itemWidth + gap;
         const nextScroll = scrollLeft + scrollAmount;
 
@@ -104,7 +104,7 @@ export const HorizontalScroll = ({
 
     // TAM KART genişliğini hesapla
     const containerWidth = scrollRef.current.clientWidth;
-    const gap = 16;
+    const gap = 12; // gap-3 = 12px
     const totalGapWidth = (currentItemsPerView - 1) * gap;
     const itemWidth = (containerWidth - totalGapWidth) / currentItemsPerView;
     const scrollAmount = itemWidth + gap;
@@ -155,7 +155,7 @@ export const HorizontalScroll = ({
       
       <div
         ref={scrollRef}
-        className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4"
+        className="flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth pb-4"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',

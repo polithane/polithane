@@ -68,7 +68,7 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: 4, tablet: 3, mobile: 2 }}
               >
                 {mpPosts.map(post => (
                   <PostCardHorizontal 
@@ -92,7 +92,7 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: 4, tablet: 3, mobile: 2 }}
               >
                 {organizationPosts.map(post => (
                   <PostCardHorizontal 
@@ -115,7 +115,7 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: 4, tablet: 3, mobile: 2 }}
               >
                 {citizenPosts.map(post => (
                   <PostCardHorizontal 
@@ -137,7 +137,7 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: 4, tablet: 3, mobile: 2 }}
               >
                 {exPoliticianPosts.map(post => (
                   <PostCardHorizontal 
