@@ -15,6 +15,7 @@ export const HomePage = () => {
   const [posts, setPosts] = useState([]);
   const [parties, setParties] = useState([]);
   const [agendas, setAgendas] = useState([]);
+  const [activeCategory, setActiveCategory] = useState('mps'); // Mobil için aktif kategori
   
   useEffect(() => {
     // Mock data loading simulation
@@ -55,6 +56,17 @@ export const HomePage = () => {
     ? posts.filter(p => p.is_featured).sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0)).slice(0, 5) 
     : [];
   
+  // Mobil için kategoriler
+  const categories = [
+    { id: 'mps', name: 'Vekiller', posts: mpPosts, color: 'rgba(0, 159, 214, 0.08)' },
+    { id: 'organization', name: 'Teşkilat', posts: organizationPosts, color: 'rgba(135, 180, 51, 0.08)' },
+    { id: 'citizens', name: 'Vatandaş', posts: citizenPosts, color: 'rgba(229, 229, 229, 0.5)' },
+    { id: 'experience', name: 'Deneyim', posts: exPoliticianPosts, color: 'rgba(212, 160, 23, 0.08)' },
+    { id: 'media', name: 'Medya', posts: mediaPosts, color: 'rgba(255, 193, 7, 0.1)' }
+  ];
+  
+  const activeTab = categories.find(c => c.id === activeCategory);
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-6 lg:pr-0">
@@ -67,12 +79,55 @@ export const HomePage = () => {
         {/* Gündem Bar */}
         {agendas.length > 0 && <AgendaBar agendas={agendas} />}
         
+        {/* MOBİL: Tab Navigation - Sticky */}
+        <div className="md:hidden sticky top-[72px] z-10 bg-gray-50 -mx-4 px-4 pb-3 mb-4 border-b border-gray-200">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`flex-shrink-0 px-4 py-2 rounded-full font-semibold text-sm transition-all ${
+                  activeCategory === cat.id
+                    ? 'bg-primary-blue text-white shadow-md'
+                    : 'bg-white text-gray-700 border border-gray-300'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        
         {/* Ana İçerik Alanı */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-4 lg:pr-0">
           {/* Sol Ana Kolon */}
           <div className="space-y-8 min-w-0">
-            {/* VEKİLLER KONUŞUYOR */}
-            <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(0, 159, 214, 0.08)' }}>
+            {/* MOBİL: Sadece Aktif Kategori */}
+            <div className="md:hidden">
+              {activeTab && (
+                <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: activeTab.color }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-gray-900">{activeTab.name.toUpperCase()} KONUŞUYOR</h2>
+                  </div>
+                  <div className="space-y-4">
+                    {activeTab.posts.slice(0, 10).map(post => (
+                      <PostCardHorizontal 
+                        key={post.post_id} 
+                        post={post}
+                        showCity={activeTab.id === 'mps'}
+                        showPartyLogo={activeTab.id !== 'citizens'}
+                        fullWidth={true}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+            
+            {/* DESKTOP: Tüm Kategoriler */}
+            <div className="hidden md:block space-y-8">
+              {/* VEKİLLER KONUŞUYOR */}
+              <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(0, 159, 214, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">VEKİLLER KONUŞUYOR</h2>
                 <a href="/category/mps" className="text-primary-blue hover:underline text-sm">
@@ -161,6 +216,7 @@ export const HomePage = () => {
                 ))}
               </HorizontalScroll>
             </section>
+            </div>
           </div>
           
           {/* Sağ Medya Sidebar */}
