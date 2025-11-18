@@ -70,11 +70,6 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
               <span className="font-semibold text-sm text-gray-900 break-words">
                 {post.user?.full_name}
               </span>
-              {showPartyLogo && post.user?.party_id && (
-                <span className="text-xs text-gray-600 flex-shrink-0">
-                  {post.user?.party?.party_short_name}
-                </span>
-              )}
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
               {showCity && post.user?.city_code && (
