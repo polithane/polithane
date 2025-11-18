@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
-import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { cloneElement } from 'react';
 
 export const HorizontalScroll = ({ 
   children, 
@@ -10,38 +10,33 @@ export const HorizontalScroll = ({
   className = ''
 }) => {
   const scrollRef = useRef(null);
-  const containerRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [screenSize, setScreenSize] = useState('desktop');
-  const [itemWidth, setItemWidth] = useState(null);
+  const [currentItemsPerView, setCurrentItemsPerView] = useState(itemsPerView.desktop);
 
+  // Ekran boyutunu tespit et
   useEffect(() => {
-    const calculateItemWidth = () => {
-      if (!containerRef.current) return;
-      
+    const handleResize = () => {
       const width = window.innerWidth;
-      let targetItems;
-      if (width >= 1024) {
-        setScreenSize('desktop');
-        targetItems = itemsPerView.desktop;
-      } else if (width >= 768) {
-        setScreenSize('tablet');
-        targetItems = itemsPerView.tablet;
-      } else {
+      if (width < 768) {
         setScreenSize('mobile');
-        targetItems = itemsPerView.mobile;
+        setCurrentItemsPerView(itemsPerView.mobile);
+      } else if (width < 1024) {
+        setScreenSize('tablet');
+        setCurrentItemsPerView(itemsPerView.tablet);
+      } else {
+        setScreenSize('desktop');
+        setCurrentItemsPerView(itemsPerView.desktop);
       }
-      
-      // Container'ın görünen genişliğini al
-      const containerWidth = containerRef.current.clientWidth;
-      const gap = 16; // gap-4 = 16px
-      const totalGaps = (targetItems - 1) * gap;
-      const calculatedWidth = (containerWidth - totalGaps) / targetItems;
-      
-      setItemWidth(calculatedWidth);
     };
 
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [itemsPerView]);
+
+  useEffect(() => {
     const checkScroll = () => {
       if (scrollRef.current) {
         const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
@@ -50,39 +45,21 @@ export const HorizontalScroll = ({
       }
     };
 
-    calculateItemWidth();
     checkScroll();
-    
-    const resizeObserver = new ResizeObserver(() => {
-      calculateItemWidth();
-      checkScroll();
-    });
-    
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
-    
-    window.addEventListener('resize', calculateItemWidth);
     const scrollElement = scrollRef.current;
     if (scrollElement) {
       scrollElement.addEventListener('scroll', checkScroll);
+      return () => scrollElement.removeEventListener('scroll', checkScroll);
     }
-    
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', calculateItemWidth);
-      if (scrollElement) {
-        scrollElement.removeEventListener('scroll', checkScroll);
-      }
-    };
-  }, [children, itemsPerView]);
+  }, [children]);
 
   useEffect(() => {
-    if (!autoScroll || !scrollRef.current || !itemWidth) return;
+    if (!autoScroll || !scrollRef.current) return;
 
     const interval = setInterval(() => {
       if (scrollRef.current) {
         const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+        const itemWidth = clientWidth / currentItemsPerView;
         const gap = 16;
         const scrollAmount = itemWidth + gap;
         const nextScroll = scrollLeft + scrollAmount;
@@ -96,11 +73,16 @@ export const HorizontalScroll = ({
     }, scrollInterval);
 
     return () => clearInterval(interval);
-  }, [autoScroll, scrollInterval, itemWidth]);
+  }, [autoScroll, scrollInterval, currentItemsPerView]);
 
   const scroll = (direction) => {
-    if (!scrollRef.current || !itemWidth) return;
+    if (!scrollRef.current) return;
+
+    // TAM KART genişliğini hesapla
+    const containerWidth = scrollRef.current.clientWidth;
     const gap = 16;
+    const totalGapWidth = (currentItemsPerView - 1) * gap;
+    const itemWidth = (containerWidth - totalGapWidth) / currentItemsPerView;
     const scrollAmount = itemWidth + gap;
     
     scrollRef.current.scrollBy({
@@ -109,8 +91,18 @@ export const HorizontalScroll = ({
     });
   };
 
+  // Children'a itemsPerView prop'unu ekle
+  const childrenWithProps = Array.isArray(children) 
+    ? children.map((child, index) => 
+        cloneElement(child, { 
+          key: index, 
+          itemsPerView: currentItemsPerView 
+        })
+      )
+    : cloneElement(children, { itemsPerView: currentItemsPerView });
+
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
+    <div className={`relative ${className}`}>
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
@@ -130,21 +122,7 @@ export const HorizontalScroll = ({
           scrollSnapType: 'x mandatory',
         }}
       >
-        {itemWidth && React.Children.map(children, (child) => {
-          if (React.isValidElement(child)) {
-            return React.cloneElement(child, {
-              style: { 
-                ...child.props.style,
-                width: `${itemWidth}px`,
-                minWidth: `${itemWidth}px`,
-                maxWidth: `${itemWidth}px`,
-                flexShrink: 0
-              }
-            });
-          }
-          return child;
-        })}
-        {!itemWidth && children}
+        {childrenWithProps}
       </div>
 
       {canScrollRight && (

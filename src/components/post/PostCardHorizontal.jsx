@@ -6,7 +6,7 @@ import { getPlaceholderImage } from '../../utils/imagePaths';
 import { useNavigate } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
 
-export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = false, fullWidth = false }) => {
+export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = false, fullWidth = false, itemsPerView = 5 }) => {
   const navigate = useNavigate();
   
   const getContentIcon = () => {
@@ -36,11 +36,19 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
     // Placeholder kullan
     return getPlaceholderImage('avatar', post.user_id || 1);
   };
+
+  // Dinamik genişlik hesaplama - tam sayıda kart göstermek için
+  const cardWidthStyle = fullWidth 
+    ? { width: '100%' }
+    : { 
+        width: `calc((100% - ${(itemsPerView - 1) * 16}px) / ${itemsPerView})`,
+        minWidth: `calc((100% - ${(itemsPerView - 1) * 16}px) / ${itemsPerView})`
+      };
   
   return (
     <div 
-      className={`card-hover ${fullWidth ? 'p-3 w-full flex-shrink' : 'p-4 flex-shrink-0'} cursor-pointer flex flex-col min-h-[400px]`}
-      style={fullWidth ? {} : { scrollSnapAlign: 'start' }}
+      className={`card-hover ${fullWidth ? 'p-3 w-full' : 'p-4'} flex-shrink-0 cursor-pointer flex flex-col min-h-[400px]`}
+      style={fullWidth ? {} : { ...cardWidthStyle, scrollSnapAlign: 'start' }}
       onClick={() => navigate(`/post/${post.post_id}`)}
     >
       {/* Üst Bilgi */}
