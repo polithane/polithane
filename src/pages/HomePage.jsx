@@ -161,6 +161,32 @@ export const HomePage = () => {
             
             {/* DESKTOP: Tüm Kategoriler */}
             <div className="hidden md:block space-y-8">
+              {/* HİT GÜNDEMLER - KARİŞİK İÇERİKLER */}
+              <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(255, 215, 0, 0.08)' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">🔥</span>
+                    <h2 className="text-xl font-bold text-gray-900">HİT GÜNDEMLER</h2>
+                    <span className="text-sm text-gray-500 font-medium">Tüm Kategorilerden</span>
+                  </div>
+                  <span className="text-sm text-gray-500">Her Kategoriden Karışık</span>
+                </div>
+                <HorizontalScroll 
+                  autoScroll={true} 
+                  scrollInterval={4000}
+                  itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                >
+                  {allPosts.slice(0, 30).map(post => (
+                    <PostCardHorizontal 
+                      key={post.post_id} 
+                      post={post}
+                      showCity={post.user?.politician_type === 'mp'}
+                      showPartyLogo={post.user?.user_type !== 'normal'}
+                    />
+                  ))}
+                </HorizontalScroll>
+              </section>
+              
               {/* VEKİLLER KONUŞUYOR */}
               <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(0, 159, 214, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
