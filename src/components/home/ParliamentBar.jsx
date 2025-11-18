@@ -34,7 +34,19 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               title={`${party.name} - ${party.seats} sandalye (${widthPercentage.toFixed(1)}%) - Tıklayın`}
               onClick={() => navigate(`/party/${index + 1}`)}
             >
-              {/* Bayrak/logo görsel olarak parti kimliğini gösteriyor - yazı yok */}
+              {/* Parti kısa adı - sadece yeterince geniş alanlarda göster (yazı sığıyorsa) */}
+              {widthPercentage > 5 && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span 
+                    className="text-white text-xs font-bold drop-shadow-lg px-1 text-center"
+                    style={{
+                      textShadow: '1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8)'
+                    }}
+                  >
+                    {party.shortName}
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
