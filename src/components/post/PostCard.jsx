@@ -26,13 +26,13 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
       className="card-hover p-4 mb-4 w-full relative"
       onClick={() => navigate(`/post/${post.post_id}`)}
     >
-      {/* Parti Logosu - SAĞ ÜST KÖŞE - 3 KAT BÜYÜK */}
+      {/* Parti Logosu - SAĞ ÜST KÖŞE - Responsive */}
       {post.user?.party_id && post.user?.party?.party_logo && (
         <div className="absolute top-4 right-4 z-10">
           <img 
             src={post.user.party.party_logo} 
             alt={post.user.party.party_short_name}
-            className="w-48 h-48 object-contain drop-shadow-lg"
+            className="w-5 h-5 sm:w-6 sm:h-6 md:w-[25px] md:h-[25px] object-contain drop-shadow-md"
             onError={(e) => {
               e.target.style.display = 'none';
             }}
@@ -41,7 +41,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
       )}
       
       {/* Üst Bilgi */}
-      <div className="flex items-start justify-between mb-3 pr-52">
+      <div className="flex items-start justify-between mb-3 pr-10">
         <div className="flex items-center gap-3 flex-1">
           <Avatar 
             src={post.user?.profile_image} 

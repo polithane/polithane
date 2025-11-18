@@ -63,11 +63,16 @@ export const PartyDetailPage = () => {
               />
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-2">{party.party_name}</h1>
-              <p className="text-gray-600 mb-4 text-xl">({party.party_short_name})</p>
-              <p className="text-sm text-gray-500">
-                Kuruluş: {formatDate(party.foundation_date)}
-              </p>
+              <h1 className="text-4xl md:text-5xl font-bold mb-3">{party.party_name}</h1>
+              <p className="text-gray-600 mb-6 text-2xl md:text-3xl font-semibold">({party.party_short_name})</p>
+              <div className="space-y-2">
+                <p className="text-lg text-gray-600">
+                  <span className="font-semibold">Kuruluş:</span> {formatDate(party.foundation_date)}
+                </p>
+                <p className="text-lg text-gray-600">
+                  <span className="font-semibold">Meclis Sandalyesi:</span> {party.parliament_seats}
+                </p>
+              </div>
             </div>
           </div>
         </div>

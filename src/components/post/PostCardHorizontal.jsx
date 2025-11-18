@@ -43,13 +43,13 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       style={fullWidth ? {} : { scrollSnapAlign: 'start', ...style }}
       onClick={() => navigate(`/post/${post.post_id}`)}
     >
-      {/* Parti Logosu - SAĞ ÜST KÖŞE - 3 KAT BÜYÜK */}
+      {/* Parti Logosu - SAĞ ÜST KÖŞE - Responsive */}
       {post.user?.party_id && post.user?.party?.party_logo && (
         <div className="absolute top-3 right-3 z-10">
           <img 
             src={post.user.party.party_logo} 
             alt={post.user.party.party_short_name}
-            className="w-36 h-36 object-contain drop-shadow-lg"
+            className="w-4 h-4 sm:w-5 sm:h-5 md:w-[20px] md:h-[20px] object-contain drop-shadow-md"
             onError={(e) => {
               e.target.style.display = 'none';
             }}
@@ -58,7 +58,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       )}
       
       {/* Üst Bilgi */}
-      <div className="flex items-start justify-between mb-3 pr-40">
+      <div className="flex items-start justify-between mb-3 pr-8">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Avatar 
             src={getAvatarUrl(post.user?.profile_image)} 
