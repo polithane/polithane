@@ -7,23 +7,23 @@ export const AgendaBar = ({ agendas = [] }) => {
   
   if (!agendas || agendas.length === 0) return null;
   
-  // Birinci satır: 5 gündem, İkinci satır: 4 gündem + TÜM GÜNDEME BAK butonu
-  const trendingAgendas = agendas.slice(0, 9); // 9 gündem
-  const firstRow = trendingAgendas.slice(0, 5);
-  const secondRow = trendingAgendas.slice(5, 9);
+  // Birinci satır: 4 gündem, İkinci satır: 3 gündem + TÜM GÜNDEME BAK butonu
+  const trendingAgendas = agendas.slice(0, 7); // 7 gündem
+  const firstRow = trendingAgendas.slice(0, 4);
+  const secondRow = trendingAgendas.slice(4, 7);
   
   const AgendaButton = ({ agenda, index }) => {
     // İlk 3 gündem için ateş ikonu
     let fireIcon = null;
     if (index === 0) {
-      // 1. en sıcak - büyük ateş
+      // 1. en sıcak - büyük ateş (20px)
       fireIcon = <Flame className="w-5 h-5 text-red-500 animate-pulse" fill="currentColor" />;
     } else if (index === 1) {
-      // 2. orta sıcak - orta ateş
-      fireIcon = <Flame className="w-4 h-4 text-orange-500 animate-pulse" fill="currentColor" />;
+      // 2. orta sıcak - orta ateş (birincinin biraz küçüğü - 17px)
+      fireIcon = <Flame className="w-[17px] h-[17px] text-red-500 animate-pulse" fill="currentColor" />;
     } else if (index === 2) {
-      // 3. hafif sıcak - küçük ateş
-      fireIcon = <Flame className="w-3 h-3 text-yellow-500 animate-pulse" fill="currentColor" />;
+      // 3. hafif sıcak - küçük ateş (14px)
+      fireIcon = <Flame className="w-3.5 h-3.5 text-yellow-500 animate-pulse" fill="currentColor" />;
     }
     
     return (
@@ -59,18 +59,18 @@ export const AgendaBar = ({ agendas = [] }) => {
         <h3 className="text-sm font-semibold text-gray-700">GÜNDEM</h3>
       </div>
       <div className="space-y-2">
-        {/* İlk Satır - 5 gündem, buton yok */}
+        {/* İlk Satır - 4 gündem, buton yok */}
         <div className="flex gap-2 pb-2 overflow-x-auto scrollbar-hide">
           {firstRow.map((agenda, index) => (
             <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index} />
           ))}
         </div>
         
-        {/* İkinci Satır - 4 gündem + TÜM GÜNDEME BAK butonu */}
+        {/* İkinci Satır - 3 gündem + TÜM GÜNDEME BAK butonu */}
         {secondRow.length > 0 && (
           <div className="flex gap-2 pb-2 overflow-x-auto scrollbar-hide">
             {secondRow.map((agenda, index) => (
-              <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index + 5} />
+              <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index + 4} />
             ))}
             <AllAgendasButton />
           </div>
