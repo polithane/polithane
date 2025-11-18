@@ -10,30 +10,54 @@ export const HorizontalScroll = ({
   className = ''
 }) => {
   const scrollRef = useRef(null);
+  const containerRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [screenSize, setScreenSize] = useState('desktop');
   const [currentItemsPerView, setCurrentItemsPerView] = useState(itemsPerView.desktop);
+  const [calculatedItemWidth, setCalculatedItemWidth] = useState(null);
 
-  // Ekran boyutunu tespit et
+  // Ekran boyutunu tespit et ve kart genişliğini hesapla
   useEffect(() => {
-    const handleResize = () => {
+    const calculateWidth = () => {
+      if (!containerRef.current) return;
+      
       const width = window.innerWidth;
+      let items;
       if (width < 768) {
         setScreenSize('mobile');
-        setCurrentItemsPerView(itemsPerView.mobile);
+        items = itemsPerView.mobile;
+        setCurrentItemsPerView(items);
       } else if (width < 1024) {
         setScreenSize('tablet');
-        setCurrentItemsPerView(itemsPerView.tablet);
+        items = itemsPerView.tablet;
+        setCurrentItemsPerView(items);
       } else {
         setScreenSize('desktop');
-        setCurrentItemsPerView(itemsPerView.desktop);
+        items = itemsPerView.desktop;
+        setCurrentItemsPerView(items);
       }
+      
+      // Container genişliğini al ve kart genişliğini hesapla
+      const containerWidth = containerRef.current.clientWidth;
+      const gap = 16;
+      const totalGaps = (items - 1) * gap;
+      const itemWidth = (containerWidth - totalGaps) / items;
+      setCalculatedItemWidth(itemWidth);
     };
 
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    calculateWidth();
+    window.addEventListener('resize', calculateWidth);
+    
+    const resizeObserver = new ResizeObserver(calculateWidth);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', calculateWidth);
+      resizeObserver.disconnect();
+    };
   }, [itemsPerView]);
 
   useEffect(() => {
@@ -91,18 +115,34 @@ export const HorizontalScroll = ({
     });
   };
 
-  // Children'a itemsPerView prop'unu ekle
-  const childrenWithProps = Array.isArray(children) 
-    ? children.map((child, index) => 
-        cloneElement(child, { 
-          key: index, 
-          itemsPerView: currentItemsPerView 
-        })
-      )
-    : cloneElement(children, { itemsPerView: currentItemsPerView });
+  // Children'a genişlik style'ı ekle
+  const childrenWithWidth = calculatedItemWidth 
+    ? (Array.isArray(children) 
+        ? children.map((child, index) => 
+            cloneElement(child, { 
+              key: child.key || index,
+              style: { 
+                ...child.props.style,
+                width: `${calculatedItemWidth}px`,
+                minWidth: `${calculatedItemWidth}px`,
+                maxWidth: `${calculatedItemWidth}px`,
+                flexShrink: 0
+              }
+            })
+          )
+        : cloneElement(children, {
+            style: { 
+              ...children.props.style,
+              width: `${calculatedItemWidth}px`,
+              minWidth: `${calculatedItemWidth}px`,
+              maxWidth: `${calculatedItemWidth}px`,
+              flexShrink: 0
+            }
+          }))
+    : children;
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative ${className}`} ref={containerRef}>
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
@@ -122,7 +162,7 @@ export const HorizontalScroll = ({
           scrollSnapType: 'x mandatory',
         }}
       >
-        {childrenWithProps}
+        {childrenWithWidth}
       </div>
 
       {canScrollRight && (
