@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { Flame } from 'lucide-react';
 import { formatPolitScore } from '../../utils/formatters';
 
 export const AgendaBar = ({ agendas = [] }) => {
@@ -6,31 +7,32 @@ export const AgendaBar = ({ agendas = [] }) => {
   
   if (!agendas || agendas.length === 0) return null;
   
-  // Birinci satır: 6 gündem, İkinci satır: 5 gündem + TÜM GÜNDEME BAK butonu
-  const trendingAgendas = agendas.slice(0, 11); // 11 gündem
-  const firstRow = trendingAgendas.slice(0, 6);
-  const secondRow = trendingAgendas.slice(6, 11);
+  // Birinci satır: 5 gündem, İkinci satır: 4 gündem + TÜM GÜNDEME BAK butonu
+  const trendingAgendas = agendas.slice(0, 9); // 9 gündem
+  const firstRow = trendingAgendas.slice(0, 5);
+  const secondRow = trendingAgendas.slice(5, 9);
   
   const AgendaButton = ({ agenda, index }) => {
-    // İlk 3 gündem için sıcak gündem efekti
-    let hotEffect = '';
+    // İlk 3 gündem için ateş ikonu
+    let fireIcon = null;
     if (index === 0) {
-      // 1. sıcak gündem - en güçlü (kırmızı ton, glow)
-      hotEffect = 'border-red-500 bg-red-50 shadow-lg shadow-red-200';
+      // 1. en sıcak - büyük ateş
+      fireIcon = <Flame className="w-5 h-5 text-red-500 animate-pulse" fill="currentColor" />;
     } else if (index === 1) {
-      // 2. sıcak gündem - orta (turuncu ton)
-      hotEffect = 'border-orange-400 bg-orange-50 shadow-md shadow-orange-100';
+      // 2. orta sıcak - orta ateş
+      fireIcon = <Flame className="w-4 h-4 text-orange-500 animate-pulse" fill="currentColor" />;
     } else if (index === 2) {
-      // 3. sıcak gündem - hafif (sarı ton)
-      hotEffect = 'border-yellow-400 bg-yellow-50 shadow-md shadow-yellow-100';
+      // 3. hafif sıcak - küçük ateş
+      fireIcon = <Flame className="w-3 h-3 text-yellow-500 animate-pulse" fill="currentColor" />;
     }
     
     return (
       <button
         key={agenda.agenda_id}
         onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
-        className={`flex items-center gap-2 px-4 py-2 ${hotEffect || 'bg-white border-2 border-gray-300'} hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0`}
+        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0"
       >
+        {fireIcon && <span className="flex-shrink-0">{fireIcon}</span>}
         <span className="text-sm font-medium whitespace-nowrap text-left">
           {agenda.agenda_title}
         </span>
@@ -56,19 +58,19 @@ export const AgendaBar = ({ agendas = [] }) => {
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-gray-700">GÜNDEM</h3>
       </div>
-      <div className="space-y-2 overflow-hidden">
-        {/* İlk Satır - 6 gündem, buton yok */}
-        <div className="flex gap-2 pb-2 flex-wrap">
+      <div className="space-y-2">
+        {/* İlk Satır - 5 gündem, buton yok */}
+        <div className="flex gap-2 pb-2 overflow-x-auto scrollbar-hide">
           {firstRow.map((agenda, index) => (
             <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index} />
           ))}
         </div>
         
-        {/* İkinci Satır - 5 gündem + TÜM GÜNDEME BAK butonu */}
+        {/* İkinci Satır - 4 gündem + TÜM GÜNDEME BAK butonu */}
         {secondRow.length > 0 && (
-          <div className="flex gap-2 pb-2 flex-wrap">
+          <div className="flex gap-2 pb-2 overflow-x-auto scrollbar-hide">
             {secondRow.map((agenda, index) => (
-              <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index + 6} />
+              <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index + 5} />
             ))}
             <AllAgendasButton />
           </div>
