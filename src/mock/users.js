@@ -129,11 +129,13 @@ const mediaUsers = mediaOutlets.map((outlet, index) => ({
   created_at: new Date(Date.now() - Math.random() * 730 * 24 * 60 * 60 * 1000).toISOString()
 }));
 
-// Teşkilat kullanıcıları - 40 kişi (il/ilçe başkanları, MYK üyeleri, vb.)
-const organizationTypes = ['provincial_chair', 'district_chair', 'myk_member', 'vice_chair', 'other'];
+// Teşkilat kullanıcıları - 60 kişi (il/ilçe başkanları, belediye başkanları, MYK üyeleri, vb.)
+const organizationTypes = ['provincial_chair', 'district_chair', 'metropolitan_mayor', 'district_mayor', 'myk_member', 'vice_chair', 'other'];
 const organizationTitles = {
   'provincial_chair': 'İl Başkanı',
   'district_chair': 'İlçe Başkanı',
+  'metropolitan_mayor': 'Büyükşehir Belediye Başkanı',
+  'district_mayor': 'İlçe Belediye Başkanı',
   'myk_member': 'MYK Üyesi',
   'vice_chair': 'Genel Başkan Yardımcısı',
   'other': 'Parti Yöneticisi'
@@ -147,8 +149,15 @@ const organizationNames = [
   'Alper Bayram', 'Neslihan Koç', 'Selim Tan', 'Burcu Özer', 'İbrahim Sönmez',
   'Özge Türker', 'Hüseyin Aydın', 'Nilüfer Arslan', 'Ramazan Kurt', 'Serap Yılmaz',
   'Ömer Kaya', 'Yeşim Çelik', 'Tahir Şahin', 'Gülşah Doğan', 'Recep Özdemir',
-  'Sibel Yıldız', 'Kadir Aksoy', 'Tuğba Ergin', 'Mehmet Ali Tekin', 'Zehra Bulut'
+  'Sibel Yıldız', 'Kadir Aksoy', 'Tuğba Ergin', 'Mehmet Ali Tekin', 'Zehra Bulut',
+  'Mansur Yavaş', 'Ekrem İmamoğlu', 'Tunç Soyer', 'Ahmet Öküzcüoğlu', 'Mehmet Oktay',
+  'Fatma Şahin', 'Alinur Aktaş', 'Murat Kurum', 'Recep Gürkan', 'Mevlüt Uysal',
+  'Cemil Deveci', 'Hasan Can Kaya', 'İsmail Altay', 'Yusuf Bahadır', 'Canan Akın',
+  'Beyza Sarı', 'Deniz Çınar', 'Efe Yalçın', 'Gamze Toprak', 'Hüseyin Özkan'
 ];
+
+const cityCodes = ['34', '06', '35', '16', '07', '01', '27', '38', '26', '41', '58', '33', '42', '43', '44', '21', '22', '25', '28', '29', '31', '32', '36', '37', '39', '46', '47', '48', '52', '54'];
+const districtNames = ['Çankaya', 'Keçiören', 'Karşıyaka', 'Bornova', 'Konak', 'Muratpaşa', 'Kepez', 'Büyükçekmece', 'Kadıköy', 'Üsküdar', 'Beylikdüzü', 'Ataşehir', 'Maltepe'];
 
 const organizationUsers = organizationNames.map((name, index) => {
   const userId = mpUsers.length + mediaUsers.length + index + 1;
@@ -157,6 +166,13 @@ const organizationUsers = organizationNames.map((name, index) => {
   const firstName = name.split(' ')[0];
   const lastName = name.split(' ').slice(1).join(' ');
   const username = `${firstName.toLowerCase()}_${lastName.toLowerCase().replace(/\s+/g, '_')}_org`;
+  const cityCode = cityCodes[index % cityCodes.length];
+  const districtName = districtNames[index % districtNames.length];
+  
+  // Belediye başkanları için Polit Score daha yüksek
+  const isPolitScoreRange = ['metropolitan_mayor', 'district_mayor'].includes(orgType) 
+    ? { min: 15000, max: 40000 } 
+    : { min: 2000, max: 10000 };
   
   return {
     user_id: userId,
@@ -168,9 +184,11 @@ const organizationUsers = organizationNames.map((name, index) => {
     user_type: 'politician',
     politician_type: orgType,
     party_id: partyId,
+    city_code: cityCode,
+    district_name: orgType === 'district_mayor' ? districtName : null,
     verification_badge: true,
-    polit_score: Math.floor(Math.random() * 10000) + 2000,
-    follower_count: Math.floor(Math.random() * 30000) + 5000,
+    polit_score: Math.floor(Math.random() * (isPolitScoreRange.max - isPolitScoreRange.min)) + isPolitScoreRange.min,
+    follower_count: Math.floor(Math.random() * 50000) + 10000,
     following_count: Math.floor(Math.random() * 500) + 100,
     post_count: Math.floor(Math.random() * 300) + 50,
     created_at: new Date(Date.now() - Math.random() * 730 * 24 * 60 * 60 * 1000).toISOString()

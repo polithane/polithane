@@ -6,12 +6,14 @@
  * @param {string} cityCode - Şehir kodu (İl/İlçe başkanları için)
  * @returns {string} Türkçe ünvan
  */
-export const getPoliticianTitle = (politicianType, cityCode = null) => {
+export const getPoliticianTitle = (politicianType, cityCode = null, districtName = null) => {
   const titles = {
     'mp': 'Milletvekili',
     'party_chair': 'Genel Başkan',
     'provincial_chair': cityCode ? `${cityCode} İl Başkanı` : 'İl Başkanı',
     'district_chair': 'İlçe Başkanı',
+    'metropolitan_mayor': 'Büyükşehir Belediye Başkanı',
+    'district_mayor': districtName ? `${districtName} Belediye Başkanı` : 'İlçe Belediye Başkanı',
     'myk_member': 'MYK Üyesi',
     'vice_chair': 'Genel Başkan Yardımcısı',
     'other': 'Parti Yöneticisi'
@@ -29,7 +31,7 @@ export const getUserTitle = (user) => {
   if (!user) return null;
   
   if (user.user_type === 'politician' && user.politician_type) {
-    return getPoliticianTitle(user.politician_type, user.city_code);
+    return getPoliticianTitle(user.politician_type, user.city_code, user.district_name);
   }
   
   if (user.user_type === 'ex_politician') {
@@ -58,6 +60,8 @@ export const getShortTitle = (politicianType) => {
     'party_chair': 'GB',
     'provincial_chair': 'İB',
     'district_chair': 'İçB',
+    'metropolitan_mayor': 'BŞB',
+    'district_mayor': 'BB',
     'myk_member': 'MYK',
     'vice_chair': 'GBY',
     'other': 'PY'

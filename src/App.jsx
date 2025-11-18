@@ -7,6 +7,7 @@ import { PostDetailPage } from './pages/PostDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PartyDetailPage } from './pages/PartyDetailPage';
 import { AgendaDetailPage } from './pages/AgendaDetailPage';
+import { CityDetailPage } from './pages/CityDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { MessagesPage } from './pages/MessagesPage';
@@ -25,6 +26,7 @@ function App() {
             <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="/party/:partyId" element={<PartyDetailPage />} />
             <Route path="/agenda/:agendaSlug" element={<AgendaDetailPage />} />
+            <Route path="/city/:cityCode" element={<CityDetailPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/messages" element={<MessagesPage />} />

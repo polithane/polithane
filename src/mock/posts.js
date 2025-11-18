@@ -296,12 +296,14 @@ export const getCategoryPosts = (category, allPosts = []) => {
   const categoryMap = {
     'mps': (p) => p.user?.user_type === 'politician' && p.user?.politician_type === 'mp',
     'organization': (p) => {
-      // Teşkilat: politician ama mp veya party_chair değil
+      // Teşkilat: politician ama mp veya party_chair değil (belediye başkanları dahil)
       return p.user?.user_type === 'politician' && 
              p.user?.politician_type !== 'mp' && 
              p.user?.politician_type !== 'party_chair' &&
              (p.user?.politician_type === 'provincial_chair' ||
               p.user?.politician_type === 'district_chair' ||
+              p.user?.politician_type === 'metropolitan_mayor' ||
+              p.user?.politician_type === 'district_mayor' ||
               p.user?.politician_type === 'myk_member' ||
               p.user?.politician_type === 'vice_chair' ||
               p.user?.politician_type === 'other');

@@ -3,7 +3,7 @@ import { FileText, Image as ImageIcon, Video, Music } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { formatPolitScore } from '../../utils/formatters';
 import { getUserTitle } from '../../utils/titleHelpers';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
 
 export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => {
@@ -87,10 +87,14 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
                   <span className="text-xs text-white/80">
                     {getUserTitle(currentPost.user)}
                   </span>
-                  {currentPost.user?.city_code && ['mp', 'provincial_chair', 'district_chair'].includes(currentPost.user?.politician_type) && (
-                    <span className="inline-flex items-center justify-center px-1.5 py-0.5 bg-white/90 text-gray-900 text-[10px] font-bold rounded-full">
+                  {currentPost.user?.city_code && ['mp', 'provincial_chair', 'district_chair', 'metropolitan_mayor', 'district_mayor'].includes(currentPost.user?.politician_type) && (
+                    <Link
+                      to={`/city/${currentPost.user.city_code}`}
+                      className="inline-flex items-center justify-center px-1.5 py-0.5 bg-white/90 hover:bg-white text-gray-900 text-[10px] font-bold rounded-full transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {currentPost.user.city_code}
-                    </span>
+                    </Link>
                   )}
                 </div>
               )}

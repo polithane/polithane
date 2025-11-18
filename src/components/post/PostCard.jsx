@@ -61,10 +61,14 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
                   <span className="font-medium text-primary-blue">
                     {getUserTitle(post.user)}
                   </span>
-                  {post.user?.city_code && ['mp', 'provincial_chair', 'district_chair'].includes(post.user?.politician_type) && (
-                    <span className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-900 text-white text-xs font-semibold rounded-full">
+                  {post.user?.city_code && ['mp', 'provincial_chair', 'district_chair', 'metropolitan_mayor', 'district_mayor'].includes(post.user?.politician_type) && (
+                    <Link
+                      to={`/city/${post.user.city_code}`}
+                      className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-900 hover:bg-primary-blue text-white text-xs font-semibold rounded-full transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {post.user.city_code}
-                    </span>
+                    </Link>
                   )}
                 </div>
               )}
