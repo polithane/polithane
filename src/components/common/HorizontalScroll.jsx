@@ -1,5 +1,4 @@
 import { useRef, useEffect, useState } from 'react';
-import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const HorizontalScroll = ({ 
@@ -10,46 +9,9 @@ export const HorizontalScroll = ({
   className = ''
 }) => {
   const scrollRef = useRef(null);
-  const containerRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [screenSize, setScreenSize] = useState('desktop');
-  const [itemWidth, setItemWidth] = useState(null);
-
-  useEffect(() => {
-    const calculateItemWidth = () => {
-      if (!containerRef.current) return;
-      
-      const width = window.innerWidth;
-      let targetItems;
-      if (width >= 1024) {
-        setScreenSize('desktop');
-        targetItems = itemsPerView.desktop;
-      } else if (width >= 768) {
-        setScreenSize('tablet');
-        targetItems = itemsPerView.tablet;
-      } else {
-        setScreenSize('mobile');
-        targetItems = itemsPerView.mobile;
-      }
-      
-      const containerWidth = containerRef.current.clientWidth;
-      const gap = 16; // gap-4 = 16px
-      const totalGaps = (targetItems - 1) * gap;
-      const calculatedWidth = (containerWidth - totalGaps) / targetItems;
-      
-      setItemWidth(calculatedWidth);
-    };
-    
-    // İlk hesaplama
-    const timeoutId = setTimeout(calculateItemWidth, 0);
-    
-    window.addEventListener('resize', calculateItemWidth);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', calculateItemWidth);
-    };
-  }, [itemsPerView]);
 
   useEffect(() => {
     const checkScroll = () => {
@@ -69,11 +31,15 @@ export const HorizontalScroll = ({
   }, [children]);
 
   useEffect(() => {
-    if (!autoScroll || !scrollRef.current || !itemWidth) return;
+    if (!autoScroll || !scrollRef.current) return;
 
     const interval = setInterval(() => {
       if (scrollRef.current) {
         const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+        const items = screenSize === 'desktop' ? itemsPerView.desktop : 
+                     screenSize === 'tablet' ? itemsPerView.tablet : 
+                     itemsPerView.mobile;
+        const itemWidth = clientWidth / items;
         const gap = 16;
         const scrollAmount = itemWidth + gap;
         const nextScroll = scrollLeft + scrollAmount;
@@ -87,10 +53,14 @@ export const HorizontalScroll = ({
     }, scrollInterval);
 
     return () => clearInterval(interval);
-  }, [autoScroll, scrollInterval, itemWidth]);
+  }, [autoScroll, scrollInterval, screenSize, itemsPerView]);
 
   const scroll = (direction) => {
-    if (!scrollRef.current || !itemWidth) return;
+    if (!scrollRef.current) return;
+    const items = screenSize === 'desktop' ? itemsPerView.desktop : 
+                 screenSize === 'tablet' ? itemsPerView.tablet : 
+                 itemsPerView.mobile;
+    const itemWidth = scrollRef.current.clientWidth / items;
     const gap = 16;
     const scrollAmount = itemWidth + gap;
     
@@ -101,7 +71,7 @@ export const HorizontalScroll = ({
   };
 
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
+    <div className={`relative ${className}`}>
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
@@ -121,20 +91,7 @@ export const HorizontalScroll = ({
           scrollSnapType: 'x mandatory',
         }}
       >
-        {itemWidth && React.Children.map(children, (child) => {
-          if (React.isValidElement(child)) {
-            return React.cloneElement(child, {
-              style: { 
-                ...child.props.style,
-                width: `${itemWidth}px`,
-                minWidth: `${itemWidth}px`,
-                maxWidth: `${itemWidth}px`
-              }
-            });
-          }
-          return child;
-        })}
-        {!itemWidth && children}
+        {children}
       </div>
 
       {canScrollRight && (
