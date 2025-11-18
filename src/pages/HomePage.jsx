@@ -60,7 +60,7 @@ export const HomePage = () => {
           {/* Sol Ana Kolon */}
           <div className="space-y-8 min-w-0">
             {/* VEKİLLER KONUŞUYOR */}
-            <section className="min-w-0 bg-blue-50/30 rounded-lg p-4">
+            <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(0, 159, 214, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">VEKİLLER KONUŞUYOR</h2>
                 <a href="/category/mps" className="text-primary-blue hover:underline text-sm">
@@ -84,7 +84,7 @@ export const HomePage = () => {
             </section>
             
             {/* TEŞKİLAT KONUŞUYOR */}
-            <section className="min-w-0 bg-green-50/30 rounded-lg p-4">
+            <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(135, 180, 51, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">TEŞKİLAT KONUŞUYOR</h2>
                 <a href="/category/organization" className="text-primary-blue hover:underline text-sm">
@@ -107,7 +107,7 @@ export const HomePage = () => {
             </section>
             
             {/* VATANDAŞ KONUŞUYOR */}
-            <section className="min-w-0 bg-gray-50/30 rounded-lg p-4">
+            <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(229, 229, 229, 0.5)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">VATANDAŞ KONUŞUYOR</h2>
                 <a href="/category/citizens" className="text-primary-blue hover:underline text-sm">
@@ -129,7 +129,7 @@ export const HomePage = () => {
             </section>
             
             {/* DENEYİM KONUŞUYOR */}
-            <section className="min-w-0 bg-amber-50/30 rounded-lg p-4">
+            <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(212, 160, 23, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">DENEYİM KONUŞUYOR</h2>
                 <a href="/category/experience" className="text-primary-blue hover:underline text-sm">
