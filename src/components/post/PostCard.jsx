@@ -3,7 +3,7 @@ import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration } from '../../utils/formatters';
 import { getUserTitle } from '../../utils/titleHelpers';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
 
 export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPosition = false }) => {
