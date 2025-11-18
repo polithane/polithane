@@ -2,6 +2,7 @@ import { Eye, Heart, MessageCircle, Share2, Video, Image as ImageIcon, Music, Fi
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration } from '../../utils/formatters';
+import { getUserTitle } from '../../utils/titleHelpers';
 import { getPlaceholderImage } from '../../utils/imagePaths';
 import { useNavigate } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
@@ -71,9 +72,20 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
                 {post.user?.full_name}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 flex-wrap">
+              {getUserTitle(post.user) && (
+                <span className="flex-shrink-0 font-medium text-primary-blue">
+                  {getUserTitle(post.user)}
+                </span>
+              )}
+              {getUserTitle(post.user) && showCity && post.user?.city_code && (
+                <span className="flex-shrink-0">•</span>
+              )}
               {showCity && post.user?.city_code && (
                 <span className="flex-shrink-0">{post.user.city_code}</span>
+              )}
+              {(getUserTitle(post.user) || (showCity && post.user?.city_code)) && (
+                <span className="flex-shrink-0">•</span>
               )}
               <span className="flex-shrink-0">{formatTimeAgo(post.created_at)}</span>
             </div>

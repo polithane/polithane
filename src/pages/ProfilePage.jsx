@@ -5,6 +5,7 @@ import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { PostCard } from '../components/post/PostCard';
 import { formatNumber, formatPolitScore } from '../utils/formatters';
+import { getUserTitle } from '../utils/titleHelpers';
 import { mockUsers } from '../mock/users';
 import { mockPosts } from '../mock/posts';
 
@@ -49,6 +50,11 @@ export const ProfilePage = () => {
                   <Badge variant="secondary">{user.party.party_short_name}</Badge>
                 )}
               </div>
+              {getUserTitle(user) && (
+                <p className="text-primary-blue font-semibold text-lg mb-2">
+                  {getUserTitle(user)}
+                </p>
+              )}
               <p className="text-gray-600 mb-2 break-words">@{user.username}</p>
               {user.bio && <p className="text-gray-800 mb-4 break-words">{user.bio}</p>}
               
