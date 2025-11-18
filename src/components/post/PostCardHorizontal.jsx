@@ -39,9 +39,9 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   
   return (
     <div 
-      className={`card-hover ${fullWidth ? 'p-3 w-full flex-shrink' : 'p-4 flex-shrink-0 w-[calc(50%-16px)] sm:w-[calc(50%-16px)] md:w-[180px] lg:w-[175px]'} cursor-pointer`}
+      className={`card-hover ${fullWidth ? 'p-3 w-full flex-shrink' : 'p-4 flex-shrink-0 w-[calc((100%-48px)/2)] md:w-[calc((100%-64px)/3)] lg:w-[calc((100%-96px)/5)]'} cursor-pointer`}
       onClick={() => navigate(`/post/${post.post_id}`)}
-      style={fullWidth ? {} : { minWidth: '150px', maxWidth: '200px' }}
+      style={fullWidth ? {} : {}}
     >
       {/* Üst Bilgi */}
       <div className="flex items-start justify-between mb-3">

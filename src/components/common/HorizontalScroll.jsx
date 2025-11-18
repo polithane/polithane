@@ -5,21 +5,28 @@ export const HorizontalScroll = ({
   children, 
   autoScroll = false, 
   scrollInterval = 5000,
-  itemsPerView = { desktop: 5, mobile: 2 },
+  itemsPerView = { desktop: 5, tablet: 3, mobile: 2 },
   className = ''
 }) => {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  const [screenSize, setScreenSize] = useState('desktop');
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      if (width >= 1024) {
+        setScreenSize('desktop');
+      } else if (width >= 768) {
+        setScreenSize('tablet');
+      } else {
+        setScreenSize('mobile');
+      }
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
   useEffect(() => {
@@ -45,7 +52,10 @@ export const HorizontalScroll = ({
     const interval = setInterval(() => {
       if (scrollRef.current) {
         const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-        const itemWidth = clientWidth / (isMobile ? itemsPerView.mobile : itemsPerView.desktop);
+        const items = screenSize === 'desktop' ? itemsPerView.desktop : 
+                     screenSize === 'tablet' ? itemsPerView.tablet : 
+                     itemsPerView.mobile;
+        const itemWidth = clientWidth / items;
         const nextScroll = scrollLeft + itemWidth;
 
         if (nextScroll >= scrollWidth - clientWidth) {
@@ -57,11 +67,14 @@ export const HorizontalScroll = ({
     }, scrollInterval);
 
     return () => clearInterval(interval);
-  }, [autoScroll, scrollInterval, isMobile, itemsPerView]);
+  }, [autoScroll, scrollInterval, screenSize, itemsPerView]);
 
   const scroll = (direction) => {
     if (!scrollRef.current) return;
-    const itemWidth = scrollRef.current.clientWidth / (isMobile ? itemsPerView.mobile : itemsPerView.desktop);
+    const items = screenSize === 'desktop' ? itemsPerView.desktop : 
+                 screenSize === 'tablet' ? itemsPerView.tablet : 
+                 itemsPerView.mobile;
+    const itemWidth = scrollRef.current.clientWidth / items;
     scrollRef.current.scrollBy({
       left: direction === 'left' ? -itemWidth : itemWidth,
       behavior: 'smooth'
@@ -82,7 +95,7 @@ export const HorizontalScroll = ({
       
       <div
         ref={scrollRef}
-        className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4"
+        className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4 px-4"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
