@@ -1,115 +1,71 @@
-// Mock kullanıcı verileri
+// Mock kullanıcı verileri - Güncel Milletvekili Listesi ile uyumlu
 import { getProfileImagePath } from '../utils/imagePaths.js';
+import { membersOfParliament } from '../data/membersOfParliament.js';
+import { CITY_CODES } from '../utils/constants.js';
 
-export const mockUsers = [
-  {
-    user_id: 1,
-    username: 'kemal_kilicdaroglu',
-    email: 'kemal@chp.org.tr',
-    full_name: 'Kemal Kılıçdaroğlu',
-    profile_image: getProfileImagePath('politician', 'party_chair', 'kemal_kilicdaroglu', 1),
-    bio: 'CHP Genel Başkanı',
-    user_type: 'politician',
-    politician_type: 'party_chair',
-    party_id: 2,
-    verification_badge: true,
-    polit_score: 125000,
-    follower_count: 2500000,
-    following_count: 150,
-    post_count: 1250,
-    created_at: '2023-01-01T00:00:00Z'
-  },
-  {
-    user_id: 2,
-    username: 'recep_tayyip_erdogan',
-    email: 'rte@akparti.org.tr',
-    full_name: 'Recep Tayyip Erdoğan',
-    profile_image: getProfileImagePath('politician', 'party_chair', 'recep_tayyip_erdogan', 2),
-    bio: 'AK Parti Genel Başkanı, Türkiye Cumhurbaşkanı',
-    user_type: 'politician',
-    politician_type: 'party_chair',
-    party_id: 1,
-    verification_badge: true,
-    polit_score: 450000,
-    follower_count: 5000000,
-    following_count: 85,
-    post_count: 3200,
-    created_at: '2023-01-01T00:00:00Z'
-  },
-  {
-    user_id: 3,
-    username: 'devlet_bahceli',
-    email: 'dbahceli@mhp.org.tr',
-    full_name: 'Devlet Bahçeli',
-    profile_image: getProfileImagePath('politician', 'party_chair', 'devlet_bahceli', 3),
-    bio: 'MHP Genel Başkanı',
-    user_type: 'politician',
-    politician_type: 'party_chair',
-    party_id: 3,
-    verification_badge: true,
-    polit_score: 98000,
-    follower_count: 1200000,
-    following_count: 120,
-    post_count: 890,
-    created_at: '2023-01-01T00:00:00Z'
-  },
-  {
-    user_id: 4,
-    username: 'ozgur_ozel',
-    email: 'ozel@chp.org.tr',
-    full_name: 'Özgür Özel',
-    profile_image: getProfileImagePath('politician', 'party_chair', 'ozgur_ozel', 4),
-    bio: 'CHP Genel Başkanı',
-    user_type: 'politician',
-    politician_type: 'party_chair',
-    party_id: 2,
-    verification_badge: true,
-    polit_score: 156000,
-    follower_count: 1800000,
-    following_count: 200,
-    post_count: 1450,
-    city_code: '35',
-    created_at: '2023-01-01T00:00:00Z'
-  },
-  {
-    user_id: 5,
-    username: 'ali_vatandas',
-    email: 'ali@example.com',
-    full_name: 'Ali Vatandaş',
-    profile_image: getProfileImagePath('normal', null, 'ali_vatandas', 5),
-    bio: 'Vatandaş',
-    user_type: 'normal',
-    verification_badge: false,
-    polit_score: 450,
-    follower_count: 120,
-    following_count: 85,
-    post_count: 23,
-    created_at: '2024-01-15T00:00:00Z'
-  },
-  {
-    user_id: 6,
-    username: 'mehmet_mp',
-    email: 'mehmet@chp.org.tr',
-    full_name: 'Mehmet Yılmaz',
-    profile_image: getProfileImagePath('politician', 'mp', 'mehmet_mp', 6),
-    bio: 'CHP Milletvekili - İstanbul',
+// Parti isimlerini party_id'ye çeviren mapping
+const partyNameToId = {
+  'AK Parti': 1,
+  'CHP': 2,
+  'DEM PARTİ': 3,
+  'MHP': 4,
+  'İYİ Parti': 5,
+  'YENİ YOL': 6,
+  'YENİDEN REFAH': 7,
+  'HÜDA PAR': 8,
+  'TİP': 9,
+  'DBP': 10,
+  'EMEP': 11,
+  'SAADET Partisi': 12,
+  'DSP': 13,
+  'DP': 14,
+  'BAĞIMSIZ': null
+};
+
+// Şehir isimlerini kodlara çeviren mapping
+const cityNameToCode = Object.entries(CITY_CODES).reduce((acc, [code, name]) => {
+  acc[name.toUpperCase()] = code;
+  return acc;
+}, {});
+
+// Milletvekillerinden kullanıcı oluştur
+const mpUsers = membersOfParliament.map((mp, index) => {
+  const userId = index + 1;
+  const nameParts = mp.name.split(' ');
+  const firstName = nameParts[0];
+  const lastName = nameParts.slice(1).join(' ');
+  const username = `${firstName.toLowerCase()}_${lastName.toLowerCase().replace(/\s+/g, '_')}`;
+  const partyId = partyNameToId[mp.party] || null;
+  const cityCode = cityNameToCode[mp.city] || null;
+  
+  return {
+    user_id: userId,
+    username: username,
+    email: `${username}@tbmm.gov.tr`,
+    full_name: mp.name,
+    profile_image: getProfileImagePath('politician', 'mp', username, userId),
+    bio: `${mp.party} Milletvekili - ${mp.city}`,
     user_type: 'politician',
     politician_type: 'mp',
-    party_id: 2,
-    city_code: '34',
+    party_id: partyId,
+    city_code: cityCode,
     verification_badge: true,
-    polit_score: 12500,
-    follower_count: 45000,
-    following_count: 250,
-    post_count: 320,
-    created_at: '2023-06-01T00:00:00Z'
-  },
+    polit_score: Math.floor(Math.random() * 50000) + 5000,
+    follower_count: Math.floor(Math.random() * 100000) + 10000,
+    following_count: Math.floor(Math.random() * 200) + 50,
+    post_count: Math.floor(Math.random() * 500) + 50,
+    created_at: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString()
+  };
+});
+
+// Medya kullanıcıları
+const mediaUsers = [
   {
-    user_id: 7,
+    user_id: mpUsers.length + 1,
     username: 'ayse_medya',
     email: 'ayse@haberturk.com',
     full_name: 'Ayşe Demir',
-    profile_image: getProfileImagePath('media', null, 'ayse_medya', 7),
+    profile_image: getProfileImagePath('media', null, 'ayse_medya', mpUsers.length + 1),
     bio: 'Gazeteci - Habertürk',
     user_type: 'media',
     verification_badge: true,
@@ -120,42 +76,45 @@ export const mockUsers = [
     created_at: '2023-03-10T00:00:00Z'
   },
   {
-    user_id: 8,
-    username: 'parti_uyesi_ahmet',
-    email: 'ahmet@example.com',
-    full_name: 'Ahmet Kaya',
-    profile_image: getProfileImagePath('party_member', null, 'parti_uyesi_ahmet', 8),
-    bio: 'AK Parti Üyesi',
-    user_type: 'party_member',
-    party_id: 1,
-    verification_badge: false,
-    polit_score: 1200,
-    follower_count: 450,
-    following_count: 320,
-    post_count: 45,
-    created_at: '2024-02-20T00:00:00Z'
-  },
-  {
-    user_id: 9,
-    username: 'eski_vekili',
-    email: 'eski@example.com',
-    full_name: 'Mustafa Özkan',
-    profile_image: getProfileImagePath('ex_politician', null, 'eski_vekili', 9),
-    bio: 'Eski Milletvekili',
-    user_type: 'ex_politician',
+    user_id: mpUsers.length + 2,
+    username: 'mehmet_gazeteci',
+    email: 'mehmet@hurriyet.com.tr',
+    full_name: 'Mehmet Yılmaz',
+    profile_image: getProfileImagePath('media', null, 'mehmet_gazeteci', mpUsers.length + 2),
+    bio: 'Gazeteci - Hürriyet',
+    user_type: 'media',
     verification_badge: true,
-    polit_score: 5600,
-    follower_count: 8500,
-    following_count: 120,
-    post_count: 95,
-    created_at: '2023-08-15T00:00:00Z'
+    polit_score: 12000,
+    follower_count: 45000,
+    following_count: 600,
+    post_count: 250,
+    created_at: '2023-05-15T00:00:00Z'
+  }
+];
+
+// Normal vatandaş kullanıcıları
+const normalUsers = [
+  {
+    user_id: mpUsers.length + mediaUsers.length + 1,
+    username: 'ali_vatandas',
+    email: 'ali@example.com',
+    full_name: 'Ali Vatandaş',
+    profile_image: getProfileImagePath('normal', null, 'ali_vatandas', mpUsers.length + mediaUsers.length + 1),
+    bio: 'Vatandaş',
+    user_type: 'normal',
+    verification_badge: false,
+    polit_score: 450,
+    follower_count: 120,
+    following_count: 85,
+    post_count: 23,
+    created_at: '2024-01-15T00:00:00Z'
   },
   {
-    user_id: 10,
+    user_id: mpUsers.length + mediaUsers.length + 2,
     username: 'fatma_citizen',
     email: 'fatma@example.com',
     full_name: 'Fatma Şahin',
-    profile_image: getProfileImagePath('normal', null, 'fatma_citizen', 10),
+    profile_image: getProfileImagePath('normal', null, 'fatma_citizen', mpUsers.length + mediaUsers.length + 2),
     bio: 'Vatandaş',
     user_type: 'normal',
     verification_badge: false,
@@ -164,79 +123,11 @@ export const mockUsers = [
     following_count: 120,
     post_count: 12,
     created_at: '2024-05-10T00:00:00Z'
-  },
-  // Teşkilat üyeleri
-  {
-    user_id: 11,
-    username: 'il_baskani_istanbul',
-    email: 'ilbaskani@chp.org.tr',
-    full_name: 'Mehmet Yıldız',
-    profile_image: getProfileImagePath('politician', 'provincial_chair', 'il_baskani_istanbul', 11),
-    bio: 'CHP İstanbul İl Başkanı',
-    user_type: 'politician',
-    politician_type: 'provincial_chair',
-    party_id: 2,
-    city_code: '34',
-    verification_badge: true,
-    polit_score: 8500,
-    follower_count: 25000,
-    following_count: 200,
-    post_count: 180,
-    created_at: '2023-06-01T00:00:00Z'
-  },
-  {
-    user_id: 12,
-    username: 'ilce_baskani_kadikoy',
-    email: 'ilcebaskani@chp.org.tr',
-    full_name: 'Ayşe Demir',
-    profile_image: getProfileImagePath('politician', 'district_chair', 'ilce_baskani_kadikoy', 12),
-    bio: 'CHP Kadıköy İlçe Başkanı',
-    user_type: 'politician',
-    politician_type: 'district_chair',
-    party_id: 2,
-    city_code: '34',
-    verification_badge: true,
-    polit_score: 4200,
-    follower_count: 12000,
-    following_count: 150,
-    post_count: 95,
-    created_at: '2023-08-15T00:00:00Z'
-  },
-  {
-    user_id: 13,
-    username: 'myk_uyesi',
-    email: 'myk@akparti.org.tr',
-    full_name: 'Ali Kaya',
-    profile_image: getProfileImagePath('politician', 'myk_member', 'myk_uyesi', 13),
-    bio: 'AK Parti MYK Üyesi',
-    user_type: 'politician',
-    politician_type: 'myk_member',
-    party_id: 1,
-    verification_badge: true,
-    polit_score: 12500,
-    follower_count: 35000,
-    following_count: 180,
-    post_count: 220,
-    created_at: '2023-04-10T00:00:00Z'
-  },
-  {
-    user_id: 14,
-    username: 'genel_baskan_yardimcisi',
-    email: 'gby@mhp.org.tr',
-    full_name: 'Mustafa Özkan',
-    profile_image: getProfileImagePath('politician', 'vice_chair', 'genel_baskan_yardimcisi', 14),
-    bio: 'MHP Genel Başkan Yardımcısı',
-    user_type: 'politician',
-    politician_type: 'vice_chair',
-    party_id: 3,
-    verification_badge: true,
-    polit_score: 18900,
-    follower_count: 45000,
-    following_count: 250,
-    post_count: 320,
-    created_at: '2023-02-20T00:00:00Z'
   }
 ];
+
+// Tüm kullanıcıları birleştir
+export const mockUsers = [...mpUsers, ...mediaUsers, ...normalUsers];
 
 // Daha fazla mock kullanıcı için helper
 export const generateMockUsers = (count = 40) => {
@@ -245,22 +136,25 @@ export const generateMockUsers = (count = 40) => {
   const cities = ['34', '06', '35', '07', '16', '01', '26', '38', '41', '27'];
   
   const users = [...mockUsers];
+  const startId = mockUsers.length + 1;
   
-  for (let i = 11; i <= count; i++) {
+  for (let i = 0; i < count; i++) {
+    const userId = startId + i;
     const firstName = names[Math.floor(Math.random() * names.length)];
     const lastName = surnames[Math.floor(Math.random() * surnames.length)];
     const city = cities[Math.floor(Math.random() * cities.length)];
     const userType = ['normal', 'normal', 'normal', 'party_member', 'normal'][Math.floor(Math.random() * 5)];
     
     users.push({
-      user_id: i,
-      username: `${firstName.toLowerCase()}_${lastName.toLowerCase()}_${i}`,
-      email: `${firstName.toLowerCase()}${i}@example.com`,
+      user_id: userId,
+      username: `${firstName.toLowerCase()}_${lastName.toLowerCase()}_${userId}`,
+      email: `${firstName.toLowerCase()}${userId}@example.com`,
       full_name: `${firstName} ${lastName}`,
-      profile_image: `/assets/mock/avatars/user${i}.jpg`,
-      bio: 'Vatandaş',
+      profile_image: getProfileImagePath(userType === 'party_member' ? 'party_member' : 'normal', null, `${firstName.toLowerCase()}_${lastName.toLowerCase()}`, userId),
+      bio: userType === 'party_member' ? 'Parti Üyesi' : 'Vatandaş',
       user_type: userType,
-      party_id: userType === 'party_member' ? Math.floor(Math.random() * 6) + 1 : null,
+      party_id: userType === 'party_member' ? Math.floor(Math.random() * 14) + 1 : null,
+      city_code: city,
       verification_badge: false,
       polit_score: Math.floor(Math.random() * 2000) + 100,
       follower_count: Math.floor(Math.random() * 500) + 50,
