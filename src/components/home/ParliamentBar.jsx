@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom';
 import { getPartyFlagPath } from '../../utils/imagePaths';
 
 export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
+  const navigate = useNavigate();
   
   if (!parliamentData || parliamentData.length === 0) return null;
   
@@ -29,7 +31,8 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 minWidth: '20px', // Çok küçük partiler için minimum genişlik
                 flexShrink: 0
               }}
-              title={`${party.name} - ${party.seats} sandalye (${widthPercentage.toFixed(1)}%)`}
+              title={`${party.name} - ${party.seats} sandalye (${widthPercentage.toFixed(1)}%) - Tıklayın`}
+              onClick={() => navigate(`/party/${index + 1}`)}
             >
                 {/* Parti kısa adı - sadece yeterince geniş alanlarda göster */}
                 {widthPercentage > 3 && (
