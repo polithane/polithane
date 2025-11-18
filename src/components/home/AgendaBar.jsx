@@ -6,10 +6,10 @@ export const AgendaBar = ({ agendas = [] }) => {
   
   if (!agendas || agendas.length === 0) return null;
   
-  // Her satırda 9 gündem + 1 "TÜM GÜNDEME BAK" butonu
-  const trendingAgendas = agendas.slice(0, 18); // 18 gündem (her satırda 9)
-  const firstRow = trendingAgendas.slice(0, 9);
-  const secondRow = trendingAgendas.slice(9, 18);
+  // Her satırda 5 gündem + 1 "TÜM GÜNDEME BAK" butonu - ekrana sığacak kadar
+  const trendingAgendas = agendas.slice(0, 10); // 10 gündem (her satırda 5)
+  const firstRow = trendingAgendas.slice(0, 5);
+  const secondRow = trendingAgendas.slice(5, 10);
   
   const AgendaButton = ({ agenda }) => (
     <button
@@ -43,12 +43,7 @@ export const AgendaBar = ({ agendas = [] }) => {
       </div>
       <div className="space-y-2">
         {/* İlk Satır */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
-          style={{
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
-        >
+        <div className="flex gap-2 pb-2">
           {firstRow.map((agenda) => (
             <AgendaButton key={agenda.agenda_id} agenda={agenda} />
           ))}
@@ -57,12 +52,7 @@ export const AgendaBar = ({ agendas = [] }) => {
         
         {/* İkinci Satır */}
         {secondRow.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
-            style={{
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-            }}
-          >
+          <div className="flex gap-2 pb-2">
             {secondRow.map((agenda) => (
               <AgendaButton key={agenda.agenda_id} agenda={agenda} />
             ))}
