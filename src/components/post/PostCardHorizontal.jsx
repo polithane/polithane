@@ -39,7 +39,8 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   
   return (
     <div 
-      className={`card-hover ${fullWidth ? 'p-3 w-full flex-shrink' : 'p-4 flex-shrink-0 w-[calc((100%-48px)/2)] md:w-[calc((100%-64px)/3)] lg:w-[calc((100%-96px)/5)]'} cursor-pointer`}
+      className={`card-hover ${fullWidth ? 'p-3 w-full flex-shrink' : 'p-4 flex-shrink-0 w-[calc((100%-48px)/2)] md:w-[calc((100%-64px)/3)] lg:w-[calc((100%-96px)/5)]'} cursor-pointer flex flex-col h-full`}
+      style={fullWidth ? {} : { scrollSnapAlign: 'start' }}
       onClick={() => navigate(`/post/${post.post_id}`)}
       style={fullWidth ? {} : {}}
     >
@@ -80,7 +81,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       </div>
       
       {/* İçerik */}
-      <div className="mb-3">
+      <div className="mb-3 flex-1">
         {post.content_type === CONTENT_TYPES.TEXT && (
           <p className="text-gray-800 text-sm line-clamp-3">{truncate(post.content_text, 100)}</p>
         )}
@@ -138,21 +139,25 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
         )}
       </div>
       
-      {/* Gündem Etiketi */}
-      {post.agenda_tag && (
+      {/* Gündem Etiketi ve Polit Puan - Alt kısım */}
+      <div className="mt-auto">
+        {post.agenda_tag && (
+          <div className="mb-2">
+            <Badge variant="primary" size="small">
+              {post.agenda_tag}
+            </Badge>
+          </div>
+        )}
+        
+        {/* Polit Puan */}
         <div className="mb-2">
-          <Badge variant="primary" size="small">
-            {post.agenda_tag}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-primary-blue">
+              {formatPolitScore(post.polit_score)}
+            </span>
+            <span className="text-xs text-gray-500">Polit Puan</span>
+          </div>
         </div>
-      )}
-      
-      {/* Polit Puan */}
-      <div className="mb-2">
-        <div className="text-lg font-bold text-primary-blue">
-          {formatPolitScore(post.polit_score)}
-        </div>
-        <div className="text-xs text-gray-500">Polit Puan</div>
       </div>
       
       {/* Alt Etkileşim Çubuğu */}

@@ -56,12 +56,14 @@ export const HorizontalScroll = ({
                      screenSize === 'tablet' ? itemsPerView.tablet : 
                      itemsPerView.mobile;
         const itemWidth = clientWidth / items;
-        const nextScroll = scrollLeft + itemWidth;
+        const gap = 16;
+        const scrollAmount = itemWidth + gap;
+        const nextScroll = scrollLeft + scrollAmount;
 
         if (nextScroll >= scrollWidth - clientWidth) {
           scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
-          scrollRef.current.scrollBy({ left: itemWidth, behavior: 'smooth' });
+          scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
         }
       }
     }, scrollInterval);
@@ -74,9 +76,14 @@ export const HorizontalScroll = ({
     const items = screenSize === 'desktop' ? itemsPerView.desktop : 
                  screenSize === 'tablet' ? itemsPerView.tablet : 
                  itemsPerView.mobile;
-    const itemWidth = scrollRef.current.clientWidth / items;
+    // Container genişliğini al (padding dahil değil)
+    const containerWidth = scrollRef.current.clientWidth;
+    const itemWidth = containerWidth / items;
+    const gap = 16; // gap-4 = 16px
+    const scrollAmount = itemWidth + gap;
+    
     scrollRef.current.scrollBy({
-      left: direction === 'left' ? -itemWidth : itemWidth,
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth'
     });
   };
@@ -95,10 +102,11 @@ export const HorizontalScroll = ({
       
       <div
         ref={scrollRef}
-        className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4 px-4"
+        className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
+          scrollSnapType: 'x mandatory',
         }}
       >
         {children}
