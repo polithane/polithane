@@ -58,7 +58,7 @@ export const HomePage = () => {
           {/* Sol Ana Kolon */}
           <div className="space-y-8 min-w-0">
             {/* VEKİLLER KONUŞUYOR */}
-            <section className="min-w-0">
+            <section className="min-w-0 bg-blue-50/30 rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">VEKİLLER KONUŞUYOR</h2>
                 <a href="/category/mps" className="text-primary-blue hover:underline text-sm">
@@ -68,7 +68,7 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 4, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
               >
                 {mpPosts.map(post => (
                   <PostCardHorizontal 
@@ -82,7 +82,7 @@ export const HomePage = () => {
             </section>
             
             {/* TEŞKİLAT KONUŞUYOR */}
-            <section className="min-w-0">
+            <section className="min-w-0 bg-green-50/30 rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">TEŞKİLAT KONUŞUYOR</h2>
                 <a href="/category/organization" className="text-primary-blue hover:underline text-sm">
@@ -92,7 +92,7 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 4, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
               >
                 {organizationPosts.map(post => (
                   <PostCardHorizontal 
@@ -105,7 +105,7 @@ export const HomePage = () => {
             </section>
             
             {/* VATANDAŞ KONUŞUYOR */}
-            <section className="min-w-0">
+            <section className="min-w-0 bg-gray-50/30 rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">VATANDAŞ KONUŞUYOR</h2>
                 <a href="/category/citizens" className="text-primary-blue hover:underline text-sm">
@@ -115,7 +115,7 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 4, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
               >
                 {citizenPosts.map(post => (
                   <PostCardHorizontal 
@@ -127,7 +127,7 @@ export const HomePage = () => {
             </section>
             
             {/* DENEYİM KONUŞUYOR */}
-            <section className="min-w-0">
+            <section className="min-w-0 bg-amber-50/30 rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">DENEYİM KONUŞUYOR</h2>
                 <a href="/category/experience" className="text-primary-blue hover:underline text-sm">
@@ -137,7 +137,7 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 4, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
               >
                 {exPoliticianPosts.map(post => (
                   <PostCardHorizontal 
