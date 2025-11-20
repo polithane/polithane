@@ -40,8 +40,11 @@ export const mockPosts = [
     post_id: 3,
     user_id: Math.min(10, mockUsers.length),
     content_type: 'image',
-    content_text: 'İstanbul\'da yaptığımız çalışma ziyaretinden görüntüler',
-    media_url: getPostMediaPath('image', 3),
+    content_text: 'İstanbul\'da yaptığımız çalışma ziyaretinden görüntüler - 2 FOTO',
+    media_url: [
+      'https://picsum.photos/800/600?random=301',
+      'https://picsum.photos/800/600?random=302'
+    ],
     agenda_tag: 'Belediyelere yapılan operasyonlar',
     polit_score: 3200,
     view_count: 15000,
@@ -54,8 +57,14 @@ export const mockPosts = [
   {
     post_id: 4,
     user_id: Math.min(15, mockUsers.length),
-    content_type: 'text',
-    content_text: 'Bugün Meclis\'te önemli bir oturum gerçekleşti. Ekonomi paketi görüşmeleri devam ediyor.',
+    content_type: 'image',
+    content_text: 'Meclis oturumundan önemli anlar - 4 FOTO',
+    media_url: [
+      'https://picsum.photos/800/600?random=401',
+      'https://picsum.photos/800/600?random=402',
+      'https://picsum.photos/800/600?random=403',
+      'https://picsum.photos/800/600?random=404'
+    ],
     agenda_tag: 'Ekonomi paketi görüşmeleri',
     polit_score: 2100,
     view_count: 8500,
@@ -68,8 +77,17 @@ export const mockPosts = [
   {
     post_id: 5,
     user_id: mockUsers.length > 0 ? mockUsers[mockUsers.length - 1]?.user_id || 1 : 1,
-    content_type: 'text',
-    content_text: 'Vatandaş olarak görüşlerimi paylaşmak istiyorum. Ekonomi konusunda daha fazla şeffaflık bekliyoruz.',
+    content_type: 'image',
+    content_text: 'Etkinlik fotoğrafları - 7 FOTO',
+    media_url: [
+      'https://picsum.photos/800/600?random=501',
+      'https://picsum.photos/800/600?random=502',
+      'https://picsum.photos/800/600?random=503',
+      'https://picsum.photos/800/600?random=504',
+      'https://picsum.photos/800/600?random=505',
+      'https://picsum.photos/800/600?random=506',
+      'https://picsum.photos/800/600?random=507'
+    ],
     agenda_tag: 'Ekonomi paketi görüşmeleri',
     polit_score: 450,
     view_count: 1200,
@@ -97,8 +115,12 @@ export const mockPosts = [
     post_id: 7,
     user_id: Math.min(20, mockUsers.length),
     content_type: 'image',
-    content_text: 'Parti etkinliğimizden kareler',
-    media_url: 'https://picsum.photos/800/600?random=7',
+    content_text: 'Parti etkinliğimizden kareler - 3 FOTO',
+    media_url: [
+      'https://picsum.photos/800/600?random=701',
+      'https://picsum.photos/800/600?random=702',
+      'https://picsum.photos/800/600?random=703'
+    ],
     agenda_tag: 'Ak Parti - MHP resepsiyon tartışması',
     polit_score: 650,
     view_count: 2500,
@@ -271,7 +293,15 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
     };
     
     if (contentType === 'image') {
-      post.media_url = getPostMediaPath('image', i);
+      // Rastgele 1-6 resim arası
+      const imageCount = Math.floor(Math.random() * 6) + 1;
+      if (imageCount === 1) {
+        post.media_url = getPostMediaPath('image', i);
+      } else {
+        post.media_url = Array.from({ length: imageCount }, (_, idx) => 
+          `https://picsum.photos/800/600?random=${i}${idx}`
+        );
+      }
     } else if (contentType === 'video') {
       post.media_url = getPostMediaPath('video', i, false);
       post.thumbnail_url = getPostMediaPath('video', i, true);
