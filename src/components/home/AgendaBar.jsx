@@ -91,9 +91,10 @@ export const AgendaBar = ({ agendas = [] }) => {
           )}
         </div>
         
-        {/* Gündem Pills - İlk 4 Gündem (3 gündem + 1 reklam) */}
+        {/* Gündem Pills - İlk 3 Gündem + Reklam */}
         <div className="flex flex-wrap gap-2 mb-3">
-          {visibleAgendas.slice(0, Math.min(visibleCount, 4)).map((agenda, index) => (
+          {/* İlk 3 Gündem */}
+          {visibleAgendas.slice(0, 3).map((agenda, index) => (
             <button
               key={agenda.agenda_id}
               onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
@@ -113,6 +114,14 @@ export const AgendaBar = ({ agendas = [] }) => {
               {agenda.agenda_title}
             </button>
           ))}
+          
+          {/* 4. Pozisyon - REKLAM (MOBİL) */}
+          <button
+            onClick={() => window.open('https://yusufbank.com', '_blank')}
+            className="flex-shrink-0 px-4 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-full text-xs font-bold shadow-md whitespace-nowrap"
+          >
+            🏦 YusufBANK
+          </button>
         </div>
         
         {/* Expanded Agendas - Grid Layout (eğer 4'ten fazla gösteriliyorsa) */}
