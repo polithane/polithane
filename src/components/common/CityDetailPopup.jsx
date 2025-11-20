@@ -1,15 +1,23 @@
-import { X, Users, Building2, MapPin, TrendingUp } from 'lucide-react';
+import { X, Users, Building2, MapPin, TrendingUp, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export const PartyDetailPopup = ({ party, onClose, position }) => {
+export const CityDetailPopup = ({ cityCode, cityName, onClose, position }) => {
   const navigate = useNavigate();
   
-  if (!party) return null;
+  if (!cityCode) return null;
   
   const handleNavigation = (path, e) => {
     e.stopPropagation();
     navigate(path);
     onClose();
+  };
+  
+  // Mock data - gerçek data ile değiştirilecek
+  const cityData = {
+    mp_count: Math.floor(Math.random() * 20) + 1,
+    metropolitan_mayor: Math.random() > 0.7 ? 'Var' : 'Yok',
+    district_count: Math.floor(Math.random() * 30) + 5,
+    post_count: Math.floor(Math.random() * 5000) + 100
   };
   
   return (
@@ -35,16 +43,12 @@ export const PartyDetailPopup = ({ party, onClose, position }) => {
         {/* Başlık */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            {party.party_logo && (
-              <img 
-                src={party.party_logo} 
-                alt={party.party_short_name}
-                className="w-10 h-10 object-contain"
-              />
-            )}
+            <div className="w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-sm">
+              {cityCode}
+            </div>
             <div>
-              <h3 className="font-bold text-lg text-gray-900">{party.party_short_name}</h3>
-              <p className="text-xs text-gray-500">{party.party_name}</p>
+              <h3 className="font-bold text-lg text-gray-900">{cityName}</h3>
+              <p className="text-xs text-gray-500">Plaka: {cityCode}</p>
             </div>
           </div>
           <button 
@@ -59,7 +63,7 @@ export const PartyDetailPopup = ({ party, onClose, position }) => {
         <div className="space-y-3">
           {/* Milletvekili Sayısı */}
           <button
-            onClick={(e) => handleNavigation(`/party/${party.party_id}?tab=mps`, e)}
+            onClick={(e) => handleNavigation(`/city/${cityCode}?tab=mps`, e)}
             className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
           >
             <div className="flex items-center gap-3">
@@ -69,65 +73,65 @@ export const PartyDetailPopup = ({ party, onClose, position }) => {
               <span className="text-sm font-semibold text-gray-700">Milletvekili Sayısı</span>
             </div>
             <span className="text-lg font-bold text-primary-blue group-hover:scale-110 transition-transform">
-              {party.mp_count || party.seats || 0}
+              {cityData.mp_count}
             </span>
           </button>
           
-          {/* Büyükşehir Belediye Sayısı */}
+          {/* Büyükşehir Belediyesi */}
           <button
-            onClick={(e) => handleNavigation(`/party/${party.party_id}?tab=metropolitan`, e)}
+            onClick={(e) => handleNavigation(`/city/${cityCode}?tab=metropolitan`, e)}
             className="w-full flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group"
           >
             <div className="flex items-center gap-3">
               <div className="bg-primary-green rounded-full p-2">
                 <Building2 className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-700">Büyükşehir Belediye</span>
+              <span className="text-sm font-semibold text-gray-700">Büyükşehir Belediyesi</span>
             </div>
-            <span className="text-lg font-bold text-primary-green group-hover:scale-110 transition-transform">
-              {party.metropolitan_count || 0}
+            <span className="text-sm font-bold text-primary-green group-hover:scale-110 transition-transform">
+              {cityData.metropolitan_mayor}
             </span>
           </button>
           
-          {/* İlçe Belediye Sayısı */}
+          {/* İlçe Sayısı */}
           <button
-            onClick={(e) => handleNavigation(`/party/${party.party_id}?tab=district`, e)}
+            onClick={(e) => handleNavigation(`/city/${cityCode}?tab=districts`, e)}
             className="w-full flex items-center justify-between p-3 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors group"
           >
             <div className="flex items-center gap-3">
               <div className="bg-accent-mustard rounded-full p-2">
                 <MapPin className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-700">İlçe Belediye</span>
+              <span className="text-sm font-semibold text-gray-700">İlçe Sayısı</span>
             </div>
             <span className="text-lg font-bold text-accent-mustard group-hover:scale-110 transition-transform">
-              {party.district_count || 0}
+              {cityData.district_count}
             </span>
           </button>
           
-          {/* Gündeme Katkı */}
+          {/* Paylaşım Sayısı */}
           <button
-            onClick={(e) => handleNavigation(`/party/${party.party_id}?tab=agendas`, e)}
+            onClick={(e) => handleNavigation(`/city/${cityCode}?tab=posts`, e)}
             className="w-full flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group"
           >
             <div className="flex items-center gap-3">
               <div className="bg-purple-600 rounded-full p-2">
                 <TrendingUp className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-700">Gündeme Katkı</span>
+              <span className="text-sm font-semibold text-gray-700">Paylaşım Sayısı</span>
             </div>
             <span className="text-lg font-bold text-purple-600 group-hover:scale-110 transition-transform">
-              {party.agenda_contribution || 0}
+              {cityData.post_count}
             </span>
           </button>
         </div>
         
         {/* Ana Profil Butonu */}
         <button
-          onClick={(e) => handleNavigation(`/party/${party.party_id}`, e)}
+          onClick={(e) => handleNavigation(`/city/${cityCode}`, e)}
           className="w-full mt-4 bg-primary-blue hover:bg-[#0088bb] text-white font-bold py-2 px-4 rounded-lg transition-colors"
         >
-          Parti Profili
+          İl Detayları
         </button>
       </div>
     </>

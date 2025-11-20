@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPartyFlagPath } from '../../utils/imagePaths';
 import { PartyDetailPopup } from '../common/PartyDetailPopup';
+import { CityDetailPopup } from '../common/CityDetailPopup';
 
 export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   const navigate = useNavigate();
   const [hoveredParty, setHoveredParty] = useState(null);
+  const [hoveredCity, setHoveredCity] = useState(null);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
+  const partyHoverTimeout = useRef(null);
+  const cityHoverTimeout = useRef(null);
   
   if (!parliamentData || parliamentData.length === 0) return null;
   
@@ -51,12 +55,19 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               title={`${party.name} - ${party.seats} sandalye (${widthPercentage.toFixed(1)}%)`}
               onClick={() => navigate(`/party/${index + 1}`)}
               onMouseEnter={(e) => {
+                // Önceki timeout'ları temizle
+                if (partyHoverTimeout.current) {
+                  clearTimeout(partyHoverTimeout.current);
+                }
                 const rect = e.currentTarget.getBoundingClientRect();
                 setPopupPosition({ x: rect.left, y: rect.bottom });
                 setHoveredParty(partyData);
               }}
               onMouseLeave={() => {
-                setHoveredParty(null);
+                // Popup'a geçiş için 300ms delay
+                partyHoverTimeout.current = setTimeout(() => {
+                  setHoveredParty(null);
+                }, 300);
               }}
             >
               {/* Parti kısa adı - sadece yeterince geniş alanlarda göster (yazı sığıyorsa) */}
@@ -108,7 +119,21 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 key={code}
                 onClick={() => navigate(`/city/${cityCode}`)}
                 className="w-[15px] h-[15px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[7px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
-                title={cityNames[cityCode] || `${code} plaka kodu`}
+                onMouseEnter={(e) => {
+                  // Önceki timeout'ları temizle
+                  if (cityHoverTimeout.current) {
+                    clearTimeout(cityHoverTimeout.current);
+                  }
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setPopupPosition({ x: rect.left, y: rect.bottom });
+                  setHoveredCity({ code: cityCode, name: cityNames[cityCode] });
+                }}
+                onMouseLeave={() => {
+                  // Popup'a geçiş için 300ms delay
+                  cityHoverTimeout.current = setTimeout(() => {
+                    setHoveredCity(null);
+                  }, 300);
+                }}
               >
                 {code}
               </button>
@@ -119,11 +144,43 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
       
       {/* Parti Detay Popup */}
       {hoveredParty && (
-        <PartyDetailPopup 
-          party={hoveredParty}
-          position={popupPosition}
-          onClose={() => setHoveredParty(null)}
-        />
+        <div
+          onMouseEnter={() => {
+            if (partyHoverTimeout.current) {
+              clearTimeout(partyHoverTimeout.current);
+            }
+          }}
+          onMouseLeave={() => {
+            setHoveredParty(null);
+          }}
+        >
+          <PartyDetailPopup 
+            party={hoveredParty}
+            position={popupPosition}
+            onClose={() => setHoveredParty(null)}
+          />
+        </div>
+      )}
+      
+      {/* İl Detay Popup */}
+      {hoveredCity && (
+        <div
+          onMouseEnter={() => {
+            if (cityHoverTimeout.current) {
+              clearTimeout(cityHoverTimeout.current);
+            }
+          }}
+          onMouseLeave={() => {
+            setHoveredCity(null);
+          }}
+        >
+          <CityDetailPopup 
+            cityCode={hoveredCity.code}
+            cityName={hoveredCity.name}
+            position={popupPosition}
+            onClose={() => setHoveredCity(null)}
+          />
+        </div>
       )}
     </div>
   );
