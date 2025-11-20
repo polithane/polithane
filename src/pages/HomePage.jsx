@@ -167,16 +167,6 @@ export const HomePage = () => {
             <div className="hidden md:block space-y-8">
               {/* HİT GÜNDEMLER - KARİŞİK İÇERİKLER */}
               <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(255, 215, 0, 0.08)' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🔥</span>
-                    <h2 className="text-xl font-bold text-gray-900">HİT PAYLAŞIMLAR</h2>
-                    <span className="text-sm text-gray-500 font-medium">Tüm Kategorilerden</span>
-                  </div>
-                  <a href="/category/all" className="text-primary-blue hover:underline text-sm">
-                    Tümünü Gör
-                  </a>
-                </div>
                 <HorizontalScroll 
                   autoScroll={true} 
                   scrollInterval={4000}
