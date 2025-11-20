@@ -78,18 +78,7 @@ export const AgendaBar = ({ agendas = [] }) => {
   return (
     <div className="mb-4">
       {/* MOBİL İÇİN: Compact ve Sticky - 3 gündem başlangıç */}
-      <div className="md:hidden sticky top-0 z-20 bg-gray-50 pb-3 -mx-4 px-4">
-        <div className="flex items-center justify-between mb-2 pt-2">
-          <h3 className="text-sm font-bold text-gray-900">🔥 GÜNDEM</h3>
-          {visibleCount < agendas.length && (
-            <button
-              onClick={showMore}
-              className="text-xs text-white bg-primary-blue hover:bg-[#0088bb] px-3 py-1 rounded-full font-bold transition-colors"
-            >
-              {visibleCount === 4 ? 'Tümünü Gör' : 'Devam Et'}
-            </button>
-          )}
-        </div>
+      <div className="md:hidden sticky top-0 z-20 bg-gray-50 pb-3 -mx-4 px-4 pt-2">
         
         {/* Gündem Pills - İlk 3 Gündem + Reklam */}
         <div className="flex flex-wrap gap-2 mb-3">
@@ -155,9 +144,6 @@ export const AgendaBar = ({ agendas = [] }) => {
       
       {/* DESKTOP İÇİN: 2 satır grid */}
       <div className="hidden md:block">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-700">GÜNDEM</h3>
-        </div>
         <div className="space-y-1.5">
           {/* İlk Satır - 3 gündem + REKLAM + 1 gündem */}
           <div className="flex gap-2">
