@@ -38,29 +38,28 @@ export const AgendaBar = ({ agendas = [] }) => {
       <button
         key={agenda.agenda_id}
         onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
-        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-1 min-w-0 h-[42px]"
+        className="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-1 min-w-0 h-[36px]"
       >
         {fireIcon && <span className="flex-shrink-0">{fireIcon}</span>}
-        <span className="text-sm font-medium truncate text-left flex-1">
+        <span className="text-xs font-medium truncate text-left flex-1">
           {agenda.agenda_title}
         </span>
-        <span className="text-xs bg-gray-100 hover:bg-white hover:text-primary-blue px-2 py-0.5 rounded-full font-semibold transition-colors flex-shrink-0">
+        <span className="text-[10px] bg-gray-100 hover:bg-white hover:text-primary-blue px-1.5 py-0.5 rounded-full font-semibold transition-colors flex-shrink-0">
           {formatPolitScore(agenda.total_polit_score)}
         </span>
       </button>
     );
   };
   
-  // REKLAM ALANI - 4. sırada (180px genişlik x 42px yükseklik)
+  // REKLAM ALANI - 4. sırada (180px genişlik x 36px yükseklik)
   const AdSpace = () => (
     <div className="flex-1 min-w-[180px] max-w-[220px]">
       <div
-        className="h-[42px] px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center"
+        className="h-[36px] px-3 py-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center"
         onClick={() => window.open('https://yusufbank.com', '_blank')}
       >
         <div className="text-center">
-          <p className="text-sm font-bold text-white drop-shadow-md">🏦 YusufBANK</p>
-          <p className="text-xs text-white/90">Güvenli Bankacılık</p>
+          <p className="text-xs font-bold text-white drop-shadow-md">🏦 YusufBANK</p>
         </div>
       </div>
     </div>
@@ -70,7 +69,7 @@ export const AgendaBar = ({ agendas = [] }) => {
   const AllAgendasButton = () => (
     <button
       onClick={() => navigate('/agendas')}
-      className="flex items-center justify-center px-6 py-2 bg-primary-blue hover:bg-[#0088bb] text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0 font-bold text-sm h-[42px]"
+      className="flex items-center justify-center px-4 py-1.5 bg-primary-blue hover:bg-[#0088bb] text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0 font-bold text-xs h-[36px]"
     >
       TÜM GÜNDEME BAK
     </button>
@@ -150,9 +149,9 @@ export const AgendaBar = ({ agendas = [] }) => {
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-gray-700">GÜNDEM</h3>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {/* İlk Satır - 3 gündem + REKLAM + 1 gündem */}
-          <div className="flex gap-2 pb-2">
+          <div className="flex gap-2">
             {firstRow.slice(0, 3).map((agenda, index) => (
               <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index} />
             ))}
@@ -165,7 +164,7 @@ export const AgendaBar = ({ agendas = [] }) => {
           
           {/* İkinci Satır - 5 gündem + TÜM GÜNDEME BAK butonu */}
           {secondRow.length > 0 && (
-            <div className="flex gap-2 pb-2">
+            <div className="flex gap-2">
               {secondRow.map((agenda, index) => (
                 <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index + 4} />
               ))}

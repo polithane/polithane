@@ -70,13 +70,13 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       
       {/* Üst Bilgi */}
       <div className="flex items-start justify-between mb-3 pr-8">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
           <div 
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/profile/${post.user?.user_id}`);
             }}
-            className="cursor-pointer hover:opacity-80 transition-opacity"
+            className="cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
           >
             <Avatar 
               src={getAvatarUrl(post.user?.profile_image)} 
@@ -86,26 +86,24 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
           </div>
           <div className="flex-1 min-w-0">
             {/* İsim - Her zaman 2 satırlık alan */}
-            <div className="h-8 mb-1">
-              <h3 
-                className="font-semibold text-sm text-gray-900 cursor-pointer hover:text-primary-blue transition-colors line-clamp-2 leading-4"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/profile/${post.user?.user_id}`);
-                }}
-              >
-                {post.user?.full_name}
-              </h3>
-            </div>
+            <h3 
+              className="font-semibold text-sm text-gray-900 cursor-pointer hover:text-primary-blue transition-colors line-clamp-2 leading-[18px] mb-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/profile/${post.user?.user_id}`);
+              }}
+            >
+              {post.user?.full_name}
+            </h3>
+            
             {/* Ünvan ve İl Kodu - Tek satır */}
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 flex-nowrap overflow-hidden">
+            <div className="flex items-center gap-1.5 mb-0.5">
               {getUserTitle(post.user, true) && (
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <>
                   <span 
-                    className="font-medium text-primary-blue cursor-pointer hover:underline whitespace-nowrap text-[11px]"
+                    className="font-medium text-primary-blue cursor-pointer hover:underline text-[10px] whitespace-nowrap"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Kullanıcı tipine göre kategori sayfasına yönlendir
                       if (post.user?.user_type === 'politician' && post.user?.politician_type === 'mp') {
                         navigate('/category/mps');
                       } else if (post.user?.user_type === 'politician') {
@@ -121,7 +119,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
                   >
                     {getUserTitle(post.user, true)}
                   </span>
-                  {/* İl kodu - Tüm kullanıcılarda göster */}
+                  {/* İl kodu - Görevin yanında */}
                   {post.user?.city_code && (
                     <Link
                       to={`/city/${post.user.city_code}`}
@@ -131,12 +129,13 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
                       {post.user.city_code}
                     </Link>
                   )}
-                </div>
+                </>
               )}
-              {getUserTitle(post.user) && (
-                <span className="flex-shrink-0">•</span>
-              )}
-              <span className="flex-shrink-0">{formatTimeAgo(post.created_at)}</span>
+            </div>
+            
+            {/* Paylaşım Zamanı - Alt satır */}
+            <div className="text-[10px] text-gray-500">
+              {formatTimeAgo(post.created_at)}
             </div>
           </div>
         </div>
