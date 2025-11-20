@@ -107,7 +107,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               <button
                 key={code}
                 onClick={() => navigate(`/city/${cityCode}`)}
-                className="w-[18px] h-[18px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[9px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
+                className="w-[16px] h-[16px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[8px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
                 title={cityNames[cityCode] || `${code} plaka kodu`}
               >
                 {code}
