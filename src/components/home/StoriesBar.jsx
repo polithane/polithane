@@ -6,7 +6,7 @@ export const StoriesBar = ({ stories = [] }) => {
   const navigate = useNavigate();
   const [hoveredStory, setHoveredStory] = useState(null);
   
-  // Mock stories data - gerçek data gelene kadar
+  // Mock stories data - gerçek data gelene kadar (12 örnek - satıra sığacak kadar)
   const mockStories = stories.length > 0 ? stories : [
     { user_id: 1, full_name: 'Kemal Kılıçdaroğlu', profile_image: 'https://i.pravatar.cc/150?img=1', story_count: 3 },
     { user_id: 2, full_name: 'Devlet Bahçeli', profile_image: 'https://i.pravatar.cc/150?img=2', story_count: 1 },
@@ -17,22 +17,9 @@ export const StoriesBar = ({ stories = [] }) => {
     { user_id: 7, full_name: 'Tunç Soyer', profile_image: 'https://i.pravatar.cc/150?img=7', story_count: 3 },
     { user_id: 8, full_name: 'Fatih Erbakan', profile_image: 'https://i.pravatar.cc/150?img=8', story_count: 2 },
     { user_id: 9, full_name: 'Ali Babacan', profile_image: 'https://i.pravatar.cc/150?img=9', story_count: 1 },
-    { user_id: 10, full_name: 'Temel Karamollaoğlu', profile_image: 'https://i.pravatar.cc/150?img=10', story_count: 3 },
-    { user_id: 11, full_name: 'Canan Kaftancıoğlu', profile_image: 'https://i.pravatar.cc/150?img=11', story_count: 2 },
-    { user_id: 12, full_name: 'Özgür Özel', profile_image: 'https://i.pravatar.cc/150?img=12', story_count: 1 },
-    { user_id: 13, full_name: 'Murat Kurum', profile_image: 'https://i.pravatar.cc/150?img=13', story_count: 4 },
-    { user_id: 14, full_name: 'Süleyman Soylu', profile_image: 'https://i.pravatar.cc/150?img=14', story_count: 2 },
-    { user_id: 15, full_name: 'İsmail Saymaz', profile_image: 'https://i.pravatar.cc/150?img=15', story_count: 3 },
-    { user_id: 16, full_name: 'Müşerref Akay', profile_image: 'https://i.pravatar.cc/150?img=16', story_count: 1 },
-    { user_id: 17, full_name: 'Nagehan Alçı', profile_image: 'https://i.pravatar.cc/150?img=17', story_count: 2 },
-    { user_id: 18, full_name: 'Erkan Tan', profile_image: 'https://i.pravatar.cc/150?img=18', story_count: 1 },
-    { user_id: 19, full_name: 'Ümit Özdağ', profile_image: 'https://i.pravatar.cc/150?img=19', story_count: 3 },
-    { user_id: 20, full_name: 'Tuncay Özkan', profile_image: 'https://i.pravatar.cc/150?img=20', story_count: 2 },
-    { user_id: 21, full_name: 'Selçuk Özdağ', profile_image: 'https://i.pravatar.cc/150?img=21', story_count: 1 },
-    { user_id: 22, full_name: 'Cem Küçük', profile_image: 'https://i.pravatar.cc/150?img=22', story_count: 4 },
-    { user_id: 23, full_name: 'Fatih Portakal', profile_image: 'https://i.pravatar.cc/150?img=23', story_count: 2 },
-    { user_id: 24, full_name: 'Ahmet Hakan', profile_image: 'https://i.pravatar.cc/150?img=24', story_count: 3 },
-    { user_id: 25, full_name: 'Sevilay Yılman', profile_image: 'https://i.pravatar.cc/150?img=25', story_count: 1 },
+    { user_id: 10, full_name: 'Özgür Özel', profile_image: 'https://i.pravatar.cc/150?img=12', story_count: 1 },
+    { user_id: 11, full_name: 'Murat Kurum', profile_image: 'https://i.pravatar.cc/150?img=13', story_count: 4 },
+    { user_id: 12, full_name: 'İsmail Saymaz', profile_image: 'https://i.pravatar.cc/150?img=15', story_count: 3 },
   ];
   
   // Story border'ı - story sayısına göre segmentlere böl
