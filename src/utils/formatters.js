@@ -10,16 +10,19 @@ export const formatNumber = (num) => {
   return num.toString();
 };
 
-// Polit Puan formatlama (K yerine P. kullanır)
+// Polit Puan formatlama - Her zaman "P." ile biter (3 P., 150 P., 2,15K P.)
 export const formatPolitScore = (num) => {
-  if (!num && num !== 0) return '0';
+  if (!num && num !== 0) return '0 P.';
   if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M';
+    // Milyon: 2,5M P.
+    return (num / 1000000).toFixed(2).replace('.', ',') + 'M P.';
   }
   if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'P.';
+    // Bin: 2,15K P.
+    return (num / 1000).toFixed(2).replace('.', ',') + 'K P.';
   }
-  return num.toString();
+  // Normal sayılar: 150 P.
+  return num.toString() + ' P.';
 };
 
 // Tarih formatlama

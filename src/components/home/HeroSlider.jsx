@@ -100,7 +100,7 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
               )}
               <span className="text-xs text-white/70">•</span>
               <span className="text-xs text-white/90 font-medium">
-                {formatPolitScore(currentPost.polit_score)} PP
+                {formatPolitScore(currentPost.polit_score)}
               </span>
             </div>
           </div>

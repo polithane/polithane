@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Eye, Heart, MessageCircle, Share2, Video, Image as ImageIcon, Music, FileText } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
+import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
 import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration } from '../../utils/formatters';
 import { getUserTitle } from '../../utils/titleHelpers';
 import { useNavigate, Link } from 'react-router-dom';
@@ -8,6 +10,7 @@ import { CONTENT_TYPES } from '../../utils/constants';
 
 export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPosition = false }) => {
   const navigate = useNavigate();
+  const [showScoreModal, setShowScoreModal] = useState(false);
   
   const getContentIcon = () => {
     switch (post.content_type) {
@@ -29,7 +32,14 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
     >
       {/* Parti Logosu - SAĞ ÜST KÖŞE - Responsive */}
       {post.user?.party_id && post.user?.party?.party_logo && (
-        <div className="absolute top-4 right-4 z-10">
+        <div 
+          className="absolute top-4 right-4 z-10 cursor-pointer hover:scale-110 transition-transform"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/party/${post.user.party_id}`);
+          }}
+          title={`${post.user.party.party_short_name} detayını gör`}
+        >
           <img 
             src={post.user.party.party_logo} 
             alt={post.user.party.party_short_name}
@@ -44,24 +54,56 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
       {/* Üst Bilgi */}
       <div className="flex items-start justify-between mb-3 pr-10">
         <div className="flex items-center gap-3 flex-1">
-          <Avatar 
-            src={post.user?.profile_image} 
-            size="40px" 
-            verified={post.user?.verification_badge}
-          />
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/profile/${post.user?.user_id}`);
+            }}
+            className="cursor-pointer hover:opacity-80 transition-opacity"
+          >
+            <Avatar 
+              src={post.user?.profile_image} 
+              size="40px" 
+              verified={post.user?.verification_badge}
+            />
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-gray-900 break-words">
+              <span 
+                className="font-semibold text-gray-900 break-words cursor-pointer hover:text-primary-blue transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/profile/${post.user?.user_id}`);
+                }}
+              >
                 {post.user?.full_name}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
               {getUserTitle(post.user) && (
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className="font-medium text-primary-blue">
+                  <span 
+                    className="font-medium text-primary-blue cursor-pointer hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Kullanıcı tipine göre kategori sayfasına yönlendir
+                      if (post.user?.user_type === 'politician' && post.user?.politician_type === 'mp') {
+                        navigate('/category/mps');
+                      } else if (post.user?.user_type === 'politician') {
+                        navigate('/category/organization');
+                      } else if (post.user?.user_type === 'ex_politician') {
+                        navigate('/category/experience');
+                      } else if (post.user?.user_type === 'media') {
+                        navigate('/category/media');
+                      } else {
+                        navigate('/category/citizens');
+                      }
+                    }}
+                  >
                     {getUserTitle(post.user)}
                   </span>
-                  {post.user?.city_code && ['mp', 'provincial_chair', 'district_chair', 'metropolitan_mayor', 'district_mayor'].includes(post.user?.politician_type) && (
+                  {/* İl kodu - Tüm kullanıcılarda göster */}
+                  {post.user?.city_code && (
                     <Link
                       to={`/city/${post.user.city_code}`}
                       className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-900 hover:bg-primary-blue text-white text-xs font-semibold rounded-full transition-colors"
@@ -81,11 +123,17 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
         </div>
         
         {/* Polit Puan */}
-        <div className="text-right ml-2">
-          <div className="text-lg font-bold text-primary-blue">
+        <div 
+          className="text-right ml-2 cursor-pointer hover:scale-105 transition-transform"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowScoreModal(true);
+          }}
+          title="Polit Puan detaylarını gör"
+        >
+          <div className="text-lg font-bold text-primary-blue hover:text-blue-700">
             {formatPolitScore(post.polit_score)}
           </div>
-          <div className="text-xs text-gray-500 whitespace-nowrap">Polit Puan</div>
         </div>
       </div>
       
@@ -144,7 +192,18 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
       
       {/* Gündem Etiketi */}
       {post.agenda_tag && (
-        <div className="mb-3">
+        <div 
+          className="mb-3 cursor-pointer inline-block"
+          onClick={(e) => {
+            e.stopPropagation();
+            // Gündem slug'ını oluştur
+            const slug = post.agenda_tag.toLowerCase()
+              .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i')
+              .replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
+              .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            navigate(`/agenda/${slug}`);
+          }}
+        >
           <Badge variant="primary" size="small">
             {post.agenda_tag}
           </Badge>
@@ -171,6 +230,14 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           <Share2 className="w-4 h-4" />
         </button>
       </div>
+      
+      {/* Polit Puan Detay Modalı */}
+      {showScoreModal && (
+        <PolitScoreDetailModal 
+          post={post}
+          onClose={() => setShowScoreModal(false)}
+        />
+      )}
     </div>
   );
 };

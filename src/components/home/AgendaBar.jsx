@@ -15,10 +15,10 @@ export const AgendaBar = ({ agendas = [] }) => {
   
   const visibleAgendas = agendas.slice(0, visibleCount);
   
-  // Birinci satır: 5 gündem, İkinci satır: 5 gündem + TÜM GÜNDEME BAK butonu
+  // Birinci satır: 3 gündem + REKLAM + 1 gündem, İkinci satır: 5 gündem + TÜM GÜNDEME BAK butonu
   const trendingAgendas = agendas.slice(0, 10); // 10 gündem
-  const firstRow = trendingAgendas.slice(0, 5);
-  const secondRow = trendingAgendas.slice(5, 10);
+  const firstRow = trendingAgendas.slice(0, 4); // İlk 4 gündem (3. sonrası reklam)
+  const secondRow = trendingAgendas.slice(4, 9);
   
   const AgendaButton = ({ agenda, index }) => {
     // İlk 3 gündem için ateş ikonu - FARKLI HIZ ANİMASYONLARI (Flash efekti)
@@ -50,6 +50,21 @@ export const AgendaBar = ({ agendas = [] }) => {
       </button>
     );
   };
+  
+  // REKLAM ALANI - 4. sırada (180px genişlik x 42px yükseklik)
+  const AdSpace = () => (
+    <div className="flex-1 min-w-[180px] max-w-[220px]">
+      <div
+        className="h-full px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center"
+        onClick={() => window.open('https://yusufbank.com', '_blank')}
+      >
+        <div className="text-center">
+          <p className="text-sm font-bold text-white drop-shadow-md">🏦 YusufBANK</p>
+          <p className="text-xs text-white/90">Güvenli Bankacılık</p>
+        </div>
+      </div>
+    </div>
+  );
   
   // "TÜM GÜNDEME BAK" butonu - Kurumsal mavi renk
   const AllAgendasButton = () => (
@@ -136,10 +151,15 @@ export const AgendaBar = ({ agendas = [] }) => {
           <h3 className="text-sm font-semibold text-gray-700">GÜNDEM</h3>
         </div>
         <div className="space-y-2">
-          {/* İlk Satır - 5 gündem */}
+          {/* İlk Satır - 3 gündem + REKLAM + 1 gündem */}
           <div className="flex gap-2 pb-2">
-            {firstRow.map((agenda, index) => (
+            {firstRow.slice(0, 3).map((agenda, index) => (
               <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index} />
+            ))}
+            {/* REKLAM ALANI - 4. pozisyon */}
+            <AdSpace />
+            {firstRow.slice(3, 4).map((agenda, index) => (
+              <AgendaButton key={agenda.agenda_id} agenda={agenda} index={3} />
             ))}
           </div>
           
@@ -147,7 +167,7 @@ export const AgendaBar = ({ agendas = [] }) => {
           {secondRow.length > 0 && (
             <div className="flex gap-2 pb-2">
               {secondRow.map((agenda, index) => (
-                <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index + 5} />
+                <AgendaButton key={agenda.agenda_id} agenda={agenda} index={index + 4} />
               ))}
               <AllAgendasButton />
             </div>
