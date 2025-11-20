@@ -1,4 +1,4 @@
-import { X, Users, Building2, MapPin, TrendingUp, Flag } from 'lucide-react';
+import { Users, Building2, MapPin, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const CityDetailPopup = ({ cityCode, cityName, onClose, position }) => {
@@ -51,12 +51,6 @@ export const CityDetailPopup = ({ cityCode, cityName, onClose, position }) => {
               <p className="text-xs text-gray-500">Plaka: {cityCode}</p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
         
         {/* Detaylar */}

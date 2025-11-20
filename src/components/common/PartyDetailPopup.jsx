@@ -1,4 +1,4 @@
-import { X, Users, Building2, MapPin, TrendingUp } from 'lucide-react';
+import { Users, Building2, MapPin, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const PartyDetailPopup = ({ party, onClose, position }) => {
@@ -40,6 +40,9 @@ export const PartyDetailPopup = ({ party, onClose, position }) => {
                 src={party.party_logo} 
                 alt={party.party_short_name}
                 className="w-10 h-10 object-contain"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
               />
             )}
             <div>
@@ -47,12 +50,6 @@ export const PartyDetailPopup = ({ party, onClose, position }) => {
               <p className="text-xs text-gray-500">{party.party_name}</p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
         
         {/* Detaylar */}
