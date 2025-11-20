@@ -91,9 +91,9 @@ export const AgendaBar = ({ agendas = [] }) => {
           )}
         </div>
         
-        {/* Gündem Pills - İlk 3 Gündem (Alt satıra kayabilir, kaydırma yok) */}
+        {/* Gündem Pills - İlk 4 Gündem (3 gündem + 1 reklam) */}
         <div className="flex flex-wrap gap-2 mb-3">
-          {visibleAgendas.slice(0, Math.min(visibleCount, 3)).map((agenda, index) => (
+          {visibleAgendas.slice(0, Math.min(visibleCount, 4)).map((agenda, index) => (
             <button
               key={agenda.agenda_id}
               onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
@@ -115,17 +115,17 @@ export const AgendaBar = ({ agendas = [] }) => {
           ))}
         </div>
         
-        {/* Expanded Agendas - Grid Layout (eğer 3'ten fazla gösteriliyorsa) */}
-        {visibleCount > 3 && (
+        {/* Expanded Agendas - Grid Layout (eğer 4'ten fazla gösteriliyorsa) */}
+        {visibleCount > 4 && (
           <div className="space-y-2">
-            {visibleAgendas.slice(3).map((agenda, index) => (
+            {visibleAgendas.slice(4).map((agenda, index) => (
               <button
                 key={agenda.agenda_id}
                 onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
                 className="w-full flex items-center justify-between px-3 py-2.5 bg-white border border-gray-200 rounded-lg hover:border-primary-blue hover:bg-blue-50 transition-all"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {index + 3 < 3 && (
+                  {index + 4 < 3 && (
                     <Flame 
                       className="w-3 h-3 flex-shrink-0 text-yellow-500" 
                       fill="currentColor"
