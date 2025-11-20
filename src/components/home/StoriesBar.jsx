@@ -50,56 +50,58 @@ export const StoriesBar = ({ stories = [] }) => {
   
   return (
     <div className="mb-4">
-      {/* Desktop & Mobile - Tüm genişliğe yayılan container */}
-      <div className="flex items-center gap-2 py-2 overflow-x-auto scrollbar-hide">
-        {/* Story Items */}
-        {mockStories.map((story) => (
-          <button
-            key={story.user_id}
-            onClick={() => navigate(`/stories/${story.user_id}`)}
-            onMouseEnter={() => setHoveredStory(story.user_id)}
-            onMouseLeave={() => setHoveredStory(null)}
-            className="flex-shrink-0 group relative"
-            title={story.full_name}
-          >
-            {/* Gradient border container */}
-            <div className={`w-[50px] h-[50px] rounded-full p-[2px] ${
-              story.story_count > 1 
-                ? 'bg-gradient-to-tr from-primary-blue via-blue-400 to-primary-blue' 
-                : 'bg-primary-blue'
-            }`}>
-              {/* Inner circle - profile image */}
-              <div className="w-full h-full rounded-full bg-white p-[1.5px]">
-                <img 
-                  src={story.profile_image} 
-                  alt={story.full_name}
-                  className="w-full h-full rounded-full object-cover group-hover:scale-105 transition-transform"
-                />
+      {/* Desktop & Mobile - Overflow ile scroll */}
+      <div className="flex items-center gap-2 py-2 overflow-x-auto scrollbar-hide pr-2">
+        {/* Story Items Container */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {mockStories.map((story) => (
+            <button
+              key={story.user_id}
+              onClick={() => navigate(`/stories/${story.user_id}`)}
+              onMouseEnter={() => setHoveredStory(story.user_id)}
+              onMouseLeave={() => setHoveredStory(null)}
+              className="flex-shrink-0 group relative"
+              title={story.full_name}
+            >
+              {/* Gradient border container */}
+              <div className={`w-[50px] h-[50px] rounded-full p-[2px] ${
+                story.story_count > 1 
+                  ? 'bg-gradient-to-tr from-primary-blue via-blue-400 to-primary-blue' 
+                  : 'bg-primary-blue'
+              }`}>
+                {/* Inner circle - profile image */}
+                <div className="w-full h-full rounded-full bg-white p-[1.5px]">
+                  <img 
+                    src={story.profile_image} 
+                    alt={story.full_name}
+                    className="w-full h-full rounded-full object-cover group-hover:scale-105 transition-transform"
+                  />
+                </div>
               </div>
-            </div>
-            
-            {/* Story count badge */}
-            {story.story_count > 1 && (
-              <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary-blue text-white text-[8px] font-bold rounded-full flex items-center justify-center border-[1.5px] border-white shadow-sm">
-                {story.story_count}
-              </div>
-            )}
-            
-            {/* Hover effect */}
-            {hoveredStory === story.user_id && (
-              <div className="absolute inset-0 rounded-full bg-primary-blue bg-opacity-10 animate-pulse"></div>
-            )}
-          </button>
-        ))}
+              
+              {/* Story count badge */}
+              {story.story_count > 1 && (
+                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary-blue text-white text-[8px] font-bold rounded-full flex items-center justify-center border-[1.5px] border-white shadow-sm">
+                  {story.story_count}
+                </div>
+              )}
+              
+              {/* Hover effect */}
+              {hoveredStory === story.user_id && (
+                <div className="absolute inset-0 rounded-full bg-primary-blue bg-opacity-10 animate-pulse"></div>
+              )}
+            </button>
+          ))}
+        </div>
         
-        {/* Tümü Butonu - SONDA */}
+        {/* Tümü Butonu - Her zaman sağda görünür */}
         <button
           onClick={() => navigate('/stories')}
-          className="flex-shrink-0 group ml-auto"
+          className="flex-shrink-0 group sticky right-0 bg-gray-50 pl-2"
           title="Tüm hikayeleri gör"
         >
           <div className="relative">
-            <div className="w-[50px] h-[50px] rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center hover:from-gray-300 hover:to-gray-400 transition-all">
+            <div className="w-[50px] h-[50px] rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center hover:from-gray-300 hover:to-gray-400 transition-all shadow-md">
               <Plus className="w-6 h-6 text-gray-600 group-hover:text-gray-700" />
             </div>
           </div>
