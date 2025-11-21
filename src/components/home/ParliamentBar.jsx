@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getPartyFlagPath } from '../../utils/imagePaths';
 import { PartyDetailPopup } from '../common/PartyDetailPopup';
 import { CityDetailPopup } from '../common/CityDetailPopup';
 
@@ -25,16 +24,23 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
       <div className="flex h-24 overflow-hidden rounded-t-lg border border-gray-300 w-full">
         {parliamentData.map((party, index) => {
           const widthPercentage = (party.seats / totalSeats) * 100;
-          const flagPath = getPartyFlagPath(party.shortName, index + 1);
           
           const logoMap = {
             'AK PARTİ': 'ak_parti.png',
             'CHP': 'chp.png',
+            'DEM Parti': 'dem_parti.png',
             'MHP': 'mhp.png',
-            'DEM': 'dem_parti.png',
             'İYİ PARTİ': 'iyi_parti.png',
+            'YENİ YOL': 'yeni_yol.png',
             'YRP': 'yrp.png',
-            'Bağımsız': 'bagimsiz.png'
+            'HÜRDAVA': 'hurdava.png',
+            'TİP': 'tip.png',
+            'BAĞIMSIZ': 'bagimsiz.png',
+            'DBP': 'dbp.png',
+            'EMEP': 'emep.png',
+            'SAADET': 'saadet.png',
+            'DSP': 'dsp.png',
+            'DP': 'dp.png'
           };
           
           const partyData = {
@@ -57,10 +63,6 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               style={{
                 width: `${widthPercentage}%`,
                 backgroundColor: party.color,
-                backgroundImage: `url(${flagPath})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
                 minWidth: '20px',
                 flexShrink: 0
               }}
