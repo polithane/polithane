@@ -141,7 +141,7 @@ export const Header = () => {
                 onClick={() => navigate('/register-new')}
                 className="px-4 py-2 text-primary-blue font-semibold hover:bg-blue-50 rounded-lg transition-colors"
               >
-                Kayıt Ol
+                Üye Ol
               </button>
               <button
                 onClick={() => navigate('/login-new')}
