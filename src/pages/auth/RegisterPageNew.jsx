@@ -402,7 +402,7 @@ export const RegisterPageNew = () => {
                       value={formData.full_name}
                       onChange={handleChange}
                       placeholder="Ahmet Yılmaz"
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                      className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                       required
                     />
                   </div>
@@ -418,7 +418,7 @@ export const RegisterPageNew = () => {
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="ornek@email.com"
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                      className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                       required
                     />
                   </div>
@@ -434,7 +434,7 @@ export const RegisterPageNew = () => {
                       value={formData.phone}
                       onChange={handleChange}
                       placeholder="5XX XXX XX XX"
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                      className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                       required
                     />
                   </div>
@@ -451,7 +451,7 @@ export const RegisterPageNew = () => {
                       value={formData.password}
                       onChange={handleChange}
                       placeholder="En az 8 karakter"
-                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                      className="w-full pl-14 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                       required
                     />
                     <button
@@ -496,7 +496,7 @@ export const RegisterPageNew = () => {
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       placeholder="Şifrenizi tekrar girin"
-                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                      className="w-full pl-14 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                       required
                     />
                     <button
@@ -590,7 +590,7 @@ export const RegisterPageNew = () => {
                       value={formData.username}
                       onChange={handleChange}
                       placeholder="@kullaniciadi"
-                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                      className="w-full pl-14 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                       required
                     />
                     <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -617,17 +617,154 @@ export const RegisterPageNew = () => {
                 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Hesap Tipi *</label>
-                  <select
-                    name="user_type"
-                    value={formData.user_type}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
-                  >
-                    <option value="normal">Vatandaş</option>
-                    <option value="party_member">Parti Üyesi</option>
-                    <option value="politician">Siyasetçi</option>
-                    <option value="media">Medya</option>
-                  </select>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Hesap tipiniz, platformdaki özelliklerinizi ve yetkilerinizi belirler
+                  </p>
+                  
+                  <div className="space-y-2">
+                    {/* Vatandaş */}
+                    <label className="flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-primary-blue transition-all bg-white">
+                      <input
+                        type="radio"
+                        name="user_type"
+                        value="normal"
+                        checked={formData.user_type === 'normal'}
+                        onChange={handleChange}
+                        className="w-5 h-5 mt-0.5 text-primary-blue border-gray-300 focus:ring-primary-blue"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                          👤 Vatandaş
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Popüler</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Siyaseti takip edin, yorum yapın ve oy verin. Standart kullanıcı hesabı.
+                        </p>
+                      </div>
+                    </label>
+                    
+                    {/* Parti Üyesi */}
+                    <label className="flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-primary-blue transition-all bg-white">
+                      <input
+                        type="radio"
+                        name="user_type"
+                        value="party_member"
+                        checked={formData.user_type === 'party_member'}
+                        onChange={handleChange}
+                        className="w-5 h-5 mt-0.5 text-primary-blue border-gray-300 focus:ring-primary-blue"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                          🎗️ Parti Üyesi
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Bir siyasi partiye üye olarak içerik paylaşın ve parti aktivitelerine katılın.
+                        </p>
+                      </div>
+                    </label>
+                    
+                    {/* Siyasetçi */}
+                    <label className="flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-primary-blue transition-all bg-white">
+                      <input
+                        type="radio"
+                        name="user_type"
+                        value="politician"
+                        checked={formData.user_type === 'politician'}
+                        onChange={handleChange}
+                        className="w-5 h-5 mt-0.5 text-primary-blue border-gray-300 focus:ring-primary-blue"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                          🏛️ Siyasetçi
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Doğrulama Gerekli</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Milletvekili, belediye başkanı veya siyasi parti yöneticisi. Kimlik doğrulaması gereklidir.
+                        </p>
+                      </div>
+                    </label>
+                    
+                    {/* Eski Siyasetçi */}
+                    <label className="flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-primary-blue transition-all bg-white">
+                      <input
+                        type="radio"
+                        name="user_type"
+                        value="ex_politician"
+                        checked={formData.user_type === 'ex_politician'}
+                        onChange={handleChange}
+                        className="w-5 h-5 mt-0.5 text-primary-blue border-gray-300 focus:ring-primary-blue"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                          📜 Eski Siyasetçi
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Görevden ayrılmış milletvekili, bakan veya yerel yönetici. Tecrübelerinizi paylaşın.
+                        </p>
+                      </div>
+                    </label>
+                    
+                    {/* Medya */}
+                    <label className="flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-primary-blue transition-all bg-white">
+                      <input
+                        type="radio"
+                        name="user_type"
+                        value="media"
+                        checked={formData.user_type === 'media'}
+                        onChange={handleChange}
+                        className="w-5 h-5 mt-0.5 text-primary-blue border-gray-300 focus:ring-primary-blue"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                          📰 Medya / Gazeteci
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Doğrulama Gerekli</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Gazete, TV, radyo veya dijital medya çalışanı. Haber ve analiz paylaşın.
+                        </p>
+                      </div>
+                    </label>
+                    
+                    {/* Akademisyen */}
+                    <label className="flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-primary-blue transition-all bg-white">
+                      <input
+                        type="radio"
+                        name="user_type"
+                        value="academic"
+                        checked={formData.user_type === 'academic'}
+                        onChange={handleChange}
+                        className="w-5 h-5 mt-0.5 text-primary-blue border-gray-300 focus:ring-primary-blue"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                          🎓 Akademisyen / Uzman
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Siyaset bilimci, hukuk profesörü veya alan uzmanı. Akademik görüşler paylaşın.
+                        </p>
+                      </div>
+                    </label>
+                    
+                    {/* STK / Sivil Toplum */}
+                    <label className="flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-primary-blue transition-all bg-white">
+                      <input
+                        type="radio"
+                        name="user_type"
+                        value="ngo"
+                        checked={formData.user_type === 'ngo'}
+                        onChange={handleChange}
+                        className="w-5 h-5 mt-0.5 text-primary-blue border-gray-300 focus:ring-primary-blue"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                          🤝 STK / Sivil Toplum
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Dernek, vakıf veya sivil toplum kuruluşu temsilcisi. Toplumsal konularda ses getirin.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
                 
                 <div className="space-y-3 pt-4 border-t border-gray-200">
