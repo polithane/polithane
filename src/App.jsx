@@ -21,6 +21,9 @@ import { RegisterPageNew } from './pages/auth/RegisterPageNew';
 // Settings Pages
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { ProfileSettings } from './pages/settings/ProfileSettings';
+import { AccountSettings } from './pages/settings/AccountSettings';
+import { SecuritySettings } from './pages/settings/SecuritySettings';
+import { NotificationSettings } from './pages/settings/NotificationSettings';
 
 // Admin Pages
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -58,10 +61,10 @@ function App() {
         {/* Settings Routes */}
         <Route path="/settings" element={<><Header /><SettingsLayout /><Footer /></>}>
           <Route path="profile" element={<ProfileSettings />} />
-          <Route path="account" element={<div className="p-8 text-center text-gray-500">Hesap Ayarları - Yakında</div>} />
-          <Route path="security" element={<div className="p-8 text-center text-gray-500">Güvenlik - Yakında</div>} />
-          <Route path="notifications" element={<div className="p-8 text-center text-gray-500">Bildirimler - Yakında</div>} />
-          <Route path="privacy" element={<div className="p-8 text-center text-gray-500">Gizlilik - Yakında</div>} />
+          <Route path="account" element={<AccountSettings />} />
+          <Route path="security" element={<SecuritySettings />} />
+          <Route path="notifications" element={<NotificationSettings />} />
+          <Route path="privacy" element={<div className="p-8 text-center text-gray-500">Gizlilik Ayarları - Yakında</div>} />
           <Route path="appearance" element={<div className="p-8 text-center text-gray-500">Görünüm - Yakında</div>} />
         </Route>
         
