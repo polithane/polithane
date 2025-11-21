@@ -154,51 +154,41 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
       
       {/* Parti Detay Popup */}
       {hoveredParty && (
-        <div
-          onMouseEnter={() => {
-            if (partyHoverTimeout.current) {
-              clearTimeout(partyHoverTimeout.current);
-            }
-          }}
-          onMouseLeave={() => {
-            // Hemen kapat
+        <PartyDetailPopup 
+          party={hoveredParty}
+          position={popupPosition}
+          onClose={() => {
             setHoveredParty(null);
             if (partyHoverTimeout.current) {
               clearTimeout(partyHoverTimeout.current);
             }
           }}
-        >
-          <PartyDetailPopup 
-            party={hoveredParty}
-            position={popupPosition}
-            onClose={() => setHoveredParty(null)}
-          />
-        </div>
+          onMouseEnter={() => {
+            if (partyHoverTimeout.current) {
+              clearTimeout(partyHoverTimeout.current);
+            }
+          }}
+        />
       )}
       
       {/* İl Detay Popup */}
       {hoveredCity && (
-        <div
-          onMouseEnter={() => {
-            if (cityHoverTimeout.current) {
-              clearTimeout(cityHoverTimeout.current);
-            }
-          }}
-          onMouseLeave={() => {
-            // Hemen kapat
+        <CityDetailPopup 
+          cityCode={hoveredCity.code}
+          cityName={hoveredCity.name}
+          position={popupPosition}
+          onClose={() => {
             setHoveredCity(null);
             if (cityHoverTimeout.current) {
               clearTimeout(cityHoverTimeout.current);
             }
           }}
-        >
-          <CityDetailPopup 
-            cityCode={hoveredCity.code}
-            cityName={hoveredCity.name}
-            position={popupPosition}
-            onClose={() => setHoveredCity(null)}
-          />
-        </div>
+          onMouseEnter={() => {
+            if (cityHoverTimeout.current) {
+              clearTimeout(cityHoverTimeout.current);
+            }
+          }}
+        />
       )}
     </div>
   );
