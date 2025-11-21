@@ -62,22 +62,14 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 minWidth: '20px', // Çok küçük partiler için minimum genişlik
                 flexShrink: 0
               }}
-              title={`${party.name} - ${party.seats} sandalye (${widthPercentage.toFixed(1)}%)`}
               onClick={() => navigate(`/party/${index + 1}`)}
               onMouseEnter={(e) => {
-                // Önceki timeout'ları temizle
-                if (partyHoverTimeout.current) {
-                  clearTimeout(partyHoverTimeout.current);
-                }
                 const rect = e.currentTarget.getBoundingClientRect();
                 setPopupPosition({ x: rect.left, y: rect.bottom });
                 setHoveredParty(partyData);
               }}
               onMouseLeave={() => {
-                // Popup'a geçiş için 200ms delay
-                partyHoverTimeout.current = setTimeout(() => {
-                  setHoveredParty(null);
-                }, 200);
+                setHoveredParty(null);
               }}
             >
               {/* Parti kısa adı - sadece yeterince geniş alanlarda göster (yazı sığıyorsa) */}
@@ -130,19 +122,12 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 onClick={() => navigate(`/city/${cityCode}`)}
                 className="w-[15px] h-[15px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[7px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
                 onMouseEnter={(e) => {
-                  // Önceki timeout'ları temizle
-                  if (cityHoverTimeout.current) {
-                    clearTimeout(cityHoverTimeout.current);
-                  }
                   const rect = e.currentTarget.getBoundingClientRect();
                   setPopupPosition({ x: rect.left, y: rect.bottom });
                   setHoveredCity({ code: cityCode, name: cityNames[cityCode] });
                 }}
                 onMouseLeave={() => {
-                  // Popup'a geçiş için 200ms delay
-                  cityHoverTimeout.current = setTimeout(() => {
-                    setHoveredCity(null);
-                  }, 200);
+                  setHoveredCity(null);
                 }}
               >
                 {code}
@@ -157,17 +142,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
         <PartyDetailPopup 
           party={hoveredParty}
           position={popupPosition}
-          onClose={() => {
-            setHoveredParty(null);
-            if (partyHoverTimeout.current) {
-              clearTimeout(partyHoverTimeout.current);
-            }
-          }}
-          onMouseEnter={() => {
-            if (partyHoverTimeout.current) {
-              clearTimeout(partyHoverTimeout.current);
-            }
-          }}
+          onClose={() => setHoveredParty(null)}
         />
       )}
       
@@ -177,17 +152,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
           cityCode={hoveredCity.code}
           cityName={hoveredCity.name}
           position={popupPosition}
-          onClose={() => {
-            setHoveredCity(null);
-            if (cityHoverTimeout.current) {
-              clearTimeout(cityHoverTimeout.current);
-            }
-          }}
-          onMouseEnter={() => {
-            if (cityHoverTimeout.current) {
-              clearTimeout(cityHoverTimeout.current);
-            }
-          }}
+          onClose={() => setHoveredCity(null)}
         />
       )}
     </div>

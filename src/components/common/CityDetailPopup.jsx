@@ -1,7 +1,7 @@
 import { Users, Building2, MapPin, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export const CityDetailPopup = ({ cityCode, cityName, onClose, position, onMouseEnter }) => {
+export const CityDetailPopup = ({ cityCode, cityName, onClose, position }) => {
   const navigate = useNavigate();
   
   if (!cityCode) return null;
@@ -37,8 +37,7 @@ export const CityDetailPopup = ({ cityCode, cityName, onClose, position, onMouse
           transform: !position?.x ? 'translate(-50%, -50%)' : 'none'
         }}
         onClick={(e) => e.stopPropagation()}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onClose}
+        onMouseEnter={(e) => e.stopPropagation()}
       >
         {/* Başlık */}
         <div className="flex items-center justify-between mb-4">

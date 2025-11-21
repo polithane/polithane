@@ -1,7 +1,7 @@
 import { Users, Building2, MapPin, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter }) => {
+export const PartyDetailPopup = ({ party, onClose, position }) => {
   const navigate = useNavigate();
   
   if (!party) return null;
@@ -29,8 +29,7 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter }) => 
           transform: !position?.x ? 'translate(-50%, -50%)' : 'none'
         }}
         onClick={(e) => e.stopPropagation()}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onClose}
+        onMouseEnter={(e) => e.stopPropagation()}
       >
         {/* Başlık */}
         <div className="flex items-center justify-between mb-4">
@@ -48,6 +47,9 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter }) => 
             <div>
               <h3 className="font-bold text-lg text-gray-900">{party.party_short_name}</h3>
               <p className="text-xs text-gray-500">{party.party_name}</p>
+              <p className="text-xs text-primary-blue font-semibold mt-1">
+                {party.seats} Sandalye ({((party.seats / 600) * 100).toFixed(1)}%)
+              </p>
             </div>
           </div>
         </div>
