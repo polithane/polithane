@@ -36,7 +36,12 @@ export const LoginPageNew = () => {
       const result = await login(formData.email, formData.password);
       
       if (result.success) {
-        navigate('/');
+        // Admin kullanıcıları admin paneline yönlendir
+        if (result.user?.is_admin || result.user?.user_type === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
       } else {
         setError(result.error || 'Giriş başarısız');
       }
