@@ -34,33 +34,36 @@ export const Header = () => {
           
           {isLoggedIn ? (
             <>
-              {/* Bildirimler */}
-              <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <Bell className="w-5 h-5 text-gray-600" />
-                {notificationCount > 0 && (
-                  <Badge 
-                    variant="danger" 
-                    size="small"
-                    className="absolute -top-1 -right-1"
-                  >
-                    {notificationCount}
-                  </Badge>
-                )}
-              </button>
-              
-              {/* Mesajlar */}
-              <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <MessageCircle className="w-5 h-5 text-gray-600" />
-                {unreadMessages > 0 && (
-                  <Badge 
-                    variant="danger" 
-                    size="small"
-                    className="absolute -top-1 -right-1"
-                  >
-                    {unreadMessages}
-                  </Badge>
-                )}
-              </button>
+                {/* Bildirimler */}
+                <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <Bell className="w-5 h-5 text-gray-600" />
+                  {notificationCount > 0 && (
+                    <Badge 
+                      variant="danger" 
+                      size="small"
+                      className="absolute -top-1 -right-1"
+                    >
+                      {notificationCount}
+                    </Badge>
+                  )}
+                </button>
+                
+                {/* Mesajlar */}
+                <button
+                  onClick={() => navigate('/messages')}
+                  className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <MessageCircle className="w-5 h-5 text-gray-600" />
+                  {unreadMessages > 0 && (
+                    <Badge 
+                      variant="danger" 
+                      size="small"
+                      className="absolute -top-1 -right-1"
+                    >
+                      {unreadMessages}
+                    </Badge>
+                  )}
+                </button>
               
               {/* Kullanıcı Avatar */}
               <button onClick={() => navigate('/profile/1')}>
