@@ -4,11 +4,15 @@ import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { AnimatedSlogan } from '../common/AnimatedSlogan';
 import { useNavigate } from 'react-router-dom';
+import { mockConversations } from '../../mock/messages';
 
 export const Header = () => {
   const navigate = useNavigate();
   const [notificationCount] = useState(5);
-  const [unreadMessages] = useState(3);
+  // Okunmamış mesaj sayısını mock verilerden al
+  const unreadMessages = mockConversations
+    .filter(c => c.message_type === 'regular')
+    .reduce((sum, c) => sum + c.unread_count, 0);
   const [isLoggedIn] = useState(false); // Mock - gerçekte auth context'ten gelecek
   
   return (
@@ -49,7 +53,10 @@ export const Header = () => {
               </button>
               
               {/* Mesajlar */}
-              <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <button 
+                onClick={() => navigate('/messages')}
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
                 <MessageCircle className="w-5 h-5 text-gray-600" />
                 {unreadMessages > 0 && (
                   <Badge 
