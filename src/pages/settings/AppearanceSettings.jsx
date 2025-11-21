@@ -151,7 +151,7 @@ export const AppearanceSettings = () => {
           >
             <div className="text-lg font-semibold text-gray-900 mb-1">Büyük</div>
             <div className="text-xs text-gray-500">Daha rahat okuma</div>
-          </div>
+          </button>
         </div>
       </div>
 
