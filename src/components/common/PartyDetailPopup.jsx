@@ -14,11 +14,10 @@ export const PartyDetailPopup = ({ party, onClose, position }) => {
   
   return (
     <>
-      {/* Backdrop - mouse gelince kapat */}
+      {/* Backdrop - tıklanınca kapat */}
       <div 
         className="fixed inset-0 z-40"
         onClick={onClose}
-        onMouseEnter={onClose}
       />
       
       {/* Popup */}
@@ -30,6 +29,7 @@ export const PartyDetailPopup = ({ party, onClose, position }) => {
           transform: !position?.x ? 'translate(-50%, -50%)' : 'none'
         }}
         onClick={(e) => e.stopPropagation()}
+        onMouseLeave={onClose}
       >
         {/* Başlık */}
         <div className="flex items-center justify-between mb-4">

@@ -74,10 +74,10 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 setHoveredParty(partyData);
               }}
               onMouseLeave={() => {
-                // Popup'a geçiş için 100ms delay
+                // Popup'a geçiş için 200ms delay
                 partyHoverTimeout.current = setTimeout(() => {
                   setHoveredParty(null);
-                }, 100);
+                }, 200);
               }}
             >
               {/* Parti kısa adı - sadece yeterince geniş alanlarda göster (yazı sığıyorsa) */}
@@ -139,10 +139,10 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                   setHoveredCity({ code: cityCode, name: cityNames[cityCode] });
                 }}
                 onMouseLeave={() => {
-                  // Popup'a geçiş için 100ms delay
+                  // Popup'a geçiş için 200ms delay
                   cityHoverTimeout.current = setTimeout(() => {
                     setHoveredCity(null);
-                  }, 100);
+                  }, 200);
                 }}
               >
                 {code}
