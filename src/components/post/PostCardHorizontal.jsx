@@ -335,9 +335,9 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
           )}
         </div>
         
-        {/* Açıklama - Tam 2 satır (line-clamp-2) */}
+        {/* Açıklama - Her zaman 2 satırlık alan (SABİT YÜKSEKLİK) */}
         {post.content_text && (
-          <p className="text-gray-800 text-sm line-clamp-2 leading-snug mb-2">
+          <p className="text-gray-800 text-sm line-clamp-2 leading-snug mb-2 h-[42px]">
             {post.content_text}
           </p>
         )}
