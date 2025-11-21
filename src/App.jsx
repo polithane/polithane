@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
+import { FloatingChat } from './components/common/FloatingChat';
 import { HomePage } from './pages/HomePage';
 import { PostDetailPage } from './pages/PostDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -35,6 +36,7 @@ function App() {
           </Routes>
         </main>
         <Footer />
+        <FloatingChat />
         <Toaster position="top-right" />
       </div>
     </Router>
