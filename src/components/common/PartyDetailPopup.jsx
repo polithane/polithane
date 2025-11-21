@@ -14,10 +14,11 @@ export const PartyDetailPopup = ({ party, onClose, position }) => {
   
   return (
     <>
-      {/* Backdrop - tıklanınca kapat */}
+      {/* Backdrop - mouse gelince veya tıklanınca kapat */}
       <div 
         className="fixed inset-0 z-40"
         onClick={onClose}
+        onMouseMove={onClose}
       />
       
       {/* Popup */}
