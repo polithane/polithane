@@ -140,7 +140,7 @@ async function importProfiles() {
         const userType = determineUserType(gorev, gorev2);
         stats[userType]++;
         
-        // Username oluştur (küçük harf, boşluk yerine alt çizgi)
+        // Username oluştur (Türkçe karakterleri İngilizce'ye çevir, küçük harf, boşluk yerine alt çizgi)
         const username = adSoyad.toLowerCase()
           .replace(/ğ/g, 'g').replace(/ü/g, 'u')
           .replace(/ş/g, 's').replace(/ı/g, 'i')
