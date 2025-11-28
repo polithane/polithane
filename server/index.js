@@ -254,7 +254,7 @@ app.delete('/api/posts/:id', async (req, res) => {
 // USERS ENDPOINTS
 // ============================================
 
-// Get user profile
+// Get user profile (with extended profile based on user_type)
 app.get('/api/users/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -263,7 +263,7 @@ app.get('/api/users/:username', async (req, res) => {
       SELECT 
         id, username, full_name, bio, avatar_url, cover_url,
         polit_score, is_verified, follower_count, following_count,
-        post_count, created_at
+        post_count, user_type, created_at
       FROM users
       WHERE username = ${username}
     `;
@@ -272,7 +272,109 @@ app.get('/api/users/:username', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
     }
 
-    res.json({ success: true, data: user });
+    // Fetch extended profile based on user_type
+    let extendedProfile = null;
+    
+    switch (user.user_type) {
+      case 'mp': // Milletvekili
+        const [mpProfile] = await sql`
+          SELECT * FROM mp_profiles WHERE user_id = ${user.id}
+        `;
+        if (mpProfile) {
+          // Get parliamentary terms
+          const terms = await sql`
+            SELECT * FROM mp_parliamentary_terms 
+            WHERE mp_profile_id = ${mpProfile.id}
+            ORDER BY term_number DESC
+          `;
+          // Get commissions
+          const commissions = await sql`
+            SELECT * FROM mp_commissions 
+            WHERE mp_profile_id = ${mpProfile.id} AND is_current = true
+            ORDER BY created_at DESC
+          `;
+          extendedProfile = { ...mpProfile, terms, commissions };
+        }
+        break;
+        
+      case 'party_official': // Parti görevlisi
+        const [partyOfficialProfile] = await sql`
+          SELECT * FROM party_official_profiles WHERE user_id = ${user.id}
+        `;
+        if (partyOfficialProfile) {
+          // Get position history
+          const positions = await sql`
+            SELECT * FROM party_official_positions 
+            WHERE party_official_profile_id = ${partyOfficialProfile.id}
+            ORDER BY start_date DESC
+          `;
+          extendedProfile = { ...partyOfficialProfile, positions };
+        }
+        break;
+        
+      case 'citizen': // Vatandaş
+        const [citizenProfile] = await sql`
+          SELECT * FROM citizen_profiles WHERE user_id = ${user.id}
+        `;
+        extendedProfile = citizenProfile;
+        break;
+        
+      case 'party_member': // Parti üyesi vatandaş
+        const [partyMemberProfile] = await sql`
+          SELECT * FROM party_member_profiles WHERE user_id = ${user.id}
+        `;
+        // Also get base citizen profile
+        const [baseProfile] = await sql`
+          SELECT * FROM citizen_profiles WHERE user_id = ${user.id}
+        `;
+        extendedProfile = { ...baseProfile, ...partyMemberProfile };
+        break;
+        
+      case 'ex_politician': // Eski siyasetçi
+        const [exPoliticianProfile] = await sql`
+          SELECT * FROM ex_politician_profiles WHERE user_id = ${user.id}
+        `;
+        if (exPoliticianProfile) {
+          // Get career history
+          const career = await sql`
+            SELECT * FROM ex_politician_career 
+            WHERE ex_politician_profile_id = ${exPoliticianProfile.id}
+            ORDER BY start_date DESC
+          `;
+          extendedProfile = { ...exPoliticianProfile, career };
+        }
+        break;
+        
+      case 'media': // Medya mensubu
+        const [mediaProfile] = await sql`
+          SELECT * FROM media_profiles WHERE user_id = ${user.id}
+        `;
+        if (mediaProfile) {
+          // Get work history
+          const workHistory = await sql`
+            SELECT * FROM media_work_history 
+            WHERE media_profile_id = ${mediaProfile.id}
+            ORDER BY start_date DESC
+          `;
+          // Get publications
+          const publications = await sql`
+            SELECT * FROM media_publications 
+            WHERE media_profile_id = ${mediaProfile.id}
+            ORDER BY publication_date DESC
+            LIMIT 10
+          `;
+          extendedProfile = { ...mediaProfile, workHistory, publications };
+        }
+        break;
+    }
+
+    res.json({ 
+      success: true, 
+      data: {
+        ...user,
+        extendedProfile
+      }
+    });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -432,6 +534,150 @@ app.get('/api/parties/:id', async (req, res) => {
     res.json({ success: true, data: party });
   } catch (error) {
     console.error('Get party error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// PROFILE MANAGEMENT ENDPOINTS
+// ============================================
+
+// Create/Update MP Profile
+app.post('/api/profiles/mp', async (req, res) => {
+  try {
+    const { user_id, ...profileData } = req.body;
+    
+    if (!user_id) {
+      return res.status(400).json({ success: false, error: 'user_id zorunlu' });
+    }
+
+    // Check if profile exists
+    const [existing] = await sql`SELECT id FROM mp_profiles WHERE user_id = ${user_id}`;
+    
+    if (existing) {
+      // Update
+      const keys = Object.keys(profileData);
+      const values = Object.values(profileData);
+      
+      if (keys.length === 0) {
+        return res.status(400).json({ success: false, error: 'Güncellenecek alan belirtilmedi' });
+      }
+
+      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const query = `UPDATE mp_profiles SET ${setClause} WHERE user_id = $1 RETURNING *`;
+      
+      const [profile] = await sql(query, [user_id, ...values]);
+      res.json({ success: true, data: profile });
+    } else {
+      // Create
+      const [profile] = await sql`
+        INSERT INTO mp_profiles (user_id, ${sql(Object.keys(profileData))})
+        VALUES (${user_id}, ${sql(Object.values(profileData))})
+        RETURNING *
+      `;
+      res.status(201).json({ success: true, data: profile });
+    }
+  } catch (error) {
+    console.error('MP profile error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create/Update Citizen Profile
+app.post('/api/profiles/citizen', async (req, res) => {
+  try {
+    const { user_id, ...profileData } = req.body;
+    
+    if (!user_id) {
+      return res.status(400).json({ success: false, error: 'user_id zorunlu' });
+    }
+
+    const [existing] = await sql`SELECT id FROM citizen_profiles WHERE user_id = ${user_id}`;
+    
+    if (existing) {
+      const keys = Object.keys(profileData);
+      const values = Object.values(profileData);
+      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const query = `UPDATE citizen_profiles SET ${setClause} WHERE user_id = $1 RETURNING *`;
+      
+      const [profile] = await sql(query, [user_id, ...values]);
+      res.json({ success: true, data: profile });
+    } else {
+      const [profile] = await sql`
+        INSERT INTO citizen_profiles (user_id, ${sql(Object.keys(profileData))})
+        VALUES (${user_id}, ${sql(Object.values(profileData))})
+        RETURNING *
+      `;
+      res.status(201).json({ success: true, data: profile });
+    }
+  } catch (error) {
+    console.error('Citizen profile error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create/Update Party Official Profile
+app.post('/api/profiles/party-official', async (req, res) => {
+  try {
+    const { user_id, ...profileData } = req.body;
+    
+    if (!user_id) {
+      return res.status(400).json({ success: false, error: 'user_id zorunlu' });
+    }
+
+    const [existing] = await sql`SELECT id FROM party_official_profiles WHERE user_id = ${user_id}`;
+    
+    if (existing) {
+      const keys = Object.keys(profileData);
+      const values = Object.values(profileData);
+      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const query = `UPDATE party_official_profiles SET ${setClause} WHERE user_id = $1 RETURNING *`;
+      
+      const [profile] = await sql(query, [user_id, ...values]);
+      res.json({ success: true, data: profile });
+    } else {
+      const [profile] = await sql`
+        INSERT INTO party_official_profiles (user_id, ${sql(Object.keys(profileData))})
+        VALUES (${user_id}, ${sql(Object.values(profileData))})
+        RETURNING *
+      `;
+      res.status(201).json({ success: true, data: profile });
+    }
+  } catch (error) {
+    console.error('Party official profile error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create/Update Media Profile
+app.post('/api/profiles/media', async (req, res) => {
+  try {
+    const { user_id, ...profileData } = req.body;
+    
+    if (!user_id) {
+      return res.status(400).json({ success: false, error: 'user_id zorunlu' });
+    }
+
+    const [existing] = await sql`SELECT id FROM media_profiles WHERE user_id = ${user_id}`;
+    
+    if (existing) {
+      const keys = Object.keys(profileData);
+      const values = Object.values(profileData);
+      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const query = `UPDATE media_profiles SET ${setClause} WHERE user_id = $1 RETURNING *`;
+      
+      const [profile] = await sql(query, [user_id, ...values]);
+      res.json({ success: true, data: profile });
+    } else {
+      const [profile] = await sql`
+        INSERT INTO media_profiles (user_id, ${sql(Object.keys(profileData))})
+        VALUES (${user_id}, ${sql(Object.values(profileData))})
+        RETURNING *
+      `;
+      res.status(201).json({ success: true, data: profile });
+    }
+  } catch (error) {
+    console.error('Media profile error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
