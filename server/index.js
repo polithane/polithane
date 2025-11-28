@@ -78,9 +78,11 @@ app.use('/api/', limiter);
 
 // Import routes
 import authRoutes from './routes/auth.js';
+import postsRoutes from './routes/posts.js';
 
 // Use routes
 app.use('/api/auth', authRoutes);
+app.use('/api/posts', postsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
