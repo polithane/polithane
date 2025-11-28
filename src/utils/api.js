@@ -1,21 +1,34 @@
-// API Service - Backend bağlantısı
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// Helper function for fetch requests
-async function apiFetch(endpoint, options = {}) {
+// Helper function to get auth header
+const getAuthHeader = () => {
+  const token = localStorage.getItem('auth_token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
+// Helper function for API calls
+const apiCall = async (endpoint, options = {}) => {
+  const url = `${API_URL}${endpoint}`;
+  const headers = {
+    ...getAuthHeader(),
+    ...options.headers,
+  };
+
+  // Don't add Content-Type for FormData
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Bir hata oluştu');
+      throw new Error(data.error || 'API call failed');
     }
 
     return data;
@@ -23,311 +36,187 @@ async function apiFetch(endpoint, options = {}) {
     console.error('API Error:', error);
     throw error;
   }
-}
+};
 
 // ============================================
-// DATA ADAPTERS - Backend -> Frontend format
+// AUTH API
 // ============================================
+export const auth = {
+  login: (username, password) =>
+    apiCall('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
 
-// Backend'den gelen post verisini frontend formatına dönüştür
-function adaptPost(post) {
-  return {
-    post_id: post.id,
-    user_id: post.user_id,
-    content_type: post.content_type || 'text',
-    content_text: post.content,
-    media_url: post.media_urls?.[0] || null,
-    thumbnail_url: post.thumbnail_url,
-    media_duration: post.media_duration,
-    agenda_tag: post.category,
-    polit_score: parseInt(post.polit_score) || 0,
-    view_count: parseInt(post.view_count) || 0,
-    like_count: parseInt(post.like_count) || 0,
-    dislike_count: 0,
-    comment_count: parseInt(post.comment_count) || 0,
-    is_featured: post.is_trending || false,
-    created_at: post.created_at,
-    user: post.username ? {
-      user_id: post.user_id,
-      username: post.username,
-      full_name: post.full_name,
-      avatar_url: post.user_avatar,
-      is_verified: post.is_verified,
-      party_id: post.party_id,
-      party: post.party_name ? {
-        party_id: post.party_id,
-        party_name: post.party_name,
-        party_short_name: post.party_name,
-        party_logo: post.party_logo,
-        party_color: post.party_color,
-      } : null
-    } : null
-  };
-}
+  register: (userData) =>
+    apiCall('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    }),
 
-// Backend'den gelen party verisini frontend formatına dönüştür
-function adaptParty(party) {
-  return {
-    party_id: party.id,
-    party_name: party.name,
-    party_short_name: party.short_name,
-    party_logo: party.logo_url,
-    party_flag: party.flag_url,
-    parliament_seats: party.parliament_seats || 0,
-    foundation_date: party.founded_date,
-    party_color: party.color,
-    is_active: party.is_active,
-    mp_count: party.mp_count || 0,
-  };
-}
+  me: () => apiCall('/api/auth/me'),
+
+  logout: () =>
+    apiCall('/api/auth/logout', {
+      method: 'POST',
+    }),
+
+  changePassword: (currentPassword, newPassword) =>
+    apiCall('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+};
 
 // ============================================
 // POSTS API
 // ============================================
-
-export const postsAPI = {
-  // Get all posts with filters
-  getAll: async (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const result = await apiFetch(`/posts?${queryString}`);
-    return result.data.map(adaptPost);
+export const posts = {
+  getAll: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/posts${query ? `?${query}` : ''}`);
   },
 
-  // Get single post by ID
-  getById: async (postId) => {
-    const result = await apiFetch(`/posts/${postId}`);
-    return result.data;
-  },
+  getById: (id) => apiCall(`/api/posts/${id}`),
 
-  // Create new post
-  create: async (postData) => {
-    const result = await apiFetch('/posts', {
+  create: (formData) => {
+    // FormData for file upload
+    return apiCall('/api/posts', {
       method: 'POST',
-      body: JSON.stringify(postData),
+      body: formData,
     });
-    return result.data;
   },
 
-  // Update post
-  update: async (postId, postData) => {
-    const result = await apiFetch(`/posts/${postId}`, {
+  update: (id, data) =>
+    apiCall(`/api/posts/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(postData),
-    });
-    return result.data;
-  },
+      body: JSON.stringify(data),
+    }),
 
-  // Delete post
-  delete: async (postId) => {
-    const result = await apiFetch(`/posts/${postId}`, {
+  delete: (id) =>
+    apiCall(`/api/posts/${id}`, {
       method: 'DELETE',
-    });
-    return result.data;
-  },
+    }),
 
-  // Like/Unlike post
-  toggleLike: async (postId) => {
-    const result = await apiFetch(`/posts/${postId}/like`, {
+  like: (id) =>
+    apiCall(`/api/posts/${id}/like`, {
       method: 'POST',
-    });
-    return result.data;
-  },
-};
+    }),
 
-// ============================================
-// PARTIES API
-// ============================================
+  getComments: (id) => apiCall(`/api/posts/${id}/comments`),
 
-export const partiesAPI = {
-  // Get all parties
-  getAll: async () => {
-    const result = await apiFetch('/parties');
-    return result.data.map(adaptParty);
-  },
-
-  // Get single party by ID
-  getById: async (partyId) => {
-    const result = await apiFetch(`/parties/${partyId}`);
-    return result.data;
-  },
-
-  // Get party posts
-  getPosts: async (partyId, params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const result = await apiFetch(`/parties/${partyId}/posts?${queryString}`);
-    return result.data;
-  },
-
-  // Follow/Unfollow party
-  toggleFollow: async (partyId) => {
-    const result = await apiFetch(`/parties/${partyId}/follow`, {
+  addComment: (id, content, parent_id = null) =>
+    apiCall(`/api/posts/${id}/comments`, {
       method: 'POST',
-    });
-    return result.data;
-  },
+      body: JSON.stringify({ content, parent_id }),
+    }),
 };
 
 // ============================================
 // USERS API
 // ============================================
+export const users = {
+  getByUsername: (username) => apiCall(`/api/users/${username}`),
 
-export const usersAPI = {
-  // Get user by ID
-  getById: async (userId) => {
-    const result = await apiFetch(`/users/${userId}`);
-    return result.data;
-  },
-
-  // Get user by username
-  getByUsername: async (username) => {
-    const result = await apiFetch(`/users/username/${username}`);
-    return result.data;
-  },
-
-  // Get user posts
-  getPosts: async (userId, params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const result = await apiFetch(`/users/${userId}/posts?${queryString}`);
-    return result.data;
-  },
-
-  // Follow/Unfollow user
-  toggleFollow: async (userId) => {
-    const result = await apiFetch(`/users/${userId}/follow`, {
-      method: 'POST',
-    });
-    return result.data;
-  },
-
-  // Update profile
-  updateProfile: async (userId, userData) => {
-    const result = await apiFetch(`/users/${userId}`, {
+  updateProfile: (formData) =>
+    apiCall('/api/users/profile', {
       method: 'PUT',
-      body: JSON.stringify(userData),
-    });
-    return result.data;
-  },
-};
+      body: formData,
+    }),
 
-// ============================================
-// COMMENTS API
-// ============================================
-
-export const commentsAPI = {
-  // Get comments for a post
-  getByPostId: async (postId) => {
-    const result = await apiFetch(`/posts/${postId}/comments`);
-    return result.data;
-  },
-
-  // Create comment
-  create: async (commentData) => {
-    const result = await apiFetch('/comments', {
+  follow: (userId) =>
+    apiCall(`/api/users/${userId}/follow`, {
       method: 'POST',
-      body: JSON.stringify(commentData),
-    });
-    return result.data;
+    }),
+
+  getPosts: (username, params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/users/${username}/posts${query ? `?${query}` : ''}`);
   },
 
-  // Delete comment
-  delete: async (commentId) => {
-    const result = await apiFetch(`/comments/${commentId}`, {
+  getFollowers: (userId) => apiCall(`/api/users/${userId}/followers`),
+
+  getFollowing: (userId) => apiCall(`/api/users/${userId}/following`),
+};
+
+// ============================================
+// MESSAGES API
+// ============================================
+export const messages = {
+  getConversations: () => apiCall('/api/messages/conversations'),
+
+  getMessages: (userId) => apiCall(`/api/messages/${userId}`),
+
+  send: (receiver_id, content) =>
+    apiCall('/api/messages/send', {
+      method: 'POST',
+      body: JSON.stringify({ receiver_id, content }),
+    }),
+
+  delete: (messageId) =>
+    apiCall(`/api/messages/${messageId}`, {
       method: 'DELETE',
-    });
-    return result.data;
-  },
+    }),
 };
 
 // ============================================
-// AGENDAS API
+// ADMIN API
 // ============================================
+export const admin = {
+  getStats: () => apiCall('/api/admin/stats'),
 
-export const agendasAPI = {
-  // Get all agendas
-  getAll: async () => {
-    const result = await apiFetch('/agendas');
-    return result.data;
+  // Users
+  getUsers: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/users${query ? `?${query}` : ''}`);
   },
 
-  // Get single agenda by ID
-  getById: async (agendaId) => {
-    const result = await apiFetch(`/agendas/${agendaId}`);
-    return result.data;
+  updateUser: (userId, data) =>
+    apiCall(`/api/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteUser: (userId) =>
+    apiCall(`/api/admin/users/${userId}`, {
+      method: 'DELETE',
+    }),
+
+  // Posts
+  getPosts: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/posts${query ? `?${query}` : ''}`);
   },
 
-  // Get agenda posts
-  getPosts: async (agendaId, params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const result = await apiFetch(`/agendas/${agendaId}/posts?${queryString}`);
-    return result.data;
-  },
+  deletePost: (postId) =>
+    apiCall(`/api/admin/posts/${postId}`, {
+      method: 'DELETE',
+    }),
+
+  // Settings
+  getSettings: () => apiCall('/api/admin/settings'),
+
+  updateSettings: (settings) =>
+    apiCall('/api/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
 };
 
 // ============================================
-// SEARCH API
+// PARTIES API
 // ============================================
-
-export const searchAPI = {
-  // Search everything
-  search: async (query, params = {}) => {
-    const queryString = new URLSearchParams({ q: query, ...params }).toString();
-    const result = await apiFetch(`/search?${queryString}`);
-    return result.data;
-  },
-
-  // Search posts
-  searchPosts: async (query, params = {}) => {
-    const queryString = new URLSearchParams({ q: query, ...params }).toString();
-    const result = await apiFetch(`/search/posts?${queryString}`);
-    return result.data;
-  },
-
-  // Search users
-  searchUsers: async (query) => {
-    const result = await apiFetch(`/search/users?q=${encodeURIComponent(query)}`);
-    return result.data;
-  },
+export const parties = {
+  getAll: () => apiCall('/api/parties'),
+  getById: (id) => apiCall(`/api/parties/${id}`),
 };
 
-// ============================================
-// TRENDING API
-// ============================================
-
-export const trendingAPI = {
-  // Get trending posts
-  getPosts: async (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const result = await apiFetch(`/trending/posts?${queryString}`);
-    return result.data;
-  },
-
-  // Get trending agendas
-  getAgendas: async () => {
-    const result = await apiFetch('/trending/agendas');
-    return result.data;
-  },
-};
-
-// ============================================
-// STATS API
-// ============================================
-
-export const statsAPI = {
-  // Get general stats
-  getGeneral: async () => {
-    const result = await apiFetch('/stats');
-    return result.data;
-  },
-};
-
-// Default export
+// Export default object with all API modules
 export default {
-  posts: postsAPI,
-  parties: partiesAPI,
-  users: usersAPI,
-  comments: commentsAPI,
-  agendas: agendasAPI,
-  search: searchAPI,
-  trending: trendingAPI,
-  stats: statsAPI,
+  auth,
+  posts,
+  users,
+  messages,
+  admin,
+  parties,
 };
