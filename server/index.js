@@ -79,10 +79,16 @@ app.use('/api/', limiter);
 // Import routes
 import authRoutes from './routes/auth.js';
 import postsRoutes from './routes/posts.js';
+import messagesRoutes from './routes/messages.js';
+import usersRoutes from './routes/users.js';
+import adminRoutes from './routes/admin.js';
 
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postsRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
