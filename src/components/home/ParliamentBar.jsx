@@ -10,6 +10,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   const [hoveredCity, setHoveredCity] = useState(null);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const closeTimeoutRef = useRef(null);
+  const isMouseOverPopup = useRef(false);
   
   if (!parliamentData || parliamentData.length === 0) return null;
   
@@ -18,6 +19,21 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
+  };
+  
+  const handlePopupMouseEnter = () => {
+    isMouseOverPopup.current = true;
+    clearCloseTimeout();
+  };
+  
+  const handlePopupMouseLeave = () => {
+    isMouseOverPopup.current = false;
+    closeTimeoutRef.current = setTimeout(() => {
+      if (!isMouseOverPopup.current) {
+        setHoveredParty(null);
+        setHoveredCity(null);
+      }
+    }, 200);
   };
   
   return (
@@ -67,14 +83,20 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               onClick={() => navigate(`/party/${index + 1}`)}
               onMouseEnter={(e) => {
                 clearCloseTimeout();
+                isMouseOverPopup.current = false;
                 const rect = e.currentTarget.getBoundingClientRect();
                 setPopupPosition({ x: rect.left, y: rect.bottom });
+                setHoveredCity(null);
                 setHoveredParty(partyData);
               }}
               onMouseLeave={() => {
-                closeTimeoutRef.current = setTimeout(() => {
-                  setHoveredParty(null);
-                }, 150);
+                if (!isMouseOverPopup.current) {
+                  closeTimeoutRef.current = setTimeout(() => {
+                    if (!isMouseOverPopup.current) {
+                      setHoveredParty(null);
+                    }
+                  }, 200);
+                }
               }}
             >
               {widthPercentage > 5 && (
@@ -125,14 +147,20 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 className="w-[15px] h-[15px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[7px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
                 onMouseEnter={(e) => {
                   clearCloseTimeout();
+                  isMouseOverPopup.current = false;
                   const rect = e.currentTarget.getBoundingClientRect();
                   setPopupPosition({ x: rect.left, y: rect.bottom });
+                  setHoveredParty(null);
                   setHoveredCity({ code: cityCode, name: cityNames[cityCode] });
                 }}
                 onMouseLeave={() => {
-                  closeTimeoutRef.current = setTimeout(() => {
-                    setHoveredCity(null);
-                  }, 150);
+                  if (!isMouseOverPopup.current) {
+                    closeTimeoutRef.current = setTimeout(() => {
+                      if (!isMouseOverPopup.current) {
+                        setHoveredCity(null);
+                      }
+                    }, 200);
+                  }
                 }}
               >
                 {code}
@@ -146,8 +174,12 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
         <PartyDetailPopup 
           party={hoveredParty}
           position={popupPosition}
-          onClose={() => setHoveredParty(null)}
-          onMouseEnter={clearCloseTimeout}
+          onClose={() => {
+            setHoveredParty(null);
+            clearCloseTimeout();
+          }}
+          onMouseEnter={handlePopupMouseEnter}
+          onMouseLeave={handlePopupMouseLeave}
         />
       )}
       
@@ -156,8 +188,12 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
           cityCode={hoveredCity.code}
           cityName={hoveredCity.name}
           position={popupPosition}
-          onClose={() => setHoveredCity(null)}
-          onMouseEnter={clearCloseTimeout}
+          onClose={() => {
+            setHoveredCity(null);
+            clearCloseTimeout();
+          }}
+          onMouseEnter={handlePopupMouseEnter}
+          onMouseLeave={handlePopupMouseLeave}
         />
       )}
     </div>

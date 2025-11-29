@@ -1,7 +1,7 @@
 import { Users, Building2, MapPin, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export const CityDetailPopup = ({ cityCode, cityName, onClose, position, onMouseEnter }) => {
+export const CityDetailPopup = ({ cityCode, cityName, onClose, position, onMouseEnter, onMouseLeave }) => {
   const navigate = useNavigate();
   
   if (!cityCode) return null;
@@ -22,19 +22,22 @@ export const CityDetailPopup = ({ cityCode, cityName, onClose, position, onMouse
   return (
     <>
       <div 
-        className="fixed inset-0 z-40"
+        className="fixed inset-0 z-40 bg-transparent"
         onClick={onClose}
+        style={{ pointerEvents: 'none' }}
       />
       
       <div 
-        className="fixed z-50 bg-white rounded-lg shadow-2xl border-2 border-gray-200 p-4 w-80"
+        className="fixed z-50 bg-white rounded-lg shadow-2xl border-2 border-gray-200 p-4 w-80 animate-fadeIn"
         style={{
           left: position?.x ? `${Math.min(position.x, window.innerWidth - 340)}px` : '50%',
           top: position?.y ? `${position.y + 10}px` : '50%',
-          transform: !position?.x ? 'translate(-50%, -50%)' : 'none'
+          transform: !position?.x ? 'translate(-50%, -50%)' : 'none',
+          pointerEvents: 'auto'
         }}
         onClick={(e) => e.stopPropagation()}
         onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
