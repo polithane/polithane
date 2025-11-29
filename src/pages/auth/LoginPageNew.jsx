@@ -57,20 +57,23 @@ export const LoginPageNew = () => {
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-blue rounded-2xl mb-4 shadow-lg">
-            <span className="text-3xl font-black text-white">P</span>
+          <div className="inline-flex items-center justify-center mb-4">
+            <img 
+              src="/ikon.png" 
+              alt="Polithane" 
+              className="w-16 h-16 object-contain drop-shadow-lg"
+              onError={(e) => {
+                // Fallback to default icon if not found
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            <div className="hidden items-center justify-center w-16 h-16 bg-primary-blue rounded-2xl shadow-lg">
+              <span className="text-3xl font-black text-white">P</span>
+            </div>
           </div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane'e Hoş Geldiniz</h1>
           <p className="text-gray-600">Türkiye siyasetinin dijital meydanı</p>
-          
-          {/* Test Hesapları */}
-          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm font-semibold text-blue-800">💡 Test İçin</p>
-            <p className="text-xs text-blue-700 mt-1">
-              Herhangi bir CHP profili ile giriş yapabilirsiniz! <br/>
-              Şifre: <span className="font-mono bg-blue-100 px-1 rounded">Polithane2024</span>
-            </p>
-          </div>
         </div>
 
         {/* Login Form */}

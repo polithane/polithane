@@ -63,8 +63,20 @@ export const AnimatedSlogan = () => {
   }, [currentIndex, showFull]);
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-primary-blue font-bold text-xl whitespace-nowrap">Polithane</span>
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* Logo */}
+      <img 
+        src="/logo.png" 
+        alt="Polithane Logo" 
+        className="h-10 w-auto object-contain"
+        onError={(e) => {
+          // Fallback to text if logo not found
+          e.target.style.display = 'none';
+          e.target.nextSibling.style.display = 'inline';
+        }}
+      />
+      <span className="text-primary-blue font-bold text-xl whitespace-nowrap hidden">Polithane</span>
+      
       <span className="text-gray-600 text-sm md:text-base min-h-[1.25rem] flex items-center">
         <span
           className={`transition-opacity duration-300 inline-block ${
