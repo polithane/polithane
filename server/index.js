@@ -83,6 +83,7 @@ import messagesRoutes from './routes/messages.js';
 import usersRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
 import verificationRoutes from './routes/verification.js';
+import settingsRoutes from './routes/settings.js';
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -91,6 +92,7 @@ app.use('/api/messages', messagesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', verificationRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
