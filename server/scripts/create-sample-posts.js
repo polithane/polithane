@@ -118,7 +118,7 @@ async function createSamplePosts() {
       FROM users 
       WHERE user_type IN ('politician', 'party_official', 'media', 'ex_politician')
       ORDER BY RANDOM()
-      LIMIT 20
+      LIMIT 50
     `;
     
     if (users.length === 0) {
@@ -128,9 +128,15 @@ async function createSamplePosts() {
     
     console.log(`✅ Found ${users.length} users`);
     
+    // Extend samplePosts to 50 by cycling through
+    const extendedPosts = [];
+    while (extendedPosts.length < 50) {
+      extendedPosts.push(...samplePosts.slice(0, Math.min(samplePosts.length, 50 - extendedPosts.length)));
+    }
+    
     // Create posts
-    for (let i = 0; i < samplePosts.length && i < users.length; i++) {
-      const post = samplePosts[i];
+    for (let i = 0; i < extendedPosts.length && i < users.length; i++) {
+      const post = extendedPosts[i];
       const user = users[i];
       
       await sql`
@@ -154,7 +160,7 @@ async function createSamplePosts() {
         )
       `;
       
-      console.log(`✅ Created post ${i + 1}/${samplePosts.length}`);
+      console.log(`✅ Created post ${i + 1}/${extendedPosts.length}`);
     }
     
     console.log('🎉 Sample posts created successfully!');

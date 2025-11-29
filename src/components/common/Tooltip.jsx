@@ -1,32 +1,72 @@
-import { useState } from 'react';
-import { clsx } from 'clsx';
+import { useState, useRef, useEffect } from 'react';
 
-export const Tooltip = ({ children, content, position = 'top', className = '' }) => {
+export const Tooltip = ({ children, content, delay = 500 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  
-  const positions = {
-    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-2'
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const timeoutRef = useRef(null);
+  const elementRef = useRef(null);
+  const tooltipRef = useRef(null);
+
+  const showTooltip = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    
+    timeoutRef.current = setTimeout(() => {
+      if (elementRef.current) {
+        const rect = elementRef.current.getBoundingClientRect();
+        setPosition({
+          top: rect.top - 35,
+          left: rect.left + rect.width / 2,
+        });
+        setIsVisible(true);
+      }
+    }, delay);
   };
-  
+
+  const hideTooltip = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsVisible(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
   return (
-    <div
-      className={clsx('relative inline-block', className)}
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-    >
-      {children}
-      {isVisible && (
-        <div className={clsx(
-          'absolute z-50 px-3 py-2 text-sm text-white bg-gray-900 rounded-lg whitespace-nowrap',
-          positions[position]
-        )}>
+    <>
+      <div
+        ref={elementRef}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        className="inline-block"
+      >
+        {children}
+      </div>
+      
+      {isVisible && content && (
+        <div
+          ref={tooltipRef}
+          className="fixed z-50 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded shadow-lg whitespace-nowrap pointer-events-none"
+          style={{
+            top: `${position.top}px`,
+            left: `${position.left}px`,
+            transform: 'translateX(-50%)',
+          }}
+        >
           {content}
-          <div className="absolute w-2 h-2 bg-gray-900 rotate-45 left-1/2 -translate-x-1/2 -bottom-1" />
+          <div
+            className="absolute left-1/2 transform -translate-x-1/2 -bottom-1"
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: '4px solid transparent',
+              borderRight: '4px solid transparent',
+              borderTop: '4px solid #1f2937',
+            }}
+          />
         </div>
       )}
-    </div>
+    </>
   );
 };

@@ -3,6 +3,7 @@ import { Eye, Heart, MessageCircle, Share2, Video, Image as ImageIcon, Music, Fi
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
+import { Tooltip } from '../common/Tooltip';
 import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration } from '../../utils/formatters';
 import { getUserTitle } from '../../utils/titleHelpers';
 import { getPlaceholderImage } from '../../utils/imagePaths';
@@ -49,23 +50,24 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
     >
       {/* Parti Logosu - SAĞ ÜST KÖŞE - %40 Büyütülmüş */}
       {post.user?.party_id && post.user?.party?.party_logo && (
-        <div 
-          className="absolute top-3 right-3 z-10 cursor-pointer hover:scale-110 transition-transform"
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/party/${post.user.party_id}`);
-          }}
-          title={`${post.user.party.party_short_name} detayını gör`}
-        >
-          <img 
-            src={post.user.party.party_logo} 
-            alt={post.user.party.party_short_name}
-            className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] md:w-[28px] md:h-[28px] object-contain drop-shadow-md"
-            onError={(e) => {
-              e.target.style.display = 'none';
+        <Tooltip content={`${post.user.party.party_short_name} detayını gör`} delay={300}>
+          <div 
+            className="absolute top-3 right-3 z-10 cursor-pointer hover:scale-110 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/party/${post.user.party_id}`);
             }}
-          />
-        </div>
+          >
+            <img 
+              src={post.user.party.party_logo} 
+              alt={post.user.party.party_short_name}
+              className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] md:w-[28px] md:h-[28px] object-contain drop-shadow-md"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+          </div>
+        </Tooltip>
       )}
       
       {/* Üst Bilgi */}
@@ -88,13 +90,15 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             </div>
             {/* Plaka Kodu - Avatar altında */}
             {post.user?.city_code && (
-              <Link
-                to={`/city/${post.user.city_code}`}
-                className="inline-flex items-center justify-center px-1.5 py-0.5 bg-gray-900 hover:bg-primary-blue text-white text-[9px] font-bold rounded-full transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {post.user.city_code}
-              </Link>
+              <Tooltip content={`${post.user.city_code} ili detayını gör`} delay={300}>
+                <Link
+                  to={`/city/${post.user.city_code}`}
+                  className="inline-flex items-center justify-center px-1.5 py-0.5 bg-gray-900 hover:bg-primary-blue text-white text-[9px] font-bold rounded-full transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {post.user.city_code}
+                </Link>
+              </Tooltip>
             )}
           </div>
           
