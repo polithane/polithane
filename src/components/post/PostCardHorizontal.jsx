@@ -345,45 +345,10 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             {post.content_text}
           </p>
         )}
-        
-        {/* REKLAM ALANI - İçerik ile gündem arasında (full width x 35px) */}
-        <div className="w-full h-[35px] mb-2 overflow-hidden rounded-md">
-          {(() => {
-            // Random marka seç
-            const brands = [
-              { name: '✈️ THY', gradient: 'from-red-600 to-red-700', url: 'https://www.turkishairlines.com' },
-              { name: '📱 Vodafone', gradient: 'from-red-500 to-red-600', url: 'https://www.vodafone.com.tr' },
-              { name: '🍔 Yemek Sepeti', gradient: 'from-purple-500 to-pink-500', url: 'https://www.yemeksepeti.com' },
-              { name: '📺 Vestel', gradient: 'from-blue-600 to-blue-700', url: 'https://www.vestel.com.tr' },
-              { name: '📱 Samsung', gradient: 'from-blue-700 to-indigo-700', url: 'https://www.samsung.com' },
-              { name: '🛏️ Yataş', gradient: 'from-blue-500 to-cyan-500', url: 'https://www.yatas.com.tr' },
-              { name: '🏦 Akbank', gradient: 'from-red-600 to-orange-600', url: 'https://www.akbank.com' },
-              { name: '✈️ Pegasus', gradient: 'from-yellow-400 to-orange-500', url: 'https://www.flypgs.com' },
-              { name: '🛒 Migros', gradient: 'from-orange-500 to-orange-600', url: 'https://www.migros.com.tr' },
-              { name: '👕 LCW', gradient: 'from-blue-600 to-blue-700', url: 'https://www.lcw.com' },
-              { name: '🌾 Ziraat Bankası', gradient: 'from-green-600 to-green-700', url: 'https://www.ziraatbank.com.tr' }
-            ];
-            const randomBrand = brands[post.post_id % brands.length]; // Her post için tutarlı ama farklı
-            
-            return (
-              <div 
-                className={`w-full h-full bg-gradient-to-r ${randomBrand.gradient} hover:brightness-110 cursor-pointer flex items-center justify-center transition-all duration-300`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(randomBrand.url, '_blank');
-                }}
-              >
-                <p className="text-white font-bold text-[11px]">{randomBrand.name}</p>
-              </div>
-            );
-          })()}
-        </div>
       </div>
       
       {/* Gündem Etiketi ve Polit Puan - Alt kısım */}
       <div className="mt-auto">
-        {/* Boşluk - Reklam ile gündem arası */}
-        <div className="h-2"></div>
         
         {/* Gündem Başlığı - Her zaman 2 satır */}
         {post.agenda_tag && (
