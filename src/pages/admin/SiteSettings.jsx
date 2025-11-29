@@ -58,6 +58,98 @@ export const SiteSettings = () => {
       </div>
       
       <div className="space-y-6">
+        {/* Email Ayarları */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Mail className="w-5 h-5 text-primary-blue" />
+            Email Doğrulama Ayarları
+          </h3>
+          
+          <div className="space-y-4">
+            {/* Email Doğrulama Aktif/Pasif */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-semibold">Email Doğrulama Sistemi</p>
+                <p className="text-sm text-gray-600">Yeni kullanıcılar email doğrulaması yapmalı mı?</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.emailVerificationEnabled}
+                  onChange={(e) => handleChange('emailVerificationEnabled', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-blue"></div>
+              </label>
+            </div>
+
+            {/* Email Ayarları (sadece email doğrulama açıksa göster) */}
+            {settings.emailVerificationEnabled && (
+              <div className="border-t pt-4 space-y-4">
+                <p className="text-sm font-semibold text-gray-700">Email Servisi Yapılandırması</p>
+                
+                {/* Service Provider */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Email Servis Sağlayıcısı</label>
+                  <select
+                    value={settings.emailServiceProvider}
+                    onChange={(e) => handleChange('emailServiceProvider', e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg"
+                  >
+                    <option value="gmail">Gmail</option>
+                    <option value="sendgrid">SendGrid</option>
+                    <option value="aws-ses">AWS SES</option>
+                  </select>
+                </div>
+
+                {/* Gmail ayarları */}
+                {settings.emailServiceProvider === 'gmail' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Gmail Adresi</label>
+                      <input
+                        type="email"
+                        value={settings.emailSmtpUser}
+                        onChange={(e) => handleChange('emailSmtpUser', e.target.value)}
+                        className="w-full px-4 py-2 border rounded-lg"
+                        placeholder="sizin-gmail@gmail.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Gmail App Password</label>
+                      <input
+                        type="password"
+                        value={settings.emailSmtpPassword}
+                        onChange={(e) => handleChange('emailSmtpPassword', e.target.value)}
+                        className="w-full px-4 py-2 border rounded-lg"
+                        placeholder="abcd efgh ijkl mnop"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:underline">
+                          Gmail App Password oluşturmak için tıklayın
+                        </a>
+                      </p>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <p className="text-sm font-semibold text-yellow-800 mb-2">📝 Gmail App Password Nasıl Oluşturulur?</p>
+                      <ol className="text-xs text-yellow-700 space-y-1 ml-4 list-decimal">
+                        <li>Google hesabınıza gidin</li>
+                        <li>Security → 2-Step Verification (Aktif edin)</li>
+                        <li>Security → App passwords</li>
+                        <li>"Select app" → "Mail" seçin</li>
+                        <li>"Select device" → "Other" → "Polithane" yazın</li>
+                        <li>Generate → 16 haneli şifreyi yukarıya yapıştırın</li>
+                      </ol>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* General Settings */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-xl font-bold text-gray-900 mb-4">Genel Bilgiler</h3>
