@@ -6,6 +6,16 @@ const getAuthHeader = () => {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
+// Türkçe hata mesajları
+const ERROR_MESSAGES = {
+  NETWORK_ERROR: 'Sunucuya bağlanılamıyor. Lütfen backend serverın çalıştığından emin olun.',
+  SERVER_ERROR: 'Sunucu hatası oluştu. Lütfen daha sonra tekrar deneyin.',
+  UNAUTHORIZED: 'Oturum süreniz doldu. Lütfen tekrar giriş yapın.',
+  NOT_FOUND: 'İstek bulunamadı.',
+  BAD_REQUEST: 'Geçersiz istek.',
+  UNKNOWN: 'Bilinmeyen bir hata oluştu.',
+};
+
 // Helper function for API calls
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_URL}${endpoint}`;
@@ -25,15 +35,40 @@ const apiCall = async (endpoint, options = {}) => {
       headers,
     });
 
-    const data = await response.json();
+    // Network error
+    if (!response.ok && response.status === 0) {
+      throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
+    }
+
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(data.error || 'API call failed');
+      // Türkçe hata mesajı döndür
+      let errorMessage = data.error || data.message || ERROR_MESSAGES.UNKNOWN;
+      
+      // HTTP status'e göre varsayılan mesajlar
+      if (response.status === 401) {
+        errorMessage = ERROR_MESSAGES.UNAUTHORIZED;
+      } else if (response.status === 404) {
+        errorMessage = ERROR_MESSAGES.NOT_FOUND;
+      } else if (response.status === 400) {
+        errorMessage = errorMessage || ERROR_MESSAGES.BAD_REQUEST;
+      } else if (response.status >= 500) {
+        errorMessage = ERROR_MESSAGES.SERVER_ERROR;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     return data;
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('API Hatası:', error);
+    
+    // Network hatası kontrolü
+    if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+      throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
+    }
+    
     throw error;
   }
 };

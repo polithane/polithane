@@ -87,7 +87,10 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: data.data.user };
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: error.message };
+      const errorMessage = error.message === 'Failed to fetch' 
+        ? 'Sunucuya bağlanılamıyor. Lütfen backend serverı çalıştırdığınızdan emin olun.' 
+        : error.message || 'Giriş sırasında bir hata oluştu';
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -121,7 +124,10 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: data.data.user };
     } catch (error) {
       console.error('Register error:', error);
-      return { success: false, error: error.message };
+      const errorMessage = error.message === 'Failed to fetch' 
+        ? 'Sunucuya bağlanılamıyor. Lütfen backend serverı çalıştırdığınızdan emin olun.' 
+        : error.message || 'Kayıt sırasında bir hata oluştu';
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
