@@ -1,4 +1,4 @@
-import postgres from 'postgres';
+import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -9,9 +9,7 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const sql = postgres(process.env.DATABASE_URL || '', {
-  ssl: process.env.NODE_ENV === 'production' ? 'require' : false,
-});
+const sql = neon(process.env.DATABASE_URL);
 
 // Türk isimleri
 const turkishNames = {
@@ -302,9 +300,7 @@ async function seedDiverseProfiles() {
     
   } catch (error) {
     console.error('❌ Hata:', error);
-    throw error;
-  } finally {
-    await sql.end();
+    console.error('Error details:', error.message);
   }
 }
 

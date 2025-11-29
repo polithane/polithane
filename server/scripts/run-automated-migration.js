@@ -1,4 +1,4 @@
-import postgres from 'postgres';
+import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,22 +10,25 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const sql = postgres(process.env.DATABASE_URL || '', {
-  ssl: process.env.NODE_ENV === 'production' ? 'require' : false,
-});
+const sql = neon(process.env.DATABASE_URL);
 
 async function runMigration() {
   try {
     console.log('🚀 Starting is_automated migration...');
     
-    // Read migration file
-    const migrationPath = path.join(__dirname, '../migrations/004_add_automated_profiles.sql');
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf-8');
+    // Execute migration commands one by one
+    await sql`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS is_automated BOOLEAN DEFAULT false
+    `;
     
-    // Execute migration
-    await sql.unsafe(migrationSQL);
+    console.log('✅ is_automated column added');
     
-    console.log('✅ is_automated field added to users table');
+    await sql`
+      UPDATE users SET is_automated = true WHERE is_automated IS NULL OR is_automated = false
+    `;
+    
+    console.log('✅ All users marked as automated');
     
     // Verify
     const result = await sql`
@@ -39,21 +42,19 @@ async function runMigration() {
     }
     
     // Check how many users are marked as automated
-    const [count] = await sql`
+    const count = await sql`
       SELECT COUNT(*) as automated_count
       FROM users
       WHERE is_automated = true
     `;
     
-    console.log(`✅ ${count.automated_count} profiles marked as automated`);
+    console.log(`✅ ${count[0]?.automated_count || 0} profiles marked as automated`);
     
     console.log('🎉 Migration completed successfully!');
     
   } catch (error) {
     console.error('❌ Migration failed:', error);
-    throw error;
-  } finally {
-    await sql.end();
+    console.error('Error details:', error.message);
   }
 }
 
