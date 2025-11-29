@@ -47,7 +47,7 @@ export const NotificationProvider = ({ children }) => {
       setNotifications(mockNotifs);
       setUnreadCount(mockNotifs.filter(n => !n.is_read).length);
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      console.error('Bildirimler yüklenemedi:', error);
     } finally {
       setLoading(false);
     }
