@@ -4,12 +4,17 @@
   "description": "Polithane Backend API - Neon PostgreSQL",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "node --watch index.js",
     "start": "node index.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "setup": "npm run migrate && npm run seed"
+    "setup": "npm run migrate && npm run seed",
+    "test": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",
@@ -25,5 +30,14 @@
     "multer": "^2.0.2",
     "nodemailer": "^7.0.11",
     "xlsx": "^0.18.5"
-  }
+  },
+  "keywords": [
+    "polithane",
+    "politics",
+    "social-media",
+    "turkey",
+    "api"
+  ],
+  "author": "Polithane",
+  "license": "PRIVATE"
 }

@@ -54,8 +54,27 @@ export const upload = multer({
 // Middleware
 app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses
+
+// CORS - Multiple origins support
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5000',
+  'https://polithane.vercel.app',
+  'https://polithane.com',
+  'https://www.polithane.com'
+];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'CORS policy: Origin not allowed.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -781,25 +800,64 @@ app.get('/api/trending/agendas', async (req, res) => {
 // ERROR HANDLING
 // ============================================
 
+// 404 handler
 app.use((req, res) => {
-  res.status(404).json({ success: false, error: 'Endpoint bulunamadı' });
+  res.status(404).json({ 
+    success: false, 
+    error: 'Endpoint bulunamadı',
+    path: req.path 
+  });
 });
 
+// Global error handler
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
-  res.status(500).json({ success: false, error: 'Sunucu hatası' });
+  
+  // CORS error
+  if (err.message.includes('CORS policy')) {
+    return res.status(403).json({ 
+      success: false, 
+      error: 'CORS policy violation',
+      message: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+  
+  // JWT error
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({ 
+      success: false, 
+      error: 'Geçersiz token' 
+    });
+  }
+  
+  // Multer error (file upload)
+  if (err.name === 'MulterError') {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Dosya yükleme hatası: ' + err.message 
+    });
+  }
+  
+  // Generic error
+  res.status(err.status || 500).json({ 
+    success: false, 
+    error: process.env.NODE_ENV === 'production' 
+      ? 'Sunucu hatası' 
+      : err.message 
+  });
 });
 
 // ============================================
 // START SERVER
 // ============================================
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   🚀 Polithane Backend başlatıldı!
   📍 Port: ${PORT}
   🗄️  Database: Neon PostgreSQL (Connected)
-  🌍 CORS: ${process.env.FRONTEND_URL}
+  🌍 CORS: Multiple origins supported
   ⚡ Environment: ${process.env.NODE_ENV}
+  🔒 Allowed Origins: localhost, vercel, polithane.com
   `);
 });
