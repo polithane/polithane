@@ -1,0 +1,13 @@
+# robots.txt for Polithane
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://polithane.com/sitemap.xml
+
+# Disallow admin pages
+Disallow: /admin/
+Disallow: /settings/
+
+# Disallow API
+Disallow: /api/
