@@ -460,11 +460,11 @@ router.post('/forgot-password', async (req, res) => {
       WHERE LOWER(email) = LOWER(${email})
     `;
 
-    // Güvenlik: Email bulunamasa bile aynı mesajı döndür (email enumeration önleme)
+    // Email kayıtlı değilse hata döndür
     if (!user) {
-      return res.json({
-        success: true,
-        message: 'Eğer bu email kayıtlıysa, şifre sıfırlama linki gönderildi.'
+      return res.status(404).json({
+        success: false,
+        error: 'Bu email adresiyle kayıtlı bir kullanıcı bulunamadı.'
       });
     }
 
