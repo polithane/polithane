@@ -4,6 +4,7 @@ import { sql, forgotPasswordLimiter } from '../index.js';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
 import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 import { getSetting } from '../utils/settingsService.js';
+import { recordFailedLogin, clearFailedLoginAttempts, getRealIP } from '../utils/securityService.js';
 
 const router = express.Router();
 
