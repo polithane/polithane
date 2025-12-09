@@ -117,13 +117,13 @@ export const verificationEmailTemplate = (email, token, frontendUrl) => {
       <div class="container">
         <div class="header">
           <h1>🎉 Hoş Geldiniz!</h1>
-          <p>Özgür, açık, şeffaf siyaset, bağımsız medya</p>
+          <p>Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
         </div>
         
         <div class="content">
           <h2>Email Adresinizi Doğrulayın</h2>
           <p>Merhaba,</p>
-          <p>Polithane'ye hoş geldiniz! Hesabınızı aktifleştirmek için email adresinizi doğrulamanız gerekmektedir.</p>
+          <p>Polithane.'ye hoş geldiniz! Hesabınızı aktifleştirmek için email adresinizi doğrulamanız gerekmektedir.</p>
           
           <div class="highlight-box">
             <p><strong>Email:</strong> ${email}</p>
@@ -144,7 +144,7 @@ export const verificationEmailTemplate = (email, token, frontendUrl) => {
         </div>
         
         <div class="footer">
-          <p><strong>Polithane</strong> - Türkiye Siyasi Sosyal Medya</p>
+          <p><strong>Polithane.</strong> - Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
           <p>
             <a href="${frontendUrl}">Ana Sayfa</a> | 
             <a href="${frontendUrl}/privacy">Gizlilik</a> | 
@@ -175,13 +175,13 @@ export const welcomeEmailTemplate = (fullName, email, frontendUrl) => {
       <div class="container">
         <div class="header">
           <h1>🎊 Hoş Geldiniz ${fullName}!</h1>
-          <p>Polithane ailesine katıldığınız için teşekkür ederiz</p>
+          <p>Polithane. ailesine katıldığınız için teşekkür ederiz</p>
         </div>
         
         <div class="content">
           <h2>Hesabınız Başarıyla Oluşturuldu!</h2>
           <p>Merhaba <strong>${fullName}</strong>,</p>
-          <p>Polithane'ye hoş geldiniz! Türkiye'nin özgür, açık ve şeffaf siyasi sosyal medya platformuna katıldınız.</p>
+          <p>Polithane.'ye hoş geldiniz! Özgür, açık, şeffaf siyaset, bağımsız medya platformuna katıldınız.</p>
           
           <div class="highlight-box">
             <p><strong>Email Adresiniz:</strong> ${email}</p>
@@ -200,7 +200,7 @@ export const welcomeEmailTemplate = (fullName, email, frontendUrl) => {
           </ul>
           
           <p style="text-align: center; margin: 32px 0;">
-            <a href="${frontendUrl}" class="button">Polithane'ye Giriş Yap</a>
+            <a href="${frontendUrl}" class="button">Polithane.'ye Giriş Yap</a>
           </p>
           
           <p style="font-size: 14px; color: #6b7280; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
@@ -210,7 +210,7 @@ export const welcomeEmailTemplate = (fullName, email, frontendUrl) => {
         </div>
         
         <div class="footer">
-          <p><strong>Polithane</strong> - Özgür, açık, şeffaf siyaset, bağımsız medya</p>
+          <p><strong>Polithane.</strong> - Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
           <p>
             <a href="${frontendUrl}">Ana Sayfa</a> | 
             <a href="${frontendUrl}/about">Hakkımızda</a> | 
@@ -243,13 +243,13 @@ export const passwordResetEmailTemplate = (email, resetToken, frontendUrl) => {
       <div class="container">
         <div class="header">
           <h1>🔐 Şifre Sıfırlama</h1>
-          <p>Polithane Hesabı</p>
+          <p>Polithane. Hesabı</p>
         </div>
         
         <div class="content">
           <h2>Şifrenizi Sıfırlayın</h2>
           <p>Merhaba,</p>
-          <p>Polithane hesabınız için şifre sıfırlama talebi aldık.</p>
+          <p>Polithane. hesabınız için şifre sıfırlama talebi aldık.</p>
           
           <div class="highlight-box">
             <p><strong>Email:</strong> ${email}</p>
@@ -272,7 +272,7 @@ export const passwordResetEmailTemplate = (email, resetToken, frontendUrl) => {
         </div>
         
         <div class="footer">
-          <p><strong>Polithane</strong> - Güvenli Platform</p>
+          <p><strong>Polithane.</strong> - Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
           <p style="margin-top: 12px; font-size: 12px;">
             Bu otomatik bir emaildir, lütfen yanıtlamayın.
           </p>
