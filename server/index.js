@@ -21,6 +21,9 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust proxy (Railway, Render, Heroku gibi platformlar için)
+app.set('trust proxy', 1);
+
 // Neon Database Connection
 export const sql = neon(process.env.DATABASE_URL);
 
@@ -32,6 +35,7 @@ app.use(compression()); // Compress responses
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5000',
+  'http://localhost:4173',
   'https://polithane.vercel.app',
   'https://polithane.com',
   'https://www.polithane.com'
@@ -39,14 +43,17 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
+    // Allow requests with no origin (mobile apps, curl, postman, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'CORS policy: Origin not allowed.';
-      return callback(new Error(msg), false);
+    // Check if origin is in allowed list or is a Vercel preview deployment
+    if (allowedOrigins.includes(origin) || origin.includes('.vercel.app')) {
+      return callback(null, true);
     }
-    return callback(null, true);
+    
+    console.log('CORS blocked origin:', origin);
+    const msg = 'CORS policy: Origin not allowed.';
+    return callback(new Error(msg), false);
   },
   credentials: true
 }));
