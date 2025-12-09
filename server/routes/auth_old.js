@@ -7,11 +7,12 @@ import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail } fr
 const router = express.Router();
 
 // ============================================
-// REGISTER - Email-based registration
+// REGISTER - Yeni kullanıcı kaydı
 // ============================================
 router.post('/register', async (req, res) => {
   try {
     const { 
+      username, 
       email, 
       password, 
       full_name,
@@ -21,10 +22,10 @@ router.post('/register', async (req, res) => {
     } = req.body;
 
     // Validation
-    if (!email || !password || !full_name) {
+    if (!username || !email || !password || !full_name) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Email, şifre ve tam ad zorunludur.' 
+        error: 'Kullanıcı adı, email, şifre ve tam ad zorunludur.' 
       });
     }
 
@@ -38,14 +39,35 @@ router.post('/register', async (req, res) => {
     }
 
     // Şifre uzunluğu kontrolü
-    if (password.length < 8) {
+    if (password.length < 6) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Şifre en az 8 karakter olmalıdır.' 
+        error: 'Şifre en az 6 karakter olmalıdır.' 
       });
     }
 
-    // Email zaten kayıtlı mı?
+    // Kullanıcı adı kontrolü (sadece harf, rakam, alt çizgi)
+    const usernameRegex = /^[a-z0-9_]+$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Kullanıcı adı sadece küçük harf, rakam ve alt çizgi içerebilir.' 
+      });
+    }
+
+    // Kullanıcı adı zaten var mı?
+    const [existingUsername] = await sql`
+      SELECT id FROM users WHERE LOWER(username) = LOWER(${username})
+    `;
+    
+    if (existingUsername) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Bu kullanıcı adı zaten kullanılıyor.' 
+      });
+    }
+
+    // Email zaten var mı?
     const [existingEmail] = await sql`
       SELECT id FROM users WHERE LOWER(email) = LOWER(${email})
     `;
@@ -53,19 +75,25 @@ router.post('/register', async (req, res) => {
     if (existingEmail) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Bu email adresi zaten kayıtlı.' 
+        error: 'Bu email adresi zaten kullanılıyor.' 
       });
     }
-
-    // Username'i email'den otomatik oluştur
-    const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString().slice(-4);
 
     // Şifreyi hashle
     const password_hash = await bcrypt.hash(password, 10);
 
-    // Email doğrulama token'ı oluştur
-    const verificationToken = generateVerificationToken();
-    const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
+    // Email doğrulama sistemi kontrolü (admin panelinden açılıp kapanabilir)
+    const emailVerificationEnabled = await isEmailVerificationEnabled();
+    
+    let emailVerified = !emailVerificationEnabled; // Kapalıysa otomatik verified
+    let verificationToken = null;
+    let tokenExpires = null;
+
+    // Email doğrulama açıksa token oluştur
+    if (emailVerificationEnabled) {
+      verificationToken = generateVerificationToken();
+      tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
+    }
 
     // Kullanıcıyı oluştur
     const [user] = await sql`
@@ -79,7 +107,8 @@ router.post('/register', async (req, res) => {
         party_id,
         email_verified,
         verification_token,
-        verification_token_expires
+        verification_token_expires,
+        verified_at
       )
       VALUES (
         ${username},
@@ -89,20 +118,28 @@ router.post('/register', async (req, res) => {
         ${user_type},
         ${province || null},
         ${party_id || null},
-        false,
+        ${emailVerified},
         ${verificationToken},
-        ${tokenExpires}
+        ${tokenExpires},
+        ${emailVerified ? new Date() : null}
       )
       RETURNING id, username, email, full_name, user_type, avatar_url, email_verified, created_at
     `;
 
-    // Verification email gönder
-    try {
-      await sendVerificationEmail(email, verificationToken);
-      console.log(`✅ Verification email sent to ${email}`);
-    } catch (emailError) {
-      console.error('⚠️ Verification email gönderme hatası:', emailError);
-      // Email gönderilemese de kayıt tamamlanmış olur
+    // Email doğrulama açıksa email gönder
+    if (emailVerificationEnabled && verificationToken) {
+      try {
+        const emailConfig = await getEmailConfig();
+        if (emailConfig.smtpUser && emailConfig.smtpPassword) {
+          await sendVerificationEmail(email, username, verificationToken, emailConfig);
+          console.log(`✅ Verification email sent to ${email}`);
+        } else {
+          console.warn('⚠️ Email verification enabled but SMTP not configured');
+        }
+      } catch (emailError) {
+        console.error('⚠️ Email send failed:', emailError);
+        // Email hatası kullanıcıyı engellemesin
+      }
     }
 
     // JWT token oluştur
@@ -110,11 +147,13 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Kayıt başarılı! Email adresinize doğrulama linki gönderildi.',
+      message: emailVerificationEnabled 
+        ? 'Kayıt başarılı! Lütfen email adresinizi doğrulayın.' 
+        : 'Kayıt başarılı! Hesabınız oluşturuldu.',
       data: {
         user,
         token,
-        requiresEmailVerification: true
+        requiresVerification: emailVerificationEnabled && !emailVerified
       }
     });
 
@@ -128,35 +167,36 @@ router.post('/register', async (req, res) => {
 });
 
 // ============================================
-// LOGIN - Email-based login
+// LOGIN - Kullanıcı girişi
 // ============================================
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
     // Validation
-    if (!email || !password) {
+    if (!username || !password) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Email ve şifre zorunludur.' 
+        error: 'Kullanıcı adı/email ve şifre zorunludur.' 
       });
     }
 
-    // Kullanıcıyı email ile bul
+    // Kullanıcıyı bul (username veya email ile)
     const [user] = await sql`
       SELECT 
         id, username, email, password_hash, full_name, 
         user_type, avatar_url, cover_url, bio, 
         is_verified, is_admin, follower_count, following_count,
-        post_count, polit_score, province, party_id, email_verified, created_at
+        post_count, polit_score, province, party_id, created_at
       FROM users 
-      WHERE LOWER(email) = LOWER(${email})
+      WHERE LOWER(username) = LOWER(${username}) 
+         OR LOWER(email) = LOWER(${username})
     `;
 
     if (!user) {
       return res.status(401).json({ 
         success: false, 
-        error: 'Email veya şifre hatalı.' 
+        error: 'Kullanıcı adı/email veya şifre hatalı.' 
       });
     }
 
@@ -166,7 +206,7 @@ router.post('/login', async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ 
         success: false, 
-        error: 'Email veya şifre hatalı.' 
+        error: 'Kullanıcı adı/email veya şifre hatalı.' 
       });
     }
 
@@ -202,25 +242,7 @@ router.post('/login', async (req, res) => {
 });
 
 // ============================================
-// LOGOUT
-// ============================================
-router.post('/logout', authenticateToken, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      message: 'Çıkış başarılı!'
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Çıkış sırasında bir hata oluştu.' 
-    });
-  }
-});
-
-// ============================================
-// GET CURRENT USER
+// GET CURRENT USER - Mevcut kullanıcı bilgisi
 // ============================================
 router.get('/me', authenticateToken, async (req, res) => {
   try {
@@ -229,7 +251,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         id, username, email, full_name, 
         user_type, avatar_url, cover_url, bio, 
         is_verified, is_admin, follower_count, following_count,
-        post_count, polit_score, province, party_id, email_verified, created_at
+        post_count, polit_score, province, party_id, created_at
       FROM users 
       WHERE id = ${req.user.id}
     `;
@@ -245,156 +267,82 @@ router.get('/me', authenticateToken, async (req, res) => {
       success: true,
       data: user
     });
+
   } catch (error) {
-    console.error('Get user error:', error);
+    console.error('Get current user error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Kullanıcı bilgisi alınamadı.' 
+      error: 'Kullanıcı bilgileri alınırken hata oluştu.' 
     });
   }
 });
 
 // ============================================
-// VERIFY EMAIL
+// LOGOUT - Çıkış (Client-side token silme)
 // ============================================
-router.post('/verify-email', async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        error: 'Doğrulama token\'ı gerekli.'
-      });
-    }
-
-    // Token ile kullanıcıyı bul
-    const [user] = await sql`
-      SELECT id, email, full_name, verification_token_expires, email_verified
-      FROM users
-      WHERE verification_token = ${token}
-    `;
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        error: 'Geçersiz doğrulama token\'ı.'
-      });
-    }
-
-    // Token süresi dolmuş mu?
-    if (new Date() > new Date(user.verification_token_expires)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Doğrulama token\'ının süresi dolmuş. Lütfen yeni bir doğrulama emaili isteyin.'
-      });
-    }
-
-    // Email zaten doğrulanmış mı?
-    if (user.email_verified) {
-      return res.json({
-        success: true,
-        message: 'Email adresi zaten doğrulanmış.'
-      });
-    }
-
-    // Email'i doğrula
-    await sql`
-      UPDATE users
-      SET email_verified = true,
-          verified_at = CURRENT_TIMESTAMP,
-          verification_token = NULL,
-          verification_token_expires = NULL
-      WHERE id = ${user.id}
-    `;
-
-    // Welcome email gönder
-    try {
-      await sendWelcomeEmail(user.email, user.full_name);
-      console.log(`✅ Welcome email sent to ${user.email}`);
-    } catch (emailError) {
-      console.error('⚠️ Welcome email gönderme hatası:', emailError);
-    }
-
-    res.json({
-      success: true,
-      message: 'Email adresiniz başarıyla doğrulandı!'
-    });
-
-  } catch (error) {
-    console.error('Email verification error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Email doğrulama sırasında bir hata oluştu.'
-    });
-  }
+router.post('/logout', authenticateToken, (req, res) => {
+  // JWT ile logout server-side'da bir şey yapmamıza gerek yok
+  // Client tarafında token silinecek
+  res.json({
+    success: true,
+    message: 'Başarıyla çıkış yapıldı.'
+  });
 });
 
 // ============================================
-// CHANGE PASSWORD
+// UPDATE PASSWORD - Şifre değiştirme
 // ============================================
 router.post('/change-password', authenticateToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Mevcut ve yeni şifre gerekli.'
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Mevcut şifre ve yeni şifre zorunludur.' 
       });
     }
 
-    if (newPassword.length < 8) {
-      return res.status(400).json({
-        success: false,
-        error: 'Yeni şifre en az 8 karakter olmalıdır.'
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Yeni şifre en az 6 karakter olmalıdır.' 
       });
     }
 
-    // Kullanıcıyı bul
+    // Mevcut şifreyi kontrol et
     const [user] = await sql`
-      SELECT id, password_hash
-      FROM users
-      WHERE id = ${req.user.id}
+      SELECT password_hash FROM users WHERE id = ${req.user.id}
     `;
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Kullanıcı bulunamadı.'
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Mevcut şifre hatalı.' 
       });
     }
 
-    // Mevcut şifre doğru mu?
-    const isValid = await bcrypt.compare(currentPassword, user.password_hash);
-
-    if (!isValid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Mevcut şifre hatalı.'
-      });
-    }
-
-    // Yeni şifreyi hashle
+    // Yeni şifreyi hashle ve güncelle
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
-    // Şifreyi güncelle
     await sql`
-      UPDATE users
+      UPDATE users 
       SET password_hash = ${newPasswordHash}
       WHERE id = ${req.user.id}
     `;
 
     res.json({
       success: true,
-      message: 'Şifreniz başarıyla değiştirildi.'
+      message: 'Şifre başarıyla değiştirildi.'
     });
 
   } catch (error) {
     console.error('Change password error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Şifre değiştirme sırasında bir hata oluştu.'
+    res.status(500).json({ 
+      success: false, 
+      error: 'Şifre değiştirme sırasında hata oluştu.' 
     });
   }
 });
