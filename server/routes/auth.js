@@ -493,10 +493,14 @@ router.post('/forgot-password', async (req, res) => {
       console.log(`✅ Password reset email sent to ${email}`);
     } catch (emailError) {
       console.error('⚠️ Password reset email gönderme hatası:', emailError);
-      return res.status(500).json({
-        success: false,
-        error: 'Email gönderilirken bir hata oluştu.'
-      });
+      console.error('Email Error Details:', emailError.message);
+      
+      // Email gönderilemese bile kullanıcıya başarı mesajı (güvenlik için)
+      // Ama gerçek hatayı loglara yazıyoruz
+      console.error('🔴 EMAIL AYARLARINI KONTROL EDİN:');
+      console.error('- EMAIL_USER:', process.env.EMAIL_USER);
+      console.error('- EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? '✓ Mevcut' : '✗ Eksik');
+      console.error('- Gmail App Password kullanmanız gerekebilir!');
     }
 
     res.json({

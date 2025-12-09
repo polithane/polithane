@@ -22,13 +22,17 @@ export const ForgotPasswordPage = () => {
         body: JSON.stringify({ email }),
       });
 
+      console.log('Forgot Password Response:', response);
+
       if (response.success) {
         setSuccess(true);
       } else {
+        console.error('Forgot Password Error:', response.error);
         setError(response.error || 'Bir hata oluştu');
       }
     } catch (err) {
-      setError('Bir hata oluştu. Lütfen tekrar deneyin.');
+      console.error('Forgot Password Exception:', err);
+      setError(err.message || 'Bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
     }
