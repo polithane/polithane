@@ -39,10 +39,21 @@ export const apiCall = async (endpoint, options = {}) => {
 
   try {
     console.log('📤 Fetching...');
+    
+    // Timeout kontrolü (30 saniye)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.error('⏰ Request timeout! (30s)');
+      controller.abort();
+    }, 30000);
+    
     const response = await fetch(url, {
       ...options,
       headers,
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     console.log('📥 Response received:', response.status, response.statusText);
 
     // Network error
@@ -72,7 +83,14 @@ export const apiCall = async (endpoint, options = {}) => {
 
     return data;
   } catch (error) {
-    console.error('API Hatası:', error);
+    console.error('💥 API Hatası:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
+    // Timeout hatası
+    if (error.name === 'AbortError') {
+      throw new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.');
+    }
     
     // Network hatası kontrolü
     if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
