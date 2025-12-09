@@ -17,6 +17,8 @@ import { SearchPage } from './pages/SearchPage';
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
 import { RegisterPageNew } from './pages/auth/RegisterPageNew';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 
 // Settings Pages
 import { SettingsLayout } from './pages/settings/SettingsLayout';
@@ -70,6 +72,8 @@ function App() {
         <Route path="/login-new" element={<LoginPageNew />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/register-new" element={<RegisterPageNew />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         {/* Settings Routes */}
         <Route path="/settings" element={<><Header /><SettingsLayout /><Footer /></>}>
