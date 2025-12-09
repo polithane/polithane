@@ -64,11 +64,30 @@ app.use(cookieParser());
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
-// Rate limiting
+// Rate limiting - Genel
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   message: 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyin.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiting - Auth endpoints (Sıkı)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 5, // Max 5 deneme
+  message: 'Çok fazla deneme yaptınız. 15 dakika sonra tekrar deneyin.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Başarılı istekleri sayma
+});
+
+// Rate limiting - Forgot Password (Çok sıkı)
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 3, // Max 3 deneme
+  message: 'Çok fazla şifre sıfırlama isteği gönderd iniz. 15 dakika sonra tekrar deneyin.',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -85,13 +104,16 @@ import verificationRoutes from './routes/verification.js';
 import settingsRoutes from './routes/settings.js';
 
 // Use routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes); // Auth için sıkı rate limit
 app.use('/api/posts', postsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', verificationRoutes);
 app.use('/api/settings', settingsRoutes);
+
+// Export limiters for specific routes
+export { forgotPasswordLimiter };
 
 // Health check
 app.get('/health', (req, res) => {

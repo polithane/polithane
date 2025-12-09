@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { sql } from '../index.js';
+import { sql, forgotPasswordLimiter } from '../index.js';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
 import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 import { getSetting } from '../utils/settingsService.js';
@@ -433,7 +433,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
 // ============================================
 // FORGOT PASSWORD - Şifremi Unuttum
 // ============================================
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
