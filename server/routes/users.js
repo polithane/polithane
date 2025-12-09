@@ -5,6 +5,128 @@ import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// ============================================
+// USERNAME VALIDATION HELPER
+// ============================================
+const validateUsername = (username) => {
+  // Max 15 karakter
+  if (username.length > 15) {
+    return { valid: false, error: 'Kullanıcı adı en fazla 15 karakter olabilir.' };
+  }
+  
+  // Min 3 karakter
+  if (username.length < 3) {
+    return { valid: false, error: 'Kullanıcı adı en az 3 karakter olmalıdır.' };
+  }
+  
+  // Sadece harfler, rakamlar, - ve . kullanılabilir
+  const usernameRegex = /^[a-zA-Z0-9.-]+$/;
+  if (!usernameRegex.test(username)) {
+    return { valid: false, error: 'Kullanıcı adı sadece harfler, rakamlar, tire (-) ve nokta (.) içerebilir.' };
+  }
+  
+  // İlk ve son karakter özel karakter olamaz
+  if (username.startsWith('-') || username.startsWith('.') || username.endsWith('-') || username.endsWith('.')) {
+    return { valid: false, error: 'Kullanıcı adı tire veya nokta ile başlayamaz/bitemez.' };
+  }
+  
+  // Ardışık özel karakterler yasak
+  if (username.includes('..') || username.includes('--') || username.includes('.-') || username.includes('-.')) {
+    return { valid: false, error: 'Ardışık özel karakterler kullanılamaz.' };
+  }
+  
+  return { valid: true };
+};
+
+// ============================================
+// CHECK USERNAME AVAILABILITY
+// ============================================
+router.get('/check-username/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    // Validate format
+    const validation = validateUsername(username);
+    if (!validation.valid) {
+      return res.json({ 
+        success: true, 
+        available: false, 
+        error: validation.error 
+      });
+    }
+    
+    // Check if username exists
+    const [existing] = await sql`
+      SELECT id FROM users WHERE LOWER(username) = LOWER(${username})
+    `;
+    
+    res.json({ 
+      success: true, 
+      available: !existing,
+      message: existing ? 'Bu kullanıcı adı zaten kullanılıyor.' : 'Kullanıcı adı müsait!'
+    });
+  } catch (error) {
+    console.error('Check username error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// UPDATE USERNAME
+// ============================================
+router.put('/username', authenticateToken, async (req, res) => {
+  try {
+    const { username } = req.body;
+    const user_id = req.user.id;
+    
+    if (!username) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Kullanıcı adı belirtilmedi.' 
+      });
+    }
+    
+    // Validate format
+    const validation = validateUsername(username);
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        success: false, 
+        error: validation.error 
+      });
+    }
+    
+    // Check if username already exists (excluding current user)
+    const [existing] = await sql`
+      SELECT id FROM users 
+      WHERE LOWER(username) = LOWER(${username}) AND id != ${user_id}
+    `;
+    
+    if (existing) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Bu kullanıcı adı zaten kullanılıyor.' 
+      });
+    }
+    
+    // Update username
+    const [updated] = await sql`
+      UPDATE users 
+      SET username = ${username.toLowerCase()}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${user_id}
+      RETURNING id, username, email, full_name
+    `;
+    
+    res.json({ 
+      success: true, 
+      message: 'Kullanıcı adınız başarıyla güncellendi!',
+      data: updated 
+    });
+  } catch (error) {
+    console.error('Update username error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get user profile by username
 router.get('/:username', optionalAuth, async (req, res) => {
   try {
