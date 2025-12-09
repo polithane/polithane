@@ -1,5 +1,6 @@
 import express from 'express';
-import { sql, upload } from '../index.js';
+import { sql } from '../index.js';
+import { upload } from '../utils/upload.js';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
