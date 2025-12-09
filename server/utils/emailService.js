@@ -4,12 +4,18 @@ import { verificationEmailTemplate, welcomeEmailTemplate, passwordResetEmailTemp
 
 // Create email transporter
 const createTransporter = () => {
+  // Railway Gmail SMTP timeout sorununu çözmek için doğrudan host/port kullanıyoruz
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465, // SSL port (587 yerine 465 deniyoruz)
+    secure: true, // SSL kullan
     auth: {
       user: process.env.EMAIL_USER || 'polithanecom@gmail.com',
       pass: process.env.EMAIL_PASSWORD
-    }
+    },
+    connectionTimeout: 10000, // 10 saniye timeout
+    greetingTimeout: 5000,
+    socketTimeout: 10000
   });
 };
 
