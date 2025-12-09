@@ -164,8 +164,12 @@ export const RegisterPageNew = () => {
     setError('');
     
     try {
+      // Generate username from email if not provided
+      const username = formData.username || formData.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+      
       const result = await register({
         ...formData,
+        username, // Add generated username
         membership_type: membershipType,
         document: documentFile
       });
