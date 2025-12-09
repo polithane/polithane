@@ -487,22 +487,18 @@ router.post('/forgot-password', async (req, res) => {
       WHERE id = ${user.id}
     `;
 
-    // Password reset email gönder
-    try {
-      await sendPasswordResetEmail(email, resetToken);
-      console.log(`✅ Password reset email sent to ${email}`);
-    } catch (emailError) {
-      console.error('⚠️ Password reset email gönderme hatası:', emailError);
-      console.error('Email Error Details:', emailError.message);
-      
-      // Email gönderilemese bile kullanıcıya başarı mesajı (güvenlik için)
-      // Ama gerçek hatayı loglara yazıyoruz
-      console.error('🔴 EMAIL AYARLARINI KONTROL EDİN:');
-      console.error('- EMAIL_USER:', process.env.EMAIL_USER);
-      console.error('- EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? '✓ Mevcut' : '✗ Eksik');
-      console.error('- Gmail App Password kullanmanız gerekebilir!');
-    }
+    // Password reset email gönder (async - response'u bloklamıyor)
+    sendPasswordResetEmail(email, resetToken)
+      .then(() => {
+        console.log(`✅ Password reset email sent to ${email}`);
+      })
+      .catch((emailError) => {
+        console.error('⚠️ Password reset email gönderme hatası:', emailError);
+        console.error('Email Error Details:', emailError.message);
+        console.error('🔴 SMTP CONNECTION TIMEOUT - Railway Gmail SMTP portlarını blokluyor olabilir!');
+      });
 
+    // Response'u hemen döndür (email gönderilmesini bekleme)
     res.json({
       success: true,
       message: 'Şifre sıfırlama linki email adresinize gönderildi.'
