@@ -4,10 +4,25 @@ import { verificationEmailTemplate, welcomeEmailTemplate, passwordResetEmailTemp
 
 // Create email transporter
 const createTransporter = () => {
-  // Railway Gmail SMTP timeout sorununu çözmek için doğrudan host/port kullanıyoruz
+  const emailService = process.env.EMAIL_SERVICE || 'gmail';
+  
+  // SendGrid (Önerilen - Railway ile çalışır)
+  if (emailService === 'sendgrid') {
+    return nodemailer.createTransport({
+      host: 'smtp.sendgrid.net',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'apikey', // SendGrid için her zaman 'apikey'
+        pass: process.env.EMAIL_PASSWORD // SendGrid API Key
+      }
+    });
+  }
+  
+  // Gmail SMTP (Railway'de timeout sorunu olabilir)
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465, // SSL port (587 yerine 465 deniyoruz)
+    port: 465, // SSL port
     secure: true, // SSL kullan
     auth: {
       user: process.env.EMAIL_USER || 'polithanecom@gmail.com',
