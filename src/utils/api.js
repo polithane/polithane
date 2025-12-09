@@ -64,18 +64,26 @@ export const apiCall = async (endpoint, options = {}) => {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      // Türkçe hata mesajı döndür
+      // Backend'den gelen hata mesajını kullan
       let errorMessage = data.error || data.message || ERROR_MESSAGES.UNKNOWN;
       
-      // HTTP status'e göre varsayılan mesajlar
-      if (response.status === 401) {
+      // HTTP status'e göre varsayılan mesajlar (sadece backend mesajı yoksa)
+      if (response.status === 401 && !data.error) {
         errorMessage = ERROR_MESSAGES.UNAUTHORIZED;
-      } else if (response.status === 404) {
-        errorMessage = ERROR_MESSAGES.NOT_FOUND;
-      } else if (response.status === 400) {
+      } else if (response.status === 404 && !data.error) {
+        errorMessage = data.error || ERROR_MESSAGES.NOT_FOUND;
+      } else if (response.status === 400 && !data.error) {
         errorMessage = errorMessage || ERROR_MESSAGES.BAD_REQUEST;
-      } else if (response.status >= 500) {
+      } else if (response.status === 429) {
+        // Rate Limit (429) - Backend mesajını kullan
+        errorMessage = data.error || 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyip tekrar deneyin.';
+      } else if (response.status >= 500 && !data.error) {
         errorMessage = ERROR_MESSAGES.SERVER_ERROR;
+      }
+      
+      // Kalan deneme hakkını ekle (brute force koruması)
+      if (data.remainingAttempts !== undefined) {
+        errorMessage += ` (Kalan deneme: ${data.remainingAttempts})`;
       }
       
       throw new Error(errorMessage);
