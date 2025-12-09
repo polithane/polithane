@@ -4,7 +4,7 @@ import { verificationEmailTemplate, welcomeEmailTemplate, passwordResetEmailTemp
 
 // Create email transporter
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER || 'polithanecom@gmail.com',
