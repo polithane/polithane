@@ -41,9 +41,9 @@ export const sendVerificationEmail = async (email, token) => {
         to: email,
         from: {
           email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
-          name: 'Polithane'
+          name: 'Polithane. Özgür, açık, şeffaf siyaset, bağımsız medya!'
         },
-        subject: '✅ Email Doğrulama - Polithane',
+        subject: '✅ Email Doğrulama - Polithane.',
         html: verificationEmailTemplate(email, token, frontendUrl)
       });
       return { success: true };
@@ -82,9 +82,9 @@ export const sendWelcomeEmail = async (email, fullName) => {
         to: email,
         from: {
           email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
-          name: 'Polithane'
+          name: 'Polithane. Özgür, açık, şeffaf siyaset, bağımsız medya!'
         },
-        subject: '🎉 Hoş Geldiniz - Polithane',
+        subject: '🎉 Hoş Geldiniz - Polithane.',
         html: welcomeEmailTemplate(fullName, email, frontendUrl)
       });
       return { success: true };
@@ -123,9 +123,9 @@ export const sendPasswordResetEmail = async (email, resetToken) => {
         to: email,
         from: {
           email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
-          name: 'Polithane'
+          name: 'Polithane. Özgür, açık, şeffaf siyaset, bağımsız medya!'
         },
-        subject: '🔐 Şifre Sıfırlama - Polithane',
+        subject: '🔐 Şifre Sıfırlama - Polithane.',
         html: passwordResetEmailTemplate(email, resetToken, frontendUrl)
       });
       return { success: true };
