@@ -97,7 +97,7 @@ export const ForgotPasswordPage = () => {
               </div>
 
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/login-new')}
                 className="w-full bg-primary-blue hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-all shadow-lg hover:shadow-xl"
               >
                 Giriş Sayfasına Dön
@@ -179,7 +179,7 @@ export const ForgotPasswordPage = () => {
           {/* Back to Login */}
           <div className="mt-6">
             <Link
-              to="/login"
+              to="/login-new"
               className="flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />

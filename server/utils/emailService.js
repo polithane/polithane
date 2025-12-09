@@ -39,7 +39,10 @@ export const sendVerificationEmail = async (email, token) => {
     try {
       await sgMail.send({
         to: email,
-        from: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+        from: {
+          email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+          name: 'Polithane'
+        },
         subject: '✅ Email Doğrulama - Polithane',
         html: verificationEmailTemplate(email, token, frontendUrl)
       });
@@ -77,7 +80,10 @@ export const sendWelcomeEmail = async (email, fullName) => {
     try {
       await sgMail.send({
         to: email,
-        from: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+        from: {
+          email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+          name: 'Polithane'
+        },
         subject: '🎉 Hoş Geldiniz - Polithane',
         html: welcomeEmailTemplate(fullName, email, frontendUrl)
       });
@@ -115,7 +121,10 @@ export const sendPasswordResetEmail = async (email, resetToken) => {
     try {
       await sgMail.send({
         to: email,
-        from: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+        from: {
+          email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+          name: 'Polithane'
+        },
         subject: '🔐 Şifre Sıfırlama - Polithane',
         html: passwordResetEmailTemplate(email, resetToken, frontendUrl)
       });

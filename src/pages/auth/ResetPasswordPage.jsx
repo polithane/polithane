@@ -65,7 +65,7 @@ export const ResetPasswordPage = () => {
       if (response.success) {
         setSuccess(true);
         setTimeout(() => {
-          navigate('/login');
+          navigate('/login-new');
         }, 3000);
       } else {
         setError(response.error || 'Şifre sıfırlama başarısız.');
@@ -120,7 +120,7 @@ export const ResetPasswordPage = () => {
               </p>
 
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/login-new')}
                 className="w-full bg-primary-blue hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-all shadow-lg hover:shadow-xl"
               >
                 Giriş Sayfasına Git
@@ -237,7 +237,7 @@ export const ResetPasswordPage = () => {
           {/* Back to Login */}
           <div className="mt-6 text-center">
             <Link
-              to="/login"
+              to="/login-new"
               className="text-gray-600 hover:text-gray-900 font-semibold transition-colors"
             >
               Giriş Sayfasına Dön
