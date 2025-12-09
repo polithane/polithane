@@ -14,7 +14,7 @@ export const SiteSettings = () => {
     allowComments: true,
     allowMessages: true,
     // Email ayarları
-    email_verification_enabled: 'false',
+    email_verification_enabled: 'true',
     email_service_provider: 'gmail',
     email_from_address: 'noreply@polithane.com',
     email_from_name: 'Polithane',

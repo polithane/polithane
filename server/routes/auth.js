@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { sql } from '../index.js';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
 import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from '../utils/emailService.js';
+import { getSetting } from '../utils/settingsService.js';
 
 const router = express.Router();
 
@@ -63,9 +64,22 @@ router.post('/register', async (req, res) => {
     // Şifreyi hashle
     const password_hash = await bcrypt.hash(password, 10);
 
-    // Email doğrulama token'ı oluştur
-    const verificationToken = generateVerificationToken();
-    const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
+    // Email verification admin panelden açık mı kontrol et
+    const emailVerificationEnabled = (await getSetting('email_verification_enabled')) === 'true';
+
+    let verificationToken = null;
+    let tokenExpires = null;
+    let emailVerified = false;
+    
+    if (emailVerificationEnabled) {
+      // Email doğrulama token'ı oluştur
+      verificationToken = generateVerificationToken();
+      tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
+      emailVerified = false;
+    } else {
+      // Email verification kapalı, direkt verified
+      emailVerified = true;
+    }
 
     // Kullanıcıyı oluştur
     const [user] = await sql`
@@ -89,20 +103,30 @@ router.post('/register', async (req, res) => {
         ${user_type},
         ${province || null},
         ${party_id || null},
-        false,
+        ${emailVerified},
         ${verificationToken},
         ${tokenExpires}
       )
       RETURNING id, username, email, full_name, user_type, avatar_url, email_verified, created_at
     `;
 
-    // Verification email gönder
-    try {
-      await sendVerificationEmail(email, verificationToken);
-      console.log(`✅ Verification email sent to ${email}`);
-    } catch (emailError) {
-      console.error('⚠️ Verification email gönderme hatası:', emailError);
-      // Email gönderilemese de kayıt tamamlanmış olur
+    // Verification email gönder (sadece açıksa)
+    if (emailVerificationEnabled) {
+      try {
+        await sendVerificationEmail(email, verificationToken);
+        console.log(`✅ Verification email sent to ${email}`);
+      } catch (emailError) {
+        console.error('⚠️ Verification email gönderme hatası:', emailError);
+        // Email gönderilemese de kayıt tamamlanmış olur
+      }
+    } else {
+      // Email verification kapalıysa welcome email gönder
+      try {
+        await sendWelcomeEmail(email, full_name);
+        console.log(`✅ Welcome email sent to ${email}`);
+      } catch (emailError) {
+        console.error('⚠️ Welcome email gönderme hatası:', emailError);
+      }
     }
 
     // JWT token oluştur
@@ -110,11 +134,13 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Kayıt başarılı! Email adresinize doğrulama linki gönderildi.',
+      message: emailVerificationEnabled 
+        ? 'Kayıt başarılı! Email adresinize doğrulama linki gönderildi.'
+        : 'Kayıt başarılı! Hoş geldiniz.',
       data: {
         user,
         token,
-        requiresEmailVerification: true
+        requiresEmailVerification: emailVerificationEnabled
       }
     });
 
@@ -167,6 +193,18 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ 
         success: false, 
         error: 'Email veya şifre hatalı.' 
+      });
+    }
+
+    // Email verification admin panelden açık mı kontrol et
+    const emailVerificationEnabled = (await getSetting('email_verification_enabled')) === 'true';
+
+    // Email verification açıksa ve email doğrulanmamışsa
+    if (emailVerificationEnabled && !user.email_verified) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Email adresinizi doğrulamanız gerekiyor. Lütfen mailinizi kontrol edin.',
+        requiresEmailVerification: true
       });
     }
 
