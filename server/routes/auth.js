@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { sql } from '../index.js';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
-import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail } from '../utils/emailService.js';
+import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -395,6 +395,151 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Şifre değiştirme sırasında bir hata oluştu.'
+    });
+  }
+});
+
+// ============================================
+// FORGOT PASSWORD - Şifremi Unuttum
+// ============================================
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email adresi gerekli.'
+      });
+    }
+
+    // Email format kontrolü
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Geçersiz email formatı.'
+      });
+    }
+
+    // Kullanıcıyı bul
+    const [user] = await sql`
+      SELECT id, email, full_name
+      FROM users
+      WHERE LOWER(email) = LOWER(${email})
+    `;
+
+    // Güvenlik: Email bulunamasa bile aynı mesajı döndür (email enumeration önleme)
+    if (!user) {
+      return res.json({
+        success: true,
+        message: 'Eğer bu email kayıtlıysa, şifre sıfırlama linki gönderildi.'
+      });
+    }
+
+    // Reset token oluştur
+    const resetToken = generateVerificationToken();
+    const tokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 saat
+
+    // Token'ı database'e kaydet
+    await sql`
+      UPDATE users
+      SET password_reset_token = ${resetToken},
+          password_reset_expires = ${tokenExpires}
+      WHERE id = ${user.id}
+    `;
+
+    // Password reset email gönder
+    try {
+      await sendPasswordResetEmail(email, resetToken);
+      console.log(`✅ Password reset email sent to ${email}`);
+    } catch (emailError) {
+      console.error('⚠️ Password reset email gönderme hatası:', emailError);
+      return res.status(500).json({
+        success: false,
+        error: 'Email gönderilirken bir hata oluştu.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Şifre sıfırlama linki email adresinize gönderildi.'
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Şifre sıfırlama sırasında bir hata oluştu.'
+    });
+  }
+});
+
+// ============================================
+// RESET PASSWORD - Şifre Sıfırlama
+// ============================================
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token ve yeni şifre gerekli.'
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'Şifre en az 8 karakter olmalıdır.'
+      });
+    }
+
+    // Token ile kullanıcıyı bul
+    const [user] = await sql`
+      SELECT id, email, password_reset_expires
+      FROM users
+      WHERE password_reset_token = ${token}
+    `;
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'Geçersiz veya süresi dolmuş token.'
+      });
+    }
+
+    // Token süresi dolmuş mu?
+    if (new Date() > new Date(user.password_reset_expires)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Şifre sıfırlama linkinin süresi dolmuş. Lütfen yeni bir link isteyin.'
+      });
+    }
+
+    // Yeni şifreyi hashle
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Şifreyi güncelle ve token'ı sil
+    await sql`
+      UPDATE users
+      SET password_hash = ${newPasswordHash},
+          password_reset_token = NULL,
+          password_reset_expires = NULL
+      WHERE id = ${user.id}
+    `;
+
+    res.json({
+      success: true,
+      message: 'Şifreniz başarıyla sıfırlandı. Yeni şifrenizle giriş yapabilirsiniz.'
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Şifre sıfırlama sırasında bir hata oluştu.'
     });
   }
 });
