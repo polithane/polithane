@@ -253,8 +253,8 @@ export const RegisterPageNew = () => {
               <span className="text-4xl font-black text-white">P</span>
             </div>
           </div>
-          <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane'e Hoş Geldiniz</h1>
-          <p className="text-gray-600">Türkiye siyasetinin dijital meydanı</p>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Hoş Geldiniz</h1>
+          <p className="text-gray-600">Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
