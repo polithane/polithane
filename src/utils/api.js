@@ -19,6 +19,12 @@ const ERROR_MESSAGES = {
 // Helper function for API calls
 export const apiCall = async (endpoint, options = {}) => {
   const url = `${API_URL}${endpoint}`;
+  
+  console.log('🌐 API_URL:', API_URL);
+  console.log('📍 Endpoint:', endpoint);
+  console.log('🔗 Full URL:', url);
+  console.log('⚙️ Options:', options);
+  
   const headers = {
     ...getAuthHeader(),
     ...options.headers,
@@ -29,11 +35,15 @@ export const apiCall = async (endpoint, options = {}) => {
     headers['Content-Type'] = 'application/json';
   }
 
+  console.log('📋 Headers:', headers);
+
   try {
+    console.log('📤 Fetching...');
     const response = await fetch(url, {
       ...options,
       headers,
     });
+    console.log('📥 Response received:', response.status, response.statusText);
 
     // Network error
     if (!response.ok && response.status === 0) {
