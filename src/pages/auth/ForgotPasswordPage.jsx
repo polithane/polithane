@@ -17,7 +17,7 @@ export const ForgotPasswordPage = () => {
     setLoading(true);
 
     try {
-      const response = await apiCall('/auth/forgot-password', {
+      const response = await apiCall('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
       });

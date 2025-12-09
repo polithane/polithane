@@ -54,7 +54,7 @@ export const ResetPasswordPage = () => {
     setLoading(true);
 
     try {
-      const response = await apiCall('/auth/reset-password', {
+      const response = await apiCall('/api/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify({
           token,
