@@ -1,24 +1,15 @@
 import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 import { verificationEmailTemplate, welcomeEmailTemplate, passwordResetEmailTemplate } from './emailTemplates.js';
 
-// Create email transporter
+// Initialize SendGrid
+if (process.env.EMAIL_SERVICE === 'sendgrid' && process.env.EMAIL_PASSWORD) {
+  sgMail.setApiKey(process.env.EMAIL_PASSWORD);
+}
+
+// Create email transporter (Gmail only)
 const createTransporter = () => {
-  const emailService = process.env.EMAIL_SERVICE || 'gmail';
-  
-  // SendGrid (Önerilen - Railway ile çalışır)
-  if (emailService === 'sendgrid') {
-    return nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'apikey', // SendGrid için her zaman 'apikey'
-        pass: process.env.EMAIL_PASSWORD // SendGrid API Key
-      }
-    });
-  }
-  
   // Gmail SMTP (Railway'de timeout sorunu olabilir)
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -41,9 +32,26 @@ export const generateVerificationToken = () => {
 
 // Send verification email
 export const sendVerificationEmail = async (email, token) => {
-  const transporter = createTransporter();
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
   
+  // SendGrid Web API (Railway ile çalışır)
+  if (process.env.EMAIL_SERVICE === 'sendgrid') {
+    try {
+      await sgMail.send({
+        to: email,
+        from: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+        subject: '✅ Email Doğrulama - Polithane',
+        html: verificationEmailTemplate(email, token, frontendUrl)
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('SendGrid email hatası:', error);
+      return { success: false, error: error.message };
+    }
+  }
+  
+  // Gmail SMTP (fallback)
+  const transporter = createTransporter();
   const mailOptions = {
     from: process.env.EMAIL_FROM || 'Polithane <polithanecom@gmail.com>',
     to: email,
@@ -62,9 +70,26 @@ export const sendVerificationEmail = async (email, token) => {
 
 // Send welcome email
 export const sendWelcomeEmail = async (email, fullName) => {
-  const transporter = createTransporter();
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
   
+  // SendGrid Web API
+  if (process.env.EMAIL_SERVICE === 'sendgrid') {
+    try {
+      await sgMail.send({
+        to: email,
+        from: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+        subject: '🎉 Hoş Geldiniz - Polithane',
+        html: welcomeEmailTemplate(fullName, email, frontendUrl)
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('SendGrid email hatası:', error);
+      return { success: false, error: error.message };
+    }
+  }
+  
+  // Gmail SMTP (fallback)
+  const transporter = createTransporter();
   const mailOptions = {
     from: process.env.EMAIL_FROM || 'Polithane <polithanecom@gmail.com>',
     to: email,
@@ -83,9 +108,26 @@ export const sendWelcomeEmail = async (email, fullName) => {
 
 // Send password reset email
 export const sendPasswordResetEmail = async (email, resetToken) => {
-  const transporter = createTransporter();
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
   
+  // SendGrid Web API (Railway SMTP portlarını blokluyor, Web API kullanmalıyız!)
+  if (process.env.EMAIL_SERVICE === 'sendgrid') {
+    try {
+      await sgMail.send({
+        to: email,
+        from: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
+        subject: '🔐 Şifre Sıfırlama - Polithane',
+        html: passwordResetEmailTemplate(email, resetToken, frontendUrl)
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('SendGrid email hatası:', error.response?.body || error);
+      return { success: false, error: error.message };
+    }
+  }
+  
+  // Gmail SMTP (fallback)
+  const transporter = createTransporter();
   const mailOptions = {
     from: process.env.EMAIL_FROM || 'Polithane <polithanecom@gmail.com>',
     to: email,
