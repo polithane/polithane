@@ -154,8 +154,8 @@ export const ResetPasswordPage = () => {
               <span className="text-4xl font-black text-white">P</span>
             </div>
           </div>
-          <h1 className="text-3xl font-black text-gray-900 mb-2">Yeni Şifre Belirle</h1>
-          <p className="text-gray-600">Hesabınız için yeni bir şifre oluşturun</p>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Yeni Şifre</h1>
+          <p className="text-gray-600">Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
         </div>
 
         {/* Form */}

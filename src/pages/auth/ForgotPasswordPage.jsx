@@ -131,8 +131,8 @@ export const ForgotPasswordPage = () => {
               <span className="text-4xl font-black text-white">P</span>
             </div>
           </div>
-          <h1 className="text-3xl font-black text-gray-900 mb-2">Şifremi Unuttum</h1>
-          <p className="text-gray-600">Email adresinize şifre sıfırlama linki göndereceğiz</p>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Şifremi Unuttum</h1>
+          <p className="text-gray-600">Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
         </div>
 
         {/* Form */}

@@ -4,9 +4,9 @@ import { apiCall } from '../../utils/api';
 
 export const SiteSettings = () => {
   const [settings, setSettings] = useState({
-    siteName: 'Polithane',
-    siteSlogan: 'Türkiye Siyasetinin Dijital Meydanı',
-    siteDescription: 'Şeffaf, demokratik ve etkileşimli siyaset platformu',
+    siteName: 'Polithane.',
+    siteSlogan: 'Özgür, açık, şeffaf siyaset, bağımsız medya!',
+    siteDescription: 'Özgür, açık, şeffaf siyaset platformu',
     contactEmail: 'info@polithane.com',
     supportEmail: 'support@polithane.com',
     maintenanceMode: false,
