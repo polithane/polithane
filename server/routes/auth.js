@@ -217,12 +217,12 @@ router.post('/login', async (req, res) => {
     // JWT token oluştur
     const token = generateToken(user);
 
-    // TODO: Son giriş zamanını güncelle (last_login kolonu eklenince aktif edilecek)
-    // await sql`
-    //   UPDATE users 
-    //   SET last_login = CURRENT_TIMESTAMP 
-    //   WHERE id = ${user.id}
-    // `;
+    // Son giriş zamanını güncelle
+    await sql`
+      UPDATE users 
+      SET last_login = CURRENT_TIMESTAMP 
+      WHERE id = ${user.id}
+    `;
 
     res.json({
       success: true,
