@@ -89,19 +89,19 @@ export const LoginPageNew = () => {
               </div>
             )}
 
-            {/* Email/Username */}
+            {/* Email */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Kullanıcı Adı veya Email
+                Email Adresiniz
               </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="text"
+                  type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="kullanici_adi veya email@ornek.com"
+                  placeholder="email@ornek.com"
                   className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                   required
                 />
