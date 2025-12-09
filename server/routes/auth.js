@@ -110,23 +110,16 @@ router.post('/register', async (req, res) => {
       RETURNING id, username, email, full_name, user_type, avatar_url, email_verified, created_at
     `;
 
-    // Verification email gönder (sadece açıksa)
+    // Verification email gönder (async - sadece açıksa)
     if (emailVerificationEnabled) {
-      try {
-        await sendVerificationEmail(email, verificationToken);
-        console.log(`✅ Verification email sent to ${email}`);
-      } catch (emailError) {
-        console.error('⚠️ Verification email gönderme hatası:', emailError);
-        // Email gönderilemese de kayıt tamamlanmış olur
-      }
+      sendVerificationEmail(email, verificationToken)
+        .then(() => console.log(`✅ Verification email sent to ${email}`))
+        .catch((emailError) => console.error('⚠️ Verification email gönderme hatası:', emailError));
     } else {
-      // Email verification kapalıysa welcome email gönder
-      try {
-        await sendWelcomeEmail(email, full_name);
-        console.log(`✅ Welcome email sent to ${email}`);
-      } catch (emailError) {
-        console.error('⚠️ Welcome email gönderme hatası:', emailError);
-      }
+      // Email verification kapalıysa welcome email gönder (async)
+      sendWelcomeEmail(email, full_name)
+        .then(() => console.log(`✅ Welcome email sent to ${email}`))
+        .catch((emailError) => console.error('⚠️ Welcome email gönderme hatası:', emailError));
     }
 
     // JWT token oluştur
