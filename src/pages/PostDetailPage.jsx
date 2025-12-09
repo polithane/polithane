@@ -50,7 +50,7 @@ export const PostDetailPage = () => {
           <div className="card mb-6">
             <div className="flex items-center gap-4 mb-4">
               <Avatar 
-                src={post.user?.profile_image} 
+                src={post.user?.avatar_url || user?.profile_image} 
                 size="60px" 
                 verified={post.user?.verification_badge}
               />
@@ -172,7 +172,7 @@ export const PostDetailPage = () => {
             <div className="space-y-4">
               {comments.map(comment => (
                 <div key={comment.comment_id} className="flex gap-3">
-                  <Avatar src={comment.user?.profile_image} size="40px" verified={comment.user?.verification_badge} />
+                  <Avatar src={comment.user?.avatar_url || user?.profile_image} size="40px" verified={comment.user?.verification_badge} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold">{comment.user?.full_name}</span>

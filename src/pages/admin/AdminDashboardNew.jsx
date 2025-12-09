@@ -134,7 +134,7 @@ export const AdminDashboardNew = () => {
           <div className="space-y-3">
             {recentUsers.map(user => (
               <div key={user.user_id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                <img src={user.profile_image} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
+                <img src={user.avatar_url || user.profile_image} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-gray-900 truncate">{user.full_name}</div>
                   <div className="text-xs text-gray-500">{user.user_type}</div>

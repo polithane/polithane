@@ -20,7 +20,7 @@ export const BlockUserModal = ({ isOpen, onClose, user, onConfirm }) => {
         {/* User Info */}
         <div className="flex items-center gap-3 justify-center mb-6">
           <Avatar 
-            src={user.profile_image} 
+            src={user.avatar_url || user.profile_image} 
             size="48px"
             verified={user.verification_badge}
           />

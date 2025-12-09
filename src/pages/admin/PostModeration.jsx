@@ -109,7 +109,7 @@ export const PostModeration = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <img src={post.user?.profile_image} alt="" className="w-8 h-8 rounded-full" />
+                      <img src={post.user?.avatar_url || user?.profile_image} alt="" className="w-8 h-8 rounded-full" />
                       <span className="text-sm font-semibold text-gray-900">{post.user?.full_name}</span>
                     </div>
                   </td>

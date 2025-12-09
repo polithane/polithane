@@ -163,9 +163,9 @@ export const ProfilePage = () => {
           {/* Profil Header */}
           <div className="flex items-start gap-6">
             <Avatar 
-              src={user.profile_image} 
+              src={user.avatar_url || user.avatar_url || user.profile_image} 
               size="120px" 
-              verified={user.verification_badge}
+              verified={user.verification_badge || user.is_verified}
             />
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2 flex-wrap">

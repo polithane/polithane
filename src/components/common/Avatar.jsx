@@ -16,8 +16,13 @@ export const Avatar = ({
   const partyLogoSize = sizeNum * 0.35;
   
   const getAvatarUrl = (url) => {
-    // Eğer gerçek path varsa kullan
-    if (url && url.startsWith('/assets/')) return url;
+    // Eğer URL varsa kullan
+    if (url) {
+      // Absolute veya relative path
+      if (url.startsWith('/') || url.startsWith('http')) {
+        return url;
+      }
+    }
     // Placeholder kullan
     const userId = url?.match(/\d+/)?.[0] || Math.floor(Math.random() * 70) + 1;
     return getPlaceholderImage('avatar', userId);

@@ -46,8 +46,8 @@ export const ProfileSettings = () => {
         <label className="block text-sm font-semibold text-gray-700 mb-3">Profil Fotoğrafı</label>
         <div className="flex items-center gap-4">
           <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-            {user?.profile_image ? (
-              <img src={user.profile_image} alt={user.full_name} className="w-full h-full object-cover" />
+            {user?.avatar_url || user?.profile_image ? (
+              <img src={user.avatar_url || user.profile_image} alt={user.full_name} className="w-full h-full object-cover" />
             ) : (
               <Camera className="w-10 h-10 text-gray-400" />
             )}

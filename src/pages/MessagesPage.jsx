@@ -151,7 +151,7 @@ export const MessagesPage = () => {
                     >
                       <div className="flex items-start gap-3">
                         <Avatar 
-                          src={user.profile_image} 
+                          src={user.avatar_url || user.profile_image} 
                           size="48px"
                           verified={user.verification_badge}
                         />
@@ -257,7 +257,7 @@ export const MessagesPage = () => {
                             >
                               {!isFromMe && (
                                 <Avatar 
-                                  src={user?.profile_image} 
+                                  src={user?.avatar_url || user?.profile_image} 
                                   size="28px"
                                   className="mr-2 flex-shrink-0"
                                 />

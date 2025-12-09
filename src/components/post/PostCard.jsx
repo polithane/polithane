@@ -62,9 +62,9 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             className="cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
           >
             <Avatar 
-              src={post.user?.profile_image} 
+              src={post.user?.avatar_url || post.user?.avatar_url || user?.profile_image} 
               size="40px" 
-              verified={post.user?.verification_badge}
+              verified={post.user?.verification_badge || post.user?.is_verified}
             />
           </div>
           <div className="flex-1 min-w-0">

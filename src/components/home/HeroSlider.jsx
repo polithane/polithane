@@ -69,7 +69,7 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
         {/* Sol: Profil Resmi + Gündem Başlığı */}
         <div className="flex items-center gap-3 flex-1 pr-4">
           <Avatar 
-            src={currentPost.user?.profile_image} 
+            src={currentPost.user?.avatar_url || user?.profile_image} 
             size="48px" 
             verified={currentPost.user?.verification_badge}
             className="border-2 border-white/30 flex-shrink-0"

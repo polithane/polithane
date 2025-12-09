@@ -61,7 +61,7 @@ export const SearchPage = () => {
               <div className="space-y-3">
                 {filteredUsers.map(user => (
                   <div key={user.user_id} className="card flex items-center gap-4">
-                    <Avatar src={user.profile_image} size="48px" verified={user.verification_badge} />
+                    <Avatar src={user.avatar_url || user.profile_image} size="48px" verified={user.verification_badge} />
                     <div className="flex-1">
                       <h3 className="font-semibold">{user.full_name}</h3>
                       <p className="text-sm text-gray-500">@{user.username}</p>

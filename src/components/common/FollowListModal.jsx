@@ -95,7 +95,7 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
                     className="cursor-pointer"
                   >
                     <Avatar 
-                      src={user.profile_image} 
+                      src={user.avatar_url || user.profile_image} 
                       size="48px"
                       verified={user.verification_badge}
                     />
