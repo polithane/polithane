@@ -61,6 +61,7 @@ function App() {
         <Route path="/" element={<><Header /><HomePage /><Footer /><FloatingChat /></>} />
         <Route path="/post/:postId" element={<><Header /><PostDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/profile/:userId" element={<><Header /><ProfilePage /><Footer /><FloatingChat /></>} />
+        <Route path="/@:username" element={<><Header /><ProfilePage /><Footer /><FloatingChat /></>} />
         <Route path="/party/:partyId" element={<><Header /><PartyDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/agenda/:agendaSlug" element={<><Header /><AgendaDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><FloatingChat /></>} />

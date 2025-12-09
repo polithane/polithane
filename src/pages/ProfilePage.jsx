@@ -14,9 +14,10 @@ import { mockUsers } from '../mock/users';
 import { mockPosts } from '../mock/posts';
 import { getFollowStats, mockBlockedUsers } from '../mock/follows';
 import { useAuth } from '../contexts/AuthContext';
+import { users } from '../utils/api';
 
 export const ProfilePage = () => {
-  const { userId } = useParams();
+  const { userId, username } = useParams();
   const { user: currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
@@ -26,23 +27,109 @@ export const ProfilePage = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [followStats, setFollowStats] = useState({ followers_count: 0, following_count: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   
-  const isOwnProfile = currentUser && (parseInt(userId) === currentUser.user_id || userId === 'me');
+  const isOwnProfile = currentUser && (
+    parseInt(userId) === currentUser.id || 
+    userId === 'me' || 
+    username === currentUser.username
+  );
+  
   const isBlocked = mockBlockedUsers.some(b => 
-    (b.blocker_id === 'currentUser' && b.blocked_id === parseInt(userId)) ||
-    (b.blocked_id === 'currentUser' && b.blocker_id === parseInt(userId))
+    (b.blocker_id === 'currentUser' && b.blocked_id === user?.id) ||
+    (b.blocked_id === 'currentUser' && b.blocker_id === user?.id)
   );
   
   useEffect(() => {
-    const foundUser = mockUsers.find(u => u.user_id === parseInt(userId));
-    setUser(foundUser);
+    const loadProfile = async () => {
+      setLoading(true);
+      setError('');
+      
+      try {
+        let profileData;
+        
+        // /@username route'u kullanılmışsa
+        if (username) {
+          const response = await users.getByUsername(username);
+          if (response.success) {
+            profileData = response.data;
+          } else {
+            setError('Kullanıcı bulunamadı');
+            setLoading(false);
+            return;
+          }
+        } 
+        // /profile/:userId route'u kullanılmışsa
+        else if (userId) {
+          // Mock data kullan (gerçek API yoksa)
+          const foundUser = mockUsers.find(u => u.user_id === parseInt(userId));
+          if (foundUser) {
+            profileData = foundUser;
+          } else {
+            setError('Kullanıcı bulunamadı');
+            setLoading(false);
+            return;
+          }
+        }
+        
+        setUser(profileData);
+        
+        // Posts yükle (username varsa API'den, yoksa mock'tan)
+        if (username) {
+          try {
+            const postsResponse = await users.getPosts(username);
+            setUserPosts(postsResponse.success ? postsResponse.data : []);
+          } catch (err) {
+            // Mock data kullan
+            const posts = mockPosts.filter(p => p.user_id === profileData.id);
+            setUserPosts(posts);
+          }
+        } else {
+          const posts = mockPosts.filter(p => p.user_id === parseInt(userId));
+          setUserPosts(posts);
+        }
+        
+        const stats = getFollowStats(profileData.id || userId);
+        setFollowStats(stats);
+      } catch (err) {
+        console.error('Profile load error:', err);
+        setError('Profil yüklenirken bir hata oluştu');
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    const posts = mockPosts.filter(p => p.user_id === parseInt(userId));
-    setUserPosts(posts);
-    
-    const stats = getFollowStats(userId);
-    setFollowStats(stats);
-  }, [userId]);
+    loadProfile();
+  }, [userId, username]);
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-blue mx-auto mb-4"></div>
+          <p className="text-gray-600">Profil yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Error state
+  if (error || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Kullanıcı Bulunamadı</h2>
+          <p className="text-gray-600 mb-6">{error || 'Aradığınız profil bulunamadı.'}</p>
+          <Link to="/" className="text-primary-blue hover:underline font-semibold">
+            Ana Sayfaya Dön
+          </Link>
+        </div>
+      </div>
+    );
+  }
   
   const handleBlock = (userId) => {
     // TODO: API çağrısı - kullanıcıyı engelle
