@@ -1,12 +1,22 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { sql, forgotPasswordLimiter } from '../index.js';
+import rateLimit from 'express-rate-limit';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
 import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 import { getSetting } from '../utils/settingsService.js';
 import { recordFailedLogin, clearFailedLoginAttempts, getRealIP } from '../utils/securityService.js';
+import { sql } from '../index.js';
 
 const router = express.Router();
+
+// Forgot Password Rate Limiter (Çok sıkı)
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 3, // Max 3 deneme
+  message: 'Çok fazla şifre sıfırlama isteği gönderdiniz. 15 dakika sonra tekrar deneyin.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ============================================
 // REGISTER - Email-based registration
@@ -173,20 +183,26 @@ router.post('/login', async (req, res) => {
       WHERE LOWER(email) = LOWER(${email})
     `;
 
-    if (!user) {
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Email veya şifre hatalı.' 
-      });
-    }
-
-    // Şifre kontrolü
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Email veya şifre hatalı.' 
+    // Kullanıcı bulunamadı veya şifre yanlış
+    const validPassword = user ? await bcrypt.compare(password, user.password_hash) : false;
+    
+    if (!user || !validPassword) {
+      // Başarısız login kaydı (Brute force koruması)
+      const ipAddress = getRealIP(req);
+      const userAgent = req.headers['user-agent'] || '';
+      const failResult = await recordFailedLogin(email, ipAddress, userAgent);
+      
+      if (failResult.blocked) {
+        return res.status(429).json({
+          success: false,
+          error: `Çok fazla başarısız deneme. IP adresiniz 15 dakika engellenmiştir.`
+        });
+      }
+      
+      return res.status(401).json({
+        success: false,
+        error: 'Email veya şifre hatalı.',
+        remainingAttempts: Math.max(0, 5 - failResult.attempts)
       });
     }
 

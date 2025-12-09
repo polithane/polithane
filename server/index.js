@@ -83,15 +83,6 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true, // Başarılı istekleri sayma
 });
 
-// Rate limiting - Forgot Password (Çok sıkı)
-const forgotPasswordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 dakika
-  max: 3, // Max 3 deneme
-  message: 'Çok fazla şifre sıfırlama isteği gönderd iniz. 15 dakika sonra tekrar deneyin.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 app.use('/api/', limiter);
 
 // Import routes
@@ -111,9 +102,6 @@ app.use('/api/users', usersRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', verificationRoutes);
 app.use('/api/settings', settingsRoutes);
-
-// Export limiters for specific routes
-export { forgotPasswordLimiter };
 
 // Health check
 app.get('/health', (req, res) => {
