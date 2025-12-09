@@ -16,24 +16,32 @@ export const ForgotPasswordPage = () => {
     setError('');
     setLoading(true);
 
+    console.log('🔄 Forgot Password - Starting...');
+    console.log('Email:', email);
+
     try {
+      console.log('📤 Sending request to /api/auth/forgot-password');
+      
       const response = await apiCall('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
 
-      console.log('Forgot Password Response:', response);
+      console.log('📥 Response received:', response);
 
       if (response.success) {
+        console.log('✅ Success! Showing success page...');
         setSuccess(true);
       } else {
-        console.error('Forgot Password Error:', response.error);
+        console.error('❌ Error response:', response.error);
         setError(response.error || 'Bir hata oluştu');
+        setLoading(false);
       }
     } catch (err) {
-      console.error('Forgot Password Exception:', err);
+      console.error('💥 Exception caught:', err);
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
       setError(err.message || 'Bir hata oluştu. Lütfen tekrar deneyin.');
-    } finally {
       setLoading(false);
     }
   };
