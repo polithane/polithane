@@ -376,6 +376,7 @@ export const getCategoryPosts = (category, allPosts = []) => {
           politician_type: orgType,
           party_id: partyId,
           verification_badge: true,
+          avatar_url: `https://i.pravatar.cc/150?img=${100 + i}`,
           profile_image: `https://i.pravatar.cc/150?img=${100 + i}`
         },
         content_type: ['text', 'image', 'video'][Math.floor(Math.random() * 3)],
