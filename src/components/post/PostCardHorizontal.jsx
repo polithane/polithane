@@ -83,7 +83,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
               className="cursor-pointer hover:opacity-80 transition-opacity"
             >
               <Avatar 
-                src={post.user?.avatar_url || post.user?.avatar_url || user?.profile_image} 
+                src={post.user?.avatar_url || post.user?.profile_image} 
                 size="32px" 
                 verified={post.user?.verification_badge || post.user?.is_verified}
               />

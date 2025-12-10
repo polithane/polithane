@@ -63,7 +63,7 @@ export const Header = () => {
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <Avatar src={user?.avatar_url || user?.avatar_url || user?.profile_image} size="36px" />
+                  <Avatar src={user?.avatar_url || user?.profile_image} size="36px" />
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </button>
                 
