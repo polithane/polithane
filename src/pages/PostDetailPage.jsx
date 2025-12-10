@@ -50,7 +50,7 @@ export const PostDetailPage = () => {
           <div className="card mb-6">
             <div className="flex items-center gap-4 mb-4">
               <Avatar 
-                src={post.user?.avatar_url || user?.profile_image} 
+                src={post.user?.avatar_url || post.user?.profile_image} 
                 size="60px" 
                 verified={post.user?.verification_badge}
               />
