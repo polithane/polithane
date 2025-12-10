@@ -61,8 +61,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// Avatar proxy middleware (for encoded URLs)
+import { avatarProxy } from './middleware/avatarProxy.js';
+app.use('/assets/profiles/politicians', avatarProxy);
+
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
 
 // Rate limiting - Genel
 const limiter = rateLimit({
