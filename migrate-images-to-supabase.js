@@ -95,6 +95,42 @@ async function uploadDefaultAvatar() {
 }
 
 // ============================================
+// HELPER: Sanitize filename for Supabase
+// ============================================
+
+function sanitizeFilename(filename) {
+  // Turkish to English character mapping
+  const charMap = {
+    'ç': 'c', 'Ç': 'C',
+    'ğ': 'g', 'Ğ': 'G',
+    'ı': 'i', 'İ': 'I',
+    'ö': 'o', 'Ö': 'O',
+    'ş': 's', 'Ş': 'S',
+    'ü': 'u', 'Ü': 'U',
+    // Cyrillic characters (found in filenames)
+    'Ш': 'I', 'ш': 'i',
+    'Щ': 'O', 'щ': 'o',
+    'Ъ': 'U', 'ъ': 'u',
+    'Ю': 'S', 'ю': 's',
+    'А': 'C', 'а': 'c',
+    'ж': 'C', 'Ж': 'C',
+    'Б': 'U', 'б': 'u',
+    'З': 'C', 'з': 'c',
+    'Я': 'S', 'я': 's'
+  };
+  
+  let sanitized = filename;
+  for (const [original, replacement] of Object.entries(charMap)) {
+    sanitized = sanitized.replace(new RegExp(original, 'g'), replacement);
+  }
+  
+  // Replace any remaining non-ASCII characters with underscore
+  sanitized = sanitized.replace(/[^\x00-\x7F]/g, '_');
+  
+  return sanitized;
+}
+
+// ============================================
 // 3. UPLOAD POLITICIAN PHOTOS
 // ============================================
 
@@ -112,27 +148,30 @@ async function uploadPoliticianPhotos() {
     
     let success = 0;
     let failed = 0;
+    const filenameMapping = {}; // Original -> Sanitized mapping
     
     for (let i = 0; i < jpgFiles.length; i++) {
-      const filename = jpgFiles[i];
-      const filePath = path.join(photosDir, filename);
+      const originalFilename = jpgFiles[i];
+      const sanitizedFilename = sanitizeFilename(originalFilename);
+      const filePath = path.join(photosDir, originalFilename);
       
       try {
         const fileBuffer = await fs.readFile(filePath);
         
         const { error } = await supabase.storage
           .from('avatars')
-          .upload(`politicians/${filename}`, fileBuffer, {
+          .upload(`politicians/${sanitizedFilename}`, fileBuffer, {
             contentType: 'image/jpeg',
             cacheControl: '3600',
             upsert: true
           });
         
         if (error) {
-          console.error(`   ❌ ${filename}:`, error.message);
+          console.error(`   ❌ ${originalFilename}:`, error.message);
           failed++;
         } else {
           success++;
+          filenameMapping[originalFilename] = sanitizedFilename;
           
           // Progress report every 100 files
           if (success % 100 === 0) {
@@ -146,10 +185,16 @@ async function uploadPoliticianPhotos() {
         }
         
       } catch (err) {
-        console.error(`   ❌ ${filename}:`, err.message);
+        console.error(`   ❌ ${originalFilename}:`, err.message);
         failed++;
       }
     }
+    
+    // Save mapping to file for database update
+    await fs.writeFile(
+      path.join(__dirname, 'filename-mapping.json'),
+      JSON.stringify(filenameMapping, null, 2)
+    );
     
     console.log(`\n✅ Uploaded ${success}/${jpgFiles.length} politician photos`);
     console.log(`❌ Failed: ${failed}\n`);
@@ -169,6 +214,15 @@ async function updateDatabaseUrls() {
   console.log('🔄 Updating database URLs...\n');
   
   const baseUrl = 'https://eldoyqgzxgubkyohvquq.supabase.co/storage/v1/object/public/avatars';
+  
+  // Load filename mapping
+  let filenameMapping = {};
+  try {
+    const mappingData = await fs.readFile(path.join(__dirname, 'filename-mapping.json'), 'utf-8');
+    filenameMapping = JSON.parse(mappingData);
+  } catch (err) {
+    console.log('⚠️  No filename mapping found, using direct filenames');
+  }
   
   // Update party logos in parties table
   console.log('📊 Updating party logos...');
@@ -205,9 +259,10 @@ async function updateDatabaseUrls() {
       let newUrl = null;
       
       if (user.avatar_url && user.avatar_url.includes('/assets/profiles/politicians/')) {
-        // Has politician photo
-        const filename = user.avatar_url.split('/').pop();
-        newUrl = `${baseUrl}/politicians/${filename}`;
+        // Has politician photo - use sanitized filename
+        const originalFilename = user.avatar_url.split('/').pop();
+        const sanitizedFilename = filenameMapping[originalFilename] || sanitizeFilename(originalFilename);
+        newUrl = `${baseUrl}/politicians/${sanitizedFilename}`;
       } else if (!user.avatar_url || user.avatar_url === '') {
         // No avatar - use default
         newUrl = `${baseUrl}/default/ikon.png`;
