@@ -15,6 +15,7 @@
     "migrate": "cd server && node scripts/run-automated-migration.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.87.1",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
