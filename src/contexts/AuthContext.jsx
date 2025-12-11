@@ -1,245 +1,357 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+/**
+ * AuthContext with Supabase Integration
+ * 
+ * This replaces the old JWT-based auth with Supabase Auth
+ */
 
-const AuthContext = createContext(null);
+import { createContext, useContext, useEffect, useState } from 'react';
+import { auth, db, supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
-};
+const AuthContext = createContext({});
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(null);
-  const navigate = useNavigate();
+  const [session, setSession] = useState(null);
 
-  // Initialize auth from localStorage and verify token
+  // ============================================
+  // INITIALIZE AUTH STATE
+  // ============================================
+  
   useEffect(() => {
-    const initAuth = async () => {
-      const storedToken = localStorage.getItem('auth_token');
-      const storedUser = localStorage.getItem('user');
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
       
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        
-        try {
-          // Verify token with backend
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/me`, {
-            headers: {
-              'Authorization': `Bearer ${storedToken}`
-            }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            setUser(data.data);
-            localStorage.setItem('user', JSON.stringify(data.data));
-          } else {
-            // Token invalid, clear storage
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user');
-            setToken(null);
-            setUser(null);
-          }
-        } catch (error) {
-          console.error('Auth verification error:', error);
-          // Network error, use cached user
-          setUser(JSON.parse(storedUser));
-        }
+      if (session?.user) {
+        loadUserProfile(session.user.id);
+      } else {
+        setLoading(false);
       }
-      
-      setLoading(false);
-    };
+    });
 
-    initAuth();
+    // Listen to auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('Auth state changed:', _event);
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        await loadUserProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Login function
-  const login = async (email, password) => {
+  // ============================================
+  // LOAD USER PROFILE
+  // ============================================
+  
+  const loadUserProfile = async (authUserId) => {
     try {
-      setLoading(true);
+      // Get user profile from database
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          party:parties(
+            id,
+            name,
+            short_name,
+            logo_url,
+            color
+          )
+        `)
+        .eq('auth_user_id', authUserId)
+        .single();
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Giriş başarısız');
+      if (error) {
+        console.error('Error loading profile:', error);
+        setProfile(null);
+      } else {
+        setProfile(data);
       }
-
-      // Save to state and localStorage
-      setToken(data.data.token);
-      setUser(data.data.user);
-      localStorage.setItem('auth_token', data.data.token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
-      
-      return { success: true, user: data.data.user };
-    } catch (error) {
-      console.error('Login error:', error);
-      const errorMessage = error.message === 'Failed to fetch' 
-        ? 'Sunucuya bağlanılamıyor. Lütfen backend serverı çalıştırdığınızdan emin olun.' 
-        : error.message || 'Giriş sırasında bir hata oluştu';
-      return { success: false, error: errorMessage };
+    } catch (err) {
+      console.error('Error loading profile:', err);
+      setProfile(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // Register function
-  const register = async (userData) => {
+  // ============================================
+  // AUTH ACTIONS
+  // ============================================
+
+  /**
+   * Sign in with email and password
+   */
+  const signIn = async (email, password) => {
     try {
-      setLoading(true);
-      
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
 
-      const data = await response.json();
+      if (error) throw error;
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Kayıt başarısız');
-      }
-
-      // Save to state and localStorage
-      setToken(data.data.token);
-      setUser(data.data.user);
-      localStorage.setItem('auth_token', data.data.token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
-      
-      return { success: true, user: data.data.user };
+      toast.success('Giriş başarılı!');
+      return data.user;
     } catch (error) {
-      console.error('Register error:', error);
-      const errorMessage = error.message === 'Failed to fetch' 
-        ? 'Sunucuya bağlanılamıyor. Lütfen backend serverı çalıştırdığınızdan emin olun.' 
-        : error.message || 'Kayıt sırasında bir hata oluştu';
-      return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
+      console.error('Sign in error:', error);
+      toast.error(error.message || 'Giriş başarısız');
+      throw error;
     }
   };
 
-  // Logout function
-  const logout = async () => {
+  /**
+   * Sign up new user
+   */
+  const signUp = async (email, password, metadata) => {
     try {
-      if (token) {
-        await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setToken(null);
-      setUser(null);
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      navigate('/');
-    }
-  };
-
-  // Update user function
-  const updateUser = (updatedData) => {
-    const newUser = { ...user, ...updatedData };
-    setUser(newUser);
-    localStorage.setItem('user', JSON.stringify(newUser));
-  };
-
-  // Refresh user data from backend
-  const refreshUser = async () => {
-    if (!token) return;
-    
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      // 1. Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata,
+          emailRedirectTo: `${window.location.origin}/verify-email`
         }
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.data);
-        localStorage.setItem('user', JSON.stringify(data.data));
+
+      if (authError) throw authError;
+
+      // 2. Create user profile in database
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .insert({
+          auth_user_id: authData.user.id,
+          email: email,
+          username: metadata.username.toLowerCase(),
+          full_name: metadata.full_name,
+          user_type: metadata.user_type || 'citizen',
+          party_id: metadata.party_id || null,
+          province: metadata.province || null
+        })
+        .select()
+        .single();
+
+      if (profileError) {
+        // Rollback: delete auth user if profile creation fails
+        await supabase.auth.admin.deleteUser(authData.user.id);
+        throw profileError;
       }
+
+      toast.success('Kayıt başarılı! Lütfen email\'inizi doğrulayın.');
+      return authData.user;
     } catch (error) {
-      console.error('Refresh user error:', error);
+      console.error('Sign up error:', error);
+      
+      // User-friendly error messages
+      let errorMessage = 'Kayıt başarısız';
+      
+      if (error.message.includes('duplicate')) {
+        errorMessage = 'Bu email veya kullanıcı adı zaten kullanılıyor';
+      } else if (error.message.includes('invalid email')) {
+        errorMessage = 'Geçersiz email adresi';
+      } else if (error.message.includes('password')) {
+        errorMessage = 'Şifre en az 8 karakter olmalıdır';
+      }
+      
+      toast.error(errorMessage);
+      throw error;
     }
   };
 
-  // Change password
-  const changePassword = async (currentPassword, newPassword) => {
+  /**
+   * Sign out
+   */
+  const signOut = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ currentPassword, newPassword }),
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      setUser(null);
+      setProfile(null);
+      toast.success('Çıkış yapıldı');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast.error('Çıkış yapılırken bir hata oluştu');
+      throw error;
+    }
+  };
+
+  /**
+   * Update user profile
+   */
+  const updateProfile = async (updates) => {
+    if (!profile) {
+      throw new Error('No profile loaded');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', profile.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProfile(data);
+      toast.success('Profil güncellendi!');
+      return data;
+    } catch (error) {
+      console.error('Update profile error:', error);
+      toast.error('Profil güncellenirken bir hata oluştu');
+      throw error;
+    }
+  };
+
+  /**
+   * Update avatar
+   */
+  const updateAvatar = async (file) => {
+    if (!profile) {
+      throw new Error('No profile loaded');
+    }
+
+    try {
+      // 1. Upload file to storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
+      const filePath = `${profile.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 3. Update user profile
+      const { data, error } = await supabase
+        .from('users')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProfile(data);
+      toast.success('Profil fotoğrafı güncellendi!');
+      return publicUrl;
+    } catch (error) {
+      console.error('Update avatar error:', error);
+      toast.error('Fotoğraf yüklenirken bir hata oluştu');
+      throw error;
+    }
+  };
+
+  /**
+   * Reset password
+   */
+  const resetPassword = async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
       });
 
-      const data = await response.json();
+      if (error) throw error;
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Şifre değiştirme başarısız');
-      }
-
-      return { success: true, message: data.message };
+      toast.success('Şifre sıfırlama linki email\'inize gönderildi');
     } catch (error) {
-      console.error('Change password error:', error);
-      return { success: false, error: error.message };
+      console.error('Reset password error:', error);
+      toast.error('Email gönderilemedi');
+      throw error;
     }
   };
 
-  // Check if user has permission
-  const hasPermission = (permission) => {
-    if (!user) return false;
-    if (user.is_admin) return true;
-    return user.permissions?.includes(permission);
+  /**
+   * Update password
+   */
+  const updatePassword = async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast.success('Şifreniz güncellendi');
+    } catch (error) {
+      console.error('Update password error:', error);
+      toast.error('Şifre güncellenirken bir hata oluştu');
+      throw error;
+    }
   };
 
-  // Check if user is admin
-  const isAdmin = () => {
-    return user?.is_admin === true || user?.user_type === 'admin';
-  };
-
-  // Get authorization header
-  const getAuthHeader = () => {
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-  };
+  // ============================================
+  // CONTEXT VALUE
+  // ============================================
 
   const value = {
-    user,
-    token,
+    // State
+    user,           // Supabase auth user
+    profile,        // User profile from database
+    session,        // Supabase session
     loading,
-    login,
-    register,
-    logout,
-    updateUser,
-    refreshUser,
-    changePassword,
-    hasPermission,
-    isAdmin,
-    getAuthHeader,
+    
+    // Computed
     isAuthenticated: !!user,
+    isEmailVerified: user?.email_confirmed_at != null,
+    
+    // Actions
+    signIn,
+    signUp,
+    signOut,
+    updateProfile,
+    updateAvatar,
+    resetPassword,
+    updatePassword,
+    
+    // Refresh profile
+    refreshProfile: () => user && loadUserProfile(user.id)
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// ============================================
+// HOOK
+// ============================================
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  
+  if (context === undefined) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  
+  return context;
+}
+
+export default AuthContext;
