@@ -1,0 +1,15 @@
+{
+  "name": "polithane-supabase-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Migration scripts for Polithane Supabase",
+  "scripts": {
+    "migrate:photos": "node migrate-chp-photos.js",
+    "migrate:photos:rollback": "node migrate-chp-photos.js rollback",
+    "migrate:data": "node migrate-data.js",
+    "verify": "node verify-migration.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}

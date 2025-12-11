@@ -13,6 +13,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { MessagesPage } from './pages/MessagesPage';
 import { SearchPage } from './pages/SearchPage';
+import TestSupabase from './pages/TestSupabase';
 
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
@@ -67,6 +68,7 @@ function App() {
         <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/messages" element={<><Header /><MessagesPage /><Footer /><FloatingChat /></>} />
         <Route path="/search" element={<><Header /><SearchPage /><Footer /><FloatingChat /></>} />
+        <Route path="/test-supabase" element={<TestSupabase />} />
         
         {/* Auth Routes (No Header/Footer) */}
         <Route path="/login" element={<LoginPage />} />
