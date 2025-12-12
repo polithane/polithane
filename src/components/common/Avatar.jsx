@@ -36,8 +36,10 @@ export const Avatar = ({
         src={getAvatarUrl(src)}
         alt={alt}
         className="w-full h-full rounded-full object-cover border-2 border-gray-200 bg-white"
+        crossOrigin="anonymous"
         onError={(e) => {
           // Hata durumunda default logo göster
+          console.log('Avatar load error:', src);
           e.target.src = DEFAULT_AVATAR;
         }}
       />
