@@ -1,6 +1,6 @@
 import { supabase } from '../services/supabase';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Helper function to get auth header
 const getAuthHeader = () => {
