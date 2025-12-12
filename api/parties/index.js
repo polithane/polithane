@@ -1,40 +1,39 @@
-// Vercel Serverless Function - Parties API
-import pg from 'pg';
-const Pool = pg.default?.Pool || pg.Pool;
-
-const getPool = () => {
-  return new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
-};
+// Vercel Serverless Function - Parties API via Supabase REST API
 
 export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, apikey, authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  const pool = getPool();
-
   try {
     if (req.method === 'GET') {
-      const result = await pool.query(`
-        SELECT 
-          id, name, short_name, slug, description,
-          logo_url, color, parliament_seats, foundation_date,
-          follower_count, post_count, is_active
-        FROM parties
-        WHERE is_active = true
-        ORDER BY parliament_seats DESC
-      `);
+      // Supabase REST API kullan
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/parties?select=id,name,short_name,slug,description,logo_url,color,parliament_seats,foundation_date,follower_count,post_count,is_active&is_active=eq.true&order=parliament_seats.desc`,
+        {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-      return res.status(200).json(result.rows);
+      if (!response.ok) {
+        throw new Error(`Supabase error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return res.status(200).json(data);
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
@@ -42,7 +41,5 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('API Error:', error);
     return res.status(500).json({ error: error.message });
-  } finally {
-    await pool.end();
   }
 }
