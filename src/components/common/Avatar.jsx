@@ -1,6 +1,8 @@
 import { Check } from 'lucide-react';
 import { clsx } from 'clsx';
-import { getPlaceholderImage } from '../../utils/imagePaths';
+
+// Default avatar - Polithane logosu
+const DEFAULT_AVATAR = '/ikon.png';
 
 export const Avatar = ({ 
   src, 
@@ -16,16 +18,12 @@ export const Avatar = ({
   const partyLogoSize = sizeNum * 0.35;
   
   const getAvatarUrl = (url) => {
-    // Eğer URL varsa kullan
-    if (url) {
-      // Absolute veya relative path
-      if (url.startsWith('/') || url.startsWith('http')) {
-        return url;
-      }
+    // Eğer geçerli URL varsa kullan
+    if (url && (url.startsWith('/') || url.startsWith('http'))) {
+      return url;
     }
-    // Placeholder kullan
-    const userId = url?.match(/\d+/)?.[0] || Math.floor(Math.random() * 70) + 1;
-    return getPlaceholderImage('avatar', userId);
+    // Yoksa default logo
+    return DEFAULT_AVATAR;
   };
 
   return (
@@ -35,11 +33,12 @@ export const Avatar = ({
       onClick={onClick}
     >
       <img
-        src={getAvatarUrl(src) || getPlaceholderImage('avatar', 1)}
+        src={getAvatarUrl(src)}
         alt={alt}
-        className="w-full h-full rounded-full object-cover border-2 border-gray-200"
+        className="w-full h-full rounded-full object-cover border-2 border-gray-200 bg-white"
         onError={(e) => {
-          e.target.src = getPlaceholderImage('avatar', 1);
+          // Hata durumunda default logo göster
+          e.target.src = DEFAULT_AVATAR;
         }}
       />
       {/* Parti Logosu - Sol alt köşe */}
