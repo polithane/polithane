@@ -252,23 +252,10 @@ async function importProfiles() {
               position_level = EXCLUDED.position_level,
               province = EXCLUDED.province
           `;
+          */
         } else if (userType === 'party_member') {
-          // Parti üyesi profili
-          await sql`
-            INSERT INTO party_member_profiles (
-              user_id,
-              party_id,
-              is_active_member
-            )
-            VALUES (
-              ${user.id},
-              ${chpParty.id},
-              ${true}
-            )
-            ON CONFLICT (user_id) DO UPDATE
-            SET
-              party_id = EXCLUDED.party_id
-          `;
+          // Parti üyesi profili - tablo yok, sadece user olarak kaydet
+          // Şimdilik hiçbir şey yapma
         }
         
         stats.success++;
