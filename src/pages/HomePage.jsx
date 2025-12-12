@@ -26,14 +26,24 @@ export const HomePage = () => {
     const loadData = async () => {
       try {
         // Supabase'den verileri çek
-        const [partiesData, usersData] = await Promise.all([
-          api.parties.getAll().catch(() => []),
-          supabase.from('users').select('*').limit(2000).then(({ data }) => data || []).catch(() => [])
+        const [partiesData, usersResponse] = await Promise.all([
+          api.parties.getAll().catch((err) => { console.error('Parties error:', err); return []; }),
+          supabase.from('users').select('*').limit(2000)
         ]);
 
+        const usersData = usersResponse?.data || [];
+        
         console.log('=== SUPABASE DATA LOADED ===');
         console.log('Parties:', partiesData?.length || 0);
-        console.log('Users:', usersData?.length || 0);
+        console.log('Users from Supabase:', usersData?.length || 0);
+        
+        if (usersData.length > 0) {
+          console.log('✅ Sample user avatar:', usersData[0]?.avatar_url);
+        }
+        
+        if (usersResponse?.error) {
+          console.error('❌ Supabase users error:', usersResponse.error);
+        }
 
         // Partileri ayarla
         if (partiesData && partiesData.length > 0) {
