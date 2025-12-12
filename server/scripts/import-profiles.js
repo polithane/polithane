@@ -1,18 +1,30 @@
 import dotenv from 'dotenv';
-import { neon } from '@neondatabase/serverless';
+import pg from 'pg';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import pkg from 'xlsx';
 import bcrypt from 'bcryptjs';
 const { read, utils } = pkg;
+const { Pool } = pg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 dotenv.config({ path: join(__dirname, '../.env') });
 
-const sql = neon(process.env.DATABASE_URL);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// Wrapper for SQL queries
+const sql = async (strings, ...values) => {
+  const query = strings.reduce((acc, str, i) => {
+    return acc + str + (values[i] !== undefined ? `$${i + 1}` : '');
+  }, '');
+  const result = await pool.query(query, values);
+  return result.rows;
+};
 
 // Görev tipine göre user_type belirleme
 function determineUserType(gorev, gorev2) {
@@ -212,7 +224,9 @@ async function importProfiles() {
               parliamentary_group = EXCLUDED.parliamentary_group
           `;
         } else if (userType === 'party_official') {
-          // Parti görevlisi profili
+          // Parti görevlisi profili - tablo yok, sadece user olarak kaydet
+          // TODO: party_official_profiles tablosu eklendiğinde aktif et
+          /*
           const positionLevel = determinePositionLevel(gorev);
           
           await sql`
