@@ -1,3 +1,5 @@
+import { supabase } from '../services/supabase';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Helper function to get auth header
@@ -143,9 +145,15 @@ export const auth = {
 // POSTS API
 // ============================================
 export const posts = {
-  getAll: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/posts${query ? `?${query}` : ''}`);
+  getAll: async (params = {}) => {
+    try {
+      // Post verileri henüz yüklenmediği için boş döndürüyoruz
+      // Mock data kullanılacak
+      return [];
+    } catch (error) {
+      console.error('Posts API error:', error);
+      return [];
+    }
   },
 
   getById: (id) => apiCall(`/api/posts/${id}`),
@@ -278,7 +286,21 @@ export const admin = {
 // PARTIES API
 // ============================================
 export const parties = {
-  getAll: () => apiCall('/api/parties'),
+  getAll: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('parties')
+        .select('*')
+        .eq('is_active', true)
+        .order('parliament_seats', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Parties API error:', error);
+      return [];
+    }
+  },
   getById: (id) => apiCall(`/api/parties/${id}`),
 };
 

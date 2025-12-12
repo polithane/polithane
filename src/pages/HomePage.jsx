@@ -9,46 +9,52 @@ import { MediaSidebar } from '../components/media/MediaSidebar';
 import { mockPosts, generateMockPosts, getCategoryPosts } from '../mock/posts';
 import { mockParties } from '../mock/parties';
 import { mockAgendas } from '../mock/agendas';
-import { mockUsers } from '../mock/users';
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 import { filterConsecutiveTextAudio, filterGridTextAudio } from '../utils/postFilters';
 import api from '../utils/api';
+import { supabase } from '../services/supabase';
 
 export const HomePage = () => {
   const [posts, setPosts] = useState([]);
   const [parties, setParties] = useState([]);
   const [agendas, setAgendas] = useState([]);
+  const [users, setUsers] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
   
   useEffect(() => {
-    // Load data from backend API
+    // Load data from Supabase
     const loadData = async () => {
       try {
-        // API'den verileri çek
-        const [postsData, partiesData] = await Promise.all([
-          api.posts.getAll({ limit: 100 }).catch(() => []),
-          api.parties.getAll().catch(() => [])
+        // Supabase'den verileri çek
+        const [partiesData, usersData] = await Promise.all([
+          api.parties.getAll().catch(() => []),
+          supabase.from('users').select('*').limit(2000).then(({ data }) => data || []).catch(() => [])
         ]);
 
-        console.log('=== API DATA LOADED ===');
-        console.log('Posts:', postsData?.length || 0);
+        console.log('=== SUPABASE DATA LOADED ===');
         console.log('Parties:', partiesData?.length || 0);
+        console.log('Users:', usersData?.length || 0);
 
-        // Eğer backend'den veri gelmezse mock data kullan
-        if (postsData && postsData.length > 0) {
-          setPosts(postsData);
-        } else {
-          console.log('Using mock posts as fallback');
-          const allPosts = generateMockPosts(400, mockUsers, mockParties);
-          setPosts(allPosts);
-        }
-
+        // Partileri ayarla
         if (partiesData && partiesData.length > 0) {
           setParties(partiesData);
         } else {
           console.log('Using mock parties as fallback');
           setParties(mockParties);
         }
+
+        // Kullanıcıları ayarla
+        if (usersData && usersData.length > 0) {
+          setUsers(usersData);
+          console.log('✅ Using real users from Supabase');
+        }
+
+        // Mock posts oluştur - gerçek kullanıcılarla
+        const finalUsers = usersData.length > 0 ? usersData : mockUsers;
+        const finalParties = partiesData.length > 0 ? partiesData : mockParties;
+        const allPosts = generateMockPosts(400, finalUsers, finalParties);
+        setPosts(allPosts);
+        console.log('Generated mock posts with real users');
 
         // Agendas için şimdilik mock data kullan
         setAgendas(mockAgendas);
