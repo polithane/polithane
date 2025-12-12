@@ -1,7 +1,6 @@
 // Vercel Serverless Function - Parties API
 import pg from 'pg';
-
-const { Pool } = pg;
+const Pool = pg.default?.Pool || pg.Pool;
 
 const getPool = () => {
   return new Pool({

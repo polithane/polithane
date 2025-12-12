@@ -1,7 +1,6 @@
 // Vercel Serverless Function - Users API
 import pg from 'pg';
-
-const { Pool } = pg;
+const Pool = pg.default?.Pool || pg.Pool;
 
 // Database connection
 const getPool = () => {
