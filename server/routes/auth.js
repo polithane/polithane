@@ -75,22 +75,11 @@ router.post('/register', async (req, res) => {
     // Şifreyi hashle
     const password_hash = await bcrypt.hash(password, 10);
 
-    // Email verification admin panelden açık mı kontrol et
-    const emailVerificationEnabled = (await getSetting('email_verification_enabled')) === 'true';
-
+    // Email verification kapalı - direkt verified (test için)
+    const emailVerificationEnabled = false; // Şimdilik kapalı
     let verificationToken = null;
     let tokenExpires = null;
-    let emailVerified = false;
-    
-    if (emailVerificationEnabled) {
-      // Email doğrulama token'ı oluştur
-      verificationToken = generateVerificationToken();
-      tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
-      emailVerified = false;
-    } else {
-      // Email verification kapalı, direkt verified
-      emailVerified = true;
-    }
+    let emailVerified = true; // Direkt aktif
 
     // Kullanıcıyı oluştur
     const [user] = await sql`
