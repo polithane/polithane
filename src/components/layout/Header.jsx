@@ -27,14 +27,14 @@ export const Header = () => {
   
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-200 h-[60px]">
-      <div className="container-main h-full flex items-center gap-3">
+      <div className="container-main h-full flex items-center justify-between relative">
         {/* Sol: Logo */}
         <div className="cursor-pointer flex items-center flex-shrink-0" onClick={() => navigate('/')}>
           <AnimatedSlogan />
         </div>
 
         {/* Orta: Polit At */}
-        <div className="flex-1 flex justify-center">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <button
             onClick={() => navigate('/polit-at')}
             className="h-[44px] px-4 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:from-blue-100 hover:to-white transition-colors shadow-sm active:scale-[0.99]"
@@ -160,13 +160,13 @@ export const Header = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/register-new')}
-                className="px-4 py-2 text-primary-blue font-semibold hover:bg-blue-50 rounded-lg transition-colors"
+                className="px-3 sm:px-4 py-2 text-primary-blue font-semibold hover:bg-blue-50 rounded-lg transition-colors text-sm"
               >
                 Üye Ol
               </button>
               <button
                 onClick={() => navigate('/login-new')}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Giriş Yap</span>
