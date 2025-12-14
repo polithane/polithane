@@ -13,6 +13,26 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   const isMouseOverPopup = useRef(false);
   
   if (!parliamentData || parliamentData.length === 0) return null;
+
+  const shortNameToPartySlug = (shortName) => {
+    const v = String(shortName || '').trim().toUpperCase('tr-TR');
+    if (v === 'AK PARTİ' || v === 'AK PARTI') return 'akp';
+    if (v === 'CHP') return 'chp';
+    if (v === 'MHP') return 'mhp';
+    if (v === 'DEM PARTİ' || v === 'DEM PARTI' || v === 'DEM') return 'dem';
+    if (v === 'İYİ PARTİ' || v === 'IYI PARTI' || v === 'IYI PARTİ') return 'iyi';
+    if (v === 'YENİ YOL') return 'yeni-yol';
+    if (v === 'YRP' || v === 'YENİDEN REFAH') return 'yrp';
+    if (v === 'HÜRDAVA' || v === 'HÜDAPAR' || v === 'HUDA PAR' || v === 'HÜDA PAR') return 'hurdava';
+    if (v === 'TİP' || v === 'TIP') return 'tip';
+    if (v === 'BAĞIMSIZ' || v === 'BAGIMSIZ') return 'bagimsiz';
+    if (v === 'DBP') return 'dbp';
+    if (v === 'EMEP') return 'emep';
+    if (v === 'SAADET' || v === 'SP' || v === 'SAADET PARTİSİ' || v === 'SAADET PARTISI') return 'saadet';
+    if (v === 'DSP') return 'dsp';
+    if (v === 'DP') return 'dp';
+    return null;
+  };
   
   const clearCloseTimeout = () => {
     if (closeTimeoutRef.current) {
@@ -42,22 +62,38 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
         {parliamentData.map((party, index) => {
           const widthPercentage = (party.seats / totalSeats) * 100;
           const flagPath = getPartyFlagPath(party.shortName, index + 1);
+          const partySlug = shortNameToPartySlug(party.shortName) || String(index + 1);
           
           const logoMap = {
             'AK PARTİ': 'ak_parti.png',
+            'AK PARTI': 'ak_parti.png',
             'CHP': 'chp.png',
             'MHP': 'mhp.png',
-            'DEM': 'dem_parti.png',
+            'DEM PARTİ': 'dem_parti.png',
+            'DEM PARTI': 'dem_parti.png',
             'İYİ PARTİ': 'iyi_parti.png',
+            'IYI PARTI': 'iyi_parti.png',
             'YRP': 'yrp.png',
-            'Bağımsız': 'bagimsiz.png'
+            'YENİ YOL': 'yeni_yol.png',
+            'HÜRDAVA': 'hurdava.png',
+            'HÜDAPAR': 'hurdava.png',
+            'TİP': 'tip.png',
+            'TIP': 'tip.png',
+            'BAĞIMSIZ': 'bagimsiz.png',
+            'BAGIMSIZ': 'bagimsiz.png',
+            'DBP': 'dbp.png',
+            'EMEP': 'emep.png',
+            'SAADET': 'saadet.png',
+            'DSP': 'dsp.png',
+            'DP': 'dp.png',
           };
           
+          const partyShortKey = String(party.shortName || '').trim().toUpperCase('tr-TR');
           const partyData = {
-            party_id: index + 1,
+            party_id: partySlug,
             party_name: party.name,
             party_short_name: party.shortName,
-            party_logo: `/assets/parties/logos/${logoMap[party.shortName] || 'bagimsiz.png'}`,
+            party_logo: `/assets/parties/logos/${logoMap[partyShortKey] || 'bagimsiz.png'}`,
             party_color: party.color,
             seats: party.seats,
             mp_count: party.seats,
@@ -80,7 +116,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 minWidth: '20px',
                 flexShrink: 0
               }}
-              onClick={() => navigate(`/party/${index + 1}`)}
+              onClick={() => navigate(`/party/${partySlug}`)}
               onMouseEnter={(e) => {
                 clearCloseTimeout();
                 isMouseOverPopup.current = false;

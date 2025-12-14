@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Avatar } from '../components/common/Avatar';
-import { Badge } from '../components/common/Badge';
 import { formatNumber, formatPolitScore, formatDate } from '../utils/formatters';
-import { PostCard } from '../components/post/PostCard';
+import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { supabase } from '../services/supabase';
 import { generateMockPosts } from '../mock/posts';
 import { mockParties } from '../mock/parties';
 import { mockUsers } from '../mock/users';
+import { getProfilePath } from '../utils/paths';
+import { normalizeUsername } from '../utils/validators';
+import { CITY_CODES } from '../utils/constants';
 
 export const PartyDetailPage = () => {
   const { partyId } = useParams();
@@ -27,13 +29,13 @@ export const PartyDetailPage = () => {
     const load = async () => {
       setLoading(true);
       setError('');
-      const pid = parseInt(partyId);
 
       const normalizeParty = (p) => {
         if (!p) return null;
         return {
           ...p,
           party_id: p.party_id ?? p.id,
+          party_slug: p.party_slug ?? p.slug,
           party_name: p.party_name ?? p.name,
           party_short_name: p.party_short_name ?? p.short_name,
           party_logo: p.party_logo ?? p.logo_url,
@@ -76,19 +78,22 @@ export const PartyDetailPage = () => {
           share_count: p.share_count,
           is_featured: p.is_featured,
           created_at: p.created_at,
+          source_url: p.source_url,
           user: p.user ? normalizeUser(p.user, partyObj) : null,
         };
       };
 
       try {
-        // Party (DB)
-        const { data: dbParty, error: partyErr } = await supabase
+        // Party (DB) - allow both UUID id and slug in URL
+        const { data: dbParty } = await supabase
           .from('parties')
           .select('*')
-          .eq('id', pid)
+          .or(`id.eq.${partyId},slug.eq.${partyId}`)
           .maybeSingle();
 
-        const partyObj = normalizeParty(dbParty) || normalizeParty(mockParties.find(p => p.party_id === pid));
+        const partyObj =
+          normalizeParty(dbParty) ||
+          normalizeParty(mockParties.find((p) => String(p.party_id) === String(partyId)));
         if (!partyObj) {
           setError('Parti bulunamadı');
           setParty(null);
@@ -99,25 +104,26 @@ export const PartyDetailPage = () => {
         // Users in party (DB)
         const { data: dbUsers } = await supabase
           .from('users')
-          .select('id,username,full_name,avatar_url,city_code,user_type,politician_type,party_id,is_verified,polit_score')
-          .eq('party_id', pid)
+          .select('id,username,full_name,avatar_url,user_type,party_id,province,is_verified,polit_score')
+          .eq('party_id', partyObj.party_id)
           .eq('is_active', true)
           .limit(2000);
 
-        const usersList = (dbUsers && dbUsers.length > 0)
-          ? dbUsers.map(u => normalizeUser(u, partyObj))
-          : mockUsers.filter(u => u.party_id === pid);
+        const usersList =
+          dbUsers && dbUsers.length > 0
+            ? dbUsers.map((u) => normalizeUser(u, partyObj))
+            : mockUsers.filter((u) => String(u.party_id) === String(partyId));
 
         const mps = usersList
-          .filter(u => u.user_type === 'politician' && u.politician_type === 'mp')
+          .filter((u) => u.user_type === 'mp')
           .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
 
         const officials = usersList
-          .filter(u => u.user_type === 'politician' && u.politician_type && u.politician_type !== 'mp')
+          .filter((u) => u.user_type === 'party_official')
           .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
 
         const members = usersList
-          .filter(u => u.user_type === 'party_member' || (u.user_type === 'normal' && u.party_id === pid))
+          .filter((u) => u.user_type === 'party_member')
           .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
 
         setPartyMPs(mps);
@@ -127,8 +133,8 @@ export const PartyDetailPage = () => {
         // Posts in party (DB)
         const { data: dbPosts } = await supabase
           .from('posts')
-          .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, user:users(id,username,full_name,avatar_url,city_code,user_type,politician_type,party_id,is_verified), party:parties(id,short_name,logo_url,color)')
-          .eq('party_id', pid)
+          .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, source_url, user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified), party:parties(id,slug,short_name,logo_url,color)')
+          .eq('party_id', partyObj.party_id)
           .eq('is_deleted', false)
           .order('polit_score', { ascending: false })
           .limit(50);
@@ -138,7 +144,7 @@ export const PartyDetailPage = () => {
         } else {
           // Fallback: gerçek DB kullanıcılarıyla mock içerik üret (UI boş kalmasın)
           const allMock = generateMockPosts(200, usersList, [partyObj]);
-          setPartyPosts(allMock.filter(p => p.user?.party_id === pid).slice(0, 30));
+          setPartyPosts(allMock.filter((p) => String(p.user?.party_id) === String(partyObj.party_id)).slice(0, 30));
         }
       } catch (e) {
         console.error(e);
@@ -169,10 +175,63 @@ export const PartyDetailPage = () => {
   
   const seatPercentage = ((party.parliament_seats / 600) * 100).toFixed(1);
 
-  const provincialChairs = partyOfficials.filter(u => u.politician_type === 'provincial_chair');
-  const districtChairs = partyOfficials.filter(u => u.politician_type === 'district_chair');
-  const metroMayors = partyOfficials.filter(u => u.politician_type === 'metropolitan_mayor');
-  const districtMayors = partyOfficials.filter(u => u.politician_type === 'district_mayor');
+  // NOTE: Detailed official roles are not yet mapped in DB for this page.
+  const provincialChairs = [];
+  const districtChairs = [];
+  const metroMayors = [];
+  const districtMayors = [];
+
+  const cityNameToCode = useMemo(() => {
+    const normalizeCityName = (name) =>
+      String(name || '')
+        .trim()
+        .toLowerCase('tr-TR')
+        .replace(/ç/g, 'c')
+        .replace(/ğ/g, 'g')
+        .replace(/ı/g, 'i')
+        .replace(/ö/g, 'o')
+        .replace(/ş/g, 's')
+        .replace(/ü/g, 'u')
+        .replace(/\s+/g, ' ');
+
+    const m = new Map();
+    Object.entries(CITY_CODES).forEach(([code, cityName]) => {
+      m.set(normalizeCityName(cityName), code);
+    });
+    return { normalizeCityName, map: m };
+  }, []);
+
+  const getPlateCodeFromProvince = (provinceName) => {
+    const key = cityNameToCode.normalizeCityName(provinceName);
+    return cityNameToCode.map.get(key) || null;
+  };
+
+  const mpsByProvince = useMemo(() => {
+    const groups = new Map();
+    (partyMPs || []).forEach((mp) => {
+      const prov = (mp.province || 'Bilinmiyor').toString();
+      if (!groups.has(prov)) groups.set(prov, []);
+      groups.get(prov).push(mp);
+    });
+    // sort MPs within each province by polit_score desc
+    for (const [prov, list] of groups.entries()) {
+      groups.set(
+        prov,
+        [...list].sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0))
+      );
+    }
+    // sort provinces by plate code if available, then alpha
+    const entries = Array.from(groups.entries());
+    entries.sort((a, b) => {
+      const aCode = getPlateCodeFromProvince(a[0]);
+      const bCode = getPlateCodeFromProvince(b[0]);
+      if (aCode && bCode) return Number(aCode) - Number(bCode);
+      if (aCode) return -1;
+      if (bCode) return 1;
+      return a[0].localeCompare(b[0], 'tr-TR');
+    });
+    return entries;
+  }, [partyMPs, cityNameToCode]);
 
   const getProfilesForTab = () => {
     if (mainTab === 'mps') return partyMPs;
@@ -312,11 +371,89 @@ export const PartyDetailPage = () => {
         
         {/* Tab İçerikleri */}
         {mainTab === 'distribution' && (
-          <div className="card">
-            <h3 className="text-lg font-black text-gray-900 mb-2">Meclis Dağılımı</h3>
-            <p className="text-sm text-gray-600">
-              Meclis sandalyesi bilgisi sabit tutulur. (Sayı: <span className="font-bold">{party.parliament_seats}</span>)
-            </p>
+          <div className="space-y-4">
+            <div className="card">
+              <h3 className="text-lg font-black text-gray-900 mb-2">Meclis Dağılımı</h3>
+              <p className="text-sm text-gray-600">
+                Bu partinin meclis dağılımı; <span className="font-bold">{party.parliament_seats}</span> sandalye üzerinden,
+                <span className="font-semibold"> iller bazında vekiller</span> gösterilerek listelenir.
+              </p>
+            </div>
+
+            {mpsByProvince.length === 0 ? (
+              <div className="card text-sm text-gray-600">Bu parti için milletvekili bulunamadı.</div>
+            ) : (
+              <div className="space-y-6">
+                {mpsByProvince.map(([provinceName, list]) => {
+                  const plateCode = getPlateCodeFromProvince(provinceName);
+                  const plateText = plateCode ? String(parseInt(plateCode, 10)) : null;
+                  return (
+                    <div key={provinceName} className="card">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            {plateCode && (
+                              <Link
+                                to={`/city/${plateCode}`}
+                                className="w-7 h-7 rounded-full bg-gray-900 hover:bg-primary-blue text-white text-xs font-bold flex items-center justify-center transition-colors flex-shrink-0"
+                              >
+                                {plateText}
+                              </Link>
+                            )}
+                            <h4 className="text-base font-black text-gray-900 truncate">{provinceName}</h4>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">{list.length} milletvekili</div>
+                        </div>
+                        <button
+                          className="text-xs font-semibold text-primary-blue hover:underline"
+                          onClick={() => setMainTab('mps')}
+                          type="button"
+                        >
+                          Tüm vekiller sekmesine git
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {list.map((u) => {
+                          const displayUsername = normalizeUsername(u.username);
+                          const uPlateCode = getPlateCodeFromProvince(u.province);
+                          const uPlateText = uPlateCode ? String(parseInt(uPlateCode, 10)) : null;
+                          return (
+                            <div
+                              key={u.user_id}
+                              className="card cursor-pointer hover:shadow-md transition-shadow flex items-center gap-3"
+                              onClick={() => navigate(getProfilePath(u))}
+                            >
+                              <Avatar
+                                src={u.avatar_url || u.profile_image}
+                                size="56px"
+                                verified={u.verification_badge || u.is_verified}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="font-bold truncate">{u.full_name}</div>
+                                <div className="text-xs text-gray-600 truncate">@{displayUsername || '-'}</div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                {uPlateCode && (
+                                  <Link
+                                    to={`/city/${uPlateCode}`}
+                                    className="w-6 h-6 rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[10px] font-bold flex items-center justify-center transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {uPlateText}
+                                  </Link>
+                                )}
+                                <div className="text-xs font-bold text-primary-blue">{formatPolitScore(u.polit_score)}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -326,15 +463,25 @@ export const PartyDetailPage = () => {
               <div
                 key={u.user_id}
                 className="card cursor-pointer hover:shadow-md transition-shadow flex items-center gap-3"
-                onClick={() => navigate(`/profile/${u.user_id}`)}
+                onClick={() => navigate(getProfilePath(u))}
               >
                 <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={u.verification_badge || u.is_verified} />
                 <div className="min-w-0 flex-1">
                   <div className="font-bold truncate">{u.full_name}</div>
-                  <div className="text-xs text-gray-600 truncate">@{u.username}</div>
-                  <div className="text-xs text-gray-500">Plaka: {u.city_code || '-'}</div>
+                  <div className="text-xs text-gray-600 truncate">@{normalizeUsername(u.username) || '-'}</div>
                 </div>
-                <div className="text-xs font-bold text-primary-blue">{formatPolitScore(u.polit_score)}</div>
+                <div className="flex items-center gap-2">
+                  {getPlateCodeFromProvince(u.province) && (
+                    <Link
+                      to={`/city/${getPlateCodeFromProvince(u.province)}`}
+                      className="w-7 h-7 rounded-full bg-gray-900 hover:bg-primary-blue text-white text-xs font-bold flex items-center justify-center transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {String(parseInt(getPlateCodeFromProvince(u.province), 10))}
+                    </Link>
+                  )}
+                  <div className="text-xs font-bold text-primary-blue">{formatPolitScore(u.polit_score)}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -361,9 +508,9 @@ export const PartyDetailPage = () => {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {sortedPosts.map(post => (
-                <PostCard key={post.post_id} post={post} />
+                <PostCardHorizontal key={post.post_id} post={post} fullWidth={true} />
               ))}
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { MoreVertical, Ban, AlertCircle, MessageCircle, Settings, Edit } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
@@ -18,9 +18,12 @@ import { users } from '../utils/api';
 import { FEATURE_FLAGS } from '../utils/constants';
 import { supabase } from '../services/supabase';
 import { normalizeUsername } from '../utils/validators';
+import { getProfilePath } from '../utils/paths';
 
 export const ProfilePage = () => {
   const { userId, username } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user: currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
@@ -34,9 +37,9 @@ export const ProfilePage = () => {
   const [error, setError] = useState('');
   
   const isOwnProfile = currentUser && (
-    parseInt(userId) === currentUser.id || 
     userId === 'me' || 
-    username === currentUser.username
+    String(userId || '') === String(currentUser.id || '') ||
+    normalizeUsername(username || '') === normalizeUsername(currentUser.username || '')
   );
   
   const isBlocked = mockBlockedUsers.some(b => 
@@ -62,6 +65,7 @@ export const ProfilePage = () => {
             party: u.party
               ? {
                   party_id: u.party.party_id ?? u.party.id,
+                  party_slug: u.party.party_slug ?? u.party.slug,
                   party_short_name: u.party.party_short_name ?? u.party.short_name,
                   party_logo: u.party.party_logo ?? u.party.logo_url,
                   party_color: u.party.party_color ?? u.party.color,
@@ -89,6 +93,7 @@ export const ProfilePage = () => {
             share_count: p.share_count,
             is_featured: p.is_featured,
             created_at: p.created_at,
+            source_url: p.source_url,
             user: p.user ? normalizeUser(p.user) : null,
           };
         };
@@ -109,7 +114,7 @@ export const ProfilePage = () => {
             // 1) önce direkt match dene (db'de zaten normalize olabilir)
             const direct = await supabase
               .from('users')
-              .select('*, party:parties(id, short_name, logo_url, color)')
+              .select('*, party:parties(id, slug, short_name, logo_url, color)')
               .eq('username', requested)
               .limit(1)
               .maybeSingle();
@@ -125,7 +130,7 @@ export const ProfilePage = () => {
               if (match?.id) {
                 const byId = await supabase
                   .from('users')
-                  .select('*, party:parties(id, short_name, logo_url, color)')
+                  .select('*, party:parties(id, slug, short_name, logo_url, color)')
                   .eq('id', match.id)
                   .limit(1)
                   .maybeSingle();
@@ -141,22 +146,17 @@ export const ProfilePage = () => {
         } 
         // /profile/:userId route'u kullanılmışsa
         else if (userId) {
-          const numericId = parseInt(userId);
-          if (Number.isFinite(numericId)) {
-            const { data, error: sbErr } = await supabase
-              .from('users')
-              .select('*, party:parties(id, short_name, logo_url, color)')
-              .eq('id', numericId)
-              .limit(1)
-              .maybeSingle();
-            if (!sbErr && data) {
-              profileData = data;
-            }
-          }
+          const { data, error: sbErr } = await supabase
+            .from('users')
+            .select('*, party:parties(id, slug, short_name, logo_url, color)')
+            .eq('id', userId)
+            .limit(1)
+            .maybeSingle();
+          if (!sbErr && data) profileData = data;
 
           // Fallback to mock if still missing
           if (!profileData) {
-            const foundUser = mockUsers.find(u => u.user_id === parseInt(userId));
+            const foundUser = mockUsers.find((u) => String(u.user_id) === String(userId));
             if (foundUser) {
               profileData = foundUser;
             } else {
@@ -167,14 +167,22 @@ export const ProfilePage = () => {
           }
         }
         
-        setUser(normalizeUser(profileData));
+        const normalizedProfile = normalizeUser(profileData);
+        setUser(normalizedProfile);
+
+        // Canonicalize URL: if user has a username, always prefer /:username
+        const canonicalPath = getProfilePath(normalizedProfile);
+        const isProfileRoute = location.pathname.startsWith('/profile/') || location.pathname.startsWith('/@');
+        if (canonicalPath && isProfileRoute && location.pathname !== canonicalPath) {
+          navigate(canonicalPath, { replace: true });
+        }
         
         // Posts: Önce DB'den dene, yoksa mock fallback
         const profileDbId = profileData.id ?? profileData.user_id;
         if (profileDbId) {
           const { data: dbPosts } = await supabase
             .from('posts')
-            .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, user:users(id,username,full_name,avatar_url,city_code,user_type,politician_type,party_id,is_verified), party:parties(id,short_name,logo_url,color)')
+            .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, source_url, user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified), party:parties(id,slug,short_name,logo_url,color)')
             .eq('user_id', profileDbId)
             .eq('is_deleted', false)
             .order('polit_score', { ascending: false })
@@ -182,11 +190,11 @@ export const ProfilePage = () => {
           if (dbPosts && dbPosts.length > 0) {
             setUserPosts(dbPosts.map(mapDbPostToUi).filter(Boolean));
           } else {
-            const posts = mockPosts.filter(p => (p.user_id === profileDbId) || (p.user_id === parseInt(userId)));
+            const posts = mockPosts.filter((p) => String(p.user_id) === String(profileDbId));
             setUserPosts(posts);
           }
         } else {
-          const posts = mockPosts.filter(p => p.user_id === parseInt(userId));
+          const posts = mockPosts.filter((p) => String(p.user_id) === String(userId));
           setUserPosts(posts);
         }
         
@@ -362,7 +370,7 @@ export const ProfilePage = () => {
                 <Button variant="outline" disabled>Engellenmiş</Button>
               ) : (
                 <>
-                  <FollowButton targetUserId={parseInt(userId)} size="md" />
+                  <FollowButton targetUserId={user?.user_id || userId} size="md" />
                   <button
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg p-2 transition-colors"
                     title="Mesaj Gönder"
