@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       
       const response = await fetch(
-        `${supabaseUrl}/rest/v1/parties?select=id,name,short_name,slug,description,logo_url,color,parliament_seats,foundation_date,follower_count,post_count,is_active&is_active=eq.true&order=parliament_seats.desc`,
+        `${supabaseUrl}/rest/v1/parties?select=id,name,short_name,slug,description,logo_url,color,parliament_seats,mp_count,organization_count,member_count,metropolitan_mayor_count,district_mayor_count,foundation_date,follower_count,post_count,is_active&is_active=eq.true&order=parliament_seats.desc`,
         {
           headers: {
             'apikey': supabaseKey,

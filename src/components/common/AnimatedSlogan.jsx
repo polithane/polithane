@@ -3,66 +3,34 @@ import { useNavigate } from 'react-router-dom';
 
 export const AnimatedSlogan = () => {
   const navigate = useNavigate();
-  const fullSlogan = 'Özgür, açık, şeffaf siyaset, bağımsız medya.';
-  // Virgül ve noktayı koruyarak kelimelere ayır
-  const words = ['Özgür,', 'açık,', 'şeffaf', 'siyaset,', 'bağımsız', 'medya.'];
+  // NOTE (per product request):
+  // - No full sentence mode
+  // - Words should keep rotating forever
+  // - No punctuation, all lowercase
+  const words = ['özgür', 'açık', 'şeffaf', 'siyaset', 'bağımsız', 'medya'];
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [showFull, setShowFull] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const timeoutRef = useRef(null);
 
   useEffect(() => {
-    // Önceki timeout'u temizle
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    if (showFull) {
-      // Tüm cümleyi göster
-      setIsVisible(true);
-      
-      // 3 saniye sonra tekrar kelime kelime başla
+    // Word-by-word loop
+    setIsVisible(true);
+    timeoutRef.current = setTimeout(() => {
+      setIsVisible(false);
       timeoutRef.current = setTimeout(() => {
-        setShowFull(false);
-        setCurrentIndex(0);
-        setIsVisible(false);
-        
-        // Kısa bir bekleme sonrası ilk kelimeyi göster
-        timeoutRef.current = setTimeout(() => {
-          setIsVisible(true);
-        }, 300);
-      }, 3000);
-      
-      return () => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      };
-    } else {
-      // Kelime kelime animasyon
-      if (currentIndex < words.length) {
-        // Mevcut kelimeyi göster
+        setCurrentIndex((prev) => (prev + 1) % words.length);
         setIsVisible(true);
-        
-        // Kelimeyi 1.5 saniye göster, sonra fade out
-        timeoutRef.current = setTimeout(() => {
-          setIsVisible(false);
-          
-          // Fade out sonrası yeni kelimeye geç
-          timeoutRef.current = setTimeout(() => {
-            if (currentIndex < words.length - 1) {
-              setCurrentIndex(currentIndex + 1);
-            } else {
-              // Son kelime gösterildi, tüm cümleyi göster
-              setShowFull(true);
-            }
-          }, 300); // Fade out süresi
-        }, 1500); // Her kelime 1.5 saniye gözüksün
-        
-        return () => {
-          if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        };
-      }
-    }
-  }, [currentIndex, showFull]);
+      }, 250);
+    }, 1400);
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [currentIndex, words.length]);
 
   return (
     <div className="flex items-center gap-3 min-w-0">
@@ -90,10 +58,10 @@ export const AnimatedSlogan = () => {
           className={`transition-opacity duration-300 inline-block ${
             isVisible ? 'opacity-100' : 'opacity-0'
           }`}
-          style={{ minWidth: showFull ? 'auto' : '120px' }}
+          style={{ minWidth: '120px' }}
         >
           <span className="block truncate max-w-[170px] sm:max-w-[260px] md:max-w-[420px]">
-            {showFull ? fullSlogan : (words[currentIndex] || '\u00A0')}
+            {words[currentIndex] || '\u00A0'}
           </span>
         </span>
       </span>

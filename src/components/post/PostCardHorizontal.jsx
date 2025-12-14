@@ -10,6 +10,32 @@ import { getPlaceholderImage } from '../../utils/imagePaths';
 import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
 import { getProfilePath } from '../../utils/paths';
+import { CITY_CODES } from '../../utils/constants';
+
+const normalizeCityName = (name) =>
+  String(name || '')
+    .trim()
+    .toLowerCase('tr-TR')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u')
+    .replace(/\s+/g, ' ');
+
+const CITY_NAME_TO_CODE = (() => {
+  const m = new Map();
+  Object.entries(CITY_CODES).forEach(([code, cityName]) => {
+    m.set(normalizeCityName(cityName), code);
+  });
+  return m;
+})();
+
+const getPlateCodeFromProvince = (provinceName) => {
+  const key = normalizeCityName(provinceName);
+  return CITY_NAME_TO_CODE.get(key) || null;
+};
 
 export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = false, fullWidth = false, style }) => {
   const navigate = useNavigate();
@@ -90,17 +116,21 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
               />
             </div>
             {/* Plaka Kodu - Avatar altında */}
-            {post.user?.city_code && (
-              <Tooltip content={`${post.user.city_code} ili detayını gör`} delay={300}>
+            {(() => {
+              const plateCode = post.user?.city_code || getPlateCodeFromProvince(post.user?.province);
+              if (!plateCode) return null;
+              return (
+                <Tooltip content={`${plateCode} ili detayını gör`} delay={300}>
                 <Link
-                  to={`/city/${post.user.city_code}`}
+                  to={`/city/${plateCode}`}
                   className="inline-flex items-center justify-center px-1.5 py-0.5 bg-gray-900 hover:bg-primary-blue text-white text-[9px] font-bold rounded-full transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {post.user.city_code}
+                  {plateCode}
                 </Link>
               </Tooltip>
-            )}
+              );
+            })()}
           </div>
           
           <div className="flex-1 min-w-0">
