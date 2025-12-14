@@ -3,6 +3,40 @@ import { mockUsers } from './users.js';
 import { mockParties } from './parties.js';
 import { getPostMediaPath, getHeroImagePath } from '../utils/imagePaths.js';
 
+// Normalize helpers: Supabase gerçek verisini mock formatına yaklaştır
+const normalizeParty = (p) => {
+  if (!p) return null;
+  return {
+    ...p,
+    party_id: p.party_id ?? p.id,
+    party_name: p.party_name ?? p.name,
+    party_short_name: p.party_short_name ?? p.short_name,
+    party_logo: p.party_logo ?? p.logo_url,
+    party_flag: p.party_flag ?? p.flag_url,
+    party_color: p.party_color ?? p.color,
+    parliament_seats: p.parliament_seats ?? p.parliament_seats ?? 0,
+    mp_count: p.mp_count ?? 0,
+    organization_count: p.organization_count ?? 0,
+    member_count: p.member_count ?? 0
+  };
+};
+
+const normalizeUser = (u, parties = []) => {
+  if (!u) return null;
+  const user_id = u.user_id ?? u.id;
+  const party_id = u.party_id ?? null;
+  const party = party_id ? parties.find((p) => (p.party_id ?? p.id) === party_id) : null;
+  return {
+    ...u,
+    user_id,
+    party_id,
+    // UI tarafında kullanılan alan isimleri
+    verification_badge: u.verification_badge ?? u.is_verified ?? false,
+    profile_image: u.profile_image ?? u.avatar_url,
+    party
+  };
+};
+
 // Mock posts - user referansları generateMockPosts içinde doldurulacak
 export const mockPosts = [
   {
@@ -182,6 +216,9 @@ export const mockPosts = [
 
 // Daha fazla post için helper - her kategori için 20 örnek oluştur
 export const generateMockPosts = (count = 90, users = mockUsers, parties = mockParties) => {
+  const normalizedParties = (parties || []).map(normalizeParty).filter(Boolean);
+  const normalizedUsers = (users || []).map((u) => normalizeUser(u, normalizedParties)).filter(Boolean);
+
   const contentTypes = ['text', 'image', 'video', 'audio'];
   const agendas = [
     'Kumpir yiyip ölen turistler',
@@ -211,11 +248,11 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
   // İlk 10 post'u mockPosts'tan al ve user referanslarını doldur
   const initialPosts = mockPosts.map(post => {
     // user_id'yi doğru şekilde bul
-    let user = users.find(u => u.user_id === post.user_id);
+    let user = normalizedUsers.find(u => u.user_id === post.user_id);
     // Eğer bulunamazsa, geçerli bir user seç
     if (!user) {
       // Milletvekili kullanıcılarından birini seç
-      const mpUsers = users.filter(u => u.user_type === 'politician' && u.politician_type === 'mp');
+      const mpUsers = normalizedUsers.filter(u => u.user_type === 'politician' && u.politician_type === 'mp');
       user = mpUsers.length > 0 ? mpUsers[Math.floor(Math.random() * mpUsers.length)] : users[0] || null;
     }
     if (!user) {
@@ -229,7 +266,7 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
       ...post,
       user: {
         ...user,
-        party: user.party_id ? parties.find(p => p.party_id === user.party_id) : null
+        party: user.party_id ? normalizedParties.find(p => p.party_id === user.party_id) : null
       }
     };
   });
@@ -239,7 +276,7 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
   for (let i = 11; i <= count; i++) {
     const contentType = contentTypes[Math.floor(Math.random() * contentTypes.length)];
     // Teşkilat üyelerini de dahil et
-    const availableUsers = users.filter(u => 
+    const availableUsers = normalizedUsers.filter(u => 
       u.user_type === 'politician' && 
       (u.politician_type === 'provincial_chair' ||
        u.politician_type === 'district_chair' ||
@@ -254,7 +291,7 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
     );
     const user = availableUsers.length > 0 
       ? availableUsers[Math.floor(Math.random() * availableUsers.length)]
-      : users[Math.floor(Math.random() * users.length)];
+      : normalizedUsers[Math.floor(Math.random() * normalizedUsers.length)];
     const agenda = agendas[Math.floor(Math.random() * agendas.length)];
     const text = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
     
@@ -281,7 +318,7 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
       user_id: user.user_id,
       user: {
         ...user,
-        party: user.party_id ? parties.find(p => p.party_id === user.party_id) : null
+        party: user.party_id ? normalizedParties.find(p => p.party_id === user.party_id) : null
       },
       content_type: contentType,
       content_text: text,

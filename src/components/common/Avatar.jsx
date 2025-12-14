@@ -20,6 +20,10 @@ export const Avatar = ({
   const getAvatarUrl = (url) => {
     // Eğer geçerli URL varsa kullan
     if (url && (url.startsWith('/') || url.startsWith('http'))) {
+      // Supabase Storage gibi URL'lerde Türkçe karakter/boşluk sorunlarını önlemek için encode et
+      if (url.startsWith('http') && !url.includes('%')) {
+        return encodeURI(url);
+      }
       return url;
     }
     // Yoksa default logo

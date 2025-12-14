@@ -16,6 +16,7 @@ import { getFollowStats, mockBlockedUsers } from '../mock/follows';
 import { useAuth } from '../contexts/AuthContext';
 import { users } from '../utils/api';
 import { FEATURE_FLAGS } from '../utils/constants';
+import { supabase } from '../services/supabase';
 
 export const ProfilePage = () => {
   const { userId, username } = useParams();
@@ -49,41 +50,117 @@ export const ProfilePage = () => {
       
       try {
         let profileData;
+        const normalizeUser = (u) => {
+          if (!u) return null;
+          return {
+            ...u,
+            user_id: u.user_id ?? u.id,
+            verification_badge: u.verification_badge ?? u.is_verified ?? false,
+            profile_image: u.profile_image ?? u.avatar_url,
+            party: u.party
+              ? {
+                  party_id: u.party.party_id ?? u.party.id,
+                  party_short_name: u.party.party_short_name ?? u.party.short_name,
+                  party_logo: u.party.party_logo ?? u.party.logo_url,
+                  party_color: u.party.party_color ?? u.party.color,
+                }
+              : null,
+          };
+        };
+
+        const mapDbPostToUi = (p) => {
+          if (!p) return null;
+          return {
+            post_id: p.post_id ?? p.id,
+            user_id: p.user_id,
+            content_type: p.content_type,
+            content_text: p.content_text,
+            media_url: p.media_url ?? p.media_urls,
+            thumbnail_url: p.thumbnail_url,
+            media_duration: p.media_duration,
+            agenda_tag: p.agenda_tag,
+            polit_score: p.polit_score,
+            view_count: p.view_count,
+            like_count: p.like_count,
+            dislike_count: p.dislike_count,
+            comment_count: p.comment_count,
+            share_count: p.share_count,
+            is_featured: p.is_featured,
+            created_at: p.created_at,
+            user: p.user ? normalizeUser(p.user) : null,
+          };
+        };
         
         // /@username route'u kullanılmışsa
         if (username) {
-          const response = await users.getByUsername(username);
-          if (response.success) {
-            profileData = response.data;
-          } else {
-            setError('Kullanıcı bulunamadı');
-            setLoading(false);
-            return;
+          try {
+            const response = await users.getByUsername(username);
+            if (response.success) {
+              profileData = response.data;
+            }
+          } catch {
+            // ignore, fallback to supabase below
+          }
+
+          if (!profileData) {
+            const { data, error: sbErr } = await supabase
+              .from('users')
+              .select('*, party:parties(id, short_name, logo_url, color)')
+              .eq('username', username)
+              .limit(1)
+              .maybeSingle();
+            if (sbErr || !data) {
+              setError('Kullanıcı bulunamadı');
+              setLoading(false);
+              return;
+            }
+            profileData = data;
           }
         } 
         // /profile/:userId route'u kullanılmışsa
         else if (userId) {
-          // Mock data kullan (gerçek API yoksa)
-          const foundUser = mockUsers.find(u => u.user_id === parseInt(userId));
-          if (foundUser) {
-            profileData = foundUser;
-          } else {
-            setError('Kullanıcı bulunamadı');
-            setLoading(false);
-            return;
+          const numericId = parseInt(userId);
+          if (Number.isFinite(numericId)) {
+            const { data, error: sbErr } = await supabase
+              .from('users')
+              .select('*, party:parties(id, short_name, logo_url, color)')
+              .eq('id', numericId)
+              .limit(1)
+              .maybeSingle();
+            if (!sbErr && data) {
+              profileData = data;
+            }
+          }
+
+          // Fallback to mock if still missing
+          if (!profileData) {
+            const foundUser = mockUsers.find(u => u.user_id === parseInt(userId));
+            if (foundUser) {
+              profileData = foundUser;
+            } else {
+              setError('Kullanıcı bulunamadı');
+              setLoading(false);
+              return;
+            }
           }
         }
         
-        setUser(profileData);
+        setUser(normalizeUser(profileData));
         
-        // Posts yükle (username varsa API'den, yoksa mock'tan)
-        if (username) {
-          try {
-            const postsResponse = await users.getPosts(username);
-            setUserPosts(postsResponse.success ? postsResponse.data : []);
-          } catch (err) {
-            // Mock data kullan
-            const posts = mockPosts.filter(p => p.user_id === profileData.id);
+        // Posts: Önce DB'den dene, yoksa mock fallback
+        const profileDbId = profileData.id ?? profileData.user_id;
+        if (profileDbId) {
+          const { data: dbPosts } = await supabase
+            .from('posts')
+            .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, user:users(id,username,full_name,avatar_url,city_code,user_type,politician_type,party_id,is_verified), party:parties(id,short_name,logo_url,color)')
+            .eq('user_id', profileDbId)
+            .eq('is_deleted', false)
+            .order('polit_score', { ascending: false })
+            .limit(50);
+          if (dbPosts && dbPosts.length > 0) {
+            setUserPosts(dbPosts.map(mapDbPostToUi).filter(Boolean));
+          } else {
+            const posts = mockPosts.filter(p => (p.user_id === profileDbId) || (p.user_id === parseInt(userId)));
             setUserPosts(posts);
           }
         } else {

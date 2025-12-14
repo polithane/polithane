@@ -7,83 +7,152 @@ import { Button } from '../components/common/Button';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { mockUsers } from '../mock/users';
 import { mockParties } from '../mock/parties';
-import { mockPosts, generateMockPosts } from '../mock/posts';
+import { generateMockPosts } from '../mock/posts';
 import { CITY_CODES } from '../utils/constants';
 import { getUserTitle } from '../utils/titleHelpers';
 import { formatPolitScore } from '../utils/formatters';
+import { supabase } from '../services/supabase';
 
 export const CityDetailPage = () => {
   const { cityCode } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('mps'); // mps, party_leaders, mayors
+  const [activeTab, setActiveTab] = useState('mps'); // mps, provincial_chairs, district_chairs, metropolitan_mayors, district_mayors, members
   const [cityData, setCityData] = useState(null);
   
   useEffect(() => {
-    // Şehir ismini al
-    const cityName = CITY_CODES[cityCode] || cityCode;
-    
-    // O şehirden tüm siyasetçileri bul
-    const cityPoliticians = mockUsers.filter(u => 
-      u.user_type === 'politician' && 
-      u.city_code === cityCode
-    );
-    
-    // Milletvekilleri (partilere göre grupla)
-    const mps = cityPoliticians
-      .filter(u => u.politician_type === 'mp')
-      .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-    
-    // Parti yöneticileri (il başkanları, ilçe başkanları)
-    const partyLeaders = cityPoliticians
-      .filter(u => ['provincial_chair', 'district_chair'].includes(u.politician_type))
-      .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-    
-    // Belediye başkanları (büyükşehir + ilçe)
-    const mayors = cityPoliticians
-      .filter(u => ['metropolitan_mayor', 'district_mayor'].includes(u.politician_type))
-      .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-    
-    // O şehirden paylaşımlar
-    const allPosts = generateMockPosts(400, mockUsers, mockParties);
-    const cityPosts = allPosts
-      .filter(p => p.user?.city_code === cityCode)
-      .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0))
-      .slice(0, 10);
-    
-    // Partilere göre grupla
-    const partiesInCity = [...new Set(cityPoliticians.map(p => p.party_id).filter(Boolean))];
-    const partyData = partiesInCity.map(partyId => {
-      const party = mockParties.find(p => p.party_id === partyId);
-      const partyMps = mps.filter(m => m.party_id === partyId);
-      const partyLeader = partyLeaders.find(l => l.party_id === partyId && l.politician_type === 'provincial_chair');
-      const partyMayor = mayors.find(m => m.party_id === partyId && m.politician_type === 'metropolitan_mayor');
-      
-      return {
-        party,
-        mps: partyMps,
-        leader: partyLeader,
-        mayor: partyMayor,
-        totalPolit: partyMps.reduce((sum, mp) => sum + (mp.polit_score || 0), 0) +
-                    (partyLeader?.polit_score || 0) +
-                    (partyMayor?.polit_score || 0)
+    const load = async () => {
+      const cityName = CITY_CODES[cityCode] || cityCode;
+
+      const normalizeParty = (p) => {
+        if (!p) return null;
+        return {
+          ...p,
+          party_id: p.party_id ?? p.id,
+          party_short_name: p.party_short_name ?? p.short_name,
+          party_logo: p.party_logo ?? p.logo_url,
+          party_color: p.party_color ?? p.color,
+        };
       };
-    }).sort((a, b) => b.totalPolit - a.totalPolit);
-    
-    setCityData({
-      cityName,
-      cityCode,
-      mps,
-      partyLeaders,
-      mayors,
-      posts: cityPosts,
-      partyData,
-      stats: {
-        totalMps: mps.length,
-        totalPartyLeaders: partyLeaders.length,
-        totalMayors: mayors.length,
-        totalParties: partiesInCity.length
+
+      const normalizeUser = (u) => {
+        if (!u) return null;
+        const partyObj = u.party ? normalizeParty(u.party) : null;
+        return {
+          ...u,
+          user_id: u.user_id ?? u.id,
+          profile_image: u.profile_image ?? u.avatar_url,
+          verification_badge: u.verification_badge ?? u.is_verified ?? false,
+          party_id: u.party_id ?? null,
+          party: partyObj,
+        };
+      };
+
+      const mapDbPostToUi = (p) => {
+        if (!p) return null;
+        return {
+          post_id: p.id,
+          user_id: p.user_id,
+          content_type: p.content_type,
+          content_text: p.content_text,
+          media_url: p.media_urls,
+          thumbnail_url: p.thumbnail_url,
+          media_duration: p.media_duration,
+          agenda_tag: p.agenda_tag,
+          polit_score: p.polit_score,
+          view_count: p.view_count,
+          like_count: p.like_count,
+          dislike_count: p.dislike_count,
+          comment_count: p.comment_count,
+          share_count: p.share_count,
+          is_featured: p.is_featured,
+          created_at: p.created_at,
+          user: p.user ? normalizeUser(p.user) : null,
+        };
+      };
+
+      // Users in city (DB)
+      const { data: dbUsers } = await supabase
+        .from('users')
+        .select('id,username,full_name,avatar_url,city_code,user_type,politician_type,party_id,is_verified,polit_score, party:parties(id,short_name,logo_url,color)')
+        .eq('city_code', cityCode)
+        .eq('is_active', true)
+        .limit(2000);
+
+      const cityUsers = (dbUsers && dbUsers.length > 0)
+        ? dbUsers.map(normalizeUser).filter(Boolean)
+        : mockUsers.filter(u => u.city_code === cityCode);
+
+      const cityPoliticians = cityUsers.filter(u => u.user_type === 'politician');
+      const mps = cityPoliticians.filter(u => u.politician_type === 'mp').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+      const provincialChairs = cityPoliticians.filter(u => u.politician_type === 'provincial_chair').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+      const districtChairs = cityPoliticians.filter(u => u.politician_type === 'district_chair').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+      const metroMayors = cityPoliticians.filter(u => u.politician_type === 'metropolitan_mayor').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+      const districtMayors = cityPoliticians.filter(u => u.politician_type === 'district_mayor').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+      const members = cityUsers.filter(u => u.user_type === 'party_member' || u.user_type === 'normal').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+
+      // Posts in city (DB) - via user_id list
+      const userIds = cityUsers.map(u => u.user_id).filter(Boolean).slice(0, 2000);
+      let cityPosts = [];
+      if (userIds.length > 0) {
+        const { data: dbPosts } = await supabase
+          .from('posts')
+          .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, user:users(id,username,full_name,avatar_url,city_code,user_type,politician_type,party_id,is_verified, party:parties(id,short_name,logo_url,color))')
+          .in('user_id', userIds)
+          .eq('is_deleted', false)
+          .order('polit_score', { ascending: false })
+          .limit(20);
+        if (dbPosts && dbPosts.length > 0) {
+          cityPosts = dbPosts.map(mapDbPostToUi).filter(Boolean);
+        }
       }
-    });
+      if (cityPosts.length === 0) {
+        const all = generateMockPosts(200, cityUsers, mockParties);
+        cityPosts = all
+          .filter(p => p.user?.city_code === cityCode)
+          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0))
+          .slice(0, 10);
+      }
+
+      // Parties in city
+      const partiesInCity = [...new Set(cityPoliticians.map(p => p.party_id).filter(Boolean))];
+      const partyData = partiesInCity.map(partyId => {
+        const party = normalizeParty((cityUsers.find(u => u.party_id === partyId)?.party) || mockParties.find(p => p.party_id === partyId));
+        const partyMps = mps.filter(m => m.party_id === partyId);
+        const leader = provincialChairs.find(l => l.party_id === partyId);
+        const mayor = metroMayors.find(m => m.party_id === partyId);
+        return {
+          party,
+          mps: partyMps,
+          leader,
+          mayor,
+          totalPolit: partyMps.reduce((sum, mp) => sum + (mp.polit_score || 0), 0) + (leader?.polit_score || 0) + (mayor?.polit_score || 0)
+        };
+      }).sort((a, b) => b.totalPolit - a.totalPolit);
+
+      setCityData({
+        cityName,
+        cityCode,
+        mps,
+        provincialChairs,
+        districtChairs,
+        metroMayors,
+        districtMayors,
+        members,
+        posts: cityPosts,
+        partyData,
+        stats: {
+          totalMps: mps.length,
+          totalProvincialChairs: provincialChairs.length,
+          totalDistrictChairs: districtChairs.length,
+          totalMetroMayors: metroMayors.length,
+          totalDistrictMayors: districtMayors.length,
+          totalMembers: members.length,
+          totalParties: partiesInCity.length
+        }
+      });
+    };
+
+    load();
   }, [cityCode]);
   
   if (!cityData) {
@@ -163,130 +232,61 @@ export const CityDetailPage = () => {
       );
     }
     
-    if (activeTab === 'party_leaders') {
+    const renderUserGrid = (list, emptyIcon, emptyText) => {
+      if (!list || list.length === 0) {
+        const Icon = emptyIcon;
+        return (
+          <div className="text-center py-12">
+            <Icon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">{emptyText}</p>
+          </div>
+        );
+      }
       return (
-        <div className="space-y-6">
-          {cityData.partyData.map(({ party, leader }) => {
-            if (!leader) return null;
-            return (
-              <div key={party.party_id} className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center gap-4">
-                  <img 
-                    src={party.party_logo} 
-                    alt={party.party_short_name}
-                    className="w-16 h-16 object-contain"
-                  />
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900">{party.party_short_name} İl Başkanlığı</h3>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <Link
-                    to={`/profile/${leader.username}`}
-                    className="flex items-center gap-4 p-5 bg-gradient-to-r from-gray-50 to-white rounded-lg hover:shadow-md transition-all group border border-gray-200"
-                  >
-                    <Avatar 
-                      src={leader.profile_image} 
-                      size="72px"
-                      verified={leader.verification_badge}
-                      className="flex-shrink-0"
-                    />
-                    <div className="flex-1">
-                      <h4 className="text-lg font-bold text-gray-900 group-hover:text-primary-blue transition-colors">
-                        {leader.full_name}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="primary" size="sm">{getUserTitle(leader)}</Badge>
-                        <span className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-900 text-white text-xs font-bold rounded-full">
-                          {leader.city_code}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-semibold text-gray-700">
-                          {formatPolitScore(leader.polit_score)} PP
-                        </span>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" className="flex-shrink-0">
-                      Profili Gör
-                    </Button>
-                  </Link>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {list.map(u => (
+            <Link
+              key={u.user_id}
+              to={`/profile/${u.user_id}`}
+              className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all group"
+            >
+              <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={u.verification_badge} className="flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-gray-900 group-hover:text-primary-blue transition-colors truncate">{u.full_name}</h4>
+                <div className="flex items-center gap-2 mt-1">
+                  {getUserTitle(u) && <Badge variant="primary" size="sm">{getUserTitle(u)}</Badge>}
+                  {u.city_code && (
+                    <span className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-900 text-white text-xs font-bold rounded-full">
+                      {u.city_code}
+                    </span>
+                  )}
                 </div>
               </div>
-            );
-          })}
-          {cityData.partyLeaders.length === 0 && (
-            <div className="text-center py-12">
-              <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">Bu şehirden parti yöneticisi bulunamadı</p>
-            </div>
-          )}
+              <div className="text-xs font-bold text-primary-blue whitespace-nowrap">{formatPolitScore(u.polit_score)}</div>
+            </Link>
+          ))}
         </div>
       );
+    };
+
+    if (activeTab === 'provincial_chairs') {
+      return renderUserGrid(cityData.provincialChairs, Briefcase, 'Bu şehirden il başkanı bulunamadı');
     }
-    
-    if (activeTab === 'mayors') {
-      return (
-        <div className="space-y-6">
-          {cityData.partyData.map(({ party, mayor }) => {
-            if (!mayor) return null;
-            return (
-              <div key={party.party_id} className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center gap-4">
-                  <img 
-                    src={party.party_logo} 
-                    alt={party.party_short_name}
-                    className="w-16 h-16 object-contain"
-                  />
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900">{party.party_short_name} Belediye Başkanlığı</h3>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <Link
-                    to={`/profile/${mayor.username}`}
-                    className="flex items-center gap-4 p-5 bg-gradient-to-r from-blue-50 to-white rounded-lg hover:shadow-md transition-all group border border-blue-200"
-                  >
-                    <Avatar 
-                      src={mayor.profile_image} 
-                      size="72px"
-                      verified={mayor.verification_badge}
-                      className="flex-shrink-0"
-                    />
-                    <div className="flex-1">
-                      <h4 className="text-lg font-bold text-gray-900 group-hover:text-primary-blue transition-colors">
-                        {mayor.full_name}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="success" size="sm">{getUserTitle(mayor)}</Badge>
-                        <span className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-900 text-white text-xs font-bold rounded-full">
-                          {mayor.city_code}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-semibold text-gray-700">
-                          {formatPolitScore(mayor.polit_score)} PP
-                        </span>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" className="flex-shrink-0">
-                      Profili Gör
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-          {cityData.mayors.length === 0 && (
-            <div className="text-center py-12">
-              <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">Bu şehirden belediye başkanı bulunamadı</p>
-            </div>
-          )}
-        </div>
-      );
+
+    if (activeTab === 'district_chairs') {
+      return renderUserGrid(cityData.districtChairs, Briefcase, 'Bu şehirden ilçe başkanı bulunamadı');
+    }
+
+    if (activeTab === 'metropolitan_mayors') {
+      return renderUserGrid(cityData.metroMayors, Building2, 'Bu şehirden büyükşehir belediye başkanı bulunamadı');
+    }
+
+    if (activeTab === 'district_mayors') {
+      return renderUserGrid(cityData.districtMayors, Building2, 'Bu şehirden ilçe belediye başkanı bulunamadı');
+    }
+
+    if (activeTab === 'members') {
+      return renderUserGrid(cityData.members, Users, 'Bu şehirden üye bulunamadı');
     }
   };
   
@@ -327,18 +327,18 @@ export const CityDetailPage = () => {
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
                 <Briefcase className="w-6 h-6 mx-auto mb-2" />
-                <div className="text-2xl font-bold">{cityData.stats.totalPartyLeaders}</div>
-                <div className="text-xs text-white/80">Parti Yön.</div>
+                <div className="text-2xl font-bold">{cityData.stats.totalProvincialChairs}</div>
+                <div className="text-xs text-white/80">İl Başkanı</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
                 <Building2 className="w-6 h-6 mx-auto mb-2" />
-                <div className="text-2xl font-bold">{cityData.stats.totalMayors}</div>
-                <div className="text-xs text-white/80">Belediye Bşk.</div>
+                <div className="text-2xl font-bold">{cityData.stats.totalMetroMayors}</div>
+                <div className="text-xs text-white/80">Büyükşehir Bşk.</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
                 <MapPin className="w-6 h-6 mx-auto mb-2" />
-                <div className="text-2xl font-bold">{cityData.stats.totalParties}</div>
-                <div className="text-xs text-white/80">Parti</div>
+                <div className="text-2xl font-bold">{cityData.stats.totalMembers}</div>
+                <div className="text-xs text-white/80">Üye</div>
               </div>
             </div>
           </div>
@@ -363,29 +363,68 @@ export const CityDetailPage = () => {
               </div>
             </button>
             <button
-              onClick={() => setActiveTab('party_leaders')}
+              onClick={() => setActiveTab('provincial_chairs')}
               className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
-                activeTab === 'party_leaders'
+                activeTab === 'provincial_chairs'
                   ? 'border-primary-blue text-primary-blue'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
               <div className="flex items-center gap-2">
                 <Briefcase className="w-4 h-4" />
-                <span>Parti Yönetimi ({cityData.stats.totalPartyLeaders})</span>
+                <span>İl Başkanları ({cityData.stats.totalProvincialChairs})</span>
               </div>
             </button>
             <button
-              onClick={() => setActiveTab('mayors')}
+              onClick={() => setActiveTab('district_chairs')}
               className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
-                activeTab === 'mayors'
+                activeTab === 'district_chairs'
+                  ? 'border-primary-blue text-primary-blue'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4" />
+                <span>İlçe Başkanları ({cityData.stats.totalDistrictChairs})</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('metropolitan_mayors')}
+              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
+                activeTab === 'metropolitan_mayors'
                   ? 'border-primary-blue text-primary-blue'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" />
-                <span>Belediye Başkanları ({cityData.stats.totalMayors})</span>
+                <span>Büyükşehir Bşk. ({cityData.stats.totalMetroMayors})</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('district_mayors')}
+              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
+                activeTab === 'district_mayors'
+                  ? 'border-primary-blue text-primary-blue'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                <span>İlçe Bşk. ({cityData.stats.totalDistrictMayors})</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('members')}
+              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
+                activeTab === 'members'
+                  ? 'border-primary-blue text-primary-blue'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                <span>Üyeler ({cityData.stats.totalMembers})</span>
               </div>
             </button>
           </div>
