@@ -153,7 +153,7 @@ export const HomePage = () => {
         {agendas.length > 0 && <AgendaBar agendas={agendas} />}
         
         {/* MOBİL: Tab Navigation - Sticky */}
-        <div className="md:hidden sticky top-[124px] z-10 bg-gray-50 -mx-4 px-4 pb-3 mb-4 border-b border-gray-200">
+        <div className="md:hidden sticky top-[72px] z-10 bg-gray-50 -mx-4 px-4 pb-3 mb-4 border-b border-gray-200">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
             {categories.map(cat => (
               <button

@@ -65,7 +65,7 @@ export const AnimatedSlogan = () => {
   }, [currentIndex, showFull]);
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
+    <div className="flex items-center gap-3 min-w-0">
       {/* Logo - Tıklanabilir */}
       <img 
         src="/logo.png" 
@@ -85,14 +85,16 @@ export const AnimatedSlogan = () => {
         Polithane
       </span>
       
-      <span className="text-gray-600 text-sm md:text-base min-h-[1.25rem] flex items-center">
+      <span className="text-gray-600 text-sm md:text-base min-h-[1.25rem] flex items-center min-w-0">
         <span
           className={`transition-opacity duration-300 inline-block ${
             isVisible ? 'opacity-100' : 'opacity-0'
           }`}
           style={{ minWidth: showFull ? 'auto' : '120px' }}
         >
-          {showFull ? fullSlogan : (words[currentIndex] || '\u00A0')}
+          <span className="block truncate max-w-[170px] sm:max-w-[260px] md:max-w-[420px]">
+            {showFull ? fullSlogan : (words[currentIndex] || '\u00A0')}
+          </span>
         </span>
       </span>
     </div>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Bell, MessageCircle, LogIn, Settings, User, Shield, LogOut, ChevronDown, Video, Image as ImageIcon, Mic, FileText } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogIn, Settings, User, Shield, LogOut, ChevronDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
@@ -26,12 +26,22 @@ export const Header = () => {
   }, []);
   
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
-      {/* Üst satır: Logo + sağ aksiyonlar (slogan asla kapanmaz) */}
-      <div className="container-main h-[60px] flex items-center justify-between">
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 h-[60px]">
+      <div className="container-main h-full flex items-center justify-between gap-3">
         {/* Sol: Logo + Slogan */}
-        <div className="cursor-pointer flex items-center flex-shrink-0 min-w-0" onClick={() => navigate('/')}>
+        <div className="cursor-pointer flex items-center flex-shrink min-w-0" onClick={() => navigate('/')}>
           <AnimatedSlogan />
+        </div>
+
+        {/* Orta: Polit At (sadece yazı, yanıp-sönen) */}
+        <div className="flex-shrink-0">
+          <button
+            onClick={() => window.open('/polit-at', '_blank', 'noopener,noreferrer')}
+            className="px-4 sm:px-5 h-[40px] rounded-full bg-primary-blue text-white font-black tracking-wide shadow-md hover:bg-blue-600 transition-colors animate-pulse"
+            title="Polit At"
+          >
+            Polit At
+          </button>
         </div>
 
         {/* Sağ: Aksiyonlar */}
@@ -154,35 +164,6 @@ export const Header = () => {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Alt satır: Polit At (ortada, sloganı kapatmaz) */}
-      <div className="container-main pb-2 flex justify-center">
-        <button
-          onClick={() => window.open('/polit-at', '_blank', 'noopener,noreferrer')}
-          className="group w-full max-w-[520px] h-[54px] rounded-2xl px-4 border border-blue-200 bg-gradient-to-r from-primary-blue via-[#00b4f0] to-primary-blue text-white shadow-md hover:shadow-lg transition-all active:scale-[0.99]"
-          title="Polit At"
-        >
-          <div className="h-full flex items-center justify-between gap-4">
-            <div className="text-[15px] font-black tracking-wide">
-              Polit At!
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-xl bg-white/15">
-                <Video className="w-7 h-7 transition-all hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.95)]" strokeWidth={2.5} />
-              </span>
-              <span className="p-1.5 rounded-xl bg-white/15">
-                <ImageIcon className="w-7 h-7 transition-all hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.95)]" strokeWidth={2.5} />
-              </span>
-              <span className="p-1.5 rounded-xl bg-white/15">
-                <Mic className="w-7 h-7 transition-all hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.95)]" strokeWidth={2.5} />
-              </span>
-              <span className="p-1.5 rounded-xl bg-white/15">
-                <FileText className="w-7 h-7 transition-all hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.95)]" strokeWidth={2.5} />
-              </span>
-            </div>
-          </div>
-        </button>
       </div>
     </header>
   );
