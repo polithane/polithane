@@ -23,6 +23,8 @@ const { Pool } = pg;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://eldoyqgzxgubkyohvquq.supabase.co';
 const AVATARS_PUBLIC_BASE = `${SUPABASE_URL}/storage/v1/object/public/avatars`;
+// NOTE: user created folder as "medya" under avatars bucket.
+const MEDIA_FOLDER = 'medya';
 
 const turkishMap = {
   ç: 'c',
@@ -312,7 +314,7 @@ async function upsertUser(pool, row) {
   }
 
   const email = `${username}@polithane.media`;
-  const avatarUrl = `${AVATARS_PUBLIC_BASE}/media/${row.imageFile}`;
+  const avatarUrl = `${AVATARS_PUBLIC_BASE}/${MEDIA_FOLDER}/${row.imageFile}`;
   const bio = buildBio(row);
 
   // Try: match by full_name (case-insensitive) first
