@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { limit = 50, offset = 0, party_id, search, id, city_code, is_active } = req.query;
+      const { limit = 50, offset = 0, party_id, search, id, province, is_active } = req.query;
       
       // Supabase REST API kullan
       const supabaseUrl = process.env.SUPABASE_URL;
@@ -32,10 +32,7 @@ export default async function handler(req, res) {
           'avatar_url',
           'bio',
           'user_type',
-          'politician_type',
-          'city_code',
           'is_active',
-          'is_automated',
           'party_id',
           'province',
           'is_verified',
@@ -56,7 +53,7 @@ export default async function handler(req, res) {
         params.set('offset', String(offset));
       }
       if (party_id) params.set('party_id', `eq.${party_id}`);
-      if (city_code) params.set('city_code', `eq.${city_code}`);
+      if (province) params.set('province', `eq.${province}`);
       if (is_active !== undefined) params.set('is_active', `eq.${String(is_active) === 'true' ? 'true' : 'false'}`);
       if (search) {
         // PostgREST or filter

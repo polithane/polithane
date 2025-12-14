@@ -71,18 +71,22 @@ export const CityDetailPage = () => {
       };
 
       // Users in city (DB)
-      const dbUsers = await apiCall(`/api/users?city_code=${encodeURIComponent(cityCode)}&is_active=true&limit=2000`).catch(() => []);
+      // NOTE: public.users doesn't have city_code in production DB; it uses "province" (city name).
+      const dbUsers = await apiCall(
+        `/api/users?province=${encodeURIComponent(cityName)}&is_active=true&limit=2000`
+      ).catch(() => []);
 
       const cityUsers = (dbUsers && dbUsers.length > 0)
         ? dbUsers.map(normalizeUser).filter(Boolean)
         : mockUsers.filter(u => u.city_code === cityCode);
 
-      const cityPoliticians = cityUsers.filter(u => u.user_type === 'politician');
-      const mps = cityPoliticians.filter(u => u.politician_type === 'mp').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const provincialChairs = cityPoliticians.filter(u => u.politician_type === 'provincial_chair').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const districtChairs = cityPoliticians.filter(u => u.politician_type === 'district_chair').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const metroMayors = cityPoliticians.filter(u => u.politician_type === 'metropolitan_mayor').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const districtMayors = cityPoliticians.filter(u => u.politician_type === 'district_mayor').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+      // Current production DB models MPs/officials differently (user_type = 'mp' / 'party_official'),
+      // so we derive lists from user_type.
+      const mps = cityUsers.filter(u => u.user_type === 'mp').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+      const provincialChairs = [];
+      const districtChairs = [];
+      const metroMayors = [];
+      const districtMayors = [];
       const members = cityUsers.filter(u => u.user_type === 'party_member' || u.user_type === 'normal').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
 
       // Posts in city (DB) - via user_id list
@@ -103,7 +107,7 @@ export const CityDetailPage = () => {
       }
 
       // Parties in city
-      const partiesInCity = [...new Set(cityPoliticians.map(p => p.party_id).filter(Boolean))];
+      const partiesInCity = [...new Set(cityUsers.map(p => p.party_id).filter(Boolean))];
       const partyData = partiesInCity.map(partyId => {
         const party = normalizeParty((cityUsers.find(u => u.party_id === partyId)?.party) || mockParties.find(p => p.party_id === partyId));
         const partyMps = mps.filter(m => m.party_id === partyId);
