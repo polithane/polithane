@@ -1,6 +1,7 @@
-import { supabase } from '../services/supabase';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// NOTE:
+// - In production on Vercel, we must call same-origin /api/* (no localhost).
+// - In local dev, fallback to the local backend if VITE_API_URL is not set.
+const API_URL = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
 
 // Helper function to get auth header
 const getAuthHeader = () => {
@@ -115,10 +116,10 @@ export const apiCall = async (endpoint, options = {}) => {
 // AUTH API
 // ============================================
 export const auth = {
-  login: (username, password) =>
+  login: (identifier, password) =>
     apiCall('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ identifier, password }),
     }),
 
   register: (userData) =>
@@ -147,9 +148,8 @@ export const auth = {
 export const posts = {
   getAll: async (params = {}) => {
     try {
-      // Post verileri henüz yüklenmediği için boş döndürüyoruz
-      // Mock data kullanılacak
-      return [];
+      const query = new URLSearchParams(params).toString();
+      return await apiCall(`/api/posts${query ? `?${query}` : ''}`);
     } catch (error) {
       console.error('Posts API error:', error);
       return [];
@@ -288,14 +288,7 @@ export const admin = {
 export const parties = {
   getAll: async () => {
     try {
-      const { data, error } = await supabase
-        .from('parties')
-        .select('*')
-        .eq('is_active', true)
-        .order('parliament_seats', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
+      return await apiCall('/api/parties');
     } catch (error) {
       console.error('Parties API error:', error);
       return [];

@@ -11,7 +11,6 @@ import { mockAgendas } from '../mock/agendas';
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
 import api from '../utils/api';
-import { supabase } from '../services/supabase';
 
 export const HomePage = () => {
   const [posts, setPosts] = useState([]);
@@ -24,37 +23,15 @@ export const HomePage = () => {
     // Load data from Supabase
     const loadData = async () => {
       try {
-        // Partiler + kullanıcılar + postlar (tamamı DB)
-        const [partiesData, usersResponse, postsResponse] = await Promise.all([
+        // Partiler + postlar (tamamı DB - Vercel /api üzerinden)
+        const [partiesData, postsData] = await Promise.all([
           api.parties.getAll().catch((err) => { console.error('Parties error:', err); return []; }),
-          supabase.from('users').select('id,username,full_name,avatar_url,user_type,party_id,province,is_verified,polit_score').eq('is_active', true).limit(2000),
-          supabase
-            .from('posts')
-            // NOTE: Do NOT nest party inside user here; PostgREST will fail on some FK graphs.
-            .select('id,user_id,party_id,content_type,content_text,content,media_urls,thumbnail_url,media_duration,category,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at,source_url, user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified)')
-            .eq('is_deleted', false)
-            .order('created_at', { ascending: false })
-            .limit(500)
+          api.posts.getAll({ limit: 500, order: 'created_at.desc' }).catch((err) => { console.error('Posts error:', err); return []; }),
         ]);
-
-        const usersData = usersResponse?.data || [];
-        const postsData = postsResponse?.data || [];
         
         console.log('=== SUPABASE DATA LOADED ===');
         console.log('Parties:', partiesData?.length || 0);
-        console.log('Users from Supabase:', usersData?.length || 0);
         console.log('Posts from Supabase:', postsData?.length || 0);
-        
-        if (usersData.length > 0) {
-          console.log('✅ Sample user avatar:', usersData[0]?.avatar_url);
-        }
-        
-        if (usersResponse?.error) {
-          console.error('❌ Supabase users error:', usersResponse.error);
-        }
-        if (postsResponse?.error) {
-          console.error('❌ Supabase posts error:', postsResponse.error);
-        }
 
         // Partileri ayarla
         if (partiesData && partiesData.length > 0) {
@@ -66,11 +43,8 @@ export const HomePage = () => {
 
         const partyMap = new Map((partiesData || []).map((p) => [p.id, p]));
 
-        // Kullanıcıları ayarla
-        if (usersData && usersData.length > 0) {
-          setUsers(usersData);
-          console.log('✅ Using real users from Supabase');
-        }
+        // Not: HomePage'de ayrıca kullanıcı listesi taşımaya gerek yok
+        setUsers([]);
 
         // Postları ayarla (tamamı DB)
         const mapDbPostToUi = (p) => ({
@@ -112,7 +86,7 @@ export const HomePage = () => {
             : null,
         });
 
-        setPosts(postsData.map(mapDbPostToUi));
+        setPosts((postsData || []).map(mapDbPostToUi));
 
         // Agendas için şimdilik mock data kullan
         setAgendas(mockAgendas);

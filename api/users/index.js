@@ -13,14 +13,28 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { limit = 50, offset = 0 } = req.query;
+      const { limit = 50, offset = 0, party_id, search } = req.query;
       
       // Supabase REST API kullan
       const supabaseUrl = process.env.SUPABASE_URL;
       const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+      const params = new URLSearchParams();
+      params.set(
+        'select',
+        'id,username,full_name,avatar_url,bio,user_type,party_id,province,is_verified,polit_score,follower_count,following_count,post_count'
+      );
+      params.set('order', 'polit_score.desc');
+      params.set('limit', String(limit));
+      params.set('offset', String(offset));
+      if (party_id) params.set('party_id', `eq.${party_id}`);
+      if (search) {
+        // PostgREST or filter
+        params.set('or', `(username.ilike.*${search}*,full_name.ilike.*${search}*)`);
+      }
       
       const response = await fetch(
-        `${supabaseUrl}/rest/v1/users?select=id,username,full_name,avatar_url,bio,user_type,party_id,province,is_verified,polit_score,follower_count,following_count,post_count&order=polit_score.desc&limit=${limit}&offset=${offset}`,
+        `${supabaseUrl}/rest/v1/users?${params.toString()}`,
         {
           headers: {
             'apikey': supabaseKey,

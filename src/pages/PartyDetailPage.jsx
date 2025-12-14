@@ -3,13 +3,14 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Avatar } from '../components/common/Avatar';
 import { formatNumber, formatPolitScore, formatDate } from '../utils/formatters';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
-import { supabase } from '../services/supabase';
 import { generateMockPosts } from '../mock/posts';
 import { mockParties } from '../mock/parties';
 import { mockUsers } from '../mock/users';
 import { getProfilePath } from '../utils/paths';
 import { normalizeUsername } from '../utils/validators';
 import { CITY_CODES } from '../utils/constants';
+import api from '../utils/api';
+import { apiCall } from '../utils/api';
 
 export const PartyDetailPage = () => {
   const { partyId } = useParams();
@@ -84,13 +85,9 @@ export const PartyDetailPage = () => {
       };
 
       try {
-        // Party (DB) - IMPORTANT:
-        // If we OR uuid(id) with slug, PostgREST will error for non-uuid values.
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(partyId || ''));
-        const partyQuery = supabase.from('parties').select('*');
-        const { data: dbParty } = isUuid
-          ? await partyQuery.eq('id', partyId).maybeSingle()
-          : await partyQuery.eq('slug', partyId).maybeSingle();
+        // Party (DB) - via Vercel /api (service role)
+        const partiesData = await api.parties.getAll();
+        const dbParty = (partiesData || []).find((p) => String(p.id) === String(partyId) || String(p.slug) === String(partyId));
 
         const partyObj =
           normalizeParty(dbParty) ||
@@ -109,12 +106,7 @@ export const PartyDetailPage = () => {
         setParty(partyObj);
 
         // Users in party (DB)
-        const { data: dbUsers } = await supabase
-          .from('users')
-          .select('id,username,full_name,avatar_url,user_type,party_id,province,is_verified,polit_score')
-          .eq('party_id', partyObj.party_id)
-          .eq('is_active', true)
-          .limit(2000);
+        const dbUsers = await apiCall(`/api/users?party_id=${partyObj.party_id}&limit=2000`).catch(() => []);
 
         const usersList =
           dbUsers && dbUsers.length > 0
@@ -138,13 +130,7 @@ export const PartyDetailPage = () => {
         setPartyMembers(members);
 
         // Posts in party (DB)
-        const { data: dbPosts } = await supabase
-          .from('posts')
-          .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, source_url, user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified), party:parties(id,slug,short_name,logo_url,color)')
-          .eq('party_id', partyObj.party_id)
-          .eq('is_deleted', false)
-          .order('polit_score', { ascending: false })
-          .limit(50);
+        const dbPosts = await api.posts.getAll({ party_id: partyObj.party_id, limit: 50, order: 'polit_score.desc' }).catch(() => []);
 
         if (dbPosts && dbPosts.length > 0) {
           setPartyPosts(dbPosts.map(mapDbPostToUi).filter(Boolean));

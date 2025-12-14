@@ -6,7 +6,7 @@ import {
   Phone, Upload, X, Search, UserPlus, Shield, FileText, Clock
 } from 'lucide-react';
 import { FEATURE_FLAGS } from '../../utils/constants';
-import { supabase } from '../../services/supabase';
+import { apiCall } from '../../utils/api';
 import { normalizeUsername } from '../../utils/validators';
 
 export const RegisterPageNew = () => {
@@ -85,18 +85,13 @@ export const RegisterPageNew = () => {
     }
     
     const q = searchQuery.trim();
-    const { data } = await supabase
-      .from('users')
-      .select('id,username,full_name,city_code,politician_type,user_type,is_automated')
-      .eq('is_automated', true)
-      .or(`username.ilike.%${q}%,full_name.ilike.%${q}%`)
-      .limit(20);
+    const data = await apiCall(`/api/users?search=${encodeURIComponent(q)}&limit=20`).catch(() => []);
     const results = (data || []).map((u) => ({
       id: u.id,
       username: `@${normalizeUsername(u.username)}`,
       full_name: u.full_name,
-      position: u.politician_type || u.user_type,
-      city: u.city_code,
+      position: u.user_type,
+      city: u.province,
       is_auto: u.is_automated
     }));
     setSearchResults(results);
@@ -633,12 +628,7 @@ export const RegisterPageNew = () => {
                 ← Geri
               </button>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-                <h3 className="font-bold text-gray-900 mb-1">Email ile Üyelik</h3>
-                <p className="text-sm text-gray-700">
-                  İlk kayıt aşamasında sadece email ile üyelik oluşturulur. Benzersiz isim daha sonra profil ayarlarından seçilecektir.
-                </p>
-              </div>
+              <div className="mb-6" />
 
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 mb-6">
