@@ -24,6 +24,7 @@ npm run preview
 
 ## 📚 Dokümantasyon
 
+- **[POLITHANE_MASTER_PLAN.md](POLITHANE_MASTER_PLAN.md)** - **Tek kaynak**: Proje tanımı + yol haritası + çalışma yönergesi
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Sistem mimarisi ve component yapısı
 - **[FEATURES.md](FEATURES.md)** - Detaylı özellik açıklamaları
 - **[INFRASTRUCTURE.md](INFRASTRUCTURE.md)** - Altyapı ve teknoloji yığını
