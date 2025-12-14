@@ -82,7 +82,7 @@ export const HomePage = () => {
     loadData();
   }, []);
   
-  // Kategorilere göre post filtreleme - her kategori için 30 örnek (POLİT PUANA GÖRE SIRALANMIŞ)
+  // Kategorilere göre post filtreleme - her kategori için 10 örnek (3 video, 3 resim, 2 yazı, 2 ses)
   const mpPosts = posts.length > 0 ? getCategoryPosts('mps', posts) : [];
   const organizationPosts = posts.length > 0 ? getCategoryPosts('organization', posts) : [];
   const citizenPosts = posts.length > 0 ? getCategoryPosts('citizens', posts) : [];

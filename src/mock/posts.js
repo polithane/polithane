@@ -320,12 +320,69 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
   return posts;
 };
 
-// Her kategori için 30 örnek post oluştur - POLİT PUANA GÖRE SIRALANMIŞ
+// Her kategori için 10 örnek post oluştur (3 video, 3 resim, 2 yazı, 2 ses)
+// Not: Ana sayfayı erken dönemde dengeli doldurmak için sabit dağılım kullanır.
 export const getCategoryPosts = (category, allPosts = []) => {
   // Eğer allPosts boşsa, generateMockPosts çağır
   if (!allPosts || allPosts.length === 0) {
     allPosts = generateMockPosts(400);
   }
+
+  const DESIRED_TOTAL = 10;
+  const desiredByType = {
+    video: 3,
+    image: 3,
+    text: 2,
+    audio: 2
+  };
+
+  const typeOrder = ['video', 'image', 'text', 'audio'];
+
+  const createSyntheticPost = ({ baseUser, content_type, post_id }) => {
+    const now = new Date();
+    const createdAt = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const post = {
+      post_id,
+      user_id: baseUser?.user_id || baseUser?.id || post_id, // fallback
+      user: baseUser || null,
+      content_type,
+      content_text: '',
+      agenda_tag: 'Gündem',
+      polit_score: Math.floor(Math.random() * 9000) + 500,
+      view_count: Math.floor(Math.random() * 50000) + 100,
+      like_count: Math.floor(Math.random() * 5000) + 10,
+      dislike_count: Math.floor(Math.random() * 500) + 1,
+      comment_count: Math.floor(Math.random() * 500) + 5,
+      is_featured: false,
+      created_at: createdAt
+    };
+
+    if (content_type === 'text') {
+      post.content_text = 'Kamuoyuyla paylaşmak isterim: gündeme dair kısa değerlendirmem.';
+      return post;
+    }
+
+    if (content_type === 'image') {
+      post.media_url = getPostMediaPath('image', post_id);
+      post.content_text = 'Paylaşımımızdan kareler';
+      return post;
+    }
+
+    if (content_type === 'video') {
+      post.media_url = getPostMediaPath('video', post_id, false);
+      post.thumbnail_url = getPostMediaPath('video', post_id, true);
+      post.media_duration = Math.floor(Math.random() * 120) + 30;
+      post.content_text = 'Kısa video açıklaması';
+      return post;
+    }
+
+    // audio
+    post.media_url = getPostMediaPath('audio', post_id);
+    post.media_duration = Math.floor(Math.random() * 180) + 30;
+    post.content_text = 'Kısa ses kaydı açıklaması';
+    return post;
+  };
   const categoryMap = {
     'mps': (p) => p.user?.user_type === 'politician' && p.user?.politician_type === 'mp',
     'organization': (p) => {
@@ -353,61 +410,76 @@ export const getCategoryPosts = (category, allPosts = []) => {
   const filtered = allPosts
     .filter(filter)
     .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-  
-  // Eğer teşkilat için yeterli post yoksa, generateMockPosts'ta teşkilat üyeleri oluştur
-  if (category === 'organization' && filtered.length < 30) {
-    // Teşkilat üyeleri için ekstra postlar oluştur
-    const orgTypes = ['provincial_chair', 'district_chair', 'myk_member', 'vice_chair', 'other'];
-    const orgUsers = allPosts
-      .map(p => p.user)
-      .filter(u => u?.user_type === 'politician' && orgTypes.includes(u?.politician_type))
-      .filter((v, i, a) => a.findIndex(u => u.user_id === v.user_id) === i);
-    
-    // Eğer yeterli teşkilat üyesi yoksa, mock users'dan oluştur
-    const needed = 30 - filtered.length;
-    for (let i = 0; i < needed; i++) {
-      const orgType = orgTypes[Math.floor(Math.random() * orgTypes.length)];
-      const partyId = Math.floor(Math.random() * 6) + 1;
-      const newPost = {
-        post_id: 1000 + i,
-        user_id: 100 + i,
-        user: {
-          user_id: 100 + i,
-          username: `org_user_${i}`,
-          full_name: `Teşkilat Üyesi ${i + 1}`,
-          user_type: 'politician',
-          politician_type: orgType,
-          party_id: partyId,
-          verification_badge: true,
-          avatar_url: `https://i.pravatar.cc/150?img=${100 + i}`,
-          profile_image: `https://i.pravatar.cc/150?img=${100 + i}`
-        },
-        content_type: ['text', 'image', 'video'][Math.floor(Math.random() * 3)],
-        content_text: 'Teşkilat çalışmalarımız devam ediyor.',
-        agenda_tag: ['ekonomi', 'eğitim', 'sağlık'][Math.floor(Math.random() * 3)],
-        polit_score: Math.floor(Math.random() * 5000) + 500,
-        view_count: Math.floor(Math.random() * 10000) + 100,
-        like_count: Math.floor(Math.random() * 500) + 10,
-        dislike_count: Math.floor(Math.random() * 50) + 1,
-        comment_count: Math.floor(Math.random() * 100) + 5,
-        is_featured: false,
-        created_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
-      };
-      
-      if (newPost.content_type === 'image') {
-        newPost.media_url = getPostMediaPath('image', 1000 + i);
-      } else if (newPost.content_type === 'video') {
-        newPost.media_url = getPostMediaPath('video', 1000 + i, false);
-        newPost.thumbnail_url = getPostMediaPath('video', 1000 + i, true);
-        newPost.media_duration = Math.floor(Math.random() * 300) + 60;
-      }
-      
-      filtered.push(newPost);
-    }
-    // Eklenen postlar dahil tekrar sıralama
-    filtered.sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+
+  // 10'luk sabit dağılım: 3 video, 3 resim, 2 yazı, 2 ses
+  const selected = [];
+  const usedIds = new Set();
+
+  for (const t of typeOrder) {
+    const need = desiredByType[t] || 0;
+    if (need <= 0) continue;
+    const candidates = filtered.filter((p) => p.content_type === t && !usedIds.has(p.post_id));
+    candidates.slice(0, need).forEach((p) => {
+      usedIds.add(p.post_id);
+      selected.push(p);
+    });
   }
-  
-  // İlk 30'u al ve POLİT PUANA GÖRE SIRALANMIŞ olarak döndür
-  return filtered.slice(0, 30);
+
+  // Eksik kalırsa kalanlardan doldur
+  if (selected.length < DESIRED_TOTAL) {
+    filtered
+      .filter((p) => !usedIds.has(p.post_id))
+      .slice(0, DESIRED_TOTAL - selected.length)
+      .forEach((p) => {
+        usedIds.add(p.post_id);
+        selected.push(p);
+      });
+  }
+
+  // Hala eksikse (nadir): sentetik post üret
+  if (selected.length < DESIRED_TOTAL) {
+    // Bu kategoriye uygun bir user bul
+    const baseUser = filtered.find((p) => p.user)?.user || null;
+    let syntheticUser = baseUser;
+
+    if (!syntheticUser) {
+      // minimal user fallback (kategori şartlarını sağlayacak)
+      const base = {
+        user_id: 900000 + Math.floor(Math.random() * 10000),
+        username: `auto_${category}_${Date.now().toString().slice(-4)}`,
+        full_name: `Otomatik Profil (${category})`,
+        verification_badge: true,
+        avatar_url: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70) + 1}`,
+        profile_image: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70) + 1}`
+      };
+      if (category === 'mps') {
+        syntheticUser = { ...base, user_type: 'politician', politician_type: 'mp' };
+      } else if (category === 'organization') {
+        syntheticUser = { ...base, user_type: 'politician', politician_type: 'provincial_chair' };
+      } else if (category === 'experience') {
+        syntheticUser = { ...base, user_type: 'ex_politician' };
+      } else if (category === 'media') {
+        syntheticUser = { ...base, user_type: 'media' };
+      } else {
+        syntheticUser = { ...base, user_type: 'normal' };
+      }
+    }
+
+    const nextIdBase = 800000 + Math.floor(Math.random() * 10000);
+    while (selected.length < DESIRED_TOTAL) {
+      // Önce dağılımdaki açıkları tamamla
+      const counts = selected.reduce((acc, p) => {
+        acc[p.content_type] = (acc[p.content_type] || 0) + 1;
+        return acc;
+      }, {});
+
+      const missingType = typeOrder.find((t) => (counts[t] || 0) < (desiredByType[t] || 0)) || 'text';
+      const post_id = nextIdBase + selected.length;
+      const sp = createSyntheticPost({ baseUser: syntheticUser, content_type: missingType, post_id });
+      selected.push(sp);
+    }
+  }
+
+  // Dizilim: önce polit_score önceliği, ama dağılımı bozmayacak şekilde hafif karıştır
+  return selected.slice(0, DESIRED_TOTAL);
 };
