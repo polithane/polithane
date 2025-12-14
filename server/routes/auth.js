@@ -207,25 +207,31 @@ router.post('/register', async (req, res) => {
 // ============================================
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, email, password } = req.body;
+    const loginValue = (identifier || email || '').trim();
 
     // Validation
-    if (!email || !password) {
+    if (!loginValue || !password) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Email ve şifre zorunludur.' 
+        error: 'Email/benzersiz isim ve şifre zorunludur.' 
       });
     }
 
-    // Kullanıcıyı email ile bul
+    // Kullanıcıyı email veya username ile bul
+    const isEmail = loginValue.includes('@');
     const [user] = await sql`
       SELECT 
-        id, username, email, password_hash, full_name, 
-        user_type, avatar_url, cover_url, bio, 
-        is_verified, is_admin, follower_count, following_count,
+        id, username, email, password_hash, full_name,
+        user_type, avatar_url, cover_url, bio,
+        is_verified, follower_count, following_count,
         post_count, polit_score, province, party_id, email_verified, created_at
       FROM users 
-      WHERE LOWER(email) = LOWER(${email})
+      WHERE ${
+        isEmail
+          ? sql`LOWER(email) = LOWER(${loginValue})`
+          : sql`username = ${loginValue}`
+      }
     `;
 
     // Kullanıcı bulunamadı veya şifre yanlış
@@ -235,7 +241,7 @@ router.post('/login', async (req, res) => {
       // Başarısız login kaydı (Brute force koruması)
       const ipAddress = getRealIP(req);
       const userAgent = req.headers['user-agent'] || '';
-      const failResult = await recordFailedLogin(email, ipAddress, userAgent);
+      const failResult = await recordFailedLogin(loginValue, ipAddress, userAgent);
       
       if (failResult.blocked) {
         return res.status(429).json({
@@ -246,7 +252,7 @@ router.post('/login', async (req, res) => {
       
       return res.status(401).json({
         success: false,
-        error: 'Email veya şifre hatalı.',
+        error: 'Email/benzersiz isim veya şifre hatalı.',
         remainingAttempts: Math.max(0, 5 - failResult.attempts)
       });
     }

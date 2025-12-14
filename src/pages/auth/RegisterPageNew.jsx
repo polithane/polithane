@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { FEATURE_FLAGS } from '../../utils/constants';
 import { supabase } from '../../services/supabase';
-import { isValidUsername, normalizeUsername } from '../../utils/validators';
+import { normalizeUsername } from '../../utils/validators';
 
 export const RegisterPageNew = () => {
   const navigate = useNavigate();
@@ -33,12 +33,10 @@ export const RegisterPageNew = () => {
   const [documentPreview, setDocumentPreview] = useState(null);
   
   const [formData, setFormData] = useState({
-    full_name: '',
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
-    username: '',
     city: '',
     district: '',
     party: '',
@@ -124,16 +122,10 @@ export const RegisterPageNew = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    // username için otomatik normalize uygula
-    if (name === 'username') {
-      const normalized = normalizeUsername(value);
-      setFormData(prev => ({ ...prev, username: normalized }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
     setError('');
   };
 
@@ -156,13 +148,8 @@ export const RegisterPageNew = () => {
 
   // Validation
   const validateForm = () => {
-    if (!formData.full_name || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
-      setError('Lütfen tüm alanları doldurun');
-      return false;
-    }
-
-    if (formData.username && !isValidUsername(formData.username)) {
-      setError('Benzersiz isim geçersiz. Sadece a-z, 0-9 ve _ kullanılabilir; 3-20 karakter olmalıdır.');
+    if (!formData.email || !formData.password || !formData.confirmPassword) {
+      setError('Lütfen email ve şifre alanlarını doldurun');
       return false;
     }
     
@@ -206,24 +193,13 @@ export const RegisterPageNew = () => {
     
     if (!validateForm()) return;
     
-    // Document check for non-normal members
-    if (membershipType !== 'normal' && !documentFile) {
-      setError('Lütfen gerekli belgeyi yükleyin');
-      return;
-    }
-    
     setLoading(true);
     setError('');
     
     try {
-      // Username: kullanıcı girdiyse onu kullan, yoksa email'den normalize üret
-      const username = formData.username || normalizeUsername(formData.email.split('@')[0]);
-      
       const result = await register({
-        ...formData,
-        username, // Add generated username
-        membership_type: membershipType,
-        document: documentFile
+        email: formData.email,
+        password: formData.password,
       });
       
       if (result.success) {
@@ -321,7 +297,8 @@ export const RegisterPageNew = () => {
                 <button
                   onClick={() => {
                     setRegistrationType('new');
-                    setStep(2);
+                    setMembershipType('normal');
+                    setStep(3);
                   }}
                   className="group p-8 border-2 border-gray-200 rounded-2xl hover:border-primary-blue hover:bg-blue-50 transition-all text-left"
                 >
@@ -648,7 +625,8 @@ export const RegisterPageNew = () => {
                 type="button"
                 onClick={() => {
                   setMembershipType(null);
-                  setStep(2);
+                  setRegistrationType(null);
+                  setStep(1);
                 }}
                 className="text-gray-600 hover:text-gray-900 mb-4 flex items-center gap-2"
               >
@@ -656,15 +634,10 @@ export const RegisterPageNew = () => {
               </button>
 
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{membershipTypes[membershipType].icon}</span>
-                  <div>
-                    <h3 className="font-bold text-gray-900">{membershipTypes[membershipType].title}</h3>
-                    <span className={`text-xs px-2 py-1 rounded-full font-semibold ${membershipTypes[membershipType].badgeColor}`}>
-                      {membershipTypes[membershipType].badge}
-                    </span>
-                  </div>
-                </div>
+                <h3 className="font-bold text-gray-900 mb-1">Email ile Üyelik</h3>
+                <p className="text-sm text-gray-700">
+                  İlk kayıt aşamasında sadece email ile üyelik oluşturulur. Benzersiz isim daha sonra profil ayarlarından seçilecektir.
+                </p>
               </div>
 
               {error && (
@@ -676,63 +649,16 @@ export const RegisterPageNew = () => {
 
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Benzersiz İsim (max 20) *</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-bold">@</span>
-                    <input
-                      type="text"
-                      name="username"
-                      value={formData.username}
-                      onChange={handleChange}
-                      placeholder="ornek: ugur_bayraktutan"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
-                      maxLength={20}
-                      required
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Sadece <span className="font-semibold">a-z, 0-9, _</span> kullanın. Türkçe karakter yok. Maksimum <span className="font-semibold">20</span> karakter.
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Ad Soyad *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">E-posta *</label>
                   <input
-                    type="text"
-                    name="full_name"
-                    value={formData.full_name}
+                    type="email"
+                    name="email"
+                    value={formData.email}
                     onChange={handleChange}
-                    placeholder="Ahmet Yılmaz"
+                    placeholder="ornek@email.com"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
                     required
                   />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">E-posta *</label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="ornek@email.com"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Telefon *</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="5XX XXX XX XX"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
-                      required
-                    />
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -792,67 +718,6 @@ export const RegisterPageNew = () => {
                   </div>
                 )}
 
-                {/* Belge Yükleme - Sadece normal üye değilse */}
-                {membershipTypes[membershipType].requiresDocument && (
-                  <div className="border-t border-gray-200 pt-6 mt-6">
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                      <div className="flex items-start gap-3">
-                        <FileText className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <h4 className="font-semibold text-amber-900 mb-1">Belge Yükleme Gerekli</h4>
-                          <p className="text-sm text-amber-800">
-                            {membershipTypes[membershipType].documentTitle} yüklemeniz gerekmektedir.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      {membershipTypes[membershipType].documentTitle} *
-                    </label>
-                    
-                    {documentPreview ? (
-                      <div className="relative border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <CheckCircle2 className="w-6 h-6 text-green-600" />
-                            <div>
-                              <p className="font-semibold text-green-900">{documentFile.name}</p>
-                              <p className="text-sm text-green-700">{(documentFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDocumentFile(null);
-                              setDocumentPreview(null);
-                            }}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label className="block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary-blue hover:bg-blue-50 transition-all">
-                        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-sm font-semibold text-gray-700 mb-1">
-                          Belgeyi Yüklemek İçin Tıklayın
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          PDF, JPG veya PNG (Maks. 10MB)
-                        </p>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={handleDocumentUpload}
-                          className="hidden"
-                          required
-                        />
-                      </label>
-                    )}
-                  </div>
-                )}
               </div>
 
               <button

@@ -59,8 +59,8 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  // Login function
-  const login = async (email, password) => {
+  // Login function (email OR username)
+  const login = async (identifier, password) => {
     try {
       setLoading(true);
       
@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       const data = await response.json();

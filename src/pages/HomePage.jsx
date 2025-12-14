@@ -30,7 +30,8 @@ export const HomePage = () => {
           supabase.from('users').select('id,username,full_name,avatar_url,user_type,party_id,province,is_verified,polit_score').eq('is_active', true).limit(2000),
           supabase
             .from('posts')
-            .select('id,user_id,party_id,content_type,content_text,content,media_urls,thumbnail_url,media_duration,category,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at,source_url, user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified, party:parties(id,slug,short_name,logo_url,color))')
+            // NOTE: Do NOT nest party inside user here; PostgREST will fail on some FK graphs.
+            .select('id,user_id,party_id,content_type,content_text,content,media_urls,thumbnail_url,media_duration,category,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at,source_url, user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified)')
             .eq('is_deleted', false)
             .order('created_at', { ascending: false })
             .limit(500)
@@ -62,6 +63,8 @@ export const HomePage = () => {
           console.log('Using mock parties as fallback');
           setParties(mockParties);
         }
+
+        const partyMap = new Map((partiesData || []).map((p) => [p.id, p]));
 
         // Kullanıcıları ayarla
         if (usersData && usersData.length > 0) {
@@ -96,13 +99,13 @@ export const HomePage = () => {
                 profile_image: p.user.avatar_url,
                 verification_badge: p.user.is_verified ?? false,
                 party_id: p.user.party_id,
-                party: p.user.party
+                party: p.user.party_id && partyMap.get(p.user.party_id)
                   ? {
-                      party_id: p.user.party.id,
-                      party_slug: p.user.party.slug,
-                      party_short_name: p.user.party.short_name,
-                      party_logo: p.user.party.logo_url,
-                      party_color: p.user.party.color,
+                      party_id: partyMap.get(p.user.party_id).id,
+                      party_slug: partyMap.get(p.user.party_id).slug,
+                      party_short_name: partyMap.get(p.user.party_id).short_name,
+                      party_logo: partyMap.get(p.user.party_id).logo_url,
+                      party_color: partyMap.get(p.user.party_id).color,
                     }
                   : null,
               }
@@ -157,7 +160,7 @@ export const HomePage = () => {
 
   const mpPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'mp'));
   const organizationPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_official'));
-  const citizenPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_member'));
+  const citizenPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_member' || p.user?.user_type === 'citizen'));
   const exPoliticianPosts = pickFixedMix([]); // DB'de henüz ex_politician yok
   const mediaPosts = pickFixedMix([]); // DB'de henüz media yok
   const featuredPosts = posts.length > 0 

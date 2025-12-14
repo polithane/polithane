@@ -8,7 +8,7 @@ export const LoginPageNew = () => {
   const { login } = useAuth();
   
   const [formData, setFormData] = useState({
-    email: '',
+    identifier: '',
     password: '',
     remember: false,
   });
@@ -33,7 +33,7 @@ export const LoginPageNew = () => {
 
     try {
       // DEMO MODE: Her email/password ile giriş yapabilirsiniz!
-      const result = await login(formData.email, formData.password);
+      const result = await login(formData.identifier, formData.password);
       
       if (result.success) {
         // Admin kullanıcıları admin paneline yönlendir
@@ -89,19 +89,19 @@ export const LoginPageNew = () => {
               </div>
             )}
 
-            {/* Email */}
+            {/* Email or Username */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Email Adresiniz
+                Email veya Benzersiz İsim
               </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
+                  type="text"
+                  name="identifier"
+                  value={formData.identifier}
                   onChange={handleChange}
-                  placeholder="email@ornek.com"
+                  placeholder="email@ornek.com veya kullaniciadi"
                   className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                   required
                 />

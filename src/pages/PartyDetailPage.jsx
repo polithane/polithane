@@ -84,16 +84,23 @@ export const PartyDetailPage = () => {
       };
 
       try {
-        // Party (DB) - allow both UUID id and slug in URL
-        const { data: dbParty } = await supabase
-          .from('parties')
-          .select('*')
-          .or(`id.eq.${partyId},slug.eq.${partyId}`)
-          .maybeSingle();
+        // Party (DB) - IMPORTANT:
+        // If we OR uuid(id) with slug, PostgREST will error for non-uuid values.
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(partyId || ''));
+        const partyQuery = supabase.from('parties').select('*');
+        const { data: dbParty } = isUuid
+          ? await partyQuery.eq('id', partyId).maybeSingle()
+          : await partyQuery.eq('slug', partyId).maybeSingle();
 
         const partyObj =
           normalizeParty(dbParty) ||
-          normalizeParty(mockParties.find((p) => String(p.party_id) === String(partyId)));
+          normalizeParty(
+            mockParties.find((p) =>
+              String(p.party_id) === String(partyId) ||
+              String(p.slug || '') === String(partyId) ||
+              String(p.party_short_name || '').toLowerCase() === String(partyId).toLowerCase()
+            )
+          );
         if (!partyObj) {
           setError('Parti bulunamadı');
           setParty(null);
