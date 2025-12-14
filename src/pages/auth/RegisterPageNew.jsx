@@ -1,14 +1,17 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   User, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, 
   Phone, Upload, X, Search, UserPlus, Shield, FileText, Clock
 } from 'lucide-react';
 import { FEATURE_FLAGS } from '../../utils/constants';
+import { supabase } from '../../services/supabase';
+import { isValidUsername, normalizeUsername } from '../../utils/validators';
 
 export const RegisterPageNew = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { register } = useAuth();
   
   const [registrationType, setRegistrationType] = useState(null); // 'new' or 'claim'
@@ -42,25 +45,62 @@ export const RegisterPageNew = () => {
     position: '',
   });
 
-  // Mock auto-created profiles (Bu gerçekte backend'den gelecek)
-  const mockAutoProfiles = [
-    { id: 1, username: '@yusufterzi', full_name: 'Yusuf Terzi', position: 'Milletvekili', city: 'Ankara', is_auto: true },
-    { id: 2, username: '@ahmetyilmaz', full_name: 'Ahmet Yılmaz', position: 'İl Başkanı', city: 'İstanbul', is_auto: true },
-    { id: 3, username: '@fatmaozkan', full_name: 'Fatma Özkan', position: 'Belediye Başkanı', city: 'İzmir', is_auto: true },
-  ];
+  // Eğer profil sahiplenme linkinden geldiysek: aramayı atla, direkt sahiplenme formu aç
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('mode');
+    const claimUserId = params.get('claimUserId');
+    if (mode === 'claim' && claimUserId && FEATURE_FLAGS.ENABLE_PROFILE_CLAIM_FLOW) {
+      (async () => {
+        try {
+          const id = parseInt(claimUserId);
+          const { data } = await supabase
+            .from('users')
+            .select('id,username,full_name,city_code,politician_type,user_type,is_automated')
+            .eq('id', id)
+            .limit(1)
+            .maybeSingle();
+          if (data) {
+            setRegistrationType('claim');
+            setStep(2);
+            setSelectedProfile({
+              id: data.id,
+              username: `@${normalizeUsername(data.username)}`,
+              full_name: data.full_name,
+              position: data.politician_type || data.user_type,
+              city: data.city_code,
+              is_auto: data.is_automated
+            });
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    }
+  }, [location.search]);
 
   // Search profiles
-  const handleProfileSearch = () => {
+  const handleProfileSearch = async () => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       return;
     }
     
-    // Mock search (gerçekte API call olacak)
-    const results = mockAutoProfiles.filter(profile => 
-      profile.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      profile.full_name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const q = searchQuery.trim();
+    const { data } = await supabase
+      .from('users')
+      .select('id,username,full_name,city_code,politician_type,user_type,is_automated')
+      .eq('is_automated', true)
+      .or(`username.ilike.%${q}%,full_name.ilike.%${q}%`)
+      .limit(20);
+    const results = (data || []).map((u) => ({
+      id: u.id,
+      username: `@${normalizeUsername(u.username)}`,
+      full_name: u.full_name,
+      position: u.politician_type || u.user_type,
+      city: u.city_code,
+      is_auto: u.is_automated
+    }));
     setSearchResults(results);
   };
 
@@ -84,10 +124,16 @@ export const RegisterPageNew = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    // username için otomatik normalize uygula
+    if (name === 'username') {
+      const normalized = normalizeUsername(value);
+      setFormData(prev => ({ ...prev, username: normalized }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
+    }
     setError('');
   };
 
@@ -112,6 +158,11 @@ export const RegisterPageNew = () => {
   const validateForm = () => {
     if (!formData.full_name || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
       setError('Lütfen tüm alanları doldurun');
+      return false;
+    }
+
+    if (formData.username && !isValidUsername(formData.username)) {
+      setError('Benzersiz isim geçersiz. Sadece a-z, 0-9 ve _ kullanılabilir; 3-20 karakter olmalıdır.');
       return false;
     }
     
@@ -165,8 +216,8 @@ export const RegisterPageNew = () => {
     setError('');
     
     try {
-      // Generate username from email if not provided
-      const username = formData.username || formData.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+      // Username: kullanıcı girdiyse onu kullan, yoksa email'den normalize üret
+      const username = formData.username || normalizeUsername(formData.email.split('@')[0]);
       
       const result = await register({
         ...formData,
@@ -331,7 +382,7 @@ export const RegisterPageNew = () => {
                 ← Geri
               </button>
 
-              <h2 className="text-2xl font-black text-gray-900 mb-2">Profilinizi Bulun</h2>
+              <h2 className="text-2xl font-black text-gray-900 mb-2">Profil Sahipliği</h2>
               <p className="text-gray-600 mb-6">
                 Kullanıcı adınızı (@kullaniciadi) veya ad soyadınızı yazarak profilinizi arayın
               </p>
@@ -377,7 +428,10 @@ export const RegisterPageNew = () => {
                         </div>
                       </div>
                       <button
-                        onClick={() => setSelectedProfile(profile)}
+                        onClick={() => {
+                          // Seçilen profili direkt sahiplenme formuna taşı
+                          setSelectedProfile(profile);
+                        }}
                         className="bg-primary-blue hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold"
                       >
                         Sahip Ol
@@ -621,6 +675,25 @@ export const RegisterPageNew = () => {
               )}
 
               <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Benzersiz İsim (max 20) *</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 font-bold">@</span>
+                    <input
+                      type="text"
+                      name="username"
+                      value={formData.username}
+                      onChange={handleChange}
+                      placeholder="ornek: ugur_bayraktutan"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                      maxLength={20}
+                      required
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Sadece <span className="font-semibold">a-z, 0-9, _</span> kullanın. Türkçe karakter yok. Maksimum <span className="font-semibold">20</span> karakter.
+                  </p>
+                </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Ad Soyad *</label>
                   <input

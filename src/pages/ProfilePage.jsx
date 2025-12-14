@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { users } from '../utils/api';
 import { FEATURE_FLAGS } from '../utils/constants';
 import { supabase } from '../services/supabase';
+import { normalizeUsername } from '../utils/validators';
 
 export const ProfilePage = () => {
   const { userId, username } = useParams();
@@ -55,6 +56,7 @@ export const ProfilePage = () => {
           return {
             ...u,
             user_id: u.user_id ?? u.id,
+            username: normalizeUsername(u.username || ''),
             verification_badge: u.verification_badge ?? u.is_verified ?? false,
             profile_image: u.profile_image ?? u.avatar_url,
             party: u.party
@@ -93,6 +95,7 @@ export const ProfilePage = () => {
         
         // /@username route'u kullanılmışsa
         if (username) {
+          const requested = normalizeUsername(username);
           try {
             const response = await users.getByUsername(username);
             if (response.success) {
@@ -103,18 +106,37 @@ export const ProfilePage = () => {
           }
 
           if (!profileData) {
-            const { data, error: sbErr } = await supabase
+            // 1) önce direkt match dene (db'de zaten normalize olabilir)
+            const direct = await supabase
               .from('users')
               .select('*, party:parties(id, short_name, logo_url, color)')
-              .eq('username', username)
+              .eq('username', requested)
               .limit(1)
               .maybeSingle();
-            if (sbErr || !data) {
+            if (!direct.error && direct.data) {
+              profileData = direct.data;
+            } else {
+              // 2) DB'de Türkçe username kalmış olabilir: 2000 kullanıcı içinde normalize ederek eşle
+              const list = await supabase
+                .from('users')
+                .select('id,username')
+                .limit(2000);
+              const match = (list.data || []).find((u) => normalizeUsername(u.username || '') === requested);
+              if (match?.id) {
+                const byId = await supabase
+                  .from('users')
+                  .select('*, party:parties(id, short_name, logo_url, color)')
+                  .eq('id', match.id)
+                  .limit(1)
+                  .maybeSingle();
+                if (!byId.error && byId.data) profileData = byId.data;
+              }
+            }
+            if (!profileData) {
               setError('Kullanıcı bulunamadı');
               setLoading(false);
               return;
             }
-            profileData = data;
           }
         } 
         // /profile/:userId route'u kullanılmışsa
@@ -274,7 +296,7 @@ export const ProfilePage = () => {
                         <p className="text-sm text-blue-800 font-medium">
                           Bu profil size ait mi?{' '}
                           <Link
-                            to="/register-new"
+                            to={`/register-new?mode=claim&claimUserId=${user.user_id}`}
                             className="text-primary-blue hover:underline font-semibold"
                           >
                             Buraya tıklayın ve profilinizin sahipliğini alın →

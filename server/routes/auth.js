@@ -27,6 +27,7 @@ router.post('/register', async (req, res) => {
       email, 
       password, 
       full_name,
+      username: requestedUsername,
       user_type = 'citizen',
       province,
       party_id
@@ -69,8 +70,63 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Username'i email'den otomatik oluştur
-    const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString().slice(-4);
+    // Username normalize + max 20 (Türkçe karakter yok)
+    const normalizeUsername = (value) => {
+      if (!value) return '';
+      const turkishMap = { ç: 'c', Ç: 'c', ğ: 'g', Ğ: 'g', ı: 'i', İ: 'i', ö: 'o', Ö: 'o', ş: 's', Ş: 's', ü: 'u', Ü: 'u' };
+      let out = value
+        .trim()
+        .split('')
+        .map((ch) => turkishMap[ch] ?? ch)
+        .join('')
+        .toLowerCase();
+      out = out.replace(/^@+/, '');
+      out = out.replace(/[\s-]+/g, '_');
+      out = out.replace(/[^a-z0-9_]/g, '');
+      out = out.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+      out = out.slice(0, 20);
+      if (out && out.length < 3) out = (out + '___').slice(0, 3);
+      if (out && !/^[a-z]/.test(out)) out = `u${out}`.slice(0, 20);
+      return out;
+    };
+
+    const isValidUsername = (u) => /^[a-z0-9_]{3,20}$/.test(u);
+
+    // Kullanıcı username girmişse onu kullan, yoksa emailden üret
+    const base = requestedUsername ? requestedUsername : email.split('@')[0];
+    let username = normalizeUsername(base);
+    if (!isValidUsername(username)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Benzersiz isim geçersiz. Sadece a-z, 0-9 ve _ kullanılabilir; 3-20 karakter olmalıdır.'
+      });
+    }
+
+    // Uniq hale getir (20 karakteri aşmadan)
+    const exists = async (u) => {
+      const [row] = await sql`SELECT id FROM users WHERE username = ${u} LIMIT 1`;
+      return !!row;
+    };
+
+    if (await exists(username)) {
+      const baseTrimmed = username.slice(0, 20);
+      let ok = false;
+      for (let i = 0; i < 25; i++) {
+        const suffix = Math.floor(Math.random() * 900 + 100).toString(); // 3 haneli
+        const candidate = `${baseTrimmed.slice(0, Math.max(0, 20 - (suffix.length + 1)))}_${suffix}`.slice(0, 20);
+        if (!(await exists(candidate))) {
+          username = candidate;
+          ok = true;
+          break;
+        }
+      }
+      if (!ok) {
+        return res.status(400).json({
+          success: false,
+          error: 'Benzersiz isim kullanılamıyor. Lütfen farklı bir isim deneyin.'
+        });
+      }
+    }
 
     // Şifreyi hashle
     const password_hash = await bcrypt.hash(password, 10);

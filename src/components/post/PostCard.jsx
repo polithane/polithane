@@ -7,6 +7,7 @@ import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration
 import { getUserTitle } from '../../utils/titleHelpers';
 import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
+import { getProfilePath } from '../../utils/paths';
 
 export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPosition = false }) => {
   const navigate = useNavigate();
@@ -57,7 +58,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           <div 
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/profile/${post.user?.user_id}`);
+              navigate(getProfilePath(post.user));
             }}
             className="cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
           >
@@ -73,7 +74,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
               className="font-semibold text-base text-gray-900 cursor-pointer hover:text-primary-blue transition-colors line-clamp-2 leading-5 mb-1"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/profile/${post.user?.user_id}`);
+                navigate(getProfilePath(post.user));
               }}
             >
               {post.user?.full_name}

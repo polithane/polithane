@@ -9,6 +9,7 @@ import { getUserTitle } from '../../utils/titleHelpers';
 import { getPlaceholderImage } from '../../utils/imagePaths';
 import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
+import { getProfilePath } from '../../utils/paths';
 
 export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = false, fullWidth = false, style }) => {
   const navigate = useNavigate();
@@ -78,7 +79,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             <div 
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/profile/${post.user?.user_id}`);
+                navigate(getProfilePath(post.user));
               }}
               className="cursor-pointer hover:opacity-80 transition-opacity"
             >
@@ -108,7 +109,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
               className="font-semibold text-sm text-gray-900 cursor-pointer hover:text-primary-blue transition-colors line-clamp-2 leading-[18px] h-[36px] mb-1"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/profile/${post.user?.user_id}`);
+                navigate(getProfilePath(post.user));
               }}
             >
               {post.user?.full_name}

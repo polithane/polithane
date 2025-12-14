@@ -8,8 +8,47 @@ export const isValidEmail = (email) => {
 // Kullanıcı adı validasyonu
 export const isValidUsername = (username) => {
   if (!username) return false;
-  const regex = /^[a-zA-Z0-9_.]{3,30}$/;
+  // Sadece ascii küçük harf, rakam ve alt çizgi. Max 20.
+  const regex = /^[a-z0-9_]{3,20}$/;
   return regex.test(username);
+};
+
+// Username normalize (Türkçe karakter -> ascii, boşluk/punktuasyon -> _, max 20)
+export const normalizeUsername = (value) => {
+  if (!value) return '';
+  const turkishMap = {
+    ç: 'c', Ç: 'c',
+    ğ: 'g', Ğ: 'g',
+    ı: 'i', İ: 'i',
+    ö: 'o', Ö: 'o',
+    ş: 's', Ş: 's',
+    ü: 'u', Ü: 'u',
+  };
+
+  let out = value
+    .trim()
+    .split('')
+    .map((ch) => turkishMap[ch] ?? ch)
+    .join('')
+    .toLowerCase();
+
+  // @ prefix çıkar
+  out = out.replace(/^@+/, '');
+  // boşluk ve tireyi underscore yap
+  out = out.replace(/[\s-]+/g, '_');
+  // izin verilmeyen karakterleri at
+  out = out.replace(/[^a-z0-9_]/g, '');
+  // tekrar eden _ sadeleştir
+  out = out.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+  // max 20
+  out = out.slice(0, 20);
+  // en az 3 karakter
+  if (out.length > 0 && out.length < 3) {
+    out = (out + '___').slice(0, 3);
+  }
+  // harf ile başlamıyorsa başına u ekle
+  if (out && !/^[a-z]/.test(out)) out = `u${out}`.slice(0, 20);
+  return out;
 };
 
 // Şifre validasyonu
