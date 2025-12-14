@@ -26,34 +26,14 @@ export const Header = () => {
   }, []);
   
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 h-[60px]">
-      <div className="container-main h-full flex items-center justify-between relative">
-        {/* Sol: Logo */}
-        <div className="cursor-pointer flex items-center flex-shrink-0" onClick={() => navigate('/')}>
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
+      {/* Üst satır: Logo + sağ aksiyonlar (slogan asla kapanmaz) */}
+      <div className="container-main h-[60px] flex items-center justify-between">
+        {/* Sol: Logo + Slogan */}
+        <div className="cursor-pointer flex items-center flex-shrink-0 min-w-0" onClick={() => navigate('/')}>
           <AnimatedSlogan />
         </div>
 
-        {/* Orta: Polit At */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <button
-            onClick={() => window.open('/polit-at', '_blank', 'noopener,noreferrer')}
-            className="group h-[56px] min-w-[260px] sm:min-w-[340px] px-4 rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:from-blue-100 hover:to-white transition-colors shadow-sm active:scale-[0.99]"
-            title="Polit At"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-[15px] font-black text-primary-blue whitespace-nowrap">
-                Polit At!
-              </div>
-              <div className="flex items-center gap-1.5 text-primary-blue">
-                <Video className="w-9 h-9 transition-all group-hover:drop-shadow-[0_0_14px_rgba(0,159,214,0.95)]" strokeWidth={2.5} />
-                <ImageIcon className="w-9 h-9 transition-all group-hover:drop-shadow-[0_0_14px_rgba(0,159,214,0.95)]" strokeWidth={2.5} />
-                <Mic className="w-9 h-9 transition-all group-hover:drop-shadow-[0_0_14px_rgba(0,159,214,0.95)]" strokeWidth={2.5} />
-                <FileText className="w-9 h-9 transition-all group-hover:drop-shadow-[0_0_14px_rgba(0,159,214,0.95)]" strokeWidth={2.5} />
-              </div>
-            </div>
-          </button>
-        </div>
-        
         {/* Sağ: Aksiyonlar */}
         <div className="flex items-center gap-4 flex-shrink-0">
           {/* Arama */}
@@ -174,6 +154,35 @@ export const Header = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Alt satır: Polit At (ortada, sloganı kapatmaz) */}
+      <div className="container-main pb-2 flex justify-center">
+        <button
+          onClick={() => window.open('/polit-at', '_blank', 'noopener,noreferrer')}
+          className="group w-full max-w-[520px] h-[54px] rounded-2xl px-4 border border-blue-200 bg-gradient-to-r from-primary-blue via-[#00b4f0] to-primary-blue text-white shadow-md hover:shadow-lg transition-all active:scale-[0.99]"
+          title="Polit At"
+        >
+          <div className="h-full flex items-center justify-between gap-4">
+            <div className="text-[15px] font-black tracking-wide">
+              Polit At!
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-xl bg-white/15">
+                <Video className="w-7 h-7 transition-all hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.95)]" strokeWidth={2.5} />
+              </span>
+              <span className="p-1.5 rounded-xl bg-white/15">
+                <ImageIcon className="w-7 h-7 transition-all hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.95)]" strokeWidth={2.5} />
+              </span>
+              <span className="p-1.5 rounded-xl bg-white/15">
+                <Mic className="w-7 h-7 transition-all hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.95)]" strokeWidth={2.5} />
+              </span>
+              <span className="p-1.5 rounded-xl bg-white/15">
+                <FileText className="w-7 h-7 transition-all hover:drop-shadow-[0_0_14px_rgba(255,255,255,0.95)]" strokeWidth={2.5} />
+              </span>
+            </div>
+          </div>
+        </button>
       </div>
     </header>
   );
