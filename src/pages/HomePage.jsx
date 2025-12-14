@@ -136,7 +136,7 @@ export const HomePage = () => {
   const organizationPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_official'));
   const citizenPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_member' || p.user?.user_type === 'citizen'));
   const exPoliticianPosts = pickFixedMix([]); // DB'de henüz ex_politician yok
-  const mediaPosts = pickFixedMix([]); // DB'de henüz media yok
+            const mediaPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'media'));
   const featuredPosts = posts.length > 0 
     ? posts.filter(p => p.is_featured).sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0)).slice(0, 5) 
     : [];
