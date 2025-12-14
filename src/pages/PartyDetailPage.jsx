@@ -149,31 +149,9 @@ export const PartyDetailPage = () => {
 
     load();
   }, [partyId]);
-  
-  if (loading) {
-    return (
-      <div className="container-main py-8">
-        <div className="text-center">Yükleniyor...</div>
-      </div>
-    );
-  }
 
-  if (error || !party) {
-    return (
-      <div className="container-main py-8">
-        <div className="text-center text-gray-700">{error || 'Parti bulunamadı'}</div>
-      </div>
-    );
-  }
-  
-  const seatPercentage = ((party.parliament_seats / 600) * 100).toFixed(1);
-
-  // NOTE: Detailed official roles are not yet mapped in DB for this page.
-  const provincialChairs = [];
-  const districtChairs = [];
-  const metroMayors = [];
-  const districtMayors = [];
-
+  // IMPORTANT: Hooks must run on every render in same order.
+  // These memos must be ABOVE any early returns (loading/error) to avoid React hook-order crashes.
   const cityNameToCode = useMemo(() => {
     const normalizeCityName = (name) =>
       String(name || '')
@@ -225,6 +203,30 @@ export const PartyDetailPage = () => {
     });
     return entries;
   }, [partyMPs, cityNameToCode]);
+  
+  if (loading) {
+    return (
+      <div className="container-main py-8">
+        <div className="text-center">Yükleniyor...</div>
+      </div>
+    );
+  }
+
+  if (error || !party) {
+    return (
+      <div className="container-main py-8">
+        <div className="text-center text-gray-700">{error || 'Parti bulunamadı'}</div>
+      </div>
+    );
+  }
+  
+  const seatPercentage = ((party.parliament_seats / 600) * 100).toFixed(1);
+
+  // NOTE: Detailed official roles are not yet mapped in DB for this page.
+  const provincialChairs = [];
+  const districtChairs = [];
+  const metroMayors = [];
+  const districtMayors = [];
 
   const getProfilesForTab = () => {
     if (mainTab === 'mps') return partyMPs;
