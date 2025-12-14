@@ -6,12 +6,10 @@ import { AgendaBar } from '../components/home/AgendaBar';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { HorizontalScroll } from '../components/common/HorizontalScroll';
 import { MediaSidebar } from '../components/media/MediaSidebar';
-import { mockPosts, generateMockPosts, getCategoryPosts } from '../mock/posts';
-import { mockUsers } from '../mock/users';
 import { mockParties } from '../mock/parties';
 import { mockAgendas } from '../mock/agendas';
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
-import { filterConsecutiveTextAudio, filterGridTextAudio } from '../utils/postFilters';
+import { filterConsecutiveTextAudio } from '../utils/postFilters';
 import api from '../utils/api';
 import { supabase } from '../services/supabase';
 
@@ -26,17 +24,25 @@ export const HomePage = () => {
     // Load data from Supabase
     const loadData = async () => {
       try {
-        // Supabase'den verileri çek
-        const [partiesData, usersResponse] = await Promise.all([
+        // Partiler + kullanıcılar + postlar (tamamı DB)
+        const [partiesData, usersResponse, postsResponse] = await Promise.all([
           api.parties.getAll().catch((err) => { console.error('Parties error:', err); return []; }),
-          supabase.from('users').select('*').limit(2000)
+          supabase.from('users').select('id,username,full_name,avatar_url,user_type,party_id,province,is_verified,polit_score').eq('is_active', true).limit(2000),
+          supabase
+            .from('posts')
+            .select('id,user_id,party_id,content_type,content_text,content,media_urls,thumbnail_url,media_duration,category,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at,source_url, user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified, party:parties(id,slug,short_name,logo_url,color))')
+            .eq('is_deleted', false)
+            .order('created_at', { ascending: false })
+            .limit(500)
         ]);
 
         const usersData = usersResponse?.data || [];
+        const postsData = postsResponse?.data || [];
         
         console.log('=== SUPABASE DATA LOADED ===');
         console.log('Parties:', partiesData?.length || 0);
         console.log('Users from Supabase:', usersData?.length || 0);
+        console.log('Posts from Supabase:', postsData?.length || 0);
         
         if (usersData.length > 0) {
           console.log('✅ Sample user avatar:', usersData[0]?.avatar_url);
@@ -44,6 +50,9 @@ export const HomePage = () => {
         
         if (usersResponse?.error) {
           console.error('❌ Supabase users error:', usersResponse.error);
+        }
+        if (postsResponse?.error) {
+          console.error('❌ Supabase posts error:', postsResponse.error);
         }
 
         // Partileri ayarla
@@ -60,21 +69,54 @@ export const HomePage = () => {
           console.log('✅ Using real users from Supabase');
         }
 
-        // Mock posts oluştur - gerçek kullanıcılarla
-        const finalUsers = usersData.length > 0 ? usersData : mockUsers;
-        const finalParties = partiesData.length > 0 ? partiesData : mockParties;
-        const allPosts = generateMockPosts(400, finalUsers, finalParties);
-        setPosts(allPosts);
-        console.log('Generated mock posts with real users');
+        // Postları ayarla (tamamı DB)
+        const mapDbPostToUi = (p) => ({
+          post_id: p.id,
+          user_id: p.user_id,
+          content_type: p.content_type || 'text',
+          content_text: p.content_text ?? p.content ?? '',
+          media_url: p.media_urls ?? [],
+          thumbnail_url: p.thumbnail_url ?? null,
+          media_duration: p.media_duration ?? null,
+          agenda_tag: p.agenda_tag ?? null,
+          polit_score: p.polit_score ?? 0,
+          view_count: p.view_count ?? 0,
+          like_count: p.like_count ?? 0,
+          dislike_count: p.dislike_count ?? 0,
+          comment_count: p.comment_count ?? 0,
+          share_count: p.share_count ?? 0,
+          is_featured: p.is_featured ?? false,
+          created_at: p.created_at,
+          source_url: p.source_url,
+          category: p.category,
+          user: p.user
+            ? {
+                ...p.user,
+                user_id: p.user.id,
+                profile_image: p.user.avatar_url,
+                verification_badge: p.user.is_verified ?? false,
+                party_id: p.user.party_id,
+                party: p.user.party
+                  ? {
+                      party_id: p.user.party.id,
+                      party_slug: p.user.party.slug,
+                      party_short_name: p.user.party.short_name,
+                      party_logo: p.user.party.logo_url,
+                      party_color: p.user.party.color,
+                    }
+                  : null,
+              }
+            : null,
+        });
+
+        setPosts(postsData.map(mapDbPostToUi));
 
         // Agendas için şimdilik mock data kullan
         setAgendas(mockAgendas);
 
       } catch (error) {
         console.error('Error loading data:', error);
-        // Fallback to mock data
-        const allPosts = generateMockPosts(400, mockUsers, mockParties);
-        setPosts(allPosts);
+        setPosts([]);
         setParties(mockParties);
         setAgendas(mockAgendas);
       }
@@ -83,12 +125,41 @@ export const HomePage = () => {
     loadData();
   }, []);
   
-  // Kategorilere göre post filtreleme - her kategori için 10 örnek (3 video, 3 resim, 2 yazı, 2 ses)
-  const mpPosts = posts.length > 0 ? getCategoryPosts('mps', posts) : [];
-  const organizationPosts = posts.length > 0 ? getCategoryPosts('organization', posts) : [];
-  const citizenPosts = posts.length > 0 ? getCategoryPosts('citizens', posts) : [];
-  const exPoliticianPosts = posts.length > 0 ? getCategoryPosts('experience', posts) : [];
-  const mediaPosts = posts.length > 0 ? getCategoryPosts('media', posts) : [];
+  // Kategorilere göre post filtreleme (DB user_type ile)
+  const pickFixedMix = (list = []) => {
+    const desiredByType = { video: 3, image: 3, text: 2, audio: 2 };
+    const typeOrder = ['video', 'image', 'text', 'audio'];
+    const selected = [];
+    const used = new Set();
+
+    for (const t of typeOrder) {
+      const need = desiredByType[t] || 0;
+      if (!need) continue;
+      list
+        .filter((p) => (p.content_type || 'text') === t && !used.has(p.post_id))
+        .slice(0, need)
+        .forEach((p) => {
+          used.add(p.post_id);
+          selected.push(p);
+        });
+    }
+    if (selected.length < 10) {
+      list
+        .filter((p) => !used.has(p.post_id))
+        .slice(0, 10 - selected.length)
+        .forEach((p) => {
+          used.add(p.post_id);
+          selected.push(p);
+        });
+    }
+    return selected;
+  };
+
+  const mpPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'mp'));
+  const organizationPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_official'));
+  const citizenPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_member'));
+  const exPoliticianPosts = pickFixedMix([]); // DB'de henüz ex_politician yok
+  const mediaPosts = pickFixedMix([]); // DB'de henüz media yok
   const featuredPosts = posts.length > 0 
     ? posts.filter(p => p.is_featured).sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0)).slice(0, 5) 
     : [];
