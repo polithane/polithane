@@ -37,18 +37,18 @@ export const Header = () => {
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <button
             onClick={() => window.open('/polit-at', '_blank', 'noopener,noreferrer')}
-            className="group h-[44px] min-w-[220px] sm:min-w-[280px] px-4 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:from-blue-100 hover:to-white transition-colors shadow-sm active:scale-[0.99]"
+            className="group h-[56px] min-w-[260px] sm:min-w-[340px] px-4 rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:from-blue-100 hover:to-white transition-colors shadow-sm active:scale-[0.99]"
             title="Polit At"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[13px] font-black text-primary-blue whitespace-nowrap">
+              <div className="text-[15px] font-black text-primary-blue whitespace-nowrap">
                 Polit At!
               </div>
-              <div className="flex items-center gap-2 text-primary-blue">
-                <Video className="w-4 h-4 transition-all group-hover:drop-shadow-[0_0_10px_rgba(0,159,214,0.85)]" />
-                <ImageIcon className="w-4 h-4 transition-all group-hover:drop-shadow-[0_0_10px_rgba(0,159,214,0.85)]" />
-                <Mic className="w-4 h-4 transition-all group-hover:drop-shadow-[0_0_10px_rgba(0,159,214,0.85)]" />
-                <FileText className="w-4 h-4 transition-all group-hover:drop-shadow-[0_0_10px_rgba(0,159,214,0.85)]" />
+              <div className="flex items-center gap-1.5 text-primary-blue">
+                <Video className="w-9 h-9 transition-all group-hover:drop-shadow-[0_0_14px_rgba(0,159,214,0.95)]" strokeWidth={2.5} />
+                <ImageIcon className="w-9 h-9 transition-all group-hover:drop-shadow-[0_0_14px_rgba(0,159,214,0.95)]" strokeWidth={2.5} />
+                <Mic className="w-9 h-9 transition-all group-hover:drop-shadow-[0_0_14px_rgba(0,159,214,0.95)]" strokeWidth={2.5} />
+                <FileText className="w-9 h-9 transition-all group-hover:drop-shadow-[0_0_14px_rgba(0,159,214,0.95)]" strokeWidth={2.5} />
               </div>
             </div>
           </button>
