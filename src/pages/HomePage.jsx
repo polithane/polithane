@@ -7,6 +7,7 @@ import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { HorizontalScroll } from '../components/common/HorizontalScroll';
 import { MediaSidebar } from '../components/media/MediaSidebar';
 import { mockPosts, generateMockPosts, getCategoryPosts } from '../mock/posts';
+import { mockUsers } from '../mock/users';
 import { mockParties } from '../mock/parties';
 import { mockAgendas } from '../mock/agendas';
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
