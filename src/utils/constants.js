@@ -44,6 +44,12 @@ export const ALLOWED_FILE_TYPES = {
   DOCUMENT: ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
 };
 
+// Feature flags (erken dönem akışları)
+// Not: Yeterli üye sayısına ulaşıldığında ENABLE_PROFILE_CLAIM_FLOW false yapılacak.
+export const FEATURE_FLAGS = {
+  ENABLE_PROFILE_CLAIM_FLOW: true,
+};
+
 // API endpoints
 export const API_ENDPOINTS = {
   AUTH: {

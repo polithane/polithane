@@ -5,6 +5,7 @@ import {
   User, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, 
   Phone, Upload, X, Search, UserPlus, Shield, FileText, Clock
 } from 'lucide-react';
+import { FEATURE_FLAGS } from '../../utils/constants';
 
 export const RegisterPageNew = () => {
   const navigate = useNavigate();
@@ -286,24 +287,26 @@ export const RegisterPageNew = () => {
                 </button>
 
                 {/* Profil Sahipliğini Al */}
-                <button
-                  onClick={() => {
-                    setRegistrationType('claim');
-                    setStep(2);
-                  }}
-                  className="group p-8 border-2 border-gray-200 rounded-2xl hover:border-primary-blue hover:bg-blue-50 transition-all text-left"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Shield className="w-8 h-8 text-purple-600" />
+                {FEATURE_FLAGS.ENABLE_PROFILE_CLAIM_FLOW && (
+                  <button
+                    onClick={() => {
+                      setRegistrationType('claim');
+                      setStep(2);
+                    }}
+                    className="group p-8 border-2 border-gray-200 rounded-2xl hover:border-primary-blue hover:bg-blue-50 transition-all text-left"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Shield className="w-8 h-8 text-purple-600" />
+                      </div>
+                      <span className="text-4xl">🔑</span>
                     </div>
-                    <span className="text-4xl">🔑</span>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Profil Sahipliğini Al</h3>
-                  <p className="text-gray-600 text-sm">
-                    Sizin için otomatik oluşturulmuş bir profil var mı? Profilinizi bulun ve sahipliğini alın.
-                  </p>
-                </button>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Profil Sahipliğini Al</h3>
+                    <p className="text-gray-600 text-sm">
+                      Sizin adınıza otomatik oluşturulmuş bir profil var mı? Profilinizi bulun ve sahipliğini alın.
+                    </p>
+                  </button>
+                )}
               </div>
 
               {/* Geri dön linki */}

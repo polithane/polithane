@@ -10,6 +10,7 @@ export const mockPosts = [
     user_id: 1,
     content_type: 'text',
     content_text: 'Ekonomi konusunda yeni açıklamalarımızı yarın yapacağız. Halkımızın refahı için çalışmaya devam ediyoruz. Şeffaflık ve hesap verebilirlik ilkelerimizden taviz vermeden ilerliyoruz.',
+    source_url: 'https://www.sozcu.com.tr/',
     agenda_tag: 'Ekonomi paketi görüşmeleri',
     polit_score: 15420,
     view_count: 125000,
@@ -27,6 +28,7 @@ export const mockPosts = [
     media_url: getPostMediaPath('video', 2, false),
     thumbnail_url: getPostMediaPath('video', 2, true),
     media_duration: 180,
+    source_url: 'https://twitter.com/RTErdogan',
     agenda_tag: 'Gençlik istihdam programları',
     polit_score: 42300,
     view_count: 850000,
@@ -45,6 +47,7 @@ export const mockPosts = [
       'https://picsum.photos/800/600?random=301',
       'https://picsum.photos/800/600?random=302'
     ],
+    source_url: 'https://www.cumhuriyet.com.tr/',
     agenda_tag: 'Belediyelere yapılan operasyonlar',
     polit_score: 3200,
     view_count: 15000,

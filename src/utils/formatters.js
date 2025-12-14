@@ -114,6 +114,22 @@ export const formatFileSize = (bytes) => {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 };
 
+// Kaynak URL'den domain çıkarma (ör: https://www.ornek.com/path -> ornek.com)
+export const getSourceDomain = (url) => {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    return (u.hostname || '').replace(/^www\./, '');
+  } catch {
+    // Geçerli URL değilse basit temizleme dene
+    return url
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split('/')[0]
+      .trim();
+  }
+};
+
 // Kısa zaman formatı
 export const formatTimeShort = (date) => {
   if (!date) return '';

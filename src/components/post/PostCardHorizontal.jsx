@@ -4,7 +4,7 @@ import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
 import { Tooltip } from '../common/Tooltip';
-import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration } from '../../utils/formatters';
+import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration, getSourceDomain } from '../../utils/formatters';
 import { getUserTitle } from '../../utils/titleHelpers';
 import { getPlaceholderImage } from '../../utils/imagePaths';
 import { useNavigate, Link } from 'react-router-dom';
@@ -412,6 +412,16 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
           <Share2 className="w-3 h-3" />
         </button>
       </div>
+
+      {/* Kaynak / Otomatik paylaşım şeffaflık satırı */}
+      {post.source_url && (
+        <div
+          className="mt-2 text-[10px] text-gray-500 leading-snug"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Bu paylaşım <span className="font-semibold">{getSourceDomain(post.source_url)}</span> adresinden alınmış olup otomatik olarak paylaşılmıştır.
+        </div>
+      )}
       
       {/* Polit Puan Detay Modalı */}
       {showScoreModal && (
