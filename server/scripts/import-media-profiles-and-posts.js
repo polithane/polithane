@@ -23,8 +23,9 @@ const { Pool } = pg;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://eldoyqgzxgubkyohvquq.supabase.co';
 const AVATARS_PUBLIC_BASE = `${SUPABASE_URL}/storage/v1/object/public/avatars`;
-// NOTE: user created folder as "medya" under avatars bucket.
-const MEDIA_FOLDER = 'medya';
+// NOTE: Bucket structure: avatars/media/*
+const MEDIA_FOLDER = 'media';
+const DEFAULT_AVATAR_URL = `${AVATARS_PUBLIC_BASE}/default/ikon.png`;
 
 const turkishMap = {
   ç: 'c',
@@ -178,7 +179,8 @@ const MEDIA = [
     bio: '1970 Ankara doğumlu. Belgesel, haber ve YouTube yayıncılığıyla bilinir.',
     newspapers: 'Radikal',
     tvRadio: 'CNN Türk',
-    imageFile: 'g8oXtmV0_400x400.jpg',
+    // Storage filename differs from source list
+    imageFile: 'q8oXtmV0_400x400.jpg',
   },
   {
     fullName: 'Yılmaz Özdil',
@@ -234,7 +236,8 @@ const MEDIA = [
     bio: '1977 İstanbul doğumlu. Siyasi yorumları ve tartışma programlarıyla bilinir.',
     newspapers: 'Sabah, Milliyet',
     tvRadio: 'Habertürk TV',
-    imageFile: 'G0RoGX2XoAA_D2.jpg',
+    // Storage filename differs from source list
+    imageFile: 'G0RoGX2XoAAa_D2.jpg',
   },
   {
     fullName: 'Can Ataklı',
@@ -242,7 +245,8 @@ const MEDIA = [
     bio: '1956 İstanbul doğumlu. Uzun yıllar yazılı basında çalıştı; dijital yayında aktiftir.',
     newspapers: 'Hürriyet, Sabah',
     tvRadio: 'Flash TV',
-    imageFile: 'can-atakli-med.acat-aralik-2013-sayisi-soylesi-0.jpg',
+    // Storage filename differs from source list
+    imageFile: 'can-atakli-mediacat-aralik-2013-sayisi-soylesi-0.jpg',
   },
   {
     fullName: 'Barış Pehlivan',
@@ -250,7 +254,8 @@ const MEDIA = [
     bio: '1983 İstanbul doğumlu. Derin siyasi olaylar ve kitaplarıyla bilinir.',
     newspapers: 'Cumhuriyet',
     tvRadio: 'Halk TV',
-    imageFile: 'Baris_Pehlivan_01.jpg',
+    // NOTE: file is currently missing in avatars/media. Will fallback to default avatar.
+    imageFile: null,
   },
   {
     fullName: 'Barış Terkoğlu',
@@ -314,7 +319,9 @@ async function upsertUser(pool, row) {
   }
 
   const email = `${username}@polithane.media`;
-  const avatarUrl = `${AVATARS_PUBLIC_BASE}/${MEDIA_FOLDER}/${row.imageFile}`;
+  const avatarUrl = row.imageFile
+    ? `${AVATARS_PUBLIC_BASE}/${MEDIA_FOLDER}/${row.imageFile}`
+    : DEFAULT_AVATAR_URL;
   const bio = buildBio(row);
 
   // Try: match by full_name (case-insensitive) first

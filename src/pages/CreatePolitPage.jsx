@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Video, Image as ImageIcon, Mic, FileText, Camera, Square, Circle, Trash2 } from 'lucide-react';
+import { Camera, Square, Circle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { posts as postsApi } from '../utils/api';
 
+const IKON_BASE = 'https://eldoyqgzxgubkyohvquq.supabase.co/storage/v1/object/public/ikons';
+
 const CONTENT_TABS = [
-  { key: 'video', icon: Video },
-  { key: 'image', icon: ImageIcon },
-  { key: 'audio', icon: Mic },
-  { key: 'text', icon: FileText },
+  { key: 'video', iconSrc: `${IKON_BASE}/videoikon.png`, alt: 'Video' },
+  { key: 'image', iconSrc: `${IKON_BASE}/resimikon.png`, alt: 'Resim' },
+  { key: 'audio', iconSrc: `${IKON_BASE}/sesikon.png`, alt: 'Ses' },
+  { key: 'text', iconSrc: `${IKON_BASE}/yaziikon.png`, alt: 'Yazı' },
 ];
 
 export const CreatePolitPage = () => {
@@ -197,7 +199,6 @@ export const CreatePolitPage = () => {
             {/* Content type tabs */}
             <div className="grid grid-cols-4 gap-2 mb-4">
               {CONTENT_TABS.map((t) => {
-                const Icon = t.icon;
                 const active = t.key === contentType;
                 return (
                   <button
@@ -214,7 +215,16 @@ export const CreatePolitPage = () => {
                     }
                   >
                     <div className="flex items-center justify-center">
-                      <Icon className="w-5 h-5" />
+                      <img
+                        src={t.iconSrc}
+                        alt={t.alt}
+                        className="w-6 h-6 object-contain"
+                        loading="lazy"
+                        onError={(e) => {
+                          // Hide broken icon (keeps tab functional)
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                     </div>
                   </button>
                 );
