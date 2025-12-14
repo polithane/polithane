@@ -36,19 +36,19 @@ export const Header = () => {
         {/* Orta: Polit At */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <button
-            onClick={() => navigate('/polit-at')}
-            className="h-[44px] px-4 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:from-blue-100 hover:to-white transition-colors shadow-sm active:scale-[0.99]"
+            onClick={() => window.open('/polit-at', '_blank', 'noopener,noreferrer')}
+            className="group h-[44px] min-w-[220px] sm:min-w-[280px] px-4 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:from-blue-100 hover:to-white transition-colors shadow-sm active:scale-[0.99]"
             title="Polit At"
           >
-            <div className="flex flex-col items-center leading-none">
-              <div className="flex items-center gap-1 text-primary-blue">
-                <Video className="w-3.5 h-3.5" />
-                <ImageIcon className="w-3.5 h-3.5" />
-                <Mic className="w-3.5 h-3.5" />
-                <FileText className="w-3.5 h-3.5" />
-              </div>
-              <div className="mt-1 text-[12px] font-black text-primary-blue">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[13px] font-black text-primary-blue whitespace-nowrap">
                 Polit At!
+              </div>
+              <div className="flex items-center gap-2 text-primary-blue">
+                <Video className="w-4 h-4 transition-all group-hover:drop-shadow-[0_0_10px_rgba(0,159,214,0.85)]" />
+                <ImageIcon className="w-4 h-4 transition-all group-hover:drop-shadow-[0_0_10px_rgba(0,159,214,0.85)]" />
+                <Mic className="w-4 h-4 transition-all group-hover:drop-shadow-[0_0_10px_rgba(0,159,214,0.85)]" />
+                <FileText className="w-4 h-4 transition-all group-hover:drop-shadow-[0_0_10px_rgba(0,159,214,0.85)]" />
               </div>
             </div>
           </button>
