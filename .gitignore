@@ -8,7 +8,11 @@ server/node_modules
 .env.development.local
 .env.test.local
 .env.production.local
+# Backend env files (never commit real secrets)
 server/.env
+server/.env*
+!server/.env.example
+!server/.env.production.example
 
 # Build outputs
 dist
