@@ -229,7 +229,7 @@ export const HomePage = () => {
                 <section className="min-w-0 rounded-lg p-2" style={{ backgroundColor: activeTab.color }}>
                   <div className="flex items-center justify-between mb-4 px-2">
                     <h2 className="text-xl font-bold text-gray-900">
-                      {activeTab.id === 'all' ? 'TÜM İÇERİKLER' : `${activeTab.name.toUpperCase()} KONUŞUYOR`}
+                      {activeTab.id === 'all' ? 'TÜM İÇERİKLER' : `${activeTab.name.toUpperCase()} GÜNDEMİ`}
                     </h2>
                   </div>
                   {/* Tek Kolon Layout - Dikey Scroll (X/Twitter gibi) */}
@@ -279,10 +279,10 @@ export const HomePage = () => {
                 </HorizontalScroll>
               </section>
               
-              {/* VEKİLLER KONUŞUYOR */}
+              {/* VEKİLLER GÜNDEMİ */}
               <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(0, 159, 214, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">VEKİLLER KONUŞUYOR</h2>
+                <h2 className="text-xl font-bold text-gray-900">VEKİLLER GÜNDEMİ</h2>
                 <a href="/category/mps" className="text-primary-blue hover:underline text-sm">
                   Tümünü Gör
                 </a>
@@ -303,10 +303,10 @@ export const HomePage = () => {
               </HorizontalScroll>
             </section>
             
-            {/* TEŞKİLAT KONUŞUYOR */}
+            {/* TEŞKİLAT GÜNDEMİ */}
             <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(135, 180, 51, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">TEŞKİLAT KONUŞUYOR</h2>
+                <h2 className="text-xl font-bold text-gray-900">TEŞKİLAT GÜNDEMİ</h2>
                 <a href="/category/organization" className="text-primary-blue hover:underline text-sm">
                   Tümünü Gör
                 </a>
@@ -326,10 +326,10 @@ export const HomePage = () => {
               </HorizontalScroll>
             </section>
             
-            {/* VATANDAŞ KONUŞUYOR */}
+            {/* VATANDAŞ GÜNDEMİ */}
             <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(229, 229, 229, 0.5)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">VATANDAŞ KONUŞUYOR</h2>
+                <h2 className="text-xl font-bold text-gray-900">VATANDAŞ GÜNDEMİ</h2>
                 <a href="/category/citizens" className="text-primary-blue hover:underline text-sm">
                   Tümünü Gör
                 </a>
@@ -348,10 +348,10 @@ export const HomePage = () => {
               </HorizontalScroll>
             </section>
             
-            {/* DENEYİM KONUŞUYOR */}
+            {/* DENEYİM GÜNDEMİ */}
             <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(212, 160, 23, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">DENEYİM KONUŞUYOR</h2>
+                <h2 className="text-xl font-bold text-gray-900">DENEYİM GÜNDEMİ</h2>
                 <a href="/category/experience" className="text-primary-blue hover:underline text-sm">
                   Tümünü Gör
                 </a>
@@ -375,7 +375,7 @@ export const HomePage = () => {
           {/* Sağ Medya Sidebar */}
           <aside className="hidden lg:block lg:mr-0 min-w-0">
             <div className="sticky top-20 bg-slate-800/80 backdrop-blur-sm rounded-lg p-4 shadow-lg">
-              <h2 className="text-sm font-bold text-white mb-4 whitespace-nowrap">MEDYA KONUŞUYOR</h2>
+              <h2 className="text-sm font-bold text-white mb-4 whitespace-nowrap">MEDYA GÜNDEMİ</h2>
               <div className="-mx-4 -mb-4 px-4 pb-4">
                 <MediaSidebar posts={posts} />
               </div>
