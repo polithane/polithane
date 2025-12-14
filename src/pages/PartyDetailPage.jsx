@@ -221,6 +221,9 @@ export const PartyDetailPage = () => {
   }
   
   const seatPercentage = ((party.parliament_seats / 600) * 100).toFixed(1);
+  const computedMpCount = partyMPs.length;
+  const computedOrgCount = partyOfficials.length;
+  const computedMemberCount = partyMembers.length;
 
   // NOTE: Detailed official roles are not yet mapped in DB for this page.
   const provincialChairs = [];
@@ -302,15 +305,15 @@ export const PartyDetailPage = () => {
             <div className="text-xs text-gray-400 mt-1">{seatPercentage}%</div>
           </div>
           <div className="card text-center">
-            <div className="text-3xl font-bold">{party.mp_count}</div>
+            <div className="text-3xl font-bold">{computedMpCount}</div>
             <div className="text-sm text-gray-500 mt-1">Milletvekili</div>
           </div>
           <div className="card text-center">
-            <div className="text-3xl font-bold">{party.organization_count}</div>
+            <div className="text-3xl font-bold">{computedOrgCount}</div>
             <div className="text-sm text-gray-500 mt-1">Teşkilat Görevlisi</div>
           </div>
           <div className="card text-center">
-            <div className="text-3xl font-bold">{formatNumber(party.member_count)}</div>
+            <div className="text-3xl font-bold">{formatNumber(computedMemberCount)}</div>
             <div className="text-sm text-gray-500 mt-1">Üye</div>
           </div>
         </div>
