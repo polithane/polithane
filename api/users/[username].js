@@ -25,7 +25,22 @@ export default async function handler(req, res) {
     const params = new URLSearchParams();
     params.set(
       'select',
-      'id,username,full_name,avatar_url,bio,user_type,party_id,province,is_verified,polit_score,follower_count,following_count,post_count'
+      [
+        'id',
+        'username',
+        'full_name',
+        'avatar_url',
+        'bio',
+        'user_type',
+        'party_id',
+        'province',
+        'is_verified',
+        'polit_score',
+        'follower_count',
+        'following_count',
+        'post_count',
+        'party:parties(id,slug,short_name,logo_url,color)',
+      ].join(',')
     );
     params.set('username', `eq.${username}`);
     params.set('limit', '1');

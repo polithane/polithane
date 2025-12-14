@@ -7,16 +7,13 @@ import { Button } from '../components/common/Button';
 import { FollowButton } from '../components/common/FollowButton';
 import { FollowListModal } from '../components/common/FollowListModal';
 import { BlockUserModal } from '../components/common/BlockUserModal';
-import { PostCard } from '../components/post/PostCard';
+import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { formatNumber, formatPolitScore } from '../utils/formatters';
 import { getUserTitle } from '../utils/titleHelpers';
-import { mockUsers } from '../mock/users';
-import { mockPosts } from '../mock/posts';
 import { getFollowStats, mockBlockedUsers } from '../mock/follows';
 import { useAuth } from '../contexts/AuthContext';
-import { users } from '../utils/api';
+import { users, posts } from '../utils/api';
 import { FEATURE_FLAGS } from '../utils/constants';
-import { supabase } from '../services/supabase';
 import { normalizeUsername } from '../utils/validators';
 import { getProfilePath } from '../utils/paths';
 
@@ -100,70 +97,30 @@ export const ProfilePage = () => {
         
         // /@username route'u kullanılmışsa
         if (username) {
-          const requested = normalizeUsername(username);
           try {
-            const response = await users.getByUsername(username);
-            if (response.success) {
-              profileData = response.data;
-            }
-          } catch {
-            // ignore, fallback to supabase below
+            profileData = await users.getByUsername(username);
+          } catch (e) {
+            console.error('User fetch by username failed:', e);
           }
 
           if (!profileData) {
-            // 1) önce direkt match dene (db'de zaten normalize olabilir)
-            const direct = await supabase
-              .from('users')
-              .select('*, party:parties(id, slug, short_name, logo_url, color)')
-              .eq('username', requested)
-              .limit(1)
-              .maybeSingle();
-            if (!direct.error && direct.data) {
-              profileData = direct.data;
-            } else {
-              // 2) DB'de Türkçe username kalmış olabilir: 2000 kullanıcı içinde normalize ederek eşle
-              const list = await supabase
-                .from('users')
-                .select('id,username')
-                .limit(2000);
-              const match = (list.data || []).find((u) => normalizeUsername(u.username || '') === requested);
-              if (match?.id) {
-                const byId = await supabase
-                  .from('users')
-                  .select('*, party:parties(id, slug, short_name, logo_url, color)')
-                  .eq('id', match.id)
-                  .limit(1)
-                  .maybeSingle();
-                if (!byId.error && byId.data) profileData = byId.data;
-              }
-            }
-            if (!profileData) {
-              setError('Kullanıcı bulunamadı');
-              setLoading(false);
-              return;
-            }
+            setError('Kullanıcı bulunamadı');
+            setLoading(false);
+            return;
           }
         } 
         // /profile/:userId route'u kullanılmışsa
         else if (userId) {
-          const { data, error: sbErr } = await supabase
-            .from('users')
-            .select('*, party:parties(id, slug, short_name, logo_url, color)')
-            .eq('id', userId)
-            .limit(1)
-            .maybeSingle();
-          if (!sbErr && data) profileData = data;
+          try {
+            profileData = await users.getById(userId);
+          } catch (e) {
+            console.error('User fetch by id failed:', e);
+          }
 
-          // Fallback to mock if still missing
           if (!profileData) {
-            const foundUser = mockUsers.find((u) => String(u.user_id) === String(userId));
-            if (foundUser) {
-              profileData = foundUser;
-            } else {
-              setError('Kullanıcı bulunamadı');
-              setLoading(false);
-              return;
-            }
+            setError('Kullanıcı bulunamadı');
+            setLoading(false);
+            return;
           }
         }
         
@@ -177,25 +134,17 @@ export const ProfilePage = () => {
           navigate(canonicalPath, { replace: true });
         }
         
-        // Posts: Önce DB'den dene, yoksa mock fallback
+        // Posts: DB'den çek
         const profileDbId = profileData.id ?? profileData.user_id;
         if (profileDbId) {
-          const { data: dbPosts } = await supabase
-            .from('posts')
-            .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, source_url, user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified), party:parties(id,slug,short_name,logo_url,color)')
-            .eq('user_id', profileDbId)
-            .eq('is_deleted', false)
-            .order('polit_score', { ascending: false })
-            .limit(50);
-          if (dbPosts && dbPosts.length > 0) {
-            setUserPosts(dbPosts.map(mapDbPostToUi).filter(Boolean));
-          } else {
-            const posts = mockPosts.filter((p) => String(p.user_id) === String(profileDbId));
-            setUserPosts(posts);
-          }
+          const dbPosts = await posts.getAll({
+            user_id: profileDbId,
+            limit: 50,
+            order: 'polit_score.desc',
+          });
+          setUserPosts((dbPosts || []).map(mapDbPostToUi).filter(Boolean));
         } else {
-          const posts = mockPosts.filter((p) => String(p.user_id) === String(userId));
-          setUserPosts(posts);
+          setUserPosts([]);
         }
         
         const stats = getFollowStats(profileData.id || userId);
@@ -467,9 +416,9 @@ export const ProfilePage = () => {
         
         {/* Tab İçerikleri */}
         {activeTab === 'posts' && (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {userPosts.map(post => (
-              <PostCard key={post.post_id} post={post} />
+              <PostCardHorizontal key={post.post_id} post={post} fullWidth={true} />
             ))}
           </div>
         )}

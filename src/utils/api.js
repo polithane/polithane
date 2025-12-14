@@ -196,6 +196,7 @@ export const posts = {
 // ============================================
 export const users = {
   getByUsername: (username) => apiCall(`/api/users/${username}`),
+  getById: (id) => apiCall(`/api/users?id=${encodeURIComponent(id)}`),
 
   updateProfile: (formData) =>
     apiCall('/api/users/profile', {

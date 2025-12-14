@@ -1,9 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase Configuration - Public credentials (anon key is safe to expose)
-const supabaseUrl = 'https://eldoyqgzxgubkyohvquq.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsZG95cWdnenhndWJreW9odnF1cSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzM0MTA0NzU1LCJleHAiOjIwNDk2ODA3NTV9.0tYXqKxXs3FLZPcIlQCUo_cQh9Dv0R5OiL7zqRQd4wA';
+// Supabase Configuration
+// IMPORTANT:
+// - Never hardcode keys in the repo.
+// - On Vercel, set:
+//   - VITE_SUPABASE_URL
+//   - VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  // Keep the app running (some pages use /api/* and won't need the client),
+  // but warn loudly for pages that still rely on Supabase JS directly.
+  console.warn(
+    'Supabase env missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the environment.'
+  );
+}
 
-console.log('✅ Supabase client initialized:', supabaseUrl);
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
