@@ -197,7 +197,7 @@ export const CreatePolitPage = () => {
             </div>
 
             {/* Content type tabs */}
-            <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="flex items-center justify-center gap-6 mb-4">
               {CONTENT_TABS.map((t) => {
                 const active = t.key === contentType;
                 return (
@@ -208,24 +208,19 @@ export const CreatePolitPage = () => {
                       setContentType(t.key);
                       resetMedia();
                     }}
-                    className={
-                      active
-                        ? 'px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-primary-blue'
-                        : 'px-3 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-                    }
+                    className="p-0 bg-transparent border-0 outline-none"
+                    title={t.alt}
                   >
-                    <div className="flex items-center justify-center">
-                      <img
-                        src={t.iconSrc}
-                        alt={t.alt}
-                        className="w-6 h-6 object-contain"
-                        loading="lazy"
-                        onError={(e) => {
-                          // Hide broken icon (keeps tab functional)
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
+                    <img
+                      src={t.iconSrc}
+                      alt={t.alt}
+                      className={`object-contain transition-transform ${active ? 'scale-110' : 'opacity-80 hover:opacity-100'}`}
+                      style={{ width: 32, height: 32 }}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                   </button>
                 );
               })}

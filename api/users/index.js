@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { limit = 50, offset = 0, party_id, search, id, province, is_active } = req.query;
+      const { limit = 50, offset = 0, party_id, search, id, province, is_active, user_type, order } = req.query;
       
       // Supabase REST API kullan
       const supabaseUrl = process.env.SUPABASE_URL;
@@ -48,13 +48,25 @@ export default async function handler(req, res) {
         params.set('id', `eq.${id}`);
         params.set('limit', '1');
       } else {
-        params.set('order', 'polit_score.desc');
+        // default ordering
+        const ord = String(order || 'polit_score.desc');
+        const [orderCol, orderDir] = ord.split('.');
+        params.set('order', `${orderCol || 'polit_score'}.${orderDir === 'asc' ? 'asc' : 'desc'}`);
         params.set('limit', String(limit));
         params.set('offset', String(offset));
       }
       if (party_id) params.set('party_id', `eq.${party_id}`);
       if (province) params.set('province', `eq.${province}`);
       if (is_active !== undefined) params.set('is_active', `eq.${String(is_active) === 'true' ? 'true' : 'false'}`);
+      if (user_type) {
+        const raw = String(user_type);
+        const list = raw
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (list.length === 1) params.set('user_type', `eq.${list[0]}`);
+        else params.set('user_type', `in.(${list.join(',')})`);
+      }
       if (search) {
         // PostgREST or filter
         params.set('or', `(username.ilike.*${search}*,full_name.ilike.*${search}*)`);

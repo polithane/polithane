@@ -16,7 +16,7 @@ export const PartyDetailPage = () => {
   const { partyId } = useParams();
   const navigate = useNavigate();
   const [party, setParty] = useState(null);
-  const [mainTab, setMainTab] = useState('distribution'); // distribution | mps | org | members | provincial | district | metro_mayor | district_mayor
+  const [mainTab, setMainTab] = useState('mps'); // mps | org | members | provincial | district | metro_mayor | district_mayor
   const [subTab, setSubTab] = useState('profiles'); // profiles | posts
   const [postSortMode, setPostSortMode] = useState('polit'); // polit | daily
   const [partyMPs, setPartyMPs] = useState([]);
@@ -106,24 +106,33 @@ export const PartyDetailPage = () => {
         setParty(partyObj);
 
         // Users in party (DB)
-        const dbUsers = await apiCall(`/api/users?party_id=${partyObj.party_id}&limit=2000`).catch(() => []);
+        // IMPORTANT: /api/users has an implicit 1000-row cap for large parties; fetch by type.
+        const [dbMps, dbOfficials, dbMembers] = await Promise.all([
+          apiCall(`/api/users?party_id=${partyObj.party_id}&user_type=mp&limit=2000&order=full_name.asc`).catch(() => []),
+          apiCall(`/api/users?party_id=${partyObj.party_id}&user_type=party_official&limit=2000&order=polit_score.desc`).catch(() => []),
+          apiCall(`/api/users?party_id=${partyObj.party_id}&user_type=party_member&limit=2000&order=polit_score.desc`).catch(() => []),
+        ]);
 
-        const usersList =
-          dbUsers && dbUsers.length > 0
-            ? dbUsers.map((u) => normalizeUser(u, partyObj))
-            : mockUsers.filter((u) => String(u.party_id) === String(partyId));
+        const mps =
+          dbMps && dbMps.length > 0
+            ? dbMps.map((u) => normalizeUser(u, partyObj))
+            : mockUsers
+                .filter((u) => String(u.party_id) === String(partyId) && u.user_type === 'mp')
+                .map((u) => normalizeUser(u, partyObj));
 
-        const mps = usersList
-          .filter((u) => u.user_type === 'mp')
-          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+        const officials =
+          dbOfficials && dbOfficials.length > 0
+            ? dbOfficials.map((u) => normalizeUser(u, partyObj))
+            : mockUsers
+                .filter((u) => String(u.party_id) === String(partyId) && u.user_type === 'party_official')
+                .map((u) => normalizeUser(u, partyObj));
 
-        const officials = usersList
-          .filter((u) => u.user_type === 'party_official')
-          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-
-        const members = usersList
-          .filter((u) => u.user_type === 'party_member')
-          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+        const members =
+          dbMembers && dbMembers.length > 0
+            ? dbMembers.map((u) => normalizeUser(u, partyObj))
+            : mockUsers
+                .filter((u) => String(u.party_id) === String(partyId) && u.user_type === 'party_member')
+                .map((u) => normalizeUser(u, partyObj));
 
         setPartyMPs(mps);
         setPartyOfficials(officials);
@@ -321,7 +330,6 @@ export const PartyDetailPage = () => {
         {/* ÜST SEKMELER */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide border-b mb-4">
           {[
-            { id: 'distribution', label: 'Meclis Dağılımı' },
             { id: 'mps', label: `Milletvekili (${partyMPs.length})` },
             { id: 'org', label: `Teşkilat Görevlisi (${partyOfficials.length})` },
             { id: 'members', label: `Üye (${partyMembers.length})` },
@@ -334,7 +342,7 @@ export const PartyDetailPage = () => {
               key={t.id}
               onClick={() => {
                 setMainTab(t.id);
-                if (t.id !== 'distribution') setSubTab('profiles');
+                setSubTab('profiles');
               }}
               className={`flex-shrink-0 px-4 py-2 rounded-full font-semibold text-sm transition-all ${
                 mainTab === t.id ? 'bg-primary-blue text-white' : 'bg-white border border-gray-300 text-gray-700'
@@ -346,7 +354,7 @@ export const PartyDetailPage = () => {
         </div>
 
         {/* ALT SEKMELER (sadece listelerde) */}
-        {mainTab !== 'distribution' && (
+        {(
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => setSubTab('profiles')}
@@ -368,7 +376,7 @@ export const PartyDetailPage = () => {
         )}
         
         {/* Tab İçerikleri */}
-        {mainTab === 'distribution' && (
+        {false && (
           <div className="space-y-4">
             <div className="card">
               <h3 className="text-lg font-black text-gray-900 mb-2">Meclis Dağılımı</h3>
