@@ -36,6 +36,8 @@ lerna-debug.log*
 
 # OS
 Thumbs.db
+core
+core.*
 
 # Uploads
 public/uploads/*
