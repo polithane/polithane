@@ -11,7 +11,7 @@ import { generateMockPosts } from '../mock/posts';
 import { CITY_CODES } from '../utils/constants';
 import { getUserTitle } from '../utils/titleHelpers';
 import { formatPolitScore } from '../utils/formatters';
-import { supabase } from '../services/supabase';
+import { apiCall } from '../utils/api';
 
 export const CityDetailPage = () => {
   const { cityCode } = useParams();
@@ -71,12 +71,7 @@ export const CityDetailPage = () => {
       };
 
       // Users in city (DB)
-      const { data: dbUsers } = await supabase
-        .from('users')
-        .select('id,username,full_name,avatar_url,city_code,user_type,politician_type,party_id,is_verified,polit_score, party:parties(id,short_name,logo_url,color)')
-        .eq('city_code', cityCode)
-        .eq('is_active', true)
-        .limit(2000);
+      const dbUsers = await apiCall(`/api/users?city_code=${encodeURIComponent(cityCode)}&is_active=true&limit=2000`).catch(() => []);
 
       const cityUsers = (dbUsers && dbUsers.length > 0)
         ? dbUsers.map(normalizeUser).filter(Boolean)
@@ -94,16 +89,10 @@ export const CityDetailPage = () => {
       const userIds = cityUsers.map(u => u.user_id).filter(Boolean).slice(0, 2000);
       let cityPosts = [];
       if (userIds.length > 0) {
-        const { data: dbPosts } = await supabase
-          .from('posts')
-          .select('id,user_id,content_type,content_text,media_urls,thumbnail_url,media_duration,agenda_tag,polit_score,view_count,like_count,dislike_count,comment_count,share_count,is_featured,created_at, user:users(id,username,full_name,avatar_url,city_code,user_type,politician_type,party_id,is_verified, party:parties(id,short_name,logo_url,color))')
-          .in('user_id', userIds)
-          .eq('is_deleted', false)
-          .order('polit_score', { ascending: false })
-          .limit(20);
-        if (dbPosts && dbPosts.length > 0) {
-          cityPosts = dbPosts.map(mapDbPostToUi).filter(Boolean);
-        }
+        const dbPosts = await apiCall(
+          `/api/posts?user_ids=${encodeURIComponent(userIds.join(','))}&limit=20&order=polit_score.desc`
+        ).catch(() => []);
+        if (dbPosts && dbPosts.length > 0) cityPosts = dbPosts.map(mapDbPostToUi).filter(Boolean);
       }
       if (cityPosts.length === 0) {
         const all = generateMockPosts(200, cityUsers, mockParties);

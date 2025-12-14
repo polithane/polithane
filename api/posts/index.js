@@ -26,6 +26,7 @@ export default async function handler(req, res) {
       offset = '0',
       party_id,
       user_id,
+      user_ids,
       agenda_tag,
       order = 'created_at.desc',
     } = req.query || {};
@@ -66,6 +67,15 @@ export default async function handler(req, res) {
     params.set('is_deleted', 'eq.false');
     if (party_id) params.set('party_id', `eq.${party_id}`);
     if (user_id) params.set('user_id', `eq.${user_id}`);
+    if (user_ids) {
+      const raw = String(user_ids);
+      const list = raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((id) => /^[0-9a-fA-F-]{10,}$/.test(id));
+      if (list.length > 0) params.set('user_id', `in.(${list.join(',')})`);
+    }
     if (agenda_tag) params.set('agenda_tag', `eq.${agenda_tag}`);
 
     // ordering

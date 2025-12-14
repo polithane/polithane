@@ -17,4 +17,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+// Never crash the whole app at import-time if env is missing.
+// createClient('', '') throws and causes a production white-screen.
+export const supabase =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : new Proxy(
+        {},
+        {
+          get() {
+            throw new Error(
+              'Supabase client is not configured (missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).'
+            );
+          },
+        }
+      );
