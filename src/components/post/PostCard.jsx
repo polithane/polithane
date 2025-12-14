@@ -3,7 +3,7 @@ import { Eye, Heart, MessageCircle, Share2, Video, Image as ImageIcon, Music, Fi
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
-import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration } from '../../utils/formatters';
+import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration, getSourceDomain } from '../../utils/formatters';
 import { getUserTitle } from '../../utils/titleHelpers';
 import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
@@ -231,6 +231,16 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           <Share2 className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Kaynak / Otomatik paylaşım şeffaflık satırı */}
+      {post.source_url && (
+        <div
+          className="mt-3 text-[11px] text-gray-500 leading-snug"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Bu paylaşım <span className="font-semibold">{getSourceDomain(post.source_url)}</span> adresinden alınmış olup otomatik olarak paylaşılmıştır.
+        </div>
+      )}
       
       {/* Polit Puan Detay Modalı */}
       {showScoreModal && (

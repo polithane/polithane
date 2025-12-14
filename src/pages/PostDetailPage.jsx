@@ -5,7 +5,7 @@ import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
-import { formatNumber, formatPolitScore, formatTimeAgo, formatDate, formatDuration } from '../utils/formatters';
+import { formatNumber, formatPolitScore, formatTimeAgo, formatDate, formatDuration, getSourceDomain } from '../utils/formatters';
 import { generateMockPosts } from '../mock/posts';
 import { mockComments, generateMockComments } from '../mock/comments';
 import ReactPlayer from 'react-player';
@@ -98,6 +98,13 @@ export const PostDetailPage = () => {
               <Badge variant="primary" className="mb-4">
                 {post.agenda_tag}
               </Badge>
+            )}
+
+            {/* Kaynak / Otomatik paylaşım şeffaflık satırı */}
+            {post.source_url && (
+              <div className="mt-2 text-xs text-gray-500 leading-snug">
+                Bu paylaşım <span className="font-semibold">{getSourceDomain(post.source_url)}</span> adresinden alınmış olup otomatik olarak paylaşılmıştır.
+              </div>
             )}
             
             {/* Etkileşim Butonları - Kompakt */}

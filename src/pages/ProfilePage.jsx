@@ -15,6 +15,7 @@ import { mockPosts } from '../mock/posts';
 import { getFollowStats, mockBlockedUsers } from '../mock/follows';
 import { useAuth } from '../contexts/AuthContext';
 import { users } from '../utils/api';
+import { FEATURE_FLAGS } from '../utils/constants';
 
 export const ProfilePage = () => {
   const { userId, username } = useParams();
@@ -190,17 +191,19 @@ export const ProfilePage = () => {
                     <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm text-blue-900 mb-2">
-                        Bu profil sistemimiz tarafından otomatik olarak oluşturulmuştur ve paylaşımlar yapay zeka tarafından yapılmaktadır.
+                        Bu üyelik sitemiz tarafından otomatik olarak oluşturulmuştur ve paylaşımlar yapay zeka tarafından yapılmaktadır.
                       </p>
-                      <p className="text-sm text-blue-800 font-medium">
-                        Bu profil size ait mi?{' '}
-                        <a 
-                          href="https://polithane.com/register-new" 
-                          className="text-primary-blue hover:underline font-semibold"
-                        >
-                          Buraya tıklayın ve profilinizin kullanım hakkını alın →
-                        </a>
-                      </p>
+                      {FEATURE_FLAGS.ENABLE_PROFILE_CLAIM_FLOW && (
+                        <p className="text-sm text-blue-800 font-medium">
+                          Bu profil size ait mi?{' '}
+                          <Link
+                            to="/register-new"
+                            className="text-primary-blue hover:underline font-semibold"
+                          >
+                            Buraya tıklayın ve profilinizin sahipliğini alın →
+                          </Link>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -33,10 +33,32 @@ Polithane siyasi bir platform olduğu için kullanıcı tipleri “etki ağırl�
 - **Eski siyasetçi**: Etkileşimleri deneyim ağırlığıyla yüksek etki sınıfındadır.
 - **Admin**: Yönetim panelinden tüm sistem ayarları ve moderasyon.
 
-### 2.2 “Doğrulama” (verification) prensibi
-- Siyasetçi/medya/kurum hesaplarında doğrulama kritik.
-- Doğrulama, hem **güven** hem de **PolitPuan ağırlığı** açısından sistemin temelidir.
-- Doğrulama süreci, admin panelde izlenebilir ve denetlenebilir olmalıdır (audit log).
+### 2.2 Doğrulama & Profil Sahipliği (erken dönem modeli)
+Erken dönemde, kamuya açık siyasi/medya içeriklerini şeffaf şekilde platforma taşımak için iki katmanlı bir yaklaşım kullanılır:
+
+**A) Otomatik oluşturulan profiller (seeded profiles)**
+- Ulaşabildiğimiz siyasetçi ve medya mensupları adına **profil oluşturabiliriz**.
+- Bu profillerin paylaşımları; sosyal medya, haber siteleri veya kişinin kendi sitesindeki **kamuya açık** kaynaklardan alınarak **otomatik** yayınlanabilir.
+- Bu profiller kullanıcı tarafından yönetilmiyorsa profil sayfasında şu ibare görünür:
+  - **“Bu üyelik sitemiz tarafından otomatik olarak oluşturulmuştur ve paylaşımlar yapay zeka tarafından yapılmaktadır.”**
+
+**B) Profil sahipliğini alma (claim)**
+- Erken dönemde “Üye Ol” akışında iki seçenek vardır:
+  - **Yeni Üye Ol**
+  - **Profil Sahipliğini Al**
+- Bir kişi profilin kendisine ait olduğunu düşünüyorsa “Profil Sahipliğini Al” ile başvurur; inceleme sonrası profil sahipliği devredilir ve otomatiklik ibaresi kaldırılır.
+- Yeterli üye sayısına ulaştığımızda bu iki seçenek kaldırılır ve yalnızca **standart üyelik** akışı kalır.
+
+**KVKK / şeffaflık ilkesi**
+- Sadece **kamuya açık** kaynaklardan içerik alınır.
+- Her otomatik taşımada kullanıcıya açık bildirim yapılır (profil düzeyi + paylaşım düzeyi).
+- Gerektiğinde içerik kaldırma/itiraz mekanizması işletilir.
+
+### 2.3 Paylaşım kaynak şeffaflığı (attribution)
+Eğer bir kişi adına paylaşılan Polit dış kaynaktan otomatik alınmışsa, Polit’in en altında şu ibare görünür:
+- **“Bu paylaşım …… adresinden alınmış olup otomatik olarak paylaşılmıştır.”**
+
+Not: Bu ibare, hem kullanıcı güveni hem de KVKK uyumu için zorunludur.
 
 ---
 
