@@ -1296,14 +1296,14 @@ function normalizePartyLabel(value) {
   return String(value || '')
     .trim()
     .replace(/\s+/g, ' ')
-    .toUpperCase('tr-TR');
+    .toLocaleUpperCase('tr-TR');
 }
 
 function normalizeProvince(value) {
   return String(value || '')
     .trim()
     .replace(/\s+/g, ' ')
-    .toUpperCase('tr-TR');
+    .toLocaleUpperCase('tr-TR');
 }
 
 function normalizeName(value) {
@@ -1393,7 +1393,7 @@ function mapPartyLabelToSlug(label) {
   if (v === 'AK PARTI' || v === 'AK PARTİ') return 'akp';
   if (v === 'CHP') return 'chp';
   if (v === 'MHP') return 'mhp';
-  if (v === 'İYİ PARTİ' || v === 'IYI PARTI' || v === 'IYI PARTİ') return 'iyi';
+  if (v === 'İYİ PARTİ' || v === 'İYİ PARTI' || v === 'IYI PARTI' || v === 'IYI PARTİ') return 'iyi';
   if (v === 'DEM PARTİ' || v === 'DEM PARTI' || v === 'DEM') return 'dem';
   if (v === 'BAĞIMSIZ' || v === 'BAGIMSIZ') return 'bagimsiz';
   if (v === 'DBP') return 'dbp';
