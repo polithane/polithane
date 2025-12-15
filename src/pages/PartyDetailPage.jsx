@@ -106,11 +106,26 @@ export const PartyDetailPage = () => {
         setParty(partyObj);
 
         // Users in party (DB)
-        // IMPORTANT: /api/users has an implicit 1000-row cap for large parties; fetch by type.
+        // IMPORTANT: large parties hit a 1000-row cap. Fetch paginated by type.
+        const fetchAllUsers = async ({ party_id, user_type, order }) => {
+          const pageSize = 1000;
+          const maxPages = 10; // safety guard
+          let out = [];
+          for (let page = 0; page < maxPages; page++) {
+            // eslint-disable-next-line no-await-in-loop
+            const chunk = await apiCall(
+              `/api/users?party_id=${party_id}&user_type=${encodeURIComponent(user_type)}&limit=${pageSize}&offset=${page * pageSize}&order=${encodeURIComponent(order)}`
+            ).catch(() => []);
+            if (Array.isArray(chunk) && chunk.length > 0) out = out.concat(chunk);
+            if (!Array.isArray(chunk) || chunk.length < pageSize) break;
+          }
+          return out;
+        };
+
         const [dbMps, dbOfficials, dbMembers] = await Promise.all([
-          apiCall(`/api/users?party_id=${partyObj.party_id}&user_type=mp&limit=2000&order=full_name.asc`).catch(() => []),
-          apiCall(`/api/users?party_id=${partyObj.party_id}&user_type=party_official&limit=2000&order=polit_score.desc`).catch(() => []),
-          apiCall(`/api/users?party_id=${partyObj.party_id}&user_type=party_member&limit=2000&order=polit_score.desc`).catch(() => []),
+          fetchAllUsers({ party_id: partyObj.party_id, user_type: 'mp', order: 'full_name.asc' }),
+          fetchAllUsers({ party_id: partyObj.party_id, user_type: 'party_official', order: 'polit_score.desc' }),
+          fetchAllUsers({ party_id: partyObj.party_id, user_type: 'party_member', order: 'polit_score.desc' }),
         ]);
 
         const mps =
@@ -133,6 +148,8 @@ export const PartyDetailPage = () => {
             : mockUsers
                 .filter((u) => String(u.party_id) === String(partyId) && u.user_type === 'party_member')
                 .map((u) => normalizeUser(u, partyObj));
+
+        const usersList = [...mps, ...officials, ...members].filter(Boolean);
 
         setPartyMPs(mps);
         setPartyOfficials(officials);
@@ -212,6 +229,29 @@ export const PartyDetailPage = () => {
     });
     return entries;
   }, [partyMPs, cityNameToCode]);
+
+  const groupByProvince = (list = []) => {
+    const groups = new Map();
+    (list || []).forEach((u) => {
+      const prov = (u?.province || 'Bilinmiyor').toString();
+      if (!groups.has(prov)) groups.set(prov, []);
+      groups.get(prov).push(u);
+    });
+    const entries = Array.from(groups.entries());
+    entries.sort((a, b) => {
+      const aCode = getPlateCodeFromProvince(a[0]);
+      const bCode = getPlateCodeFromProvince(b[0]);
+      if (aCode && bCode) return Number(aCode) - Number(bCode);
+      if (aCode) return -1;
+      if (bCode) return 1;
+      return a[0].localeCompare(b[0], 'tr-TR');
+    });
+    // sort within province
+    return entries.map(([prov, items]) => [
+      prov,
+      [...items].sort((x, y) => (y?.polit_score || 0) - (x?.polit_score || 0)),
+    ]);
+  };
   
   if (loading) {
     return (
@@ -266,6 +306,36 @@ export const PartyDetailPage = () => {
     if (postSortMode === 'daily') return dailyEngagementScore(b) - dailyEngagementScore(a);
     return (b.polit_score || 0) - (a.polit_score || 0);
   });
+
+  const profileGroups = useMemo(() => {
+    if (mainTab === 'mps') return mpsByProvince;
+    return groupByProvince(profilesForTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainTab, profilesForTab, mpsByProvince]);
+
+  const postGroups = useMemo(() => {
+    // group posts by province of post.user (or fallback to partyMPs map by user_id)
+    const provByUserId = new Map();
+    [...partyMPs, ...partyOfficials, ...partyMembers].forEach((u) => {
+      if (u?.user_id) provByUserId.set(u.user_id, u.province || null);
+    });
+    const groups = new Map();
+    (sortedPosts || []).forEach((p) => {
+      const prov = (p?.user?.province || provByUserId.get(p.user_id) || 'Bilinmiyor').toString();
+      if (!groups.has(prov)) groups.set(prov, []);
+      groups.get(prov).push(p);
+    });
+    const entries = Array.from(groups.entries());
+    entries.sort((a, b) => {
+      const aCode = getPlateCodeFromProvince(a[0]);
+      const bCode = getPlateCodeFromProvince(b[0]);
+      if (aCode && bCode) return Number(aCode) - Number(bCode);
+      if (aCode) return -1;
+      if (bCode) return 1;
+      return a[0].localeCompare(b[0], 'tr-TR');
+    });
+    return entries;
+  }, [sortedPosts, partyMPs, partyOfficials, partyMembers, cityNameToCode]);
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -464,32 +534,44 @@ export const PartyDetailPage = () => {
         )}
 
         {mainTab !== 'distribution' && subTab === 'profiles' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {profilesForTab.map(u => (
-              <div
-                key={u.user_id}
-                className="card cursor-pointer hover:shadow-md transition-shadow flex items-center gap-3"
-                onClick={() => navigate(getProfilePath(u))}
-              >
-                <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={u.verification_badge || u.is_verified} />
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold truncate">{u.full_name}</div>
-                  <div className="text-xs text-gray-600 truncate">@{normalizeUsername(u.username) || '-'}</div>
+          <div className="space-y-6">
+            {profileGroups.map(([provinceName, list]) => {
+              const plateCode = getPlateCodeFromProvince(provinceName);
+              const plateText = plateCode ? String(parseInt(plateCode, 10)) : null;
+              return (
+                <div key={provinceName} className="card">
+                  <div className="flex items-center gap-2 mb-4">
+                    {plateCode && (
+                      <Link
+                        to={`/city/${plateCode}`}
+                        className="w-7 h-7 rounded-full bg-gray-900 hover:bg-primary-blue text-white text-xs font-bold flex items-center justify-center transition-colors flex-shrink-0"
+                      >
+                        {plateText}
+                      </Link>
+                    )}
+                    <div className="font-black text-gray-900 truncate">{provinceName}</div>
+                    <div className="text-xs text-gray-500">{list.length}</div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {list.map((u) => (
+                      <div
+                        key={u.user_id}
+                        className="card cursor-pointer hover:shadow-md transition-shadow flex items-center gap-3"
+                        onClick={() => navigate(getProfilePath(u))}
+                      >
+                        <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={u.verification_badge || u.is_verified} />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold truncate">{u.full_name}</div>
+                          <div className="text-xs text-gray-600 truncate">@{normalizeUsername(u.username) || '-'}</div>
+                        </div>
+                        <div className="text-xs font-bold text-primary-blue">{formatPolitScore(u.polit_score)}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {getPlateCodeFromProvince(u.province) && (
-                    <Link
-                      to={`/city/${getPlateCodeFromProvince(u.province)}`}
-                      className="w-7 h-7 rounded-full bg-gray-900 hover:bg-primary-blue text-white text-xs font-bold flex items-center justify-center transition-colors"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {String(parseInt(getPlateCodeFromProvince(u.province), 10))}
-                    </Link>
-                  )}
-                  <div className="text-xs font-bold text-primary-blue">{formatPolitScore(u.polit_score)}</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -514,10 +596,32 @@ export const PartyDetailPage = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedPosts.map(post => (
-                <PostCardHorizontal key={post.post_id} post={post} fullWidth={true} />
-              ))}
+            <div className="space-y-6">
+              {postGroups.map(([provinceName, list]) => {
+                const plateCode = getPlateCodeFromProvince(provinceName);
+                const plateText = plateCode ? String(parseInt(plateCode, 10)) : null;
+                return (
+                  <div key={provinceName} className="card">
+                    <div className="flex items-center gap-2 mb-4">
+                      {plateCode && (
+                        <Link
+                          to={`/city/${plateCode}`}
+                          className="w-7 h-7 rounded-full bg-gray-900 hover:bg-primary-blue text-white text-xs font-bold flex items-center justify-center transition-colors flex-shrink-0"
+                        >
+                          {plateText}
+                        </Link>
+                      )}
+                      <div className="font-black text-gray-900 truncate">{provinceName}</div>
+                      <div className="text-xs text-gray-500">{list.length}</div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {list.map((post) => (
+                        <PostCardHorizontal key={post.post_id} post={post} fullWidth={true} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
