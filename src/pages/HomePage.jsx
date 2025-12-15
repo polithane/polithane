@@ -11,12 +11,14 @@ import { mockAgendas } from '../mock/agendas';
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
 import api from '../utils/api';
+import { apiCall } from '../utils/api';
 
 export const HomePage = () => {
   const [posts, setPosts] = useState([]);
   const [parties, setParties] = useState([]);
   const [agendas, setAgendas] = useState([]);
   const [users, setUsers] = useState([]);
+  const [polifest, setPolifest] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
   
   useEffect(() => {
@@ -91,11 +93,26 @@ export const HomePage = () => {
         // Agendas için şimdilik mock data kullan
         setAgendas(mockAgendas);
 
+        // PoliFest: real profiles from DB (no mock)
+        const polifestUsers = await apiCall(
+          `/api/users?user_type=mp,party_official,media&limit=24&order=polit_score.desc`
+        ).catch(() => []);
+        setPolifest(
+          (polifestUsers || []).map((u) => ({
+            user_id: u.id,
+            username: u.username,
+            full_name: u.full_name,
+            profile_image: u.avatar_url,
+            story_count: Math.max(1, Math.min(6, Math.floor((u.post_count || 1) / 3) || 1)),
+          }))
+        );
+
       } catch (error) {
         console.error('Error loading data:', error);
         setPosts([]);
         setParties(mockParties);
         setAgendas(mockAgendas);
+        setPolifest([]);
       }
     };
 
@@ -195,7 +212,7 @@ export const HomePage = () => {
         <ParliamentBar parliamentData={currentParliamentDistribution} totalSeats={totalSeats} />
         
         {/* Stories/Reels Bar */}
-        <StoriesBar />
+        <StoriesBar stories={polifest} />
         
         {/* Gündem Bar */}
         {agendas.length > 0 && <AgendaBar agendas={agendas} />}

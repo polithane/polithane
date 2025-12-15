@@ -15,6 +15,8 @@ import { MessagesPage } from './pages/MessagesPage';
 import { SearchPage } from './pages/SearchPage';
 import { CreatePolitPage } from './pages/CreatePolitPage';
 import { TestPage } from './pages/TestPage';
+import { PoliFestPage } from './pages/PoliFestPage';
+import { PoliFestViewerPage } from './pages/PoliFestViewerPage';
 
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
@@ -72,6 +74,11 @@ function App() {
         <Route path="/search" element={<><Header /><SearchPage /><Footer /><FloatingChat /></>} />
         <Route path="/polit-at" element={<><Header /><CreatePolitPage /><Footer /><FloatingChat /></>} />
         <Route path="/test" element={<><Header /><TestPage /><Footer /><FloatingChat /></>} />
+        <Route path="/polifest" element={<><Header /><PoliFestPage /><Footer /><FloatingChat /></>} />
+        <Route path="/polifest/:usernameOrId" element={<PoliFestViewerPage />} />
+        {/* Backward-compatible legacy routes */}
+        <Route path="/stories" element={<><Header /><PoliFestPage /><Footer /><FloatingChat /></>} />
+        <Route path="/stories/:usernameOrId" element={<PoliFestViewerPage />} />
         
         {/* Auth Routes (No Header/Footer) */}
         <Route path="/login" element={<LoginPage />} />
