@@ -195,7 +195,9 @@ export const posts = {
 // USERS API
 // ============================================
 export const users = {
-  getByUsername: (username) => apiCall(`/api/users/${username}`),
+  // NOTE: Vercel dynamic route (/api/users/:username) may be shadowed by SPA rewrites.
+  // Use query-based lookup to ensure it always returns JSON.
+  getByUsername: (username) => apiCall(`/api/users?username=${encodeURIComponent(username)}`),
   getById: (id) => apiCall(`/api/users?id=${encodeURIComponent(id)}`),
 
   updateProfile: (formData) =>

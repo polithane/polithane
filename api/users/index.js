@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { limit = 50, offset = 0, party_id, search, id, province, is_active, user_type, order } = req.query;
+      const { limit = 50, offset = 0, party_id, search, id, username, province, is_active, user_type, order } = req.query;
       
       // Supabase REST API kullan
       const supabaseUrl = process.env.SUPABASE_URL;
@@ -43,9 +43,10 @@ export default async function handler(req, res) {
           'party:parties(id,slug,short_name,logo_url,color)',
         ].join(',')
       );
-      // If fetching by id, return a single row
-      if (id) {
-        params.set('id', `eq.${id}`);
+      // If fetching a single row
+      if (id || username) {
+        if (id) params.set('id', `eq.${id}`);
+        if (username) params.set('username', `eq.${username}`);
         params.set('limit', '1');
       } else {
         // default ordering
@@ -91,7 +92,7 @@ export default async function handler(req, res) {
       }
 
       const data = await response.json();
-      if (id) return res.status(200).json(data?.[0] || null);
+      if (id || username) return res.status(200).json(data?.[0] || null);
       return res.status(200).json(data);
     }
 
