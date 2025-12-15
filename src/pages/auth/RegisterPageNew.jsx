@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
@@ -31,17 +31,25 @@ export const RegisterPageNew = () => {
   // Document uploads
   const [documentFile, setDocumentFile] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
+  const [parties, setParties] = useState([]);
   
   const [formData, setFormData] = useState({
+    full_name: '',
+    username: '',
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
-    city: '',
-    district: '',
-    party: '',
-    position: '',
+    province: '',
+    district_name: '',
+    party_id: '',
   });
+
+  useEffect(() => {
+    apiCall('/api/parties')
+      .then((data) => setParties(Array.isArray(data) ? data : []))
+      .catch(() => setParties([]));
+  }, []);
 
   // Eğer profil sahiplenme linkinden geldiysek: aramayı atla, direkt sahiplenme formu aç
   useEffect(() => {
@@ -51,23 +59,17 @@ export const RegisterPageNew = () => {
     if (mode === 'claim' && claimUserId && FEATURE_FLAGS.ENABLE_PROFILE_CLAIM_FLOW) {
       (async () => {
         try {
-          const id = parseInt(claimUserId);
-          const { data } = await supabase
-            .from('users')
-            .select('id,username,full_name,city_code,politician_type,user_type,is_automated')
-            .eq('id', id)
-            .limit(1)
-            .maybeSingle();
-          if (data) {
+          const profile = await apiCall(`/api/users?id=${encodeURIComponent(claimUserId)}`).catch(() => null);
+          if (profile) {
             setRegistrationType('claim');
             setStep(2);
             setSelectedProfile({
-              id: data.id,
-              username: `@${normalizeUsername(data.username)}`,
-              full_name: data.full_name,
-              position: data.politician_type || data.user_type,
-              city: data.city_code,
-              is_auto: data.is_automated
+              id: profile.id,
+              username: `@${normalizeUsername(profile.username)}`,
+              full_name: profile.full_name,
+              position: profile.politician_type || profile.user_type,
+              city: profile.province || profile.city_code,
+              is_auto: profile.is_automated
             });
           }
         } catch {
@@ -143,8 +145,8 @@ export const RegisterPageNew = () => {
 
   // Validation
   const validateForm = () => {
-    if (!formData.email || !formData.password || !formData.confirmPassword) {
-      setError('Lütfen email ve şifre alanlarını doldurun');
+    if (!formData.full_name || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError('Lütfen ad soyad, email ve şifre alanlarını doldurun');
       return false;
     }
     
@@ -193,8 +195,14 @@ export const RegisterPageNew = () => {
     
     try {
       const result = await register({
+        full_name: formData.full_name,
+        username: formData.username,
         email: formData.email,
         password: formData.password,
+        membership_type: membershipType, // backend maps this to user_type
+        province: formData.province,
+        district_name: formData.district_name,
+        party_id: formData.party_id || null,
       });
       
       if (result.success) {
@@ -253,6 +261,10 @@ export const RegisterPageNew = () => {
     }
   };
 
+  const needsParty = useMemo(() => ['party_member', 'organization', 'mp'].includes(membershipType), [membershipType]);
+  const needsLocation = useMemo(() => ['party_member', 'organization', 'mp'].includes(membershipType), [membershipType]);
+  const selectedMembership = membershipType ? membershipTypes[membershipType] : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center p-4 py-12">
       <div className="w-full max-w-4xl">
@@ -292,8 +304,8 @@ export const RegisterPageNew = () => {
                 <button
                   onClick={() => {
                     setRegistrationType('new');
-                    setMembershipType('normal');
-                    setStep(3);
+                    setMembershipType(null);
+                    setStep(2);
                   }}
                   className="group p-8 border-2 border-gray-200 rounded-2xl hover:border-primary-blue hover:bg-blue-50 transition-all text-left"
                 >
@@ -620,8 +632,7 @@ export const RegisterPageNew = () => {
                 type="button"
                 onClick={() => {
                   setMembershipType(null);
-                  setRegistrationType(null);
-                  setStep(1);
+                  setStep(2);
                 }}
                 className="text-gray-600 hover:text-gray-900 mb-4 flex items-center gap-2"
               >
@@ -639,6 +650,31 @@ export const RegisterPageNew = () => {
 
               <div className="space-y-4 mb-6">
                 <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Ad Soyad *</label>
+                  <input
+                    type="text"
+                    name="full_name"
+                    value={formData.full_name}
+                    onChange={handleChange}
+                    placeholder="Adınız Soyadınız"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Benzersiz İsim (opsiyonel)</label>
+                  <input
+                    type="text"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleChange}
+                    placeholder="@kullaniciadi"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">E-posta *</label>
                   <input
                     type="email"
@@ -650,6 +686,74 @@ export const RegisterPageNew = () => {
                     required
                   />
                 </div>
+
+                {needsLocation && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">İl *</label>
+                      <input
+                        type="text"
+                        name="province"
+                        value={formData.province}
+                        onChange={handleChange}
+                        placeholder="Örn: ANKARA"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">İlçe (opsiyonel)</label>
+                      <input
+                        type="text"
+                        name="district_name"
+                        value={formData.district_name}
+                        onChange={handleChange}
+                        placeholder="Örn: ÇANKAYA"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {needsParty && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Parti *</label>
+                    <select
+                      name="party_id"
+                      value={formData.party_id}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none bg-white"
+                      required
+                    >
+                      <option value="">Seçiniz</option>
+                      {parties.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.short_name || p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {selectedMembership?.requiresDocument && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-5 h-5 text-gray-600" />
+                      <div className="font-bold text-gray-900">
+                        Belge (şimdilik opsiyonel): {selectedMembership.documentTitle}
+                      </div>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleDocumentUpload}
+                      className="block w-full text-sm text-gray-700"
+                    />
+                    <div className="text-xs text-gray-500 mt-2">
+                      Not: Belge doğrulama akışı sonraki adımda zorunlu hale getirilecek.
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
