@@ -13,9 +13,29 @@ import { getUserTitle } from '../utils/titleHelpers';
 import { getFollowStats, mockBlockedUsers } from '../mock/follows';
 import { useAuth } from '../contexts/AuthContext';
 import { users, posts } from '../utils/api';
-import { FEATURE_FLAGS } from '../utils/constants';
+import { CITY_CODES, FEATURE_FLAGS } from '../utils/constants';
 import { normalizeUsername } from '../utils/validators';
 import { getProfilePath } from '../utils/paths';
+
+const normalizeCityName = (name) =>
+  String(name || '')
+    .trim()
+    .toLowerCase('tr-TR')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u')
+    .replace(/\s+/g, ' ');
+
+const CITY_NAME_TO_CODE = (() => {
+  const m = new Map();
+  Object.entries(CITY_CODES).forEach(([code, cityName]) => {
+    m.set(normalizeCityName(cityName), code);
+  });
+  return m;
+})();
 
 export const ProfilePage = () => {
   const { userId, username } = useParams();
@@ -228,9 +248,38 @@ export const ProfilePage = () => {
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h1 className="text-2xl md:text-3xl font-bold break-words">{user.full_name}</h1>
                 {user.verification_badge && <Badge variant="primary">Doğrulanmış</Badge>}
-                {user.party_id && user.party?.party_short_name && (
-                  <Badge variant="secondary">{user.party.party_short_name}</Badge>
+                {user.party_id && user.party?.party_logo && (
+                  <Link
+                    to={`/party/${user.party.party_slug || user.party.party_id || user.party_id}`}
+                    className="inline-flex items-center justify-center w-9 h-9 bg-white rounded-full border border-gray-200 shadow-sm"
+                    title={user.party.party_short_name || 'Parti'}
+                  >
+                    <img
+                      src={user.party.party_logo}
+                      alt={user.party.party_short_name || 'Parti'}
+                      className="w-7 h-7 object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </Link>
                 )}
+                {(() => {
+                  const plateCode =
+                    user.city_code ||
+                    (user.province ? CITY_NAME_TO_CODE.get(normalizeCityName(user.province)) : null);
+                  const plateText = plateCode ? String(parseInt(plateCode, 10)) : null;
+                  if (!plateCode) return null;
+                  return (
+                    <Link
+                      to={`/city/${plateCode}`}
+                      className="w-9 h-9 rounded-full bg-gray-900 hover:bg-primary-blue text-white text-xs font-bold flex items-center justify-center transition-colors"
+                      title={user.province || 'Şehir'}
+                    >
+                      {plateText}
+                    </Link>
+                  );
+                })()}
               </div>
               {getUserTitle(user) && (
                 <p className="text-primary-blue font-semibold text-lg mb-2">

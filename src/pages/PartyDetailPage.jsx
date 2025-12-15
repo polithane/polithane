@@ -373,50 +373,56 @@ export const PartyDetailPage = () => {
         </div>
         
         {/* ÜST SEKMELER */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide border-b mb-4 justify-center">
-          {[
-            { id: 'mps', label: `Milletvekili (${partyMPs.length})` },
-            { id: 'org', label: `Teşkilat Görevlisi (${partyOfficials.length})` },
-            { id: 'members', label: `Üye (${partyMembers.length})` },
-            { id: 'provincial', label: `İl Başkanları (${provincialChairs.length})` },
-            { id: 'district', label: `İlçe Başkanları (${districtChairs.length})` },
-            { id: 'metro_mayor', label: `İl Belediye Bşk. (${metroMayors.length})` },
-            { id: 'district_mayor', label: `İlçe Belediye Bşk. (${districtMayors.length})` },
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => {
-                setMainTab(t.id);
-                setSubTab('profiles');
-              }}
-              className={`flex-shrink-0 px-4 py-2 rounded-full font-semibold text-sm transition-all ${
-                mainTab === t.id ? 'bg-primary-blue text-white' : 'bg-white border border-gray-300 text-gray-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="border-b mb-4">
+          <div className="flex justify-center">
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide max-w-full pb-3">
+              {[
+                { id: 'mps', label: `Milletvekili (${partyMPs.length})` },
+                { id: 'org', label: `Teşkilat Görevlisi (${partyOfficials.length})` },
+                { id: 'members', label: `Üye (${partyMembers.length})` },
+                { id: 'provincial', label: `İl Başkanları (${provincialChairs.length})` },
+                { id: 'district', label: `İlçe Başkanları (${districtChairs.length})` },
+                { id: 'metro_mayor', label: `İl Belediye Bşk. (${metroMayors.length})` },
+                { id: 'district_mayor', label: `İlçe Belediye Bşk. (${districtMayors.length})` },
+              ].map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    setMainTab(t.id);
+                    setSubTab('profiles');
+                  }}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full font-semibold text-sm transition-all ${
+                    mainTab === t.id ? 'bg-primary-blue text-white' : 'bg-white border border-gray-300 text-gray-700'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* ALT SEKMELER (sadece listelerde) */}
         {(
-          <div className="flex gap-2 mb-6 justify-center">
-            <button
-              onClick={() => setSubTab('profiles')}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm border ${
-                subTab === 'profiles' ? 'bg-primary-blue text-white border-primary-blue' : 'bg-white text-gray-700 border-gray-300'
-              }`}
-            >
-              Profiller
-            </button>
-            <button
-              onClick={() => setSubTab('posts')}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm border ${
-                subTab === 'posts' ? 'bg-primary-blue text-white border-primary-blue' : 'bg-white text-gray-700 border-gray-300'
-              }`}
-            >
-              Paylaşımlar
-            </button>
+          <div className="flex justify-center mb-6">
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide max-w-full">
+              <button
+                onClick={() => setSubTab('profiles')}
+                className={`px-4 py-2 rounded-lg font-semibold text-sm border ${
+                  subTab === 'profiles' ? 'bg-primary-blue text-white border-primary-blue' : 'bg-white text-gray-700 border-gray-300'
+                }`}
+              >
+                Profiller
+              </button>
+              <button
+                onClick={() => setSubTab('posts')}
+                className={`px-4 py-2 rounded-lg font-semibold text-sm border ${
+                  subTab === 'posts' ? 'bg-primary-blue text-white border-primary-blue' : 'bg-white text-gray-700 border-gray-300'
+                }`}
+              >
+                Paylaşımlar
+              </button>
+            </div>
           </div>
         )}
         
