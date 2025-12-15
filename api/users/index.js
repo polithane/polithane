@@ -61,7 +61,9 @@ export default async function handler(req, res) {
         params.set('offset', String(offset));
       }
       if (party_id) params.set('party_id', `eq.${party_id}`);
-      if (province) params.set('province', `eq.${province}`);
+      // Province names are not consistently cased in DB (often stored as 'ANTALYA' etc).
+      // Use case-insensitive match so city pages reliably return results.
+      if (province) params.set('province', `ilike.${province}`);
       if (is_active !== undefined) params.set('is_active', `eq.${String(is_active) === 'true' ? 'true' : 'false'}`);
       if (user_type) {
         const raw = String(user_type);

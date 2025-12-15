@@ -20,6 +20,7 @@ export const CityDetailPage = () => {
   useEffect(() => {
     const load = async () => {
       const cityName = CITY_CODES[cityCode] || cityCode;
+      const provinceQuery = String(cityName || '').toLocaleUpperCase('tr-TR');
 
       const normalizeParty = (p) => {
         if (!p) return null;
@@ -71,7 +72,7 @@ export const CityDetailPage = () => {
       // Users in city (DB)
       // NOTE: We fetch by province name (city name).
       const dbUsers = await apiCall(
-        `/api/users?province=${encodeURIComponent(cityName)}&is_active=true&limit=2000`
+        `/api/users?province=${encodeURIComponent(provinceQuery)}&limit=2000`
       ).catch(() => []);
 
       const cityUsers = (dbUsers || []).map(normalizeUser).filter(Boolean);
