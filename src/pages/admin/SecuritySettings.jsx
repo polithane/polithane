@@ -1,12 +1,92 @@
-import { Shield, Lock, Eye, AlertTriangle, CheckCircle, Key } from 'lucide-react';
+import { Shield, Lock, Eye, AlertTriangle, CheckCircle, Key, Smartphone } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import api from '../../utils/api';
 
 export const SecuritySettings = () => {
+  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState({
+    admin_mfa_enabled: 'false',
+    admin_mfa_require_new_device: 'false',
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.admin.getSettings();
+        if (res?.data) setSettings(res.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const toggle = async (key) => {
+    const next = { ...settings, [key]: String(settings[key]) === 'true' ? 'false' : 'true' };
+    setSettings(next);
+    try {
+      await api.admin.updateSettings(next);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Güvenlik Ayarları</h1>
         <p className="text-gray-600">Platform güvenliğini yönetin ve izleyin</p>
+      </div>
+
+      {/* Admin / Manager MFA (feature-ready, default off) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center">
+            <Smartphone className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-gray-900">Yönetici Mobil Doğrulama</h3>
+            <p className="text-sm text-gray-600">Şimdilik pasif. Açıldığında yeni cihazdan girişte doğrulama istenir.</p>
+          </div>
+          {loading ? (
+            <span className="text-xs text-gray-400">Yükleniyor...</span>
+          ) : (
+            <span className="text-xs font-bold text-gray-700">
+              {String(settings.admin_mfa_enabled) === 'true' ? 'Açık' : 'Kapalı'}
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => toggle('admin_mfa_enabled')}
+            className={`px-4 py-3 rounded-lg border font-semibold text-sm transition-colors ${
+              String(settings.admin_mfa_enabled) === 'true'
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-white text-gray-900 border-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            Mobil doğrulamayı {String(settings.admin_mfa_enabled) === 'true' ? 'kapat' : 'aç'}
+          </button>
+          <button
+            type="button"
+            onClick={() => toggle('admin_mfa_require_new_device')}
+            className={`px-4 py-3 rounded-lg border font-semibold text-sm transition-colors ${
+              String(settings.admin_mfa_require_new_device) === 'true'
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-white text-gray-900 border-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            Yeni cihaz zorunluluğu {String(settings.admin_mfa_require_new_device) === 'true' ? 'kapat' : 'aç'}
+          </button>
+        </div>
+
+        <div className="mt-3 text-xs text-gray-500">
+          Not: SMS/2FA akışı sonraki adımda eklenecek. Bu ekran ayarları şimdiden saklar.
+        </div>
       </div>
 
       {/* Security Score */}

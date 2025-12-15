@@ -28,24 +28,9 @@ export const AuthProvider = ({ children }) => {
         setToken(storedToken);
         
         try {
-          // Verify token with backend
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/me`, {
-            headers: {
-              'Authorization': `Bearer ${storedToken}`
-            }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            setUser(data.data);
-            localStorage.setItem('user', JSON.stringify(data.data));
-          } else {
-            // Token invalid, clear storage
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user');
-            setToken(null);
-            setUser(null);
-          }
+          const data = await api.auth.me();
+          setUser(data.data);
+          localStorage.setItem('user', JSON.stringify(data.data));
         } catch (error) {
           console.error('Auth verification error:', error);
           // Network error, use cached user
@@ -63,20 +48,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (identifier, password) => {
     try {
       setLoading(true);
-      
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ identifier, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Giriş başarısız');
-      }
+      const data = await api.auth.login(identifier, password);
 
       // Save to state and localStorage
       setToken(data.data.token);
@@ -100,20 +72,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
-      
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Kayıt başarısız');
-      }
+      const data = await api.auth.register(userData);
 
       // Save to state and localStorage
       setToken(data.data.token);
@@ -137,12 +96,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       if (token) {
-        await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        await api.auth.logout().catch(() => null);
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -167,17 +121,9 @@ export const AuthProvider = ({ children }) => {
     if (!token) return;
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.data);
-        localStorage.setItem('user', JSON.stringify(data.data));
-      }
+      const data = await api.auth.me();
+      setUser(data.data);
+      localStorage.setItem('user', JSON.stringify(data.data));
     } catch (error) {
       console.error('Refresh user error:', error);
     }
@@ -186,21 +132,7 @@ export const AuthProvider = ({ children }) => {
   // Change password
   const changePassword = async (currentPassword, newPassword) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Şifre değiştirme başarısız');
-      }
-
+      const data = await api.auth.changePassword(currentPassword, newPassword);
       return { success: true, message: data.message };
     } catch (error) {
       console.error('Change password error:', error);
