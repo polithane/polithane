@@ -253,32 +253,23 @@ export const PartyDetailPage = () => {
     ]);
   };
   
-  if (loading) {
-    return (
-      <div className="container-main py-8">
-        <div className="text-center">Yükleniyor...</div>
-      </div>
-    );
-  }
-
-  if (error || !party) {
-    return (
-      <div className="container-main py-8">
-        <div className="text-center text-gray-700">{error || 'Parti bulunamadı'}</div>
-      </div>
-    );
-  }
-  
-  const seatPercentage = ((party.parliament_seats / 600) * 100).toFixed(1);
-  const computedMpCount = partyMPs.length;
-  const computedOrgCount = partyOfficials.length;
-  const computedMemberCount = partyMembers.length;
-
-  // NOTE: Detailed official roles are not yet mapped in DB for this page.
-  const provincialChairs = [];
-  const districtChairs = [];
-  const metroMayors = [];
-  const districtMayors = [];
+  // NOTE: Detailed official roles are mapped via politician_type (backfilled in DB).
+  const provincialChairs = useMemo(
+    () => (partyOfficials || []).filter((u) => u?.politician_type === 'provincial_chair'),
+    [partyOfficials]
+  );
+  const districtChairs = useMemo(
+    () => (partyOfficials || []).filter((u) => u?.politician_type === 'district_chair'),
+    [partyOfficials]
+  );
+  const metroMayors = useMemo(
+    () => (partyOfficials || []).filter((u) => u?.politician_type === 'metropolitan_mayor'),
+    [partyOfficials]
+  );
+  const districtMayors = useMemo(
+    () => (partyOfficials || []).filter((u) => u?.politician_type === 'district_mayor'),
+    [partyOfficials]
+  );
 
   const getProfilesForTab = () => {
     if (mainTab === 'mps') return partyMPs;
@@ -292,9 +283,8 @@ export const PartyDetailPage = () => {
   };
 
   const profilesForTab = getProfilesForTab();
-  const userIdsForTab = new Set((profilesForTab || []).map(u => u.user_id));
-
-  const postsForTab = (partyPosts || []).filter(p => userIdsForTab.has(p.user_id));
+  const userIdsForTab = new Set((profilesForTab || []).map((u) => u.user_id));
+  const postsForTab = (partyPosts || []).filter((p) => userIdsForTab.has(p.user_id));
   const dailyEngagementScore = (p) => {
     const likes = Number(p.like_count || 0);
     const comments = Number(p.comment_count || 0);
@@ -314,7 +304,7 @@ export const PartyDetailPage = () => {
   }, [mainTab, profilesForTab, mpsByProvince]);
 
   const postGroups = useMemo(() => {
-    // group posts by province of post.user (or fallback to partyMPs map by user_id)
+    // group posts by province of post.user (or fallback to party user map by user_id)
     const provByUserId = new Map();
     [...partyMPs, ...partyOfficials, ...partyMembers].forEach((u) => {
       if (u?.user_id) provByUserId.set(u.user_id, u.province || null);
@@ -336,7 +326,28 @@ export const PartyDetailPage = () => {
     });
     return entries;
   }, [sortedPosts, partyMPs, partyOfficials, partyMembers, cityNameToCode]);
+
+  if (loading) {
+    return (
+      <div className="container-main py-8">
+        <div className="text-center">Yükleniyor...</div>
+      </div>
+    );
+  }
+
+  if (error || !party) {
+    return (
+      <div className="container-main py-8">
+        <div className="text-center text-gray-700">{error || 'Parti bulunamadı'}</div>
+      </div>
+    );
+  }
   
+  const seatPercentage = ((party.parliament_seats / 600) * 100).toFixed(1);
+  const computedMpCount = partyMPs.length;
+  const computedOrgCount = partyOfficials.length;
+  const computedMemberCount = partyMembers.length;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Parti Header */}
