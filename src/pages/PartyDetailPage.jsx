@@ -373,7 +373,7 @@ export const PartyDetailPage = () => {
         </div>
         
         {/* ÜST SEKMELER */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide border-b mb-4">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide border-b mb-4 justify-center">
           {[
             { id: 'mps', label: `Milletvekili (${partyMPs.length})` },
             { id: 'org', label: `Teşkilat Görevlisi (${partyOfficials.length})` },
@@ -400,7 +400,7 @@ export const PartyDetailPage = () => {
 
         {/* ALT SEKMELER (sadece listelerde) */}
         {(
-          <div className="flex gap-2 mb-6">
+          <div className="flex gap-2 mb-6 justify-center">
             <button
               onClick={() => setSubTab('profiles')}
               className={`px-4 py-2 rounded-lg font-semibold text-sm border ${
