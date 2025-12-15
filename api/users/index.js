@@ -34,6 +34,7 @@ export default async function handler(req, res) {
           'user_type',
           'politician_type',
           'is_active',
+          'is_automated',
           'party_id',
           'province',
           'city_code',

@@ -5,13 +5,11 @@ import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
-import { mockUsers } from '../mock/users';
-import { mockParties } from '../mock/parties';
-import { generateMockPosts } from '../mock/posts';
 import { CITY_CODES } from '../utils/constants';
 import { getUserTitle } from '../utils/titleHelpers';
 import { formatPolitScore } from '../utils/formatters';
 import { apiCall } from '../utils/api';
+import { getProfilePath } from '../utils/paths';
 
 export const CityDetailPage = () => {
   const { cityCode } = useParams();
@@ -71,14 +69,12 @@ export const CityDetailPage = () => {
       };
 
       // Users in city (DB)
-      // NOTE: public.users doesn't have city_code in production DB; it uses "province" (city name).
+      // NOTE: We fetch by province name (city name).
       const dbUsers = await apiCall(
         `/api/users?province=${encodeURIComponent(cityName)}&is_active=true&limit=2000`
       ).catch(() => []);
 
-      const cityUsers = (dbUsers && dbUsers.length > 0)
-        ? dbUsers.map(normalizeUser).filter(Boolean)
-        : mockUsers.filter(u => u.city_code === cityCode);
+      const cityUsers = (dbUsers || []).map(normalizeUser).filter(Boolean);
 
       // Derive lists from user_type + politician_type (backfilled in DB)
       const mps = cityUsers
@@ -107,18 +103,11 @@ export const CityDetailPage = () => {
         ).catch(() => []);
         if (dbPosts && dbPosts.length > 0) cityPosts = dbPosts.map(mapDbPostToUi).filter(Boolean);
       }
-      if (cityPosts.length === 0) {
-        const all = generateMockPosts(200, cityUsers, mockParties);
-        cityPosts = all
-          .filter(p => p.user?.city_code === cityCode)
-          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0))
-          .slice(0, 10);
-      }
 
       // Parties in city
       const partiesInCity = [...new Set(cityUsers.map(p => p.party_id).filter(Boolean))];
       const partyData = partiesInCity.map(partyId => {
-        const party = normalizeParty((cityUsers.find(u => u.party_id === partyId)?.party) || mockParties.find(p => p.party_id === partyId));
+        const party = normalizeParty((cityUsers.find(u => u.party_id === partyId)?.party) || null);
         const partyMps = mps.filter(m => m.party_id === partyId);
         const leader = provincialChairs.find(l => l.party_id === partyId);
         const mayor = metroMayors.find(m => m.party_id === partyId);
@@ -192,7 +181,7 @@ export const CityDetailPage = () => {
                   {mps.map(mp => (
                     <Link
                       key={mp.user_id}
-                      to={`/profile/${mp.username}`}
+                      to={getProfilePath(mp)}
                       className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
                     >
                       <Avatar 
@@ -249,7 +238,7 @@ export const CityDetailPage = () => {
           {list.map(u => (
             <Link
               key={u.user_id}
-              to={`/profile/${u.user_id}`}
+              to={getProfilePath(u)}
               className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all group"
             >
               <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={u.verification_badge} className="flex-shrink-0" />
@@ -280,7 +269,7 @@ export const CityDetailPage = () => {
     }
 
     if (activeTab === 'metropolitan_mayors') {
-      return renderUserGrid(cityData.metroMayors, Building2, 'Bu şehirden büyükşehir belediye başkanı bulunamadı');
+      return renderUserGrid(cityData.metroMayors, Building2, 'Bu şehirden il belediye başkanı bulunamadı');
     }
 
     if (activeTab === 'district_mayors') {
@@ -335,7 +324,7 @@ export const CityDetailPage = () => {
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
                 <Building2 className="w-6 h-6 mx-auto mb-2" />
                 <div className="text-2xl font-bold">{cityData.stats.totalMetroMayors}</div>
-                <div className="text-xs text-white/80">Büyükşehir Bşk.</div>
+                <div className="text-xs text-white/80">İl Bel. Bşk.</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
                 <MapPin className="w-6 h-6 mx-auto mb-2" />
@@ -400,7 +389,7 @@ export const CityDetailPage = () => {
             >
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" />
-                <span>Büyükşehir Bşk. ({cityData.stats.totalMetroMayors})</span>
+                <span>İl Bel. Bşk. ({cityData.stats.totalMetroMayors})</span>
               </div>
             </button>
             <button
@@ -413,7 +402,7 @@ export const CityDetailPage = () => {
             >
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" />
-                <span>İlçe Bşk. ({cityData.stats.totalDistrictMayors})</span>
+                <span>İlçe Bel. Bşk. ({cityData.stats.totalDistrictMayors})</span>
               </div>
             </button>
             <button

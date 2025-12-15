@@ -3,9 +3,6 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Avatar } from '../components/common/Avatar';
 import { formatNumber, formatPolitScore, formatDate } from '../utils/formatters';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
-import { generateMockPosts } from '../mock/posts';
-import { mockParties } from '../mock/parties';
-import { mockUsers } from '../mock/users';
 import { getProfilePath } from '../utils/paths';
 import { normalizeUsername } from '../utils/validators';
 import { CITY_CODES } from '../utils/constants';
@@ -89,15 +86,7 @@ export const PartyDetailPage = () => {
         const partiesData = await api.parties.getAll();
         const dbParty = (partiesData || []).find((p) => String(p.id) === String(partyId) || String(p.slug) === String(partyId));
 
-        const partyObj =
-          normalizeParty(dbParty) ||
-          normalizeParty(
-            mockParties.find((p) =>
-              String(p.party_id) === String(partyId) ||
-              String(p.slug || '') === String(partyId) ||
-              String(p.party_short_name || '').toLowerCase() === String(partyId).toLowerCase()
-            )
-          );
+        const partyObj = normalizeParty(dbParty);
         if (!partyObj) {
           setError('Parti bulunamadı');
           setParty(null);
@@ -128,28 +117,9 @@ export const PartyDetailPage = () => {
           fetchAllUsers({ party_id: partyObj.party_id, user_type: 'party_member', order: 'polit_score.desc' }),
         ]);
 
-        const mps =
-          dbMps && dbMps.length > 0
-            ? dbMps.map((u) => normalizeUser(u, partyObj))
-            : mockUsers
-                .filter((u) => String(u.party_id) === String(partyId) && u.user_type === 'mp')
-                .map((u) => normalizeUser(u, partyObj));
-
-        const officials =
-          dbOfficials && dbOfficials.length > 0
-            ? dbOfficials.map((u) => normalizeUser(u, partyObj))
-            : mockUsers
-                .filter((u) => String(u.party_id) === String(partyId) && u.user_type === 'party_official')
-                .map((u) => normalizeUser(u, partyObj));
-
-        const members =
-          dbMembers && dbMembers.length > 0
-            ? dbMembers.map((u) => normalizeUser(u, partyObj))
-            : mockUsers
-                .filter((u) => String(u.party_id) === String(partyId) && u.user_type === 'party_member')
-                .map((u) => normalizeUser(u, partyObj));
-
-        const usersList = [...mps, ...officials, ...members].filter(Boolean);
+        const mps = (dbMps || []).map((u) => normalizeUser(u, partyObj)).filter(Boolean);
+        const officials = (dbOfficials || []).map((u) => normalizeUser(u, partyObj)).filter(Boolean);
+        const members = (dbMembers || []).map((u) => normalizeUser(u, partyObj)).filter(Boolean);
 
         setPartyMPs(mps);
         setPartyOfficials(officials);
@@ -158,13 +128,7 @@ export const PartyDetailPage = () => {
         // Posts in party (DB)
         const dbPosts = await api.posts.getAll({ party_id: partyObj.party_id, limit: 50, order: 'polit_score.desc' }).catch(() => []);
 
-        if (dbPosts && dbPosts.length > 0) {
-          setPartyPosts(dbPosts.map(mapDbPostToUi).filter(Boolean));
-        } else {
-          // Fallback: gerçek DB kullanıcılarıyla mock içerik üret (UI boş kalmasın)
-          const allMock = generateMockPosts(200, usersList, [partyObj]);
-          setPartyPosts(allMock.filter((p) => String(p.user?.party_id) === String(partyObj.party_id)).slice(0, 30));
-        }
+        setPartyPosts((dbPosts || []).map(mapDbPostToUi).filter(Boolean));
       } catch (e) {
         console.error(e);
         setError('Parti verileri yüklenirken hata oluştu');
