@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Avatar } from '../components/common/Avatar';
 import { formatNumber, formatPolitScore, formatDate } from '../utils/formatters';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
+import { getUserTitle } from '../utils/titleHelpers';
 import { getProfilePath } from '../utils/paths';
 import { normalizeUsername } from '../utils/validators';
 import { CITY_CODES } from '../utils/constants';
@@ -408,16 +409,20 @@ export const PartyDetailPage = () => {
             <div className="flex gap-2 overflow-x-auto scrollbar-hide max-w-full">
               <button
                 onClick={() => setSubTab('profiles')}
-                className={`px-4 py-2 rounded-lg font-semibold text-sm border ${
-                  subTab === 'profiles' ? 'bg-primary-blue text-white border-primary-blue' : 'bg-white text-gray-700 border-gray-300'
+                className={`px-4 py-2 rounded-lg font-semibold text-sm border transition-colors ${
+                  subTab === 'profiles'
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-900 border-gray-900 hover:bg-gray-50'
                 }`}
               >
                 Profiller
               </button>
               <button
                 onClick={() => setSubTab('posts')}
-                className={`px-4 py-2 rounded-lg font-semibold text-sm border ${
-                  subTab === 'posts' ? 'bg-primary-blue text-white border-primary-blue' : 'bg-white text-gray-700 border-gray-300'
+                className={`px-4 py-2 rounded-lg font-semibold text-sm border transition-colors ${
+                  subTab === 'posts'
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-900 border-gray-900 hover:bg-gray-50'
                 }`}
               >
                 Paylaşımlar
@@ -545,6 +550,11 @@ export const PartyDetailPage = () => {
                         <div className="min-w-0 flex-1">
                           <div className="font-bold truncate">{u.full_name}</div>
                           <div className="text-xs text-gray-600 truncate">@{normalizeUsername(u.username) || '-'}</div>
+                          {getUserTitle(u) && (
+                            <div className="text-[11px] font-semibold text-primary-blue mt-0.5 truncate">
+                              {getUserTitle(u)}
+                            </div>
+                          )}
                         </div>
                         <div className="text-xs font-bold text-primary-blue">{formatPolitScore(u.polit_score)}</div>
                       </div>

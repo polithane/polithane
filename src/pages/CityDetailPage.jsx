@@ -160,6 +160,29 @@ export const CityDetailPage = () => {
   
   // Tab içeriği
   const renderTabContent = () => {
+    const groupByParty = (list = []) => {
+      const groups = new Map();
+      (list || []).forEach((u) => {
+        const partyId = u.party_id || 'no_party';
+        if (!groups.has(partyId)) {
+          groups.set(partyId, {
+            partyId,
+            party: u.party || null,
+            list: [],
+          });
+        }
+        groups.get(partyId).list.push(u);
+      });
+      const out = Array.from(groups.values()).map((g) => ({
+        ...g,
+        totalPolit: (g.list || []).reduce((sum, u) => sum + (u?.polit_score || 0), 0),
+      }));
+      out.sort((a, b) => (b.totalPolit || 0) - (a.totalPolit || 0));
+      // sort inside party
+      out.forEach((g) => g.list.sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0)));
+      return out;
+    };
+
     if (activeTab === 'mps') {
       return (
         <div className="space-y-6">
@@ -204,7 +227,7 @@ export const CityDetailPage = () => {
                         <div className="flex items-center gap-1 mt-1">
                           <TrendingUp className="w-3 h-3 text-green-600" />
                           <span className="text-xs font-semibold text-gray-700">
-                            {formatPolitScore(mp.polit_score)} PP
+                            {formatPolitScore(mp.polit_score)}
                           </span>
                         </div>
                       </div>
@@ -224,8 +247,9 @@ export const CityDetailPage = () => {
       );
     }
     
-    const renderUserGrid = (list, emptyIcon, emptyText) => {
-      if (!list || list.length === 0) {
+    const renderPartyGroupedUserGrid = (groups, emptyIcon, emptyText, options = {}) => {
+      const { showDistrictGroups = false } = options;
+      if (!groups || groups.length === 0) {
         const Icon = emptyIcon;
         return (
           <div className="text-center py-12">
@@ -235,50 +259,152 @@ export const CityDetailPage = () => {
         );
       }
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {list.map(u => (
-            <Link
-              key={u.user_id}
-              to={getProfilePath(u)}
-              className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all group"
-            >
-              <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={u.verification_badge} className="flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-gray-900 group-hover:text-primary-blue transition-colors truncate">{u.full_name}</h4>
-                <div className="flex items-center gap-2 mt-1">
-                  {getUserTitle(u) && <Badge variant="primary" size="sm">{getUserTitle(u)}</Badge>}
-                  {u.city_code && (
-                    <span className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-900 text-white text-xs font-bold rounded-full">
-                      {u.city_code}
-                    </span>
+        <div className="space-y-6">
+          {groups.map((g) => {
+            const party = g.party;
+            const partyKey = g.partyId || party?.party_id || party?.id || 'no_party';
+
+            if (!showDistrictGroups) {
+              return (
+                <div key={partyKey} className="bg-white rounded-lg shadow-md p-6">
+                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200">
+                    {party?.party_logo && (
+                      <img src={party.party_logo} alt={party.party_short_name || 'Parti'} className="w-12 h-12 object-contain" />
+                    )}
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-900">{party?.party_short_name || 'Partisiz'}</h3>
+                      <p className="text-sm text-gray-500">{g.list.length} profil</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {g.list.map((u) => (
+                      <Link
+                        key={u.user_id}
+                        to={getProfilePath(u)}
+                        className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                      >
+                        <Avatar
+                          src={u.avatar_url || u.profile_image}
+                          size="56px"
+                          verified={u.verification_badge}
+                          className="flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 group-hover:text-primary-blue transition-colors truncate">
+                            {u.full_name}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-xs text-gray-600 mt-1">
+                            {getUserTitle(u) && <span className="font-medium text-primary-blue">{getUserTitle(u)}</span>}
+                            {u.city_code && (
+                              <span className="inline-flex items-center justify-center px-1.5 py-0.5 bg-gray-900 text-white text-[10px] font-bold rounded-full">
+                                {u.city_code}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-xs font-bold text-primary-blue whitespace-nowrap">{formatPolitScore(u.polit_score)}</div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            // district grouping inside party
+            const byDistrict = new Map();
+            (g.list || []).forEach((u) => {
+              const dn = (u.district_name || 'Bilinmiyor').toString();
+              if (!byDistrict.has(dn)) byDistrict.set(dn, []);
+              byDistrict.get(dn).push(u);
+            });
+            const districtGroups = Array.from(byDistrict.entries()).sort((a, b) => a[0].localeCompare(b[0], 'tr-TR'));
+
+            return (
+              <div key={partyKey} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200">
+                  {party?.party_logo && (
+                    <img src={party.party_logo} alt={party.party_short_name || 'Parti'} className="w-12 h-12 object-contain" />
                   )}
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900">{party?.party_short_name || 'Partisiz'}</h3>
+                    <p className="text-sm text-gray-500">{g.list.length} ilçe başkanı</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  {districtGroups.map(([districtName, list]) => (
+                    <div key={districtName}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-black text-gray-900">{districtName}</div>
+                        <div className="text-xs text-gray-500">{list.length}</div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {list
+                          .slice()
+                          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0))
+                          .map((u) => (
+                            <Link
+                              key={u.user_id}
+                              to={getProfilePath(u)}
+                              className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                            >
+                              <Avatar
+                                src={u.avatar_url || u.profile_image}
+                                size="56px"
+                                verified={u.verification_badge}
+                                className="flex-shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-gray-900 group-hover:text-primary-blue transition-colors truncate">
+                                  {u.full_name}
+                                </h4>
+                                <div className="flex items-center gap-1.5 text-xs text-gray-600 mt-1">
+                                  {getUserTitle(u) && <span className="font-medium text-primary-blue">{getUserTitle(u)}</span>}
+                                  {u.city_code && (
+                                    <span className="inline-flex items-center justify-center px-1.5 py-0.5 bg-gray-900 text-white text-[10px] font-bold rounded-full">
+                                      {u.city_code}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-xs font-bold text-primary-blue whitespace-nowrap">{formatPolitScore(u.polit_score)}</div>
+                            </Link>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="text-xs font-bold text-primary-blue whitespace-nowrap">{formatPolitScore(u.polit_score)}</div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       );
     };
 
     if (activeTab === 'provincial_chairs') {
-      return renderUserGrid(cityData.provincialChairs, Briefcase, 'Bu şehirden il başkanı bulunamadı');
+      return renderPartyGroupedUserGrid(groupByParty(cityData.provincialChairs), Briefcase, 'Bu şehirden il başkanı bulunamadı');
     }
 
     if (activeTab === 'district_chairs') {
-      return renderUserGrid(cityData.districtChairs, Briefcase, 'Bu şehirden ilçe başkanı bulunamadı');
+      return renderPartyGroupedUserGrid(
+        groupByParty(cityData.districtChairs),
+        Briefcase,
+        'Bu şehirden ilçe başkanı bulunamadı',
+        { showDistrictGroups: true }
+      );
     }
 
     if (activeTab === 'metropolitan_mayors') {
-      return renderUserGrid(cityData.metroMayors, Building2, 'Bu şehirden il belediye başkanı bulunamadı');
+      return renderPartyGroupedUserGrid(groupByParty(cityData.metroMayors), Building2, 'Bu şehirden il belediye başkanı bulunamadı');
     }
 
     if (activeTab === 'district_mayors') {
-      return renderUserGrid(cityData.districtMayors, Building2, 'Bu şehirden ilçe belediye başkanı bulunamadı');
+      return renderPartyGroupedUserGrid(groupByParty(cityData.districtMayors), Building2, 'Bu şehirden ilçe belediye başkanı bulunamadı');
     }
 
     if (activeTab === 'members') {
-      return renderUserGrid(cityData.members, Users, 'Bu şehirden üye bulunamadı');
+      return renderPartyGroupedUserGrid(groupByParty(cityData.members), Users, 'Bu şehirden üye bulunamadı');
     }
   };
   

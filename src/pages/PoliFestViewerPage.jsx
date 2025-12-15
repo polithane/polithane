@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
@@ -13,6 +13,7 @@ export const PoliFestViewerPage = () => {
   const [items, setItems] = useState([]);
   const [idx, setIdx] = useState(0);
   const timerRef = useRef(null);
+  const closeToList = useCallback(() => navigate('/polifest'), [navigate]);
 
   const current = items[idx] || null;
   const progressCount = Math.max(items.length, 1);
@@ -57,12 +58,12 @@ export const PoliFestViewerPage = () => {
     if (!items.length) return;
     timerRef.current = setTimeout(() => {
       if (idx < items.length - 1) setIdx(idx + 1);
-      else navigate(-1);
+      else closeToList();
     }, currentDuration);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [idx, items.length, currentDuration, navigate]);
+  }, [idx, items.length, currentDuration, closeToList]);
 
   return (
     <div className="fixed inset-0 bg-black text-white z-50">
@@ -86,7 +87,7 @@ export const PoliFestViewerPage = () => {
             <div className="text-xs text-white/70 truncate">@{user?.username || '-'}</div>
           </div>
         </div>
-        <button onClick={() => navigate(-1)} className="p-2 rounded-full bg-white/10 hover:bg-white/20">
+        <button onClick={closeToList} className="p-2 rounded-full bg-white/10 hover:bg-white/20">
           <X className="w-5 h-5" />
         </button>
       </div>
