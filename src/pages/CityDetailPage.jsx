@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { MapPin, Users, Building2, Briefcase, ArrowLeft, TrendingUp } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
@@ -15,6 +15,7 @@ export const CityDetailPage = () => {
   const { cityCode } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('mps'); // mps, provincial_chairs, district_chairs, metropolitan_mayors, district_mayors, members
+  const [activePartyId, setActivePartyId] = useState(null);
   const [cityData, setCityData] = useState(null);
   
   useEffect(() => {
@@ -146,6 +147,37 @@ export const CityDetailPage = () => {
 
     load();
   }, [cityCode]);
+
+  const currentListForPartySelector = useMemo(() => {
+    if (!cityData) return [];
+    if (activeTab === 'mps') return cityData.mps || [];
+    if (activeTab === 'provincial_chairs') return cityData.provincialChairs || [];
+    if (activeTab === 'district_chairs') return cityData.districtChairs || [];
+    if (activeTab === 'metropolitan_mayors') return cityData.metroMayors || [];
+    if (activeTab === 'district_mayors') return cityData.districtMayors || [];
+    if (activeTab === 'members') return cityData.members || [];
+    return [];
+  }, [cityData, activeTab]);
+
+  const partyOptions = useMemo(() => {
+    if (!cityData) return [];
+    const map = new Map();
+    (currentListForPartySelector || []).forEach((u) => {
+      if (!u?.party_id) return;
+      const pid = String(u.party_id);
+      const prev = map.get(pid) || { partyId: pid, party: u.party || null, count: 0 };
+      map.set(pid, { ...prev, party: prev.party || u.party || null, count: prev.count + 1 });
+    });
+    const out = Array.from(map.values())
+      .filter((x) => x.party?.party_logo) // show only parties with a logo
+      .sort((a, b) => b.count - a.count);
+    return out;
+  }, [cityData, currentListForPartySelector]);
+
+  useEffect(() => {
+    // When switching tabs, default to the party with the most profiles (fair + deterministic).
+    setActivePartyId(partyOptions[0]?.partyId || null);
+  }, [activeTab, partyOptions]);
   
   if (!cityData) {
     return (
@@ -160,6 +192,12 @@ export const CityDetailPage = () => {
   
   // Tab içeriği
   const renderTabContent = () => {
+    const selectedPartyId = activePartyId ? String(activePartyId) : null;
+    const filterByParty = (list = []) => {
+      if (!selectedPartyId) return list;
+      return (list || []).filter((u) => String(u.party_id || '') === selectedPartyId);
+    };
+
     const groupByParty = (list = []) => {
       const groups = new Map();
       (list || []).forEach((u) => {
@@ -184,9 +222,12 @@ export const CityDetailPage = () => {
     };
 
     if (activeTab === 'mps') {
+      const selectedPartyData = selectedPartyId
+        ? (cityData.partyData || []).filter((x) => String(x.party?.party_id || x.party?.id || '') === selectedPartyId)
+        : cityData.partyData;
       return (
         <div className="space-y-6">
-          {cityData.partyData.map(({ party, mps }) => {
+          {selectedPartyData.map(({ party, mps }) => {
             if (mps.length === 0) return null;
             return (
               <div key={party.party_id} className="bg-white rounded-lg shadow-md p-6">
@@ -383,12 +424,16 @@ export const CityDetailPage = () => {
     };
 
     if (activeTab === 'provincial_chairs') {
-      return renderPartyGroupedUserGrid(groupByParty(cityData.provincialChairs), Briefcase, 'Bu şehirden il başkanı bulunamadı');
+      return renderPartyGroupedUserGrid(
+        groupByParty(filterByParty(cityData.provincialChairs)),
+        Briefcase,
+        'Bu şehirden il başkanı bulunamadı'
+      );
     }
 
     if (activeTab === 'district_chairs') {
       return renderPartyGroupedUserGrid(
-        groupByParty(cityData.districtChairs),
+        groupByParty(filterByParty(cityData.districtChairs)),
         Briefcase,
         'Bu şehirden ilçe başkanı bulunamadı',
         { showDistrictGroups: true }
@@ -396,15 +441,27 @@ export const CityDetailPage = () => {
     }
 
     if (activeTab === 'metropolitan_mayors') {
-      return renderPartyGroupedUserGrid(groupByParty(cityData.metroMayors), Building2, 'Bu şehirden il belediye başkanı bulunamadı');
+      return renderPartyGroupedUserGrid(
+        groupByParty(filterByParty(cityData.metroMayors)),
+        Building2,
+        'Bu şehirden il belediye başkanı bulunamadı'
+      );
     }
 
     if (activeTab === 'district_mayors') {
-      return renderPartyGroupedUserGrid(groupByParty(cityData.districtMayors), Building2, 'Bu şehirden ilçe belediye başkanı bulunamadı');
+      return renderPartyGroupedUserGrid(
+        groupByParty(filterByParty(cityData.districtMayors)),
+        Building2,
+        'Bu şehirden ilçe belediye başkanı bulunamadı'
+      );
     }
 
     if (activeTab === 'members') {
-      return renderPartyGroupedUserGrid(groupByParty(cityData.members), Users, 'Bu şehirden üye bulunamadı');
+      return renderPartyGroupedUserGrid(
+        groupByParty(filterByParty(cityData.members)),
+        Users,
+        'Bu şehirden üye bulunamadı'
+      );
     }
   };
   
@@ -466,86 +523,63 @@ export const CityDetailPage = () => {
       {/* Tab Navigation */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="container-main">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-            <button
-              onClick={() => setActiveTab('mps')}
-              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
-                activeTab === 'mps'
-                  ? 'border-primary-blue text-primary-blue'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                <span>Milletvekilleri ({cityData.stats.totalMps})</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('provincial_chairs')}
-              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
-                activeTab === 'provincial_chairs'
-                  ? 'border-primary-blue text-primary-blue'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Briefcase className="w-4 h-4" />
-                <span>İl Başkanları ({cityData.stats.totalProvincialChairs})</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('district_chairs')}
-              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
-                activeTab === 'district_chairs'
-                  ? 'border-primary-blue text-primary-blue'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Briefcase className="w-4 h-4" />
-                <span>İlçe Başkanları ({cityData.stats.totalDistrictChairs})</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('metropolitan_mayors')}
-              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
-                activeTab === 'metropolitan_mayors'
-                  ? 'border-primary-blue text-primary-blue'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                <span>İl Bel. Bşk. ({cityData.stats.totalMetroMayors})</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('district_mayors')}
-              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
-                activeTab === 'district_mayors'
-                  ? 'border-primary-blue text-primary-blue'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                <span>İlçe Bel. Bşk. ({cityData.stats.totalDistrictMayors})</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('members')}
-              className={`flex-shrink-0 px-6 py-4 font-semibold text-sm transition-all border-b-2 ${
-                activeTab === 'members'
-                  ? 'border-primary-blue text-primary-blue'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                <span>Üyeler ({cityData.stats.totalMembers})</span>
-              </div>
-            </button>
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide py-3">
+            {[
+              { id: 'mps', label: `Milletvekilleri (${cityData.stats.totalMps})`, Icon: Users },
+              { id: 'provincial_chairs', label: `İl Başkanları (${cityData.stats.totalProvincialChairs})`, Icon: Briefcase },
+              { id: 'district_chairs', label: `İlçe Başkanları (${cityData.stats.totalDistrictChairs})`, Icon: Briefcase },
+              { id: 'metropolitan_mayors', label: `İl Bel. Bşk. (${cityData.stats.totalMetroMayors})`, Icon: Building2 },
+              { id: 'district_mayors', label: `İlçe Bel. Bşk. (${cityData.stats.totalDistrictMayors})`, Icon: Building2 },
+              { id: 'members', label: `Üyeler (${cityData.stats.totalMembers})`, Icon: Users },
+            ].map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex-shrink-0 px-4 py-2 rounded-full font-semibold text-sm border transition-colors ${
+                  activeTab === id
+                    ? 'bg-primary-blue text-white border-primary-blue'
+                    : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4" />
+                  <span className="whitespace-nowrap">{label}</span>
+                </div>
+              </button>
+            ))}
           </div>
+
+          {/* Party selector (fair display): logos sorted by count for current tab */}
+          {partyOptions.length > 0 && (
+            <div className="pb-3 -mt-1">
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                {partyOptions.map((p) => {
+                  const isActive = String(activePartyId || '') === String(p.partyId);
+                  return (
+                    <button
+                      key={p.partyId}
+                      type="button"
+                      onClick={() => setActivePartyId(p.partyId)}
+                      className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-full border transition-colors ${
+                        isActive ? 'bg-gray-900 border-gray-900' : 'bg-white border-gray-300 hover:bg-gray-50'
+                      }`}
+                      title={`${p.party?.party_short_name || ''} (${p.count})`}
+                    >
+                      <img
+                        src={p.party.party_logo}
+                        alt={p.party.party_short_name || 'Parti'}
+                        className="w-6 h-6 object-contain"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      <span className={`text-xs font-bold ${isActive ? 'text-white' : 'text-gray-900'}`}>{p.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
