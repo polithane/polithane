@@ -8,6 +8,7 @@ import { PostDetailPage } from './pages/PostDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PartyDetailPage } from './pages/PartyDetailPage';
 import { AgendaDetailPage } from './pages/AgendaDetailPage';
+import { AgendasPage } from './pages/AgendasPage';
 import { CityDetailPage } from './pages/CityDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -69,6 +70,7 @@ function App() {
         <Route path="/:username" element={<><Header /><ProfilePage /><Footer /><FloatingChat /></>} />
         <Route path="/party/:partyId" element={<><Header /><PartyDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/agenda/:agendaSlug" element={<><Header /><AgendaDetailPage /><Footer /><FloatingChat /></>} />
+        <Route path="/agendas" element={<><Header /><AgendasPage /><Footer /><FloatingChat /></>} />
         <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/messages" element={<><Header /><MessagesPage /><Footer /><FloatingChat /></>} />
         <Route path="/search" element={<><Header /><SearchPage /><Footer /><FloatingChat /></>} />
