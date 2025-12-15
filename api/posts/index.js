@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         'is_deleted',
         'created_at',
         'source_url',
-        'user:users(id,username,full_name,avatar_url,user_type,party_id,province,is_verified,is_active)',
+        'user:users(id,username,full_name,avatar_url,user_type,politician_type,party_id,province,city_code,is_verified,is_active)',
       ].join(',')
     );
 
