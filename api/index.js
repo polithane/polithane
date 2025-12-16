@@ -361,6 +361,103 @@ function requireAdmin(req, res) {
   return auth;
 }
 
+function requireAuth(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) {
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+    return null;
+  }
+  return auth;
+}
+
+async function safeUserPatch(userId, patch) {
+  const maxTries = 8;
+  let attempt = 0;
+  let payload = { ...patch };
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    attempt += 1;
+    try {
+      const updated = await supabaseRestPatch('users', { id: `eq.${userId}` }, payload);
+      return updated;
+    } catch (e) {
+      if (attempt >= maxTries) throw e;
+      const msg = String(e?.message || '');
+      const m = msg.match(/column\s+users\.([a-zA-Z0-9_]+)\s+does not exist/i);
+      if (!m) throw e;
+      const col = m[1];
+      if (!Object.prototype.hasOwnProperty.call(payload, col)) throw e;
+      delete payload[col];
+      if (Object.keys(payload).length === 0) return [];
+    }
+  }
+}
+
+async function usersCheckUsername(req, res, username) {
+  const u = String(username || '').trim().toLowerCase();
+  if (!u || u.length < 3) return res.json({ success: true, available: false, message: 'En az 3 karakter olmalı' });
+  if (u.length > 20) return res.json({ success: true, available: false, message: 'En fazla 20 karakter olabilir' });
+  if (!/^[a-z0-9._-]+$/.test(u)) {
+    return res.json({ success: true, available: false, message: 'Sadece a-z, 0-9, . _ - kullanılabilir' });
+  }
+  const rows = await supabaseRestGet('users', { select: 'id', username: `eq.${u}`, limit: '1' }).catch(() => []);
+  const available = !(Array.isArray(rows) && rows.length > 0);
+  res.json({ success: true, available, message: available ? 'Müsait' : 'Kullanımda' });
+}
+
+async function usersUpdateUsername(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const u = String(body?.username || '').trim().toLowerCase();
+  if (!u || u.length < 3) return res.status(400).json({ success: false, error: 'Kullanıcı adı en az 3 karakter olmalı.' });
+  if (u.length > 20) return res.status(400).json({ success: false, error: 'Kullanıcı adı en fazla 20 karakter olabilir.' });
+  if (!/^[a-z0-9._-]+$/.test(u)) return res.status(400).json({ success: false, error: 'Sadece a-z, 0-9, . _ - kullanılabilir.' });
+
+  const exists = await supabaseRestGet('users', { select: 'id', username: `eq.${u}`, limit: '1' }).catch(() => []);
+  if (Array.isArray(exists) && exists[0] && String(exists[0].id) !== String(auth.id)) {
+    return res.status(400).json({ success: false, error: 'Bu kullanıcı adı kullanımda.' });
+  }
+
+  const updated = await safeUserPatch(auth.id, { username: u });
+  const user = updated?.[0] || null;
+  if (user) delete user.password_hash;
+  res.json({ success: true, data: user });
+}
+
+async function usersUpdateMe(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+
+  const allowed = {};
+  if (Object.prototype.hasOwnProperty.call(body, 'full_name')) allowed.full_name = String(body.full_name || '').trim();
+  if (Object.prototype.hasOwnProperty.call(body, 'bio')) allowed.bio = body.bio ? String(body.bio).slice(0, 2000) : null;
+  if (Object.prototype.hasOwnProperty.call(body, 'avatar_url')) allowed.avatar_url = body.avatar_url ? String(body.avatar_url).slice(0, 500) : null;
+  if (Object.prototype.hasOwnProperty.call(body, 'cover_url')) allowed.cover_url = body.cover_url ? String(body.cover_url).slice(0, 500) : null;
+
+  // Schema may vary: province/city_code, phone, birth_date etc. We'll try and drop unknown columns.
+  if (Object.prototype.hasOwnProperty.call(body, 'province')) allowed.province = body.province ? String(body.province).slice(0, 100) : null;
+  if (Object.prototype.hasOwnProperty.call(body, 'district')) allowed.district = body.district ? String(body.district).slice(0, 100) : null;
+  if (Object.prototype.hasOwnProperty.call(body, 'city_code')) allowed.city_code = body.city_code ? String(body.city_code).slice(0, 50) : null;
+  if (Object.prototype.hasOwnProperty.call(body, 'phone')) allowed.phone = body.phone ? String(body.phone).slice(0, 30) : null;
+  if (Object.prototype.hasOwnProperty.call(body, 'birth_date')) allowed.birth_date = body.birth_date || null;
+  if (Object.prototype.hasOwnProperty.call(body, 'metadata') && body.metadata && typeof body.metadata === 'object') {
+    allowed.metadata = body.metadata;
+  }
+
+  // Basic validation
+  if (allowed.full_name && allowed.full_name.length < 2) return res.status(400).json({ success: false, error: 'Ad Soyad çok kısa.' });
+  if (allowed.phone && !/^[0-9+\s()-]{6,30}$/.test(allowed.phone)) return res.status(400).json({ success: false, error: 'Telefon formatı geçersiz.' });
+
+  if (Object.keys(allowed).length === 0) return res.status(400).json({ success: false, error: 'Güncellenecek alan yok.' });
+
+  const updated = await safeUserPatch(auth.id, allowed);
+  const user = updated?.[0] || null;
+  if (user) delete user.password_hash;
+  res.json({ success: true, data: user });
+}
+
 async function supabaseCount(table, params = {}) {
   const { supabaseUrl, key } = getSupabaseKeys();
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
@@ -515,6 +612,107 @@ async function adminGetPosts(req, res) {
 async function adminDeletePost(req, res, postId) {
   requireAdmin(req, res);
   const updated = await supabaseRestPatch('posts', { id: `eq.${postId}` }, { is_deleted: true });
+  res.json({ success: true, data: updated?.[0] || null });
+}
+
+function slugifyParty(input) {
+  const s = String(input || '').trim().toLowerCase();
+  const map = { ç: 'c', ğ: 'g', ı: 'i', i: 'i', ö: 'o', ş: 's', ü: 'u' };
+  return s
+    .split('')
+    .map((ch) => map[ch] ?? ch)
+    .join('')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 100);
+}
+
+async function adminGetParties(req, res) {
+  requireAdmin(req, res);
+  const { page = 1, limit = 20, search, is_active } = req.query;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const offset = (pageNum - 1) * limitNum;
+
+  const params = {
+    select: '*',
+    order: 'name.asc',
+    limit: String(limitNum),
+    offset: String(offset),
+  };
+  if (is_active === 'true' || is_active === 'false') params.is_active = `eq.${is_active}`;
+  if (search && String(search).trim()) {
+    const q = String(search).trim();
+    params.or = `(name.ilike.*${q}*,short_name.ilike.*${q}*,slug.ilike.*${q}*)`;
+  }
+
+  const countParams = { select: 'id' };
+  if (params.is_active) countParams.is_active = params.is_active;
+  if (params.or) countParams.or = params.or;
+
+  const [total, rows] = await Promise.all([
+    supabaseCount('parties', countParams).catch(() => 0),
+    supabaseRestGet('parties', params).catch(() => []),
+  ]);
+
+  res.json({
+    success: true,
+    data: Array.isArray(rows) ? rows : [],
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limitNum)),
+    },
+  });
+}
+
+async function adminCreateParty(req, res) {
+  requireAdmin(req, res);
+  const body = await readJsonBody(req);
+  const name = String(body?.name || '').trim();
+  const short_name = String(body?.short_name || '').trim();
+  if (!name || !short_name) return res.status(400).json({ success: false, error: 'name ve short_name zorunludur.' });
+
+  const payload = {
+    name,
+    short_name,
+    slug: String(body?.slug || '').trim() || slugifyParty(name),
+    description: body?.description ?? null,
+    logo_url: body?.logo_url ?? null,
+    flag_url: body?.flag_url ?? null,
+    color: body?.color ?? null,
+    is_active: typeof body?.is_active === 'boolean' ? body.is_active : true,
+    foundation_date: body?.foundation_date ?? null,
+  };
+
+  const inserted = await supabaseRestInsert('parties', payload);
+  res.status(201).json({ success: true, data: inserted?.[0] || null });
+}
+
+async function adminUpdateParty(req, res, partyId) {
+  requireAdmin(req, res);
+  const body = await readJsonBody(req);
+  const allowed = {};
+  const fields = ['name', 'short_name', 'slug', 'description', 'logo_url', 'flag_url', 'color', 'foundation_date'];
+  for (const f of fields) {
+    if (Object.prototype.hasOwnProperty.call(body, f)) allowed[f] = body[f] ?? null;
+  }
+  if (typeof body?.is_active === 'boolean') allowed.is_active = body.is_active;
+  if (Object.keys(allowed).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
+
+  if (typeof allowed.slug === 'string' && allowed.slug.trim()) {
+    allowed.slug = slugifyParty(allowed.slug);
+  }
+
+  const updated = await supabaseRestPatch('parties', { id: `eq.${partyId}` }, allowed);
+  res.json({ success: true, data: updated?.[0] || null });
+}
+
+async function adminDeleteParty(req, res, partyId) {
+  requireAdmin(req, res);
+  const updated = await supabaseRestPatch('parties', { id: `eq.${partyId}` }, { is_active: false });
   res.json({ success: true, data: updated?.[0] || null });
 }
 
@@ -1010,6 +1208,12 @@ export default async function handler(req, res) {
       }
       
       if (url === '/api/users' || url === '/api/users/') return await getUsers(req, res); // Search
+      if (url.startsWith('/api/users/check-username/') && req.method === 'GET') {
+        const username = url.split('/api/users/check-username/')[1];
+        return await usersCheckUsername(req, res, username);
+      }
+      if (url === '/api/users/username' && req.method === 'PUT') return await usersUpdateUsername(req, res);
+      if (url === '/api/users/me' && req.method === 'PUT') return await usersUpdateMe(req, res);
       if (url.startsWith('/api/users/')) {
           const rest = url.split('/api/users/')[1];
           const parts = rest.split('/').filter(Boolean);
@@ -1056,6 +1260,8 @@ export default async function handler(req, res) {
       if (url === '/api/admin/stats' && req.method === 'GET') return await adminGetStats(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
       if (url === '/api/admin/posts' && req.method === 'GET') return await adminGetPosts(req, res);
+      if (url === '/api/admin/parties' && req.method === 'GET') return await adminGetParties(req, res);
+      if (url === '/api/admin/parties' && req.method === 'POST') return await adminCreateParty(req, res);
       if (url === '/api/admin/notifications' && req.method === 'POST') return await adminSendNotification(req, res);
       if (url.startsWith('/api/admin/users/') && req.method === 'PUT') {
         const userId = url.split('/api/admin/users/')[1];
@@ -1068,6 +1274,14 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/admin/posts/') && req.method === 'DELETE') {
         const postId = url.split('/api/admin/posts/')[1];
         return await adminDeletePost(req, res, postId);
+      }
+      if (url.startsWith('/api/admin/parties/') && req.method === 'PUT') {
+        const partyId = url.split('/api/admin/parties/')[1];
+        return await adminUpdateParty(req, res, partyId);
+      }
+      if (url.startsWith('/api/admin/parties/') && req.method === 'DELETE') {
+        const partyId = url.split('/api/admin/parties/')[1];
+        return await adminDeleteParty(req, res, partyId);
       }
 
       // Search

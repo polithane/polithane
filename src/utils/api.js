@@ -288,6 +288,26 @@ export const admin = {
       method: 'POST',
       body: JSON.stringify({ user_id, title, message, type, broadcast }),
     }),
+
+  // Parties
+  getParties: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/parties${query ? `?${query}` : ''}`);
+  },
+  createParty: (data) =>
+    apiCall('/api/admin/parties', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateParty: (partyId, data) =>
+    apiCall(`/api/admin/parties/${partyId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteParty: (partyId) =>
+    apiCall(`/api/admin/parties/${partyId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // ============================================

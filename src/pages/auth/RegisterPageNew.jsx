@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Eye, EyeOff, Check, X, ChevronRight, AlertCircle, Search, 
-  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, CheckCircle 
+  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, CheckCircle, Mail, Lock
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Avatar } from '../../components/common/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
 import { parties as partiesApi, users as usersApi } from '../../utils/api';
 import { CITY_CODES } from '../../utils/constants';
+import { isValidEmail, isValidPhone, isValidFileSize, isValidFileType } from '../../utils/validators';
 
 // Şifre kuralları
 const PASSWORD_RULES = [
@@ -120,6 +121,7 @@ export const RegisterPageNew = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [globalError, setGlobalError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Init
   useEffect(() => {
@@ -181,8 +183,8 @@ export const RegisterPageNew = () => {
     
     // Regex Check First
     if (field === 'email') {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(value)) {
+        const hasTurkish = /[çğıöşüİÇĞÖŞÜ]/.test(String(value || ''));
+        if (!isValidEmail(value) || hasTurkish) {
             setEmailStatus('idle');
             return;
         }
@@ -218,8 +220,20 @@ export const RegisterPageNew = () => {
     
     setFormData(prev => ({ ...prev, [name]: value }));
     setGlobalError('');
+    setFieldErrors((prev) => ({ ...prev, [name]: '' }));
 
     if (name === 'email') checkAvailability('email', value);
+    if (name === 'phone' && value) {
+      if (!isValidPhone(value)) {
+        setFieldErrors((prev) => ({ ...prev, phone: 'Telefon 05XXXXXXXXX formatında olmalı.' }));
+      }
+    }
+    if (name === 'email' && value) {
+      const hasTurkish = /[çğıöşüİÇĞÖŞÜ]/.test(String(value || ''));
+      if (!isValidEmail(value) || hasTurkish) {
+        setFieldErrors((prev) => ({ ...prev, email: 'Geçerli bir e‑posta girin (Türkçe karakter olmadan).' }));
+      }
+    }
   };
 
   // Search Profile
@@ -259,6 +273,14 @@ export const RegisterPageNew = () => {
       setGlobalError('Bu email adresi zaten kullanımda.');
       return;
     }
+    if (formData.email && (/[çğıöşüİÇĞÖŞÜ]/.test(formData.email) || !isValidEmail(formData.email))) {
+      setGlobalError('Geçerli bir email adresi giriniz (Türkçe karakter olmadan).');
+      return;
+    }
+    if (formData.phone && !isValidPhone(formData.phone)) {
+      setGlobalError('Telefon 05XXXXXXXXX formatında olmalı.');
+      return;
+    }
 
     setLoading(true);
     setGlobalError('');
@@ -266,6 +288,13 @@ export const RegisterPageNew = () => {
     try {
       let documentData = null;
       if (file) {
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+        if (!isValidFileType(file, allowedTypes)) {
+          throw new Error('Belge türü desteklenmiyor. PDF/JPG/PNG yükleyin.');
+        }
+        if (!isValidFileSize(file, 5)) {
+          throw new Error('Belge boyutu çok büyük. En fazla 5MB yükleyin.');
+        }
         const toBase64 = (file) => new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -286,7 +315,15 @@ export const RegisterPageNew = () => {
         }
       }
 
-      const userType = formData.membership_type === 'organization' ? 'party_member' : formData.membership_type;
+      const membershipToUserType = (m) => {
+        if (m === 'citizen') return 'citizen';
+        if (m === 'party_member') return 'party_member';
+        if (m === 'organization') return 'party_official';
+        if (m === 'politician') return 'mp';
+        if (m === 'media') return 'media';
+        return 'citizen';
+      };
+      const userType = membershipToUserType(formData.membership_type);
       
       const payload = {
         full_name: formData.full_name,
@@ -296,7 +333,7 @@ export const RegisterPageNew = () => {
         party_id: formData.party_id,
         province: formData.province,
         district: formData.district,
-        politician_type: formData.role_type || formData.org_position || null,
+        politician_type: formData.role_type || null,
         metadata: {
             phone: formData.phone,
             media_title: formData.media_title,
@@ -331,8 +368,9 @@ export const RegisterPageNew = () => {
         throw new Error(result.error || 'Kayıt başarısız.');
       }
 
-      if (result.requiresApproval) {
-        setSuccessMessage(result.message);
+      const requiresApproval = !!(result?.requiresApproval ?? result?.data?.requiresApproval);
+      if (requiresApproval) {
+        setSuccessMessage(result?.message || 'Başvurunuz alındı. İnceleme sonrası bilgilendirileceksiniz.');
       } else {
         if (result.data?.token) {
             localStorage.setItem('auth_token', result.data.token);
@@ -448,25 +486,29 @@ export const RegisterPageNew = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="col-span-1 md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Ad Soyad</label>
-            <input
-              type="text"
-              name="full_name"
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-primary-blue focus:border-transparent transition-all"
-              value={formData.full_name}
-              onChange={handleInputChange}
-              required
-              readOnly={!!claimUser}
-              maxLength={50}
-            />
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
+              <input
+                type="text"
+                name="full_name"
+                className="w-full border border-gray-300 rounded-lg p-3 pl-14 focus:ring-2 focus:ring-primary-blue focus:border-transparent transition-all"
+                value={formData.full_name}
+                onChange={handleInputChange}
+                required
+                readOnly={!!claimUser}
+                maxLength={50}
+              />
+            </div>
           </div>
 
           <div className="col-span-1 md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Adresi</label>
             <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
               <input
                 type="email"
                 name="email"
-                className={`w-full border rounded-lg p-3 pr-10 focus:ring-2 transition-all ${
+                className={`w-full border rounded-lg p-3 pl-14 pr-10 focus:ring-2 transition-all ${
                   emailStatus === 'taken' ? 'border-red-500 bg-red-50' : 
                   emailStatus === 'available' ? 'border-green-500 bg-green-50' : 'border-gray-300'
                 }`}
@@ -482,6 +524,7 @@ export const RegisterPageNew = () => {
               </div>
             </div>
             {emailStatus === 'taken' && <p className="text-xs text-red-600 mt-1">Bu email kullanımda.</p>}
+            {fieldErrors.email && <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>}
           </div>
 
           {/* Party & Location */}
@@ -532,6 +575,22 @@ export const RegisterPageNew = () => {
               maxLength={50}
             />
           </div>
+          
+          <div className="col-span-1 md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Telefon (Opsiyonel)</label>
+            <input
+              type="tel"
+              name="phone"
+              className={`w-full border rounded-lg p-3 ${
+                fieldErrors.phone ? 'border-red-400 bg-red-50' : 'border-gray-300'
+              }`}
+              value={formData.phone}
+              onChange={handleInputChange}
+              placeholder="05XXXXXXXXX"
+              maxLength={11}
+            />
+            {fieldErrors.phone && <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>}
+          </div>
 
           {/* Media Specific */}
           {isMedia && (
@@ -540,11 +599,11 @@ export const RegisterPageNew = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kurum Adı</label>
-                  <input type="text" name="media_outlet" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} required maxLength={100} />
+                  <input type="text" name="media_outlet" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} maxLength={100} placeholder="Opsiyonel" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ünvan</label>
-                  <input type="text" name="media_title" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} required maxLength={50} />
+                  <input type="text" name="media_title" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} maxLength={50} placeholder="Opsiyonel" />
                 </div>
               </div>
               <div>
@@ -576,7 +635,23 @@ export const RegisterPageNew = () => {
                   type="file" 
                   accept=".pdf,.jpg,.jpeg,.png"
                   className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
-                  onChange={(e) => setFile(e.target.files[0])}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+                    if (!isValidFileType(f, allowedTypes)) {
+                      setGlobalError('Belge türü desteklenmiyor. PDF/JPG/PNG yükleyin.');
+                      setFile(null);
+                      return;
+                    }
+                    if (!isValidFileSize(f, 5)) {
+                      setGlobalError('Belge boyutu çok büyük. En fazla 5MB yükleyin.');
+                      setFile(null);
+                      return;
+                    }
+                    setGlobalError('');
+                    setFile(f);
+                  }}
                   required
                 />
               </div>
@@ -595,10 +670,11 @@ export const RegisterPageNew = () => {
           <div className="col-span-1 md:col-span-2 border-t pt-4 mt-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Şifre</label>
             <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
               <input
                 type={showPassword ? "text" : "password"}
                 name="password"
-                className="w-full border border-gray-300 rounded-lg p-3 pr-10"
+                className="w-full border border-gray-300 rounded-lg p-3 pl-14 pr-10"
                 value={formData.password}
                 onChange={handleInputChange}
                 required
@@ -683,8 +759,8 @@ export const RegisterPageNew = () => {
   const renderChoice = () => (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Aramıza Katılın</h1>
-        <p className="text-gray-600">Siyasetin nabzını tutun, şeffaf ve özgür platformda yerinizi alın.</p>
+        <h1 className="text-2xl font-black text-gray-900 mb-2">Üyelik Seçenekleri</h1>
+        <p className="text-gray-600">Yeni üyelik veya mevcut profili sahiplenme.</p>
       </div>
 
       <div className="grid gap-4">
@@ -726,6 +802,28 @@ export const RegisterPageNew = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center p-4 py-10">
       <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 md:p-10 border border-gray-100">
+        <div className="text-center mb-8">
+          <div 
+            className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform"
+            onClick={() => navigate('/')}
+          >
+            <img 
+              src="/ikon.png" 
+              alt="Polithane" 
+              className="w-20 h-20 object-contain drop-shadow-lg"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            <div className="hidden items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg">
+              <span className="text-4xl font-black text-white">P</span>
+            </div>
+          </div>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Üye Ol</h1>
+          <p className="text-gray-600">Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
+        </div>
+
         {step === 0 && renderChoice()}
         {step === 1 && handleSearch && renderSearch && renderSearch()} 
         {/* renderSearch and renderTypeSelection are same as previous logic but simplified call here */}
