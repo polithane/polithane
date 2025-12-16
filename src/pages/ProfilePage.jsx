@@ -144,7 +144,8 @@ export const ProfilePage = () => {
           }
         }
         
-        const normalizedProfile = normalizeUser(profileData);
+        const resolvedProfileData = profileData?.data ? profileData.data : profileData;
+        const normalizedProfile = normalizeUser(resolvedProfileData);
         setUser(normalizedProfile);
 
         // Canonicalize URL: if user has a username, always prefer /:username
@@ -155,7 +156,7 @@ export const ProfilePage = () => {
         }
         
         // Posts: DB'den çek
-        const profileDbId = profileData.id ?? profileData.user_id;
+        const profileDbId = resolvedProfileData?.id ?? resolvedProfileData?.user_id;
         if (profileDbId) {
           const dbPosts = await posts.getAll({
             user_id: profileDbId,
@@ -167,7 +168,7 @@ export const ProfilePage = () => {
           setUserPosts([]);
         }
         
-        const stats = getFollowStats(profileData.id || userId);
+        const stats = getFollowStats(resolvedProfileData?.id || userId);
         setFollowStats(stats);
       } catch (err) {
         console.error('Profile load error:', err);

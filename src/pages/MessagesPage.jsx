@@ -4,11 +4,12 @@ import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { formatTimeAgo } from '../utils/formatters';
-import { mockUsers } from '../mock/users';
-import { mockConversations, mockMessages, generateMockMessages } from '../mock/messages';
 import { Search, Send, AlertCircle } from 'lucide-react';
+import { messages as messagesApi } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export const MessagesPage = () => {
+  const { user } = useAuth();
   const [selectedConv, setSelectedConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -17,22 +18,18 @@ export const MessagesPage = () => {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   
-  // Filter only regular conversations (not requests)
-  const regularConversations = mockConversations?.filter(c => c?.message_type === 'regular') || [];
+  const [conversations, setConversations] = useState([]);
   
   // Filter conversations by search query
   const filteredConversations = searchQuery
-    ? regularConversations.filter(conv => {
-        try {
-          const user = mockUsers.find(u => u?.user_id === conv?.participant_id);
-          return user?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                 conv?.last_message?.toLowerCase().includes(searchQuery.toLowerCase());
-        } catch (err) {
-          console.error('Error filtering conversation:', err);
-          return false;
-        }
+    ? (conversations || []).filter((conv) => {
+        const u = conv.participant;
+        return (
+          (u?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (conv?.last_message || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
       })
-    : regularConversations;
+    : conversations;
   
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -42,59 +39,48 @@ export const MessagesPage = () => {
   // Load messages when conversation is selected
   useEffect(() => {
     if (selectedConv) {
-      try {
+      const load = async () => {
         setLoading(true);
         setError(null);
-        
-        // Simulate async loading with a small delay
-        const timer = setTimeout(() => {
-          try {
-            const conversationMessages = mockMessages[selectedConv.conversation_id] || 
-                                         generateMockMessages(selectedConv.conversation_id, 10);
-            
-            // Validate messages
-            const validMessages = conversationMessages?.filter(msg => 
-              msg && msg.message_id && msg.message_text
-            ) || [];
-            
-            setMessages(validMessages);
-            setLoading(false);
-            
-            // Scroll to bottom after messages load
-            setTimeout(scrollToBottom, 100);
-          } catch (err) {
-            console.error('Error loading messages:', err);
-            setError('Mesajlar yüklenirken bir hata oluştu');
-            setMessages([]);
-            setLoading(false);
-          }
-        }, 100);
-        
-        return () => clearTimeout(timer);
-      } catch (err) {
-        console.error('Error in useEffect:', err);
-        setError('Bir hata oluştu');
-        setLoading(false);
-      }
+        try {
+          const r = await messagesApi.getMessages(selectedConv.participant_id);
+          if (r?.success) setMessages(r.data || []);
+          setTimeout(scrollToBottom, 100);
+        } catch (err) {
+          console.error('Error loading messages:', err);
+          setError('Mesajlar yüklenirken bir hata oluştu');
+          setMessages([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      load();
     }
   }, [selectedConv]);
+
+  // Load conversations
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.id) return;
+      try {
+        const r = await messagesApi.getConversations();
+        if (r?.success) setConversations(r.data || []);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
+  }, [user?.id]);
   
   // Send message
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConv) return;
     
     try {
-      const newMsg = {
-        message_id: Date.now(),
-        conversation_id: selectedConv.conversation_id,
-        sender_id: 'currentUser',
-        receiver_id: selectedConv.participant_id,
-        message_text: newMessage,
-        created_at: new Date().toISOString(),
-        is_read: false
-      };
-      
-      setMessages(prev => [...prev, newMsg]);
+      const sent = await messagesApi.send(selectedConv.participant_id, newMessage.trim());
+      if (sent?.success) {
+        setMessages((prev) => [...prev, sent.data]);
+      }
       setNewMessage('');
       
       // Scroll to bottom after sending
@@ -130,7 +116,7 @@ export const MessagesPage = () => {
                 try {
                   if (!conv || !conv.conversation_id) return null;
                   
-                  const user = mockUsers.find(u => u?.user_id === conv.participant_id);
+                  const user = conv.participant;
                   if (!user) return null;
                   
                   return (
@@ -204,16 +190,16 @@ export const MessagesPage = () => {
                 <div className="p-4 border-b">
                   <div className="flex items-center gap-3">
                     <Avatar 
-                      src={mockUsers.find(u => u.user_id === selectedConv.participant_id)?.profile_image} 
+                      src={selectedConv.participant?.avatar_url || selectedConv.participant?.profile_image} 
                       size="40px"
-                      verified={mockUsers.find(u => u.user_id === selectedConv.participant_id)?.verification_badge}
+                      verified={selectedConv.participant?.verification_badge || selectedConv.participant?.is_verified}
                     />
                     <div>
                       <h3 className="font-semibold">
-                        {mockUsers.find(u => u.user_id === selectedConv.participant_id)?.full_name}
+                        {selectedConv.participant?.full_name}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        {mockUsers.find(u => u.user_id === selectedConv.participant_id)?.user_type === 'politician' ? 'Siyasetçi' : 'Kullanıcı'}
+                        {selectedConv.participant?.user_type || 'Kullanıcı'}
                       </p>
                     </div>
                   </div>
@@ -245,19 +231,19 @@ export const MessagesPage = () => {
                     <div className="space-y-3">
                       {messages.map((message) => {
                         try {
-                          if (!message || !message.message_id) return null;
+                          if (!message || !message.id) return null;
                           
-                          const isFromMe = message.sender_id === 'currentUser';
-                          const user = isFromMe ? null : mockUsers.find(u => u?.user_id === selectedConv?.participant_id);
+                          const isFromMe = message.sender_id === user?.id;
+                          const otherUser = isFromMe ? null : selectedConv?.participant;
                           
                           return (
                             <div
-                              key={message.message_id}
+                              key={message.id}
                               className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
                             >
                               {!isFromMe && (
                                 <Avatar 
-                                  src={user?.avatar_url || user?.profile_image} 
+                                  src={otherUser?.avatar_url || otherUser?.profile_image} 
                                   size="28px"
                                   className="mr-2 flex-shrink-0"
                                 />
@@ -271,7 +257,7 @@ export const MessagesPage = () => {
                                       : 'bg-white text-gray-900 rounded-bl-sm border border-gray-200'
                                   }`}
                                 >
-                                  <p className="text-sm break-words">{message.message_text || ''}</p>
+                                  <p className="text-sm break-words">{message.content || ''}</p>
                                 </div>
                                 
                                 <div className="flex items-center gap-1 mt-1 px-1">

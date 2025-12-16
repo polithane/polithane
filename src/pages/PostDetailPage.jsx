@@ -6,41 +6,116 @@ import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
 import { formatNumber, formatPolitScore, formatTimeAgo, formatDate, formatDuration, getSourceDomain } from '../utils/formatters';
-import { generateMockPosts } from '../mock/posts';
-import { mockComments, generateMockComments } from '../mock/comments';
 import ReactPlayer from 'react-player';
+import { posts as postsApi } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export const PostDetailPage = () => {
   const { postId } = useParams();
   const navigate = useNavigate();
+  const { user: currentUser, isAuthenticated } = useAuth();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [newComment, setNewComment] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   
   useEffect(() => {
-    // Tüm postları generate et (400 post)
-    const allPosts = generateMockPosts(400);
-    const foundPost = allPosts.find(p => p.post_id === parseInt(postId));
-    setPost(foundPost);
-    
-    // Her post için 8-10 yorum garantile
-    const commentCount = Math.floor(Math.random() * 3) + 8; // 8, 9 veya 10 yorum
-    const postComments = generateMockComments(commentCount).map((comment, index) => ({
-      ...comment,
-      comment_id: parseInt(postId) * 1000 + index,
-      post_id: parseInt(postId)
-    }));
-    setComments(postComments);
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const detail = await postsApi.getById(postId);
+        const dbPost = detail?.data ? detail.data : detail;
+        setPost(dbPost);
+
+        const c = await postsApi.getComments(postId).catch(() => null);
+        const rows = c?.data?.data || c?.data || c || [];
+        setComments(Array.isArray(rows) ? rows : []);
+      } catch (e) {
+        console.error(e);
+        setError(e?.message || 'Paylaşım yüklenemedi.');
+        setPost(null);
+        setComments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [postId]);
   
-  if (!post) {
+  if (loading) {
     return (
       <div className="container-main py-8">
         <div className="text-center">Yükleniyor...</div>
       </div>
     );
   }
+
+  if (error || !post) {
+    return (
+      <div className="container-main py-8">
+        <div className="text-center text-gray-700">{error || 'Paylaşım bulunamadı.'}</div>
+      </div>
+    );
+  }
+
+  const uiPost = {
+    post_id: post.post_id ?? post.id,
+    user_id: post.user_id,
+    content_type: post.content_type || (Array.isArray(post.media_urls) && post.media_urls.length > 0 ? 'image' : 'text'),
+    content_text: post.content_text ?? post.content ?? '',
+    media_url: post.media_url ?? post.media_urls ?? [],
+    thumbnail_url: post.thumbnail_url,
+    media_duration: post.media_duration,
+    agenda_tag: post.agenda_tag,
+    polit_score: post.polit_score,
+    view_count: post.view_count,
+    like_count: post.like_count,
+    comment_count: post.comment_count,
+    share_count: post.share_count,
+    created_at: post.created_at,
+    source_url: post.source_url,
+    user: post.user || null,
+  };
+
+  const handleToggleLike = async () => {
+    if (!isAuthenticated) {
+      navigate('/login-new');
+      return;
+    }
+    try {
+      const r = await postsApi.like(uiPost.post_id);
+      if (r?.success) {
+        // Refresh counts
+        const detail = await postsApi.getById(uiPost.post_id);
+        setPost(detail?.data ? detail.data : detail);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!isAuthenticated) {
+      navigate('/login-new');
+      return;
+    }
+    const text = newComment.trim();
+    if (!text) return;
+    try {
+      await postsApi.addComment(uiPost.post_id, text);
+      setNewComment('');
+      const c = await postsApi.getComments(uiPost.post_id).catch(() => null);
+      const rows = c?.data?.data || c?.data || c || [];
+      setComments(Array.isArray(rows) ? rows : []);
+      const detail = await postsApi.getById(uiPost.post_id);
+      setPost(detail?.data ? detail.data : detail);
+    } catch (e) {
+      console.error(e);
+    }
+  };
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -50,81 +125,85 @@ export const PostDetailPage = () => {
           <div className="card mb-6">
             <div className="flex items-center gap-4 mb-4">
               <Avatar 
-                src={post.user?.avatar_url || post.user?.profile_image} 
+                src={uiPost.user?.avatar_url || uiPost.user?.profile_image} 
                 size="60px" 
-                verified={post.user?.verification_badge}
+                verified={uiPost.user?.verification_badge || uiPost.user?.is_verified}
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-lg break-words">{post.user?.full_name}</h3>
-                  {post.user?.party_id && post.user?.party?.party_short_name && (
-                    <Badge variant="secondary" size="small">{post.user.party.party_short_name}</Badge>
+                  <h3 className="font-bold text-lg break-words">{uiPost.user?.full_name}</h3>
+                  {uiPost.user?.party_id && uiPost.user?.party?.short_name && (
+                    <Badge variant="secondary" size="small">{uiPost.user.party.short_name}</Badge>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 break-words">{formatDate(post.created_at)}</p>
+                <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
               </div>
-              <Button variant="outline" onClick={() => navigate(`/profile/${post.user_id}`)}>
+              <Button variant="outline" onClick={() => navigate(`/profile/${uiPost.user_id}`)}>
                 Takip Et
               </Button>
             </div>
             
             {/* İçerik */}
             <div className="mb-4">
-              {post.content_type === 'text' && (
-                <p className="text-gray-900 text-2xl leading-relaxed font-medium whitespace-pre-wrap">{post.content_text}</p>
+              {uiPost.content_type === 'text' && (
+                <p className="text-gray-900 text-2xl leading-relaxed font-medium whitespace-pre-wrap">{uiPost.content_text}</p>
               )}
-              {post.content_type === 'image' && (
+              {uiPost.content_type === 'image' && (
                 <div>
-                  <img src={post.media_url} alt="" className="w-full rounded-lg mb-3" />
-                  {post.content_text && <p className="text-gray-800">{post.content_text}</p>}
+                  {Array.isArray(uiPost.media_url) ? (
+                    <img src={uiPost.media_url[0]} alt="" className="w-full rounded-lg mb-3" />
+                  ) : (
+                    <img src={uiPost.media_url} alt="" className="w-full rounded-lg mb-3" />
+                  )}
+                  {uiPost.content_text && <p className="text-gray-800">{uiPost.content_text}</p>}
                 </div>
               )}
-              {post.content_type === 'video' && (
+              {uiPost.content_type === 'video' && (
                 <div>
-                  <ReactPlayer url={post.media_url} controls width="100%" />
-                  {post.content_text && <p className="text-gray-800 mt-3">{post.content_text}</p>}
+                  <ReactPlayer url={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} controls width="100%" />
+                  {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
                 </div>
               )}
-              {post.content_type === 'audio' && (
+              {uiPost.content_type === 'audio' && (
                 <div className="bg-gray-100 rounded-lg p-6">
-                  <audio src={post.media_url} controls className="w-full" />
-                  {post.content_text && <p className="text-gray-800 mt-3">{post.content_text}</p>}
+                  <audio src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} controls className="w-full" />
+                  {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
                 </div>
               )}
             </div>
             
             {/* Gündem */}
-            {post.agenda_tag && (
+            {uiPost.agenda_tag && (
               <Badge variant="primary" className="mb-4">
-                {post.agenda_tag}
+                {uiPost.agenda_tag}
               </Badge>
             )}
 
             {/* Kaynak / Otomatik paylaşım şeffaflık satırı */}
-            {post.source_url && (
+            {uiPost.source_url && (
               <div className="mt-2 text-xs text-gray-500 leading-snug">
-                Bu paylaşım <span className="font-semibold">{getSourceDomain(post.source_url)}</span> adresinden alınmış olup otomatik olarak paylaşılmıştır.
+                Bu paylaşım <span className="font-semibold">{getSourceDomain(uiPost.source_url)}</span> adresinden alınmış olup otomatik olarak paylaşılmıştır.
               </div>
             )}
             
             {/* Etkileşim Butonları - Kompakt */}
             <div className="grid grid-cols-3 gap-2 pt-4 border-t">
               {/* BEĞEN - Özel Vurgulu */}
-              <button className="flex items-center justify-center gap-2 bg-gradient-to-br from-red-500 via-pink-500 to-red-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <button onClick={handleToggleLike} className="flex items-center justify-center gap-2 bg-gradient-to-br from-red-500 via-pink-500 to-red-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                 <Heart className="w-4 h-4" fill="currentColor" />
-                <span className="text-sm font-bold">BEĞEN ({formatNumber(post.like_count)})</span>
+                <span className="text-sm font-bold">BEĞEN ({formatNumber(uiPost.like_count)})</span>
               </button>
               
               {/* YORUM */}
               <button className="flex items-center justify-center gap-2 bg-gradient-to-br from-primary-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                 <MessageCircle className="w-4 h-4" />
-                <span className="text-sm font-bold">YORUM ({formatNumber(post.comment_count)})</span>
+                <span className="text-sm font-bold">YORUM ({formatNumber(uiPost.comment_count)})</span>
               </button>
               
               {/* PAYLAŞ */}
               <button className="flex items-center justify-center gap-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                 <Share2 className="w-4 h-4" />
-                <span className="text-sm font-bold">PAYLAŞ ({formatNumber(post.share_count || 0)})</span>
+                <span className="text-sm font-bold">PAYLAŞ ({formatNumber(uiPost.share_count || 0)})</span>
               </button>
             </div>
             
@@ -140,7 +219,7 @@ export const PostDetailPage = () => {
             <div className="mt-4 pt-4 border-t">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-primary-blue">{formatPolitScore(post.polit_score)}</div>
+                    <div className="text-3xl font-bold text-primary-blue">{formatPolitScore(uiPost.polit_score)}</div>
                 </div>
                 <Button variant="outline" onClick={() => setShowScoreModal(true)}>
                   Detaylı Hesaplama
@@ -156,7 +235,7 @@ export const PostDetailPage = () => {
             {/* Yorum Ekleme */}
             <div className="mb-6 pb-6 border-b">
               <div className="flex gap-3">
-                <Avatar src="/assets/mock/avatars/user1.jpg" size="40px" />
+                <Avatar src={currentUser?.avatar_url || currentUser?.profile_image} size="40px" />
                 <div className="flex-1">
                   <textarea
                     value={newComment}
@@ -165,10 +244,7 @@ export const PostDetailPage = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
                     rows="3"
                   />
-                  <Button className="mt-2" onClick={() => {
-                    // Mock comment add
-                    setNewComment('');
-                  }}>
+                  <Button className="mt-2" onClick={handleAddComment}>
                     Gönder
                   </Button>
                 </div>
@@ -178,14 +254,14 @@ export const PostDetailPage = () => {
             {/* Yorum Listesi */}
             <div className="space-y-4">
               {comments.map(comment => (
-                <div key={comment.comment_id} className="flex gap-3">
-                  <Avatar src={comment.user?.avatar_url || user?.profile_image} size="40px" verified={comment.user?.verification_badge} />
+                <div key={comment.id || comment.comment_id} className="flex gap-3">
+                  <Avatar src={comment.user?.avatar_url || comment.user?.profile_image} size="40px" verified={comment.user?.verification_badge || comment.user?.is_verified} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold">{comment.user?.full_name}</span>
                       <span className="text-sm text-gray-500">{formatTimeAgo(comment.created_at)}</span>
                     </div>
-                    <p className="text-gray-800 mb-2">{comment.comment_text}</p>
+                    <p className="text-gray-800 mb-2">{comment.content || comment.comment_text}</p>
                     <div className="flex items-center gap-4">
                       <button className="flex items-center gap-1 text-gray-600 hover:text-red-500">
                         <Heart className="w-4 h-4" />
@@ -212,7 +288,7 @@ export const PostDetailPage = () => {
         <div className="space-y-4">
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-primary-blue mb-2">
-              {formatPolitScore(post.polit_score)} Polit Puan
+              {formatPolitScore(uiPost.polit_score)} Polit Puan
             </div>
             <p className="text-sm text-gray-600">
               Bu puan, paylaşımınıza yapılan etkileşimlerden hesaplanmıştır.
@@ -223,15 +299,15 @@ export const PostDetailPage = () => {
             <ul className="space-y-2">
               <li className="flex justify-between">
                 <span>Görüntülenme:</span>
-                <span className="font-semibold">{formatNumber(post.view_count)}</span>
+                <span className="font-semibold">{formatNumber(uiPost.view_count)}</span>
               </li>
               <li className="flex justify-between">
                 <span>Beğeni:</span>
-                <span className="font-semibold">{formatNumber(post.like_count)}</span>
+                <span className="font-semibold">{formatNumber(uiPost.like_count)}</span>
               </li>
               <li className="flex justify-between">
                 <span>Yorum:</span>
-                <span className="font-semibold">{formatNumber(post.comment_count)}</span>
+                <span className="font-semibold">{formatNumber(uiPost.comment_count)}</span>
               </li>
             </ul>
           </div>

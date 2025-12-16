@@ -29,8 +29,13 @@ export const AuthProvider = ({ children }) => {
         
         try {
           const data = await api.auth.me();
-          setUser(data.data);
-          localStorage.setItem('user', JSON.stringify(data.data));
+          const resolvedUser = data?.data?.user ?? data?.data ?? null;
+          if (resolvedUser) {
+            setUser(resolvedUser);
+            localStorage.setItem('user', JSON.stringify(resolvedUser));
+          } else {
+            setUser(JSON.parse(storedUser));
+          }
         } catch (error) {
           console.error('Auth verification error:', error);
           // Network error, use cached user
@@ -122,8 +127,11 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const data = await api.auth.me();
-      setUser(data.data);
-      localStorage.setItem('user', JSON.stringify(data.data));
+      const resolvedUser = data?.data?.user ?? data?.data ?? null;
+      if (resolvedUser) {
+        setUser(resolvedUser);
+        localStorage.setItem('user', JSON.stringify(resolvedUser));
+      }
     } catch (error) {
       console.error('Refresh user error:', error);
     }

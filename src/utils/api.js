@@ -158,13 +158,11 @@ export const posts = {
 
   getById: (id) => apiCall(`/api/posts/${id}`),
 
-  create: (formData) => {
-    // FormData for file upload
-    return apiCall('/api/posts', {
+  create: (payload) =>
+    apiCall('/api/posts', {
       method: 'POST',
-      body: formData,
-    });
-  },
+      body: JSON.stringify(payload || {}),
+    }),
 
   update: (id, data) =>
     apiCall(`/api/posts/${id}`, {
