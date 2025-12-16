@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Eye, EyeOff, Check, X, ChevronRight, AlertCircle, Search, 
-  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, HelpCircle 
+  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, Calendar 
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Avatar } from '../../components/common/Avatar';
@@ -65,7 +65,7 @@ const MEMBERSHIP_TYPES = [
 export const RegisterPageNew = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { register } = useAuth();
+  const { register } = useAuth(); // AuthContext'teki register fonksiyonu FormData desteklemeli veya burada direkt fetch kullanacağız
   
   // URL Params
   const initialMode = searchParams.get('mode'); // 'claim'
@@ -83,7 +83,6 @@ export const RegisterPageNew = () => {
   
   // Availability
   const [emailStatus, setEmailStatus] = useState('idle');
-  const [usernameStatus, setUsernameStatus] = useState('idle');
   const [availabilityTimeout, setAvailabilityTimeout] = useState(null);
 
   // Captcha
@@ -96,7 +95,6 @@ export const RegisterPageNew = () => {
     role_type: '', 
     full_name: '',
     email: '',
-    username: '',
     password: '',
     password_confirm: '',
     phone: '',
@@ -108,11 +106,17 @@ export const RegisterPageNew = () => {
     media_outlet: '',
     media_website: '',
     media_bio: '',
-    org_position: ''
+    org_position: '',
+    start_date: '',
+    previous_roles: '',
+    bio: ''
   });
+  
+  const [file, setFile] = useState(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [globalError, setGlobalError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Init
   useEffect(() => {
@@ -135,7 +139,7 @@ export const RegisterPageNew = () => {
   const generateCaptcha = () => {
     const a = Math.floor(Math.random() * 10) + 1;
     const b = Math.floor(Math.random() * 10) + 1;
-    setCaptcha({ q: `${a} + ${b} = ?`, a: a + b });
+    setCaptcha({ q: `${a} + ${b} =`, a: a + b });
     setCaptchaInput('');
   };
 
@@ -150,7 +154,6 @@ export const RegisterPageNew = () => {
         setFormData(prev => ({
           ...prev,
           full_name: data.data.full_name,
-          username: data.data.username, // Keep username but validate ownership
           membership_type: mapUserTypeToMembership(data.data.user_type, data.data.politician_type),
           party_id: data.data.party_id || '',
           province: data.data.province || '',
@@ -175,15 +178,10 @@ export const RegisterPageNew = () => {
   // Availability Check
   const checkAvailability = async (field, value) => {
     if (!value || value.length < 3) return;
-    if (field === 'username' && claimUser && value === claimUser.username) {
-      setUsernameStatus('available'); // Claiming own username is allowed (backend logic handles linking)
-      return;
-    }
-
+    
     if (availabilityTimeout) clearTimeout(availabilityTimeout);
     
     if (field === 'email') setEmailStatus('checking');
-    if (field === 'username') setUsernameStatus('checking');
 
     const timeout = setTimeout(async () => {
       try {
@@ -193,7 +191,6 @@ export const RegisterPageNew = () => {
         
         if (data.success) {
           if (field === 'email') setEmailStatus(data.emailAvailable ? 'available' : 'taken');
-          if (field === 'username') setUsernameStatus(data.usernameAvailable ? 'available' : 'taken');
         }
       } catch (err) {
         console.error('Check failed:', err);
@@ -209,7 +206,6 @@ export const RegisterPageNew = () => {
     setGlobalError('');
 
     if (name === 'email') checkAvailability('email', value);
-    if (name === 'username') checkAvailability('username', value);
   };
 
   // Search Profile
@@ -220,8 +216,6 @@ export const RegisterPageNew = () => {
     }
     setIsSearching(true);
     try {
-      // Mock search or real API if available
-      // Using direct API call pattern
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       const res = await fetch(`${apiUrl}/users?search=${encodeURIComponent(query)}&limit=5`);
       const data = await res.json();
@@ -252,31 +246,64 @@ export const RegisterPageNew = () => {
     setGlobalError('');
 
     try {
-      const registerData = {
-        ...formData,
-        user_type: formData.membership_type === 'organization' ? 'party_member' : formData.membership_type, // Org maps to party_member with politician_type in backend logic usually
-        politician_type: formData.role_type || formData.org_position || null,
-        metadata: {
-          media_title: formData.media_title,
-          media_outlet: formData.media_outlet,
-          media_website: formData.media_website,
-          media_bio: formData.media_bio,
-          phone: formData.phone
-        },
-        is_claim: !!claimUser,
-        claim_user_id: claimUser?.id
+      // Use FormData for file upload support
+      const submitData = new FormData();
+      submitData.append('full_name', formData.full_name);
+      submitData.append('email', formData.email);
+      submitData.append('password', formData.password);
+      
+      const userType = formData.membership_type === 'organization' ? 'party_member' : formData.membership_type;
+      submitData.append('user_type', userType);
+      
+      if (formData.party_id) submitData.append('party_id', formData.party_id);
+      if (formData.province) submitData.append('province', formData.province);
+      if (formData.district) submitData.append('district', formData.district);
+      
+      const polType = formData.role_type || formData.org_position || null;
+      if (polType) submitData.append('politician_type', polType);
+
+      // Metadata construction
+      const metadata = {
+        phone: formData.phone,
+        media_title: formData.media_title,
+        media_outlet: formData.media_outlet,
+        media_website: formData.media_website,
+        media_bio: formData.media_bio,
+        start_date: formData.start_date,
+        previous_roles: formData.previous_roles,
+        bio: formData.bio
       };
+      submitData.append('metadata', JSON.stringify(metadata));
 
-      // Backend expects specific user_type strings
-      // Mapping:
-      // citizen -> citizen
-      // party_member -> party_member
-      // organization -> party_member (with politician_type set) OR politician (if mayor)
-      // politician -> politician (mp)
-      // media -> media
+      if (claimUser) {
+        submitData.append('is_claim', 'true');
+        submitData.append('claim_user_id', claimUser.id);
+      }
 
-      await register(registerData);
-      navigate('/');
+      if (file) {
+        submitData.append('document', file);
+      }
+
+      // Direct fetch call because context register might not support FormData yet
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${apiUrl}/auth/register`, {
+        method: 'POST',
+        body: submitData, // Content-Type header should NOT be set manually for FormData
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kayıt başarısız.');
+      }
+
+      // Success logic
+      if (result.requiresApproval) {
+        setSuccessMessage(result.message);
+      } else {
+        // Auto login for citizen
+        navigate('/');
+      }
     } catch (err) {
       setGlobalError(err.message || 'Kayıt başarısız oldu.');
     } finally {
@@ -285,6 +312,21 @@ export const RegisterPageNew = () => {
   };
 
   // --- RENDERERS ---
+
+  if (successMessage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 text-center">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Check className="w-10 h-10 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Başvurunuz Alındı</h2>
+          <p className="text-gray-600 mb-8">{successMessage}</p>
+          <Button onClick={() => navigate('/')} fullWidth>Ana Sayfaya Dön</Button>
+        </div>
+      </div>
+    );
+  }
 
   // 0. Initial Choice
   const renderChoice = () => (
@@ -360,7 +402,6 @@ export const RegisterPageNew = () => {
               setFormData(prev => ({
                 ...prev,
                 full_name: user.full_name,
-                username: user.username,
                 membership_type: mapUserTypeToMembership(user.user_type, user.politician_type),
                 party_id: user.party_id || '',
                 province: user.province || ''
@@ -434,6 +475,9 @@ export const RegisterPageNew = () => {
     const isMedia = formData.membership_type === 'media';
     const isPolitician = formData.membership_type === 'politician';
     const isPartyMember = formData.membership_type === 'party_member' || isTeşkilat || isPolitician;
+    
+    // Dynamic Role Labels based on selection
+    const isDistrictRole = formData.role_type === 'district_chair' || formData.role_type === 'district_mayor';
 
     return (
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -451,21 +495,35 @@ export const RegisterPageNew = () => {
 
         {/* Dynamic Fields based on Type */}
         {isTeşkilat && (
-          <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 mb-4">
-            <label className="block text-sm font-bold text-orange-800 mb-2">Göreviniz</label>
-            <select
-              name="role_type"
-              className="w-full border-orange-200 rounded-lg p-2.5 bg-white"
-              onChange={handleInputChange}
-              required
-            >
-              <option value="">Seçiniz...</option>
-              <option value="party_official">Parti Teşkilatı Görevlisi</option>
-              <option value="provincial_chair">İl Başkanı</option>
-              <option value="district_chair">İlçe Başkanı</option>
-              <option value="metropolitan_mayor">Büyükşehir Bld. Başkanı</option>
-              <option value="district_mayor">İlçe Bld. Başkanı</option>
-            </select>
+          <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 mb-4 space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-orange-800 mb-2">Göreviniz</label>
+              <select
+                name="role_type"
+                className="w-full border-orange-200 rounded-lg p-2.5 bg-white"
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Seçiniz...</option>
+                <option value="party_official">Parti Teşkilatı Görevlisi</option>
+                <option value="provincial_chair">İl Başkanı</option>
+                <option value="district_chair">İlçe Başkanı</option>
+                <option value="metropolitan_mayor">Büyükşehir Bld. Başkanı</option>
+                <option value="district_mayor">İlçe Bld. Başkanı</option>
+              </select>
+            </div>
+            
+            {formData.role_type === 'party_official' && (
+              <div>
+                <label className="block text-sm font-bold text-orange-800 mb-1">Görev Ünvanı</label>
+                <input type="text" name="org_position" className="w-full border-orange-200 rounded-lg p-2" onChange={handleInputChange} required placeholder="Örn: Gençlik Kolları Bşk." />
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-bold text-orange-800 mb-1">Göreve Başlama Tarihi</label>
+              <input type="date" name="start_date" className="w-full border-orange-200 rounded-lg p-2" onChange={handleInputChange} required />
+            </div>
           </div>
         )}
 
@@ -506,30 +564,6 @@ export const RegisterPageNew = () => {
             {emailStatus === 'taken' && <p className="text-xs text-red-600 mt-1">Bu email kullanımda.</p>}
           </div>
 
-          <div className="col-span-1 md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Kullanıcı Adı (Benzersiz)</label>
-            <div className="relative">
-              <input
-                type="text"
-                name="username"
-                className={`w-full border rounded-lg p-3 pr-10 focus:ring-2 transition-all ${
-                  usernameStatus === 'taken' ? 'border-red-500 bg-red-50' : 
-                  usernameStatus === 'available' ? 'border-green-500 bg-green-50' : 'border-gray-300'
-                }`}
-                value={formData.username}
-                onChange={handleInputChange}
-                required
-                readOnly={!!claimUser} // Claiming requires keeping the username usually
-              />
-              <div className="absolute right-3 top-3.5">
-                {usernameStatus === 'checking' && <div className="animate-spin w-5 h-5 border-2 border-primary-blue border-t-transparent rounded-full" />}
-                {usernameStatus === 'available' && <Check className="w-5 h-5 text-green-600" />}
-                {usernameStatus === 'taken' && <X className="w-5 h-5 text-red-600" />}
-              </div>
-            </div>
-            {usernameStatus === 'taken' && <p className="text-xs text-red-600 mt-1">Bu kullanıcı adı kullanımda.</p>}
-          </div>
-
           {/* Party & Location */}
           {isPartyMember && (
             <div className="col-span-1 md:col-span-2">
@@ -566,13 +600,15 @@ export const RegisterPageNew = () => {
           </div>
 
           <div className="col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">İlçe (Opsiyonel)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">İlçe</label>
             <input
               type="text"
               name="district"
               className="w-full border border-gray-300 rounded-lg p-3"
               value={formData.district}
               onChange={handleInputChange}
+              required={isDistrictRole} // Zorunluluk dinamik
+              placeholder={isDistrictRole ? 'Zorunlu alan' : 'Opsiyonel'}
             />
           </div>
 
@@ -580,38 +616,57 @@ export const RegisterPageNew = () => {
           {isMedia && (
             <div className="col-span-1 md:col-span-2 bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
               <h4 className="font-bold text-gray-900 flex items-center"><Mic className="w-4 h-4 mr-2"/> Medya Bilgileri</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kurum Adı</label>
+                  <input type="text" name="media_outlet" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} required />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ünvan</label>
+                  <input type="text" name="media_title" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} required />
+                </div>
+              </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kurum Adı</label>
-                <input
-                  type="text"
-                  name="media_outlet"
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                  placeholder="Örn: Hürriyet, Fox TV..."
-                  onChange={handleInputChange}
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Web Sitesi</label>
+                <input type="url" name="media_website" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kısa Biyografi</label>
+                <textarea name="media_bio" className="w-full border border-gray-300 rounded-lg p-2" rows="2" onChange={handleInputChange}></textarea>
+              </div>
+            </div>
+          )}
+
+          {/* Dosya Yükleme (Belge) */}
+          {(isPartyMember || isTeşkilat || isPolitician) && (
+            <div className="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
+              <label className="block text-sm font-bold text-blue-900 mb-2 flex items-center">
+                <FileText className="w-4 h-4 mr-2"/> 
+                Resmi Belge Yükleme (Zorunlu)
+              </label>
+              <p className="text-xs text-blue-700 mb-3">
+                {isPolitician && 'Lütfen mazbatanızın net bir fotoğrafını yükleyiniz.'}
+                {formData.role_type && formData.role_type.includes('chair') && 'Lütfen mazbatanızın veya atama yazınızın fotoğrafını yükleyiniz.'}
+                {formData.role_type === 'party_official' && 'Lütfen görevlendirme yazınızı yükleyiniz.'}
+                {formData.membership_type === 'party_member' && 'Lütfen E-Devlet üzerinden alacağınız parti üyelik belgesini yükleyiniz.'}
+              </p>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="file" 
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
+                  onChange={(e) => setFile(e.target.files[0])}
                   required
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ünvan</label>
-                <input
-                  type="text"
-                  name="media_title"
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                  placeholder="Örn: Muhabir, Köşe Yazarı..."
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Web Sitesi (Opsiyonel)</label>
-                <input
-                  type="url"
-                  name="media_website"
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                  placeholder="https://..."
-                  onChange={handleInputChange}
-                />
-              </div>
+            </div>
+          )}
+
+          {/* Extra Info */}
+          {(isTeşkilat || isPolitician) && (
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Önceki Görevler (Opsiyonel)</label>
+              <textarea name="previous_roles" className="w-full border border-gray-300 rounded-lg p-3" rows="2" onChange={handleInputChange}></textarea>
             </div>
           )}
 
@@ -636,7 +691,6 @@ export const RegisterPageNew = () => {
               </button>
             </div>
             
-            {/* Checklist */}
             <div className="flex flex-wrap gap-2 mt-2">
               {PASSWORD_RULES.map(rule => {
                 const isValid = rule.validator(formData.password);
@@ -674,18 +728,20 @@ export const RegisterPageNew = () => {
           {/* Captcha */}
           <div className="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
             <div className="flex items-center gap-3">
-              <ShieldCheck className="text-blue-600" />
-              <div className="flex-1">
-                <label className="block text-sm font-bold text-blue-900 mb-1">Güvenlik Sorusu</label>
-                <p className="text-sm text-blue-700 mb-2">{captcha.q}</p>
-                <input
-                  type="number"
-                  placeholder="Sonucu yazın"
-                  className="w-32 border border-blue-200 rounded-lg p-2"
-                  value={captchaInput}
-                  onChange={(e) => setCaptchaInput(e.target.value)}
-                  required
-                />
+              <ShieldCheck className="text-blue-600 flex-shrink-0" />
+              <div className="flex-1 flex items-center gap-4">
+                <label className="block text-sm font-bold text-blue-900 whitespace-nowrap">Güvenlik Sorusu:</label>
+                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-blue-200">
+                  <span className="font-mono text-lg font-bold text-blue-800">{captcha.q}</span>
+                  <input
+                    type="number"
+                    className="w-16 border-0 border-b-2 border-blue-300 focus:border-blue-600 focus:ring-0 text-center font-bold text-lg p-0 appearance-none"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    required
+                    placeholder="?"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -706,7 +762,6 @@ export const RegisterPageNew = () => {
           loading={loading}
           disabled={
             emailStatus === 'taken' || 
-            (usernameStatus === 'taken' && !claimUser) ||
             !formData.password || 
             formData.password !== formData.password_confirm
           }
