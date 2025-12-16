@@ -110,7 +110,7 @@ router.get('/users', async (req, res) => {
       SELECT 
         id, username, full_name, email, user_type, 
         is_verified, is_admin, post_count, follower_count,
-        polit_score, created_at, last_login
+        polit_score, created_at, last_login, metadata
       FROM users
       ${whereClause}
       ORDER BY created_at DESC

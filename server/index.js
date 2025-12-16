@@ -846,6 +846,18 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================
 
+// Run migrations on startup
+(async () => {
+  try {
+    console.log('🔄 Checking database migrations...');
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'`;
+    await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS content TEXT`;
+    console.log('✅ Migrations checked/applied');
+  } catch (err) {
+    console.error('⚠️ Migration warning:', err.message);
+  }
+})();
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   🚀 Polithane Backend başlatıldı!

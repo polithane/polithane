@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Eye, EyeOff, Check, X, ChevronRight, AlertCircle, Search, 
-  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, Calendar 
+  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, Calendar, CheckCircle 
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Avatar } from '../../components/common/Avatar';
@@ -316,13 +316,23 @@ export const RegisterPageNew = () => {
   if (successMessage) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Check className="w-10 h-10 text-green-600" />
+        <div className="w-full max-w-lg bg-white rounded-3xl shadow-xl p-10 text-center border border-blue-50">
+          <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+            <ShieldCheck className="w-12 h-12 text-blue-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Başvurunuz Alındı</h2>
-          <p className="text-gray-600 mb-8">{successMessage}</p>
-          <Button onClick={() => navigate('/')} fullWidth>Ana Sayfaya Dön</Button>
+          <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">Başvurunuz Alındı</h2>
+          <div className="bg-blue-50 p-6 rounded-2xl mb-8 text-left">
+            <h4 className="font-bold text-blue-900 mb-2 flex items-center">
+              <CheckCircle className="w-5 h-5 mr-2" />
+              Süreç Başlatıldı
+            </h4>
+            <p className="text-blue-800 text-sm leading-relaxed">
+              Değerli kullanıcımız, üyelik başvurunuz ve ilettiğiniz belgeler sistemimize güvenli bir şekilde kaydedilmiştir. 
+              <br/><br/>
+              Ekibimiz başvurunuzu <strong>en kısa sürede</strong> titizlikle inceleyecek ve sonuç hakkında size e-posta/SMS yoluyla bilgilendirme yapacaktır. Bu süreçte gösterdiğiniz anlayış için teşekkür ederiz.
+            </p>
+          </div>
+          <Button onClick={() => navigate('/')} variant="outline" fullWidth size="lg">Ana Sayfaya Dön</Button>
         </div>
       </div>
     );
