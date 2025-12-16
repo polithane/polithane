@@ -26,27 +26,18 @@ export default async function handler(req, res) {
       order = 'created_at.desc',
     } = req.query || {};
 
+    // Use * for fields to avoid missing columns issues, plus the user relation
     const params = {
-        select: [
-            'id', 'user_id', 'party_id', 'content', 'content_type', 'content_text',
-            'media_urls', 'thumbnail_url', 'media_duration', 'category', 'agenda_tag',
-            'polit_score', 'view_count', 'like_count', 'dislike_count', 'comment_count',
-            'share_count', 'is_featured', 'is_deleted', 'created_at', 'source_url',
-            'user:users(id,username,full_name,avatar_url,user_type,politician_type,party_id,province,city_code,is_verified,is_active)'
-        ].join(','),
+        select: '*,user:users(id,username,full_name,avatar_url,user_type,politician_type,party_id,province,city_code,is_verified,is_active)',
         limit: String(limit),
         offset: String(offset),
         is_deleted: 'eq.false'
     };
 
-    // Ordering logic
-    // Frontend sends "created_at.desc"
-    // Supabase expects "created_at.desc" as value for "order" key
     if (order) {
         params.order = order;
     }
 
-    // Filters
     if (party_id) params.party_id = `eq.${party_id}`;
     if (user_id) params.user_id = `eq.${user_id}`;
     if (agenda_tag) params.agenda_tag = `eq.${agenda_tag}`;
@@ -54,18 +45,17 @@ export default async function handler(req, res) {
         const raw = String(user_ids);
         const list = raw.split(',').map(s => s.trim()).filter(id => /^[0-9a-fA-F-]{10,}$/.test(id));
         if (list.length > 0) {
-            // Overwrite single user_id filter if list exists
             params.user_id = `in.(${list.join(',')})`;
         }
     }
 
     const data = await supabaseRestGet('posts', params);
     
-    // Return data directly (Array expected by frontend)
+    // Always return array
     res.status(200).json(Array.isArray(data) ? data : []);
 
   } catch (error) {
     console.error('Posts API Error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 }
