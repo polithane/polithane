@@ -25,7 +25,13 @@ npm run preview
 ## 📚 Dokümantasyon
 
 - **[POLITHANE_MASTER_PLAN.md](POLITHANE_MASTER_PLAN.md)** - **Tek kaynak**: Proje tanımı + yol haritası + çalışma yönergesi
-- **[WORK_ARCHIVE/README.md](WORK_ARCHIVE/README.md)** - Eski dokümanlar (arşiv)
+
+## 🔒 Altyapı Kararı (Sabit)
+
+- **DB/Auth/Storage/Realtime**: Supabase
+- **Web hosting**: Vercel
+- **Harici e-posta**: SendGrid (şimdilik)
+- **Kural**: Bu karar sabittir; projeye başka bir veritabanı/hosting sağlayıcısı eklenmez ve migrasyon önerilmez.
 
 ## 📦 Teknolojiler
 

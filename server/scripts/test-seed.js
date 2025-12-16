@@ -47,7 +47,7 @@ async function testSeed() {
       INSERT INTO posts (user_id, content, content_type, category)
       VALUES
         (${users[0].id}, 'Bu bir test post - Polithane artık veritabanı ile çalışıyor! 🎉', 'text', 'haber'),
-        (${users[1].id}, 'İkinci test post - Neon PostgreSQL bağlantısı başarılı!', 'text', 'duyuru'),
+        (${users[1].id}, 'İkinci test post - Polithane artık Supabase üzerinde çalışıyor!', 'text', 'duyuru'),
         (${users[2].id}, 'Politikacı test post - Siyasi sosyal medya platformu hazır!', 'text', 'gundem')
     `;
     console.log('✅ 3 post eklendi\n');

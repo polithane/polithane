@@ -56,7 +56,7 @@ export const DatabaseManagement = () => {
             </div>
             <div className="flex items-center justify-between py-3 border-b border-gray-100">
               <span className="text-sm text-gray-600">Host:</span>
-              <span className="text-sm font-semibold text-gray-900">Neon (Serverless)</span>
+              <span className="text-sm font-semibold text-gray-900">Supabase (Managed)</span>
             </div>
             <div className="flex items-center justify-between py-3 border-b border-gray-100">
               <span className="text-sm text-gray-600">Bölge:</span>
