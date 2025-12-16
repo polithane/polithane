@@ -9,10 +9,6 @@
       "destination": "/api/admin/[route]?route=:path*"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
       "source": "/(.*)",
       "destination": "/"
     }
