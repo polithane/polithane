@@ -151,7 +151,7 @@ Admin panel Polithane’nin üretim gücüdür. Minimum modüller:
 - **DB/Auth/Storage/Realtime**: Supabase
 - **Web hosting**: Vercel
 - **Harici e-posta**: SendGrid (şimdilik)
-- Neon/Railway vb. **kullanılmıyor** (tamamen kaldırıldı).
+- Başka bir veritabanı/hosting sağlayıcısı **kullanılmıyor** ve bu karar **sabit** (migrasyon önerme/ekleme).
 
 ### 7.2 Repodaki bazı dokümanlar
 Repo içinde `INFRASTRUCTURE.md` ve `SCALING_STRATEGY.md` gibi dosyalarda Supabase dışı seçenekler (Hetzner/Redis/Elasticsearch vb.) anlatılıyor. Bunlar:
@@ -235,7 +235,7 @@ Amaç: iOS/Android için “çalışan ilk sürüm” (temel ekranlar + Supabase
 ### 11.1 “Tek kaynak” kuralı
 - Bu dosya (`POLITHANE_MASTER_PLAN.md`) **tek kaynak**.
 - Tamamlananlar için: `IMPLEMENTATION_STATUS.md`
-- Kurulum/ortam için: `SUPABASE_SETUP_GUIDE.md`, `VERCEL_DEPLOY_GUIDE.md`, `PRODUCTION_CHECKLIST.md`
+- Kurulum/ortam için: Vercel ortam değişkenleri + Supabase proje ayarları (örnekler için `.env.example`).
 - PolitPuan teknik mantık için: `src/utils/politScore.js`
 
 ### 11.2 Plan güncelleme nasıl yapılır?

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, FileText, TrendingUp, Activity, DollarSign, Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { mockUsers } from '../../mock/users';
-import { generateMockPosts } from '../../mock/posts';
+import { admin as adminApi } from '../../utils/api';
 
 export const AdminDashboardNew = () => {
   const [stats, setStats] = useState({
@@ -24,33 +23,21 @@ export const AdminDashboardNew = () => {
   const [topPosts, setTopPosts] = useState([]);
 
   useEffect(() => {
-    // Calculate real stats from mock data
-    const users = mockUsers;
-    const posts = generateMockPosts(400);
-    
-    const totalViews = posts.reduce((sum, p) => sum + p.view_count, 0);
-    const totalLikes = posts.reduce((sum, p) => sum + p.like_count, 0);
-    const totalComments = posts.reduce((sum, p) => sum + p.comment_count, 0);
-    const totalShares = posts.reduce((sum, p) => sum + (p.share_count || 0), 0);
-    const totalPolitScore = posts.reduce((sum, p) => sum + p.polit_score, 0);
-    
-    setStats({
-      totalUsers: users.length,
-      totalPosts: posts.length,
-      totalViews,
-      totalLikes,
-      totalComments,
-      totalShares,
-      totalPolitScore,
-      activeUsers24h: Math.floor(users.length * 0.3),
-      newUsersToday: Math.floor(users.length * 0.05),
-      newPostsToday: Math.floor(posts.length * 0.08),
-      avgPolitScore: Math.floor(totalPolitScore / posts.length),
-    });
-    
-    setRecentUsers(users.slice(0, 5));
-    setRecentPosts(posts.slice(0, 5));
-    setTopPosts(posts.sort((a, b) => b.polit_score - a.polit_score).slice(0, 5));
+    const load = async () => {
+      try {
+        const r = await adminApi.getStats();
+        if (r?.success) {
+          setStats((prev) => ({
+            ...prev,
+            totalUsers: r.data?.totalUsers || 0,
+            totalPosts: r.data?.totalPosts || 0,
+          }));
+        }
+      } catch (e) {
+        console.error('Admin stats load error:', e);
+      }
+    };
+    load();
   }, []);
   
   const statCards = [

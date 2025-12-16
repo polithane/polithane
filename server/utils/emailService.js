@@ -8,9 +8,9 @@ if (process.env.EMAIL_SERVICE === 'sendgrid' && process.env.EMAIL_PASSWORD) {
   sgMail.setApiKey(process.env.EMAIL_PASSWORD);
 }
 
-// Create email transporter (Gmail only)
+// Create email transporter (SMTP fallback)
 const createTransporter = () => {
-  // Gmail SMTP (Railway'de timeout sorunu olabilir)
+  // Gmail SMTP (bazı hosting sağlayıcılarında SMTP portları bloklanabilir)
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465, // SSL port
@@ -34,7 +34,7 @@ export const generateVerificationToken = () => {
 export const sendVerificationEmail = async (email, token) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
   
-  // SendGrid Web API (Railway ile çalışır)
+  // SendGrid Web API
   if (process.env.EMAIL_SERVICE === 'sendgrid') {
     try {
       await sgMail.send({
@@ -116,7 +116,7 @@ export const sendWelcomeEmail = async (email, fullName) => {
 export const sendPasswordResetEmail = async (email, resetToken) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
   
-  // SendGrid Web API (Railway SMTP portlarını blokluyor, Web API kullanmalıyız!)
+  // SendGrid Web API (SMTP portları bloklu ortamlarda Web API kullanılır)
   if (process.env.EMAIL_SERVICE === 'sendgrid') {
     try {
       await sgMail.send({

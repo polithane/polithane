@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { notifications as notificationsApi } from '../utils/api';
 
 const NotificationContext = createContext(null);
 
@@ -23,29 +24,12 @@ export const NotificationProvider = ({ children }) => {
     
     setLoading(true);
     try {
-      // TODO: API call
-      // Mock notifications
-      const mockNotifs = [
-        {
-          notification_id: 1,
-          type: 'like',
-          title: 'Paylaşımınız beğenildi',
-          message: 'Ahmet Yılmaz paylaşımınızı beğendi',
-          is_read: false,
-          created_at: new Date().toISOString(),
-        },
-        {
-          notification_id: 2,
-          type: 'comment',
-          title: 'Yeni yorum',
-          message: 'Mehmet Demir paylaşımınıza yorum yaptı',
-          is_read: false,
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-        },
-      ];
-      
-      setNotifications(mockNotifs);
-      setUnreadCount(mockNotifs.filter(n => !n.is_read).length);
+      const r = await notificationsApi.list({ limit: 50 });
+      if (r?.success) {
+        const list = r.data || [];
+        setNotifications(list);
+        setUnreadCount(list.filter((n) => !n.is_read).length);
+      }
     } catch (error) {
       console.error('Bildirimler yüklenemedi:', error);
     } finally {
@@ -55,21 +39,36 @@ export const NotificationProvider = ({ children }) => {
 
   // Mark as read
   const markAsRead = async (notificationId) => {
-    setNotifications(prev =>
-      prev.map(n => n.notification_id === notificationId ? { ...n, is_read: true } : n)
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    try {
+      await notificationsApi.markRead(notificationId);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId || n.notification_id === notificationId ? { ...n, is_read: true } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Mark all as read
   const markAllAsRead = async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    setUnreadCount(0);
+    try {
+      await notificationsApi.markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Delete notification
   const deleteNotification = async (notificationId) => {
-    setNotifications(prev => prev.filter(n => n.notification_id !== notificationId));
+    try {
+      await notificationsApi.delete(notificationId);
+    } catch (e) {
+      console.error(e);
+    }
+    setNotifications((prev) => prev.filter((n) => (n.id || n.notification_id) !== notificationId));
   };
 
   // Add notification (for real-time)
@@ -87,7 +86,7 @@ export const NotificationProvider = ({ children }) => {
       
       const interval = setInterval(() => {
         fetchNotifications();
-      }, 30000);
+      }, 15000);
       
       return () => clearInterval(interval);
     }

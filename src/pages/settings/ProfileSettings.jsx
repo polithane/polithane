@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, Upload, Camera } from 'lucide-react';
+import { apiCall } from '../../utils/api';
 
 export const ProfileSettings = () => {
   const { user, updateUser } = useAuth();
@@ -15,6 +16,7 @@ export const ProfileSettings = () => {
   
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,14 +27,25 @@ export const ProfileSettings = () => {
     e.preventDefault();
     setLoading(true);
     setSuccess(false);
+    setError('');
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      updateUser(formData);
+      const res = await apiCall('/api/users/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          full_name: formData.full_name,
+          bio: formData.bio,
+          phone: formData.phone,
+          city_code: formData.city_code,
+        }),
+      });
+      if (!res?.success) throw new Error(res?.error || 'Güncelleme başarısız.');
+      if (res.data) updateUser(res.data);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       console.error('Update failed:', error);
+      setError(error?.message || 'Güncelleme başarısız.');
     } finally {
       setLoading(false);
     }
@@ -65,6 +78,11 @@ export const ProfileSettings = () => {
             ✓ Profil başarıyla güncellendi!
           </div>
         )}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            {error}
+          </div>
+        )}
         
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Ad Soyad</label>
@@ -79,6 +97,18 @@ export const ProfileSettings = () => {
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Biyografi</label>
           <textarea name="bio" value={formData.bio} onChange={handleChange} rows={4} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none resize-none" placeholder="Kendinizden bahsedin..." />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Telefon (Opsiyonel)</label>
+          <input
+            type="tel"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
+            placeholder="05XXXXXXXXX"
+          />
         </div>
         
         <div className="flex justify-end">

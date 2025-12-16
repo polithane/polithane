@@ -4,6 +4,7 @@ import { Camera, Square, Circle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { posts as postsApi } from '../utils/api';
+import { supabase } from '../services/supabase';
 
 const IKON_BASE = 'https://eldoyqgzxgubkyohvquq.supabase.co/storage/v1/object/public/ikons';
 
@@ -16,11 +17,11 @@ const CONTENT_TABS = [
 
 export const CreatePolitPage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const [contentType, setContentType] = useState('video');
   const [content, setContent] = useState('');
-  const [category, setCategory] = useState('gundem');
+  const [category, setCategory] = useState('general');
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -163,14 +164,47 @@ export const CreatePolitPage = () => {
 
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('content', content);
-      formData.append('category', category);
+      // Upload media (if any) directly to Supabase Storage (client-side),
+      // then create the post via our /api/posts endpoint (JSON).
+      let media_urls = [];
 
-      // Backend upload alanı: media (max 5)
-      files.slice(0, 5).forEach((f) => formData.append('media', f));
+      if (files.length > 0) {
+        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+          throw new Error('Supabase ayarları eksik. VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY eklenmeli.');
+        }
+        if (!user?.id) {
+          throw new Error('Kullanıcı bilgisi bulunamadı. Lütfen çıkış yapıp tekrar giriş yapın.');
+        }
 
-      const result = await postsApi.create(formData);
+        const bucket = 'uploads';
+        const safeName = (name) =>
+          String(name || 'file')
+            .replace(/\s+/g, '_')
+            .replace(/[^a-zA-Z0-9._-]/g, '')
+            .slice(-120);
+
+        const uploadOne = async (file) => {
+          const ext = safeName(file.name).split('.').pop() || 'bin';
+          const path = `posts/${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+          const { error } = await supabase.storage.from(bucket).upload(path, file, {
+            contentType: file.type || 'application/octet-stream',
+            upsert: false,
+          });
+          if (error) throw error;
+          const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+          return data.publicUrl;
+        };
+
+        media_urls = await Promise.all(files.slice(0, 5).map(uploadOne));
+      }
+
+      const result = await postsApi.create({
+        content: content,
+        content_type: contentType,
+        content_text: content,
+        category,
+        media_urls,
+      });
       if (result?.success && result?.data?.id) {
         toast.success('Polit başarıyla oluşturuldu.');
         navigate(`/post/${result.data.id}`);
@@ -234,8 +268,11 @@ export const CreatePolitPage = () => {
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
                 >
-                  <option value="gundem">Gündem</option>
                   <option value="general">Genel</option>
+                  <option value="mps">Vekiller</option>
+                  <option value="organization">Teşkilat</option>
+                  <option value="citizens">Vatandaş</option>
+                  <option value="media">Medya</option>
                 </select>
               </div>
 

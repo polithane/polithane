@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -9,8 +9,6 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-const sql = neon(process.env.DATABASE_URL);
 
 // Import mock data from frontend
 const mockDataPath = join(__dirname, '../../src/mock');

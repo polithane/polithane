@@ -121,10 +121,23 @@ export const AccountSettings = () => {
           setError(response.error || 'Kullanıcı adı güncellenemedi');
           return;
         }
+        if (response.data) updateUser(response.data);
       }
       
-      // Diğer alanları güncelle
-      updateUser(formData);
+      // Diğer alanları DB'ye yaz
+      const other = await apiCall('/api/users/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          phone: formData.phone,
+          city_code: formData.city_code,
+          birth_date: formData.birth_date,
+        })
+      });
+      if (!other.success) {
+        setError(other.error || 'Hesap bilgileri güncellenemedi');
+        return;
+      }
+      if (other.data) updateUser(other.data);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {

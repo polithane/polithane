@@ -4,12 +4,12 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { neon } from '@neondatabase/serverless';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { sql } from './db.js';
 
 // Load environment variables
 dotenv.config();
@@ -21,15 +21,21 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Trust proxy (Railway, Render, Heroku gibi platformlar için)
+// Trust proxy (reverse-proxy arkasında çalışan dağıtımlar için)
 app.set('trust proxy', 1);
 
-// Neon Database Connection
-export const sql = neon(process.env.DATABASE_URL);
+// Database connection is provided by ./db.js (PostgreSQL / Supabase)
 
 // Middleware
 app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses
+
+function assertSafeIdentifier(id) {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id)) {
+    throw new Error(`Unsafe SQL identifier: ${id}`);
+  }
+  return `"${id}"`;
+}
 
 // CORS - Multiple origins support
 const allowedOrigins = [
@@ -123,7 +129,7 @@ app.get('/api/test-db', async (req, res) => {
     const result = await sql`SELECT NOW() as current_time, version() as pg_version`;
     res.json({ 
       success: true, 
-      message: 'Neon bağlantısı başarılı!',
+      message: 'PostgreSQL bağlantısı başarılı!',
       data: result[0]
     });
   } catch (error) {
@@ -635,18 +641,23 @@ app.post('/api/profiles/mp', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Güncellenecek alan belirtilmedi' });
       }
 
-      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const setClause = keys.map((key, i) => `${assertSafeIdentifier(key)} = $${i + 2}`).join(', ');
       const query = `UPDATE mp_profiles SET ${setClause} WHERE user_id = $1 RETURNING *`;
       
       const [profile] = await sql(query, [user_id, ...values]);
       res.json({ success: true, data: profile });
     } else {
       // Create
-      const [profile] = await sql`
-        INSERT INTO mp_profiles (user_id, ${sql(Object.keys(profileData))})
-        VALUES (${user_id}, ${sql(Object.values(profileData))})
-        RETURNING *
-      `;
+      const keys = Object.keys(profileData);
+      const values = Object.values(profileData);
+      if (keys.length === 0) {
+        const [profile] = await sql('INSERT INTO mp_profiles (user_id) VALUES ($1) RETURNING *', [user_id]);
+        return res.status(201).json({ success: true, data: profile });
+      }
+      const cols = keys.map(assertSafeIdentifier).join(', ');
+      const placeholders = keys.map((_, i) => `$${i + 2}`).join(', ');
+      const text = `INSERT INTO mp_profiles (user_id, ${cols}) VALUES ($1, ${placeholders}) RETURNING *`;
+      const [profile] = await sql(text, [user_id, ...values]);
       res.status(201).json({ success: true, data: profile });
     }
   } catch (error) {
@@ -669,17 +680,22 @@ app.post('/api/profiles/citizen', async (req, res) => {
     if (existing) {
       const keys = Object.keys(profileData);
       const values = Object.values(profileData);
-      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const setClause = keys.map((key, i) => `${assertSafeIdentifier(key)} = $${i + 2}`).join(', ');
       const query = `UPDATE citizen_profiles SET ${setClause} WHERE user_id = $1 RETURNING *`;
       
       const [profile] = await sql(query, [user_id, ...values]);
       res.json({ success: true, data: profile });
     } else {
-      const [profile] = await sql`
-        INSERT INTO citizen_profiles (user_id, ${sql(Object.keys(profileData))})
-        VALUES (${user_id}, ${sql(Object.values(profileData))})
-        RETURNING *
-      `;
+      const keys = Object.keys(profileData);
+      const values = Object.values(profileData);
+      if (keys.length === 0) {
+        const [profile] = await sql('INSERT INTO citizen_profiles (user_id) VALUES ($1) RETURNING *', [user_id]);
+        return res.status(201).json({ success: true, data: profile });
+      }
+      const cols = keys.map(assertSafeIdentifier).join(', ');
+      const placeholders = keys.map((_, i) => `$${i + 2}`).join(', ');
+      const text = `INSERT INTO citizen_profiles (user_id, ${cols}) VALUES ($1, ${placeholders}) RETURNING *`;
+      const [profile] = await sql(text, [user_id, ...values]);
       res.status(201).json({ success: true, data: profile });
     }
   } catch (error) {
@@ -702,17 +718,22 @@ app.post('/api/profiles/party-official', async (req, res) => {
     if (existing) {
       const keys = Object.keys(profileData);
       const values = Object.values(profileData);
-      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const setClause = keys.map((key, i) => `${assertSafeIdentifier(key)} = $${i + 2}`).join(', ');
       const query = `UPDATE party_official_profiles SET ${setClause} WHERE user_id = $1 RETURNING *`;
       
       const [profile] = await sql(query, [user_id, ...values]);
       res.json({ success: true, data: profile });
     } else {
-      const [profile] = await sql`
-        INSERT INTO party_official_profiles (user_id, ${sql(Object.keys(profileData))})
-        VALUES (${user_id}, ${sql(Object.values(profileData))})
-        RETURNING *
-      `;
+      const keys = Object.keys(profileData);
+      const values = Object.values(profileData);
+      if (keys.length === 0) {
+        const [profile] = await sql('INSERT INTO party_official_profiles (user_id) VALUES ($1) RETURNING *', [user_id]);
+        return res.status(201).json({ success: true, data: profile });
+      }
+      const cols = keys.map(assertSafeIdentifier).join(', ');
+      const placeholders = keys.map((_, i) => `$${i + 2}`).join(', ');
+      const text = `INSERT INTO party_official_profiles (user_id, ${cols}) VALUES ($1, ${placeholders}) RETURNING *`;
+      const [profile] = await sql(text, [user_id, ...values]);
       res.status(201).json({ success: true, data: profile });
     }
   } catch (error) {
@@ -735,17 +756,22 @@ app.post('/api/profiles/media', async (req, res) => {
     if (existing) {
       const keys = Object.keys(profileData);
       const values = Object.values(profileData);
-      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const setClause = keys.map((key, i) => `${assertSafeIdentifier(key)} = $${i + 2}`).join(', ');
       const query = `UPDATE media_profiles SET ${setClause} WHERE user_id = $1 RETURNING *`;
       
       const [profile] = await sql(query, [user_id, ...values]);
       res.json({ success: true, data: profile });
     } else {
-      const [profile] = await sql`
-        INSERT INTO media_profiles (user_id, ${sql(Object.keys(profileData))})
-        VALUES (${user_id}, ${sql(Object.values(profileData))})
-        RETURNING *
-      `;
+      const keys = Object.keys(profileData);
+      const values = Object.values(profileData);
+      if (keys.length === 0) {
+        const [profile] = await sql('INSERT INTO media_profiles (user_id) VALUES ($1) RETURNING *', [user_id]);
+        return res.status(201).json({ success: true, data: profile });
+      }
+      const cols = keys.map(assertSafeIdentifier).join(', ');
+      const placeholders = keys.map((_, i) => `$${i + 2}`).join(', ');
+      const text = `INSERT INTO media_profiles (user_id, ${cols}) VALUES ($1, ${placeholders}) RETURNING *`;
+      const [profile] = await sql(text, [user_id, ...values]);
       res.status(201).json({ success: true, data: profile });
     }
   } catch (error) {
@@ -862,7 +888,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   🚀 Polithane Backend başlatıldı!
   📍 Port: ${PORT}
-  🗄️  Database: Neon PostgreSQL (Connected)
+  🗄️  Database: PostgreSQL (Supabase) (Connected)
   🌍 CORS: Multiple origins supported
   ⚡ Environment: ${process.env.NODE_ENV}
   🔒 Allowed Origins: localhost, vercel, polithane.com

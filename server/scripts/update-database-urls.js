@@ -5,12 +5,11 @@
  * Local path'leri R2 URL'lerine çevir
  */
 
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const sql = neon(process.env.DATABASE_URL);
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || 'https://pub-xxxxx.r2.dev';
 
 async function updateDatabaseUrls() {

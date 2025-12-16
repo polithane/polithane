@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Eye, Trash2, CheckCircle, XCircle, Flag } from 'lucide-react';
-import { generateMockPosts } from '../../mock/posts';
+import { Search, Eye, Trash2 } from 'lucide-react';
+import { admin as adminApi } from '../../utils/api';
 import { formatPolitScore, formatTimeAgo } from '../../utils/formatters';
 
 export const PostModeration = () => {
@@ -12,16 +12,30 @@ export const PostModeration = () => {
     flagged: 'all',
   });
   const [selectedPosts, setSelectedPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
 
   useEffect(() => {
-    const allPosts = generateMockPosts(100);
-    setPosts(allPosts);
-  }, []);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const r = await adminApi.getPosts({ page: pagination.page, limit: 50, search: searchQuery || undefined });
+        if (r?.success) {
+          setPosts(r.data || []);
+          setPagination(r.pagination || pagination);
+        }
+      } catch (e) {
+        console.error('Admin posts load error:', e);
+        setPosts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page]);
 
   const filteredPosts = posts.filter(post => {
-    if (searchQuery && !post.content_text?.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
     if (filters.content_type !== 'all' && post.content_type !== filters.content_type) {
       return false;
     }
@@ -30,12 +44,10 @@ export const PostModeration = () => {
 
   const handleDeletePost = (postId) => {
     if (confirm('Bu postu silmek istediğinize emin misiniz?')) {
-      setPosts(prev => prev.filter(p => p.post_id !== postId));
+      adminApi.deletePost(postId)
+        .then(() => setPosts((prev) => prev.filter((p) => (p.id || p.post_id) !== postId)))
+        .catch((e) => alert('İşlem başarısız: ' + (e?.message || '')));
     }
-  };
-
-  const handleApprovePost = (postId) => {
-    console.log('Approve post:', postId);
   };
 
   return (
@@ -100,11 +112,15 @@ export const PostModeration = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredPosts.slice(0, 20).map(post => (
-                <tr key={post.post_id} className="border-b hover:bg-gray-50 transition-colors">
+              {loading ? (
+                <tr><td colSpan="7" className="p-8 text-center text-gray-500">Yükleniyor...</td></tr>
+              ) : filteredPosts.length === 0 ? (
+                <tr><td colSpan="7" className="p-8 text-center text-gray-500">Post bulunamadı.</td></tr>
+              ) : filteredPosts.slice(0, 50).map(post => (
+                <tr key={post.id || post.post_id} className="border-b hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="max-w-md">
-                      <p className="text-sm text-gray-900 line-clamp-2">{post.content_text}</p>
+                      <p className="text-sm text-gray-900 line-clamp-2">{post.content_text ?? post.content ?? ''}</p>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -115,7 +131,7 @@ export const PostModeration = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-                      {post.content_type}
+                      {post.content_type || 'text'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -136,10 +152,7 @@ export const PostModeration = () => {
                       <button className="p-2 text-blue-600 hover:bg-blue-50 rounded" title="Görüntüle">
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleApprovePost(post.post_id)} className="p-2 text-green-600 hover:bg-green-50 rounded" title="Onayla">
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeletePost(post.post_id)} className="p-2 text-red-600 hover:bg-red-50 rounded" title="Sil">
+                      <button onClick={() => handleDeletePost(post.id || post.post_id)} className="p-2 text-red-600 hover:bg-red-50 rounded" title="Sil">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

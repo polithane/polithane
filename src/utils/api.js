@@ -158,13 +158,11 @@ export const posts = {
 
   getById: (id) => apiCall(`/api/posts/${id}`),
 
-  create: (formData) => {
-    // FormData for file upload
-    return apiCall('/api/posts', {
+  create: (payload) =>
+    apiCall('/api/posts', {
       method: 'POST',
-      body: formData,
-    });
-  },
+      body: JSON.stringify(payload || {}),
+    }),
 
   update: (id, data) =>
     apiCall(`/api/posts/${id}`, {
@@ -283,6 +281,55 @@ export const admin = {
       method: 'PUT',
       body: JSON.stringify(settings),
     }),
+
+  // Notifications (admin broadcast / direct)
+  sendNotification: ({ user_id, title, message, type = 'system', broadcast = false }) =>
+    apiCall('/api/admin/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ user_id, title, message, type, broadcast }),
+    }),
+
+  // Parties
+  getParties: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/parties${query ? `?${query}` : ''}`);
+  },
+  createParty: (data) =>
+    apiCall('/api/admin/parties', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateParty: (partyId, data) =>
+    apiCall(`/api/admin/parties/${partyId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteParty: (partyId) =>
+    apiCall(`/api/admin/parties/${partyId}`, {
+      method: 'DELETE',
+    }),
+};
+
+// ============================================
+// NOTIFICATIONS API
+// ============================================
+export const notifications = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/notifications${query ? `?${query}` : ''}`);
+  },
+  markRead: (id) =>
+    apiCall(`/api/notifications/${id}`, {
+      method: 'POST',
+    }),
+  markAllRead: () =>
+    apiCall('/api/notifications/read-all', {
+      method: 'POST',
+    }),
+  delete: (id) =>
+    apiCall(`/api/notifications/${id}`, {
+      method: 'DELETE',
+    }),
 };
 
 // ============================================
@@ -308,4 +355,5 @@ export default {
   messages,
   admin,
   parties,
+  notifications,
 };

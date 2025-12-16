@@ -4,7 +4,7 @@
  * =================================================
  */
 
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -14,8 +14,6 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const sql = neon(process.env.DATABASE_URL);
 
 async function runSecurityMigration() {
   try {

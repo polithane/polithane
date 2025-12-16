@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Image as ImageIcon, Video, Music } from 'lucide-react';
+import { Image as ImageIcon, Video, Music, PenTool } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { formatPolitScore } from '../../utils/formatters';
 import { getUserTitle } from '../../utils/titleHelpers';
@@ -41,7 +41,7 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
   
   // İçerik tipi ikonu
   const getContentIcon = () => {
-    const iconClass = "w-16 h-16 md:w-20 md:h-20 text-white/90";
+    const iconClass = "w-4 h-4 md:w-5 md:h-5 text-white/90";
     switch (currentPost.content_type) {
       case CONTENT_TYPES.VIDEO:
         return <Video className={iconClass} />;
@@ -50,24 +50,38 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
       case CONTENT_TYPES.AUDIO:
         return <Music className={iconClass} />;
       default:
-        return <FileText className={iconClass} />;
+        return <PenTool className={iconClass} />;
     }
   };
   
   const bgColor = getBackgroundColor();
   
   return (
-    <div 
-      className="relative h-[100px] md:h-[120px] rounded-xl overflow-hidden cursor-pointer mb-4 shadow-lg"
-      style={{ backgroundColor: bgColor }}
-      onClick={() => navigate(`/post/${currentPost.post_id}`)}
-    >
+    <div className="mb-4">
+      {/* Mobile: big CTA above slider */}
+      <div className="md:hidden mb-2">
+        <button
+          type="button"
+          onClick={() => navigate('/polit-at')}
+          className="w-full h-[52px] rounded-xl bg-primary-blue text-white font-black tracking-wide shadow-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+          title="Polit At"
+        >
+          <PenTool className="w-5 h-5" />
+          Polit At
+        </button>
+      </div>
+
+      <div 
+        className="relative h-[100px] md:h-[120px] rounded-xl overflow-hidden cursor-pointer shadow-lg"
+        style={{ backgroundColor: bgColor }}
+        onClick={() => navigate(`/post/${currentPost.post_id}`)}
+      >
       {/* Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent" />
       
-      <div className="relative h-full flex items-center justify-between px-4 md:px-6">
+      <div className="relative h-full flex items-center justify-between px-4 md:px-6 gap-3">
         {/* Sol: Profil Resmi + Gündem Başlığı */}
-        <div className="flex items-center gap-3 flex-1 pr-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <Avatar 
             src={currentPost.user?.avatar_url || currentPost.user?.profile_image} 
             size="48px" 
@@ -102,13 +116,26 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
               <span className="text-xs text-white/90 font-medium">
                 {formatPolitScore(currentPost.polit_score)}
               </span>
+              <span className="text-xs text-white/70">•</span>
+              {getContentIcon()}
             </div>
           </div>
         </div>
         
-        {/* Sağ: İçerik Tipi İkonu */}
-        <div className="flex-shrink-0">
-          {getContentIcon()}
+        {/* Desktop: huge CTA on the far right */}
+        <div className="hidden md:flex flex-shrink-0">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate('/polit-at');
+            }}
+            className="h-[56px] px-8 rounded-2xl bg-white/15 hover:bg-white/20 border border-white/25 text-white font-black tracking-wide shadow-xl transition-all flex items-center gap-3"
+            title="Polit At"
+          >
+            <PenTool className="w-6 h-6" />
+            Polit At
+          </button>
         </div>
       </div>
       
@@ -129,6 +156,7 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 };

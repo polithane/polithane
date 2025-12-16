@@ -5,15 +5,13 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
-
-const sql = neon(process.env.DATABASE_URL);
 
 // Cyrillic characters we've found
 const cyrillicChars = ['Ш', 'Щ', 'Ъ', 'Ю', 'ж', 'А', 'О'];

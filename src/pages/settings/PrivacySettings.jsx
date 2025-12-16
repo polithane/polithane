@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Shield, Eye, EyeOff, Lock, Users, Globe } from 'lucide-react';
+import { Shield, Eye, Lock, Users, Globe, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiCall } from '../../utils/api';
 
 export const PrivacySettings = () => {
+  const { user, updateUser } = useAuth();
   const [settings, setSettings] = useState({
     profileVisibility: 'public',
     showEmail: false,
@@ -16,6 +19,9 @@ export const PrivacySettings = () => {
     showFollowing: true,
     indexProfile: true,
   });
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   const handleToggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -25,9 +31,47 @@ export const PrivacySettings = () => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleSave = async () => {
+    setSaving(true);
+    setSuccess(false);
+    setError('');
+    try {
+      const baseMeta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+      const res = await apiCall('/api/users/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          metadata: {
+            ...baseMeta,
+            privacy_settings: settings,
+          },
+        }),
+      });
+      if (!res?.success) throw new Error(res?.error || 'Kaydedilemedi.');
+      if (res.data) updateUser(res.data);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (e) {
+      setError(e?.message || 'Kaydedilemedi.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-black text-gray-900 mb-6">Gizlilik Ayarları</h2>
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 flex items-center gap-2 mb-6">
+          <CheckCircle className="w-5 h-5" />
+          Kaydedildi.
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 flex items-center gap-2 mb-6">
+          <AlertCircle className="w-5 h-5" />
+          {error}
+        </div>
+      )}
 
       {/* Profile Visibility */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
@@ -251,8 +295,13 @@ export const PrivacySettings = () => {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <button className="px-6 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold">
-          Değişiklikleri Kaydet
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-6 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Save className="w-4 h-4" />
+          {saving ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
         </button>
       </div>
     </div>
