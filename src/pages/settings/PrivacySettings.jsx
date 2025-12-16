@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Shield, Eye, Lock, Users, Globe, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiCall } from '../../utils/api';
@@ -22,6 +22,16 @@ export const PrivacySettings = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  const savedPrivacy = useMemo(() => {
+    const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+    return meta.privacy_settings && typeof meta.privacy_settings === 'object' ? meta.privacy_settings : null;
+  }, [user]);
+
+  useEffect(() => {
+    if (!savedPrivacy) return;
+    setSettings((prev) => ({ ...prev, ...savedPrivacy }));
+  }, [savedPrivacy]);
 
   const handleToggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));

@@ -27,16 +27,34 @@ export const ThemeProvider = ({ children }) => {
 
   // Load theme from localStorage
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const savedDarkMode = localStorage.getItem('darkMode');
-    
-    if (savedTheme) {
-      setTheme(JSON.parse(savedTheme));
-    }
-    
-    if (savedDarkMode) {
-      setDarkMode(savedDarkMode === 'true');
-    }
+    const read = () => {
+      const savedTheme = localStorage.getItem('theme');
+      const savedDarkMode = localStorage.getItem('darkMode');
+      if (savedTheme) {
+        try {
+          setTheme(JSON.parse(savedTheme));
+        } catch {
+          // ignore
+        }
+      }
+      if (savedDarkMode != null) {
+        setDarkMode(savedDarkMode === 'true');
+      }
+    };
+
+    read();
+
+    // React to updates triggered elsewhere (e.g., settings saved after login)
+    const onStorage = (e) => {
+      if (e?.key === 'theme' || e?.key === 'darkMode') read();
+    };
+    const onThemeApply = () => read();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('theme:apply', onThemeApply);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('theme:apply', onThemeApply);
+    };
   }, []);
 
   // Apply theme to CSS variables
@@ -64,6 +82,7 @@ export const ThemeProvider = ({ children }) => {
     const updatedTheme = { ...theme, ...newTheme };
     setTheme(updatedTheme);
     localStorage.setItem('theme', JSON.stringify(updatedTheme));
+    window.dispatchEvent(new Event('theme:apply'));
   };
 
   // Toggle dark mode
@@ -71,6 +90,21 @@ export const ThemeProvider = ({ children }) => {
     const newDarkMode = !darkMode;
     setDarkMode(newDarkMode);
     localStorage.setItem('darkMode', newDarkMode.toString());
+    window.dispatchEvent(new Event('theme:apply'));
+  };
+
+  // Direct setters (used by settings pages)
+  const setDarkModeValue = (value) => {
+    const v = !!value;
+    setDarkMode(v);
+    localStorage.setItem('darkMode', v.toString());
+    window.dispatchEvent(new Event('theme:apply'));
+  };
+
+  const setPrimaryColor = (value) => {
+    const v = String(value || '').trim();
+    if (!v) return;
+    updateTheme({ primaryColor: v });
   };
 
   // Reset to default
@@ -82,8 +116,11 @@ export const ThemeProvider = ({ children }) => {
   const value = {
     theme,
     darkMode,
+    primaryColor: theme.primaryColor,
     updateTheme,
     toggleDarkMode,
+    setDarkMode: setDarkModeValue,
+    setPrimaryColor,
     resetTheme,
   };
 

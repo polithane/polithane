@@ -1,12 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Sun, Moon, Monitor, Palette, Type, Layout } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiCall } from '../../utils/api';
 
 export const AppearanceSettings = () => {
   const { darkMode, primaryColor, setDarkMode, setPrimaryColor } = useTheme();
+  const { user, updateUser } = useAuth();
   const [selectedTheme, setSelectedTheme] = useState('light');
   const [fontSize, setFontSize] = useState('medium');
   const [compactMode, setCompactMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const savedAppearance = useMemo(() => {
+    const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+    return meta.appearance_settings && typeof meta.appearance_settings === 'object' ? meta.appearance_settings : null;
+  }, [user]);
+
+  useEffect(() => {
+    if (!savedAppearance) return;
+    if (typeof savedAppearance.darkMode === 'boolean') setDarkMode(savedAppearance.darkMode);
+    if (typeof savedAppearance.primaryColor === 'string' && savedAppearance.primaryColor) setPrimaryColor(savedAppearance.primaryColor);
+    if (typeof savedAppearance.fontSize === 'string') setFontSize(savedAppearance.fontSize);
+    if (typeof savedAppearance.compactMode === 'boolean') setCompactMode(savedAppearance.compactMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedAppearance]);
+
+  useEffect(() => {
+    setSelectedTheme(darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   const colorOptions = [
     { name: 'Mavi', value: '#00aaff', color: 'bg-[#00aaff]' },
@@ -16,6 +38,43 @@ export const AppearanceSettings = () => {
     { name: 'Turuncu', value: '#ff9500', color: 'bg-orange-500' },
     { name: 'Pembe', value: '#ff2d55', color: 'bg-pink-500' },
   ];
+
+  const applyToDom = (nextFontSize, nextCompact) => {
+    const root = document.documentElement;
+    root.dataset.fontSize = nextFontSize || 'medium';
+    root.dataset.compact = nextCompact ? 'true' : 'false';
+  };
+
+  useEffect(() => {
+    applyToDom(fontSize, compactMode);
+  }, [fontSize, compactMode]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const baseMeta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+      const appearance_settings = {
+        darkMode: !!darkMode,
+        primaryColor: String(primaryColor || '').trim(),
+        fontSize,
+        compactMode: !!compactMode,
+      };
+      const res = await apiCall('/api/users/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          metadata: {
+            ...baseMeta,
+            appearance_settings,
+          },
+        }),
+      });
+      if (res?.success && res.data) updateUser(res.data);
+      // Ensure ThemeProvider picks up localStorage-backed theme values immediately
+      window.dispatchEvent(new Event('theme:apply'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -70,7 +129,10 @@ export const AppearanceSettings = () => {
           </button>
 
           <button
-            onClick={() => setSelectedTheme('auto')}
+            onClick={() => {
+              setSelectedTheme('auto');
+              // keep current darkMode; "system" can be added later
+            }}
             className={`flex flex-col items-center gap-3 p-4 border-2 rounded-xl transition-all ${
               selectedTheme === 'auto' ? 'border-primary-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'
             }`}
@@ -182,8 +244,12 @@ export const AppearanceSettings = () => {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <button className="px-6 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold">
-          Değişiklikleri Kaydet
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-6 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
         </button>
       </div>
     </div>

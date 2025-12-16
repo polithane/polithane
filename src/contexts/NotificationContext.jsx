@@ -13,20 +13,36 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const notifSettings = (() => {
+    const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+    return meta.notification_settings && typeof meta.notification_settings === 'object' ? meta.notification_settings : {};
+  })();
+  const pushEnabled = notifSettings.pushNotifications !== false;
+  const typeAllowed = (n) => {
+    const t = String(n?.type || 'system');
+    if (t === 'like') return notifSettings.likes !== false;
+    if (t === 'comment') return notifSettings.comments !== false;
+    if (t === 'follow') return notifSettings.follows !== false;
+    if (t === 'mention') return notifSettings.mentions !== false;
+    if (t === 'message') return notifSettings.messages !== false;
+    // system/unknown -> always show
+    return true;
+  };
+
   // Fetch notifications
   const fetchNotifications = async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !pushEnabled) return;
     
     setLoading(true);
     try {
       const r = await notificationsApi.list({ limit: 50 });
       if (r?.success) {
-        const list = r.data || [];
+        const list = (r.data || []).filter(typeAllowed);
         setNotifications(list);
         setUnreadCount(list.filter((n) => !n.is_read).length);
       }
@@ -81,7 +97,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Poll for new notifications every 30 seconds
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && pushEnabled) {
       fetchNotifications();
       
       const interval = setInterval(() => {
@@ -90,7 +106,12 @@ export const NotificationProvider = ({ children }) => {
       
       return () => clearInterval(interval);
     }
-  }, [isAuthenticated]);
+    // If push disabled, clear state
+    if (isAuthenticated && !pushEnabled) {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }, [isAuthenticated, pushEnabled]);
 
   const value = {
     notifications,

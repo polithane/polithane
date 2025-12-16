@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Save, Bell, Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiCall } from '../../utils/api';
@@ -19,6 +19,16 @@ export const NotificationSettings = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  const savedNotif = useMemo(() => {
+    const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+    return meta.notification_settings && typeof meta.notification_settings === 'object' ? meta.notification_settings : null;
+  }, [user]);
+
+  useEffect(() => {
+    if (!savedNotif) return;
+    setSettings((prev) => ({ ...prev, ...savedNotif }));
+  }, [savedNotif]);
 
   const handleToggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));

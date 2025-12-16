@@ -52,6 +52,8 @@ export const ProfilePage = () => {
   const [followStats, setFollowStats] = useState({ followers_count: 0, following_count: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [privacyBlocked, setPrivacyBlocked] = useState(false);
+  const [privacyMessage, setPrivacyMessage] = useState('');
   
   const isOwnProfile = currentUser && (
     userId === 'me' || 
@@ -68,6 +70,8 @@ export const ProfilePage = () => {
     const loadProfile = async () => {
       setLoading(true);
       setError('');
+      setPrivacyBlocked(false);
+      setPrivacyMessage('');
       
       try {
         let profileData;
@@ -148,6 +152,21 @@ export const ProfilePage = () => {
         const normalizedProfile = normalizeUser(resolvedProfileData);
         setUser(normalizedProfile);
 
+        // Apply privacy settings (client-side enforcement)
+        const ps =
+          resolvedProfileData?.metadata && typeof resolvedProfileData.metadata === 'object'
+            ? resolvedProfileData.metadata.privacy_settings
+            : null;
+        const visibility = ps?.profileVisibility || 'public';
+        if (!isOwnProfile && (visibility === 'private' || visibility === 'followers')) {
+          setPrivacyBlocked(true);
+          setPrivacyMessage(
+            visibility === 'private'
+              ? 'Bu profil gizlidir.'
+              : 'Bu profil sadece takipçilere açıktır.'
+          );
+        }
+
         // Canonicalize URL: if user has a username, always prefer /:username
         const canonicalPath = getProfilePath(normalizedProfile);
         const isProfileRoute = location.pathname.startsWith('/profile/') || location.pathname.startsWith('/@');
@@ -155,15 +174,19 @@ export const ProfilePage = () => {
           navigate(canonicalPath, { replace: true });
         }
         
-        // Posts: DB'den çek
-        const profileDbId = resolvedProfileData?.id ?? resolvedProfileData?.user_id;
-        if (profileDbId) {
-          const dbPosts = await posts.getAll({
-            user_id: profileDbId,
-            limit: 50,
-            order: 'polit_score.desc',
-          });
-          setUserPosts((dbPosts || []).map(mapDbPostToUi).filter(Boolean));
+        // Posts: respect privacy (public-only until follow enforcement is implemented end-to-end)
+        if (!privacyBlocked) {
+          const profileDbId = resolvedProfileData?.id ?? resolvedProfileData?.user_id;
+          if (profileDbId) {
+            const dbPosts = await posts.getAll({
+              user_id: profileDbId,
+              limit: 50,
+              order: 'polit_score.desc',
+            });
+            setUserPosts((dbPosts || []).map(mapDbPostToUi).filter(Boolean));
+          } else {
+            setUserPosts([]);
+          }
         } else {
           setUserPosts([]);
         }
@@ -317,26 +340,30 @@ export const ProfilePage = () => {
               
               {/* İstatistikler */}
               <div className="flex gap-8 mt-4">
-                <div
-                  onClick={() => {
-                    setFollowModalTab('followers');
-                    setShowFollowModal(true);
-                  }}
-                  className="cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <div className="text-xl font-bold">{formatNumber(followStats.followers_count)}</div>
-                  <div className="text-sm text-gray-500">Takipçi</div>
-                </div>
-                <div
-                  onClick={() => {
-                    setFollowModalTab('following');
-                    setShowFollowModal(true);
-                  }}
-                  className="cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <div className="text-xl font-bold">{formatNumber(followStats.following_count)}</div>
-                  <div className="text-sm text-gray-500">Takip</div>
-                </div>
+                {((user?.metadata && user.metadata.privacy_settings?.showFollowers) ?? true) && (
+                  <div
+                    onClick={() => {
+                      setFollowModalTab('followers');
+                      setShowFollowModal(true);
+                    }}
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <div className="text-xl font-bold">{formatNumber(followStats.followers_count)}</div>
+                    <div className="text-sm text-gray-500">Takipçi</div>
+                  </div>
+                )}
+                {((user?.metadata && user.metadata.privacy_settings?.showFollowing) ?? true) && (
+                  <div
+                    onClick={() => {
+                      setFollowModalTab('following');
+                      setShowFollowModal(true);
+                    }}
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <div className="text-xl font-bold">{formatNumber(followStats.following_count)}</div>
+                    <div className="text-sm text-gray-500">Takip</div>
+                  </div>
+                )}
                 <div>
                   <div className="text-xl font-bold">{formatNumber(user.post_count)}</div>
                   <div className="text-sm text-gray-500">Paylaşım</div>
@@ -431,6 +458,12 @@ export const ProfilePage = () => {
       
       {/* Tabs */}
       <div className="container-main py-6">
+        {privacyBlocked && (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 text-center mb-6">
+            <h3 className="text-xl font-black text-gray-900 mb-2">Bu profil gizli</h3>
+            <p className="text-gray-600">{privacyMessage}</p>
+          </div>
+        )}
         <div className="flex gap-4 border-b mb-6">
           <button
             className={`pb-3 px-4 font-medium ${
