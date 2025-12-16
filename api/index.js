@@ -71,13 +71,13 @@ async function getParties(req, res) {
 
 async function getUsers(req, res) {
     const { search, limit = 20 } = req.query;
-    if (!search || search.length < 3) return res.json({ success: true, data: [] });
+    if (!search || search.length < 3) return res.json([]);
     const data = await supabaseRestGet('users', {
         select: 'id,username,full_name,avatar_url,user_type,politician_type,party_id,province',
         or: `username.ilike.*${search}*,full_name.ilike.*${search}*`,
         limit: String(Math.min(parseInt(limit), 50))
     });
-    res.json({ success: true, data: data || [] });
+    res.json(data || []);
 }
 
 async function authCheckAvailability(req, res) {

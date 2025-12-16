@@ -85,9 +85,8 @@ export const RegisterPageNew = () => {
   const [emailStatus, setEmailStatus] = useState('idle');
   const [availabilityTimeout, setAvailabilityTimeout] = useState(null);
 
-  // Captcha
-  const [captcha, setCaptcha] = useState({ q: '', a: 0 });
-  const [captchaInput, setCaptchaInput] = useState('');
+  // Honeypot (Spam Trap)
+  const [honeypot, setHoneypot] = useState('');
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -101,7 +100,6 @@ export const RegisterPageNew = () => {
     province: '',
     district: '',
     party_id: '',
-    // Metadata fields
     media_title: '',
     media_outlet: '',
     media_website: '',
@@ -121,7 +119,6 @@ export const RegisterPageNew = () => {
   // Init
   useEffect(() => {
     loadParties();
-    generateCaptcha();
     if (initialUserId) {
       loadClaimUser(initialUserId);
     }
@@ -129,23 +126,18 @@ export const RegisterPageNew = () => {
 
   const loadParties = async () => {
     try {
-      // API call to /api/parties
       const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
       const res = await fetch(`${apiUrl}/parties`);
       const data = await res.json();
-      if (data.success) {
+      // Ensure array
+      if (Array.isArray(data)) {
+        setParties(data);
+      } else if (data.data && Array.isArray(data.data)) {
         setParties(data.data);
       }
     } catch (err) {
       console.error('Parties error:', err);
     }
-  };
-
-  const generateCaptcha = () => {
-    const a = Math.floor(Math.random() * 10) + 1;
-    const b = Math.floor(Math.random() * 10) + 1;
-    setCaptcha({ q: `${a} + ${b} =`, a: a + b });
-    setCaptchaInput('');
   };
 
   const loadClaimUser = async (id) => {
@@ -155,7 +147,6 @@ export const RegisterPageNew = () => {
       if (data && data.success) {
         setClaimUser(data.data);
         setStep(3); // Directly to form
-        // Pre-fill form
         setFormData(prev => ({
           ...prev,
           full_name: data.data.full_name,
@@ -171,7 +162,6 @@ export const RegisterPageNew = () => {
     }
   };
 
-  // Helper
   const mapUserTypeToMembership = (userType, politicianType) => {
     if (userType === 'mp') return 'politician';
     if (userType === 'media') return 'media';
@@ -182,7 +172,16 @@ export const RegisterPageNew = () => {
 
   // Availability Check
   const checkAvailability = async (field, value) => {
-    if (!value || value.length < 3) return;
+    if (!value || value.length < 5) return;
+    
+    // Regex Check First
+    if (field === 'email') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value)) {
+            setEmailStatus('idle');
+            return;
+        }
+    }
     
     if (availabilityTimeout) clearTimeout(availabilityTimeout);
     
@@ -207,6 +206,11 @@ export const RegisterPageNew = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Limits
+    if (name === 'full_name' && value.length > 50) return;
+    if (name === 'district' && value.length > 50) return;
+    
     setFormData(prev => ({ ...prev, [name]: value }));
     setGlobalError('');
 
@@ -224,8 +228,10 @@ export const RegisterPageNew = () => {
       const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
       const res = await fetch(`${apiUrl}/users?search=${encodeURIComponent(query)}&limit=5`);
       const data = await res.json();
-      if (data.success) {
-        setSearchResults(data.data || []);
+      if (Array.isArray(data)) {
+        setSearchResults(data);
+      } else if (data.data && Array.isArray(data.data)) {
+        setSearchResults(data.data);
       }
     } catch (err) {
       console.error(err);
@@ -237,9 +243,11 @@ export const RegisterPageNew = () => {
   // Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (parseInt(captchaInput) !== captcha.a) {
-      setGlobalError('Güvenlik sorusu yanlış. Lütfen tekrar deneyiniz.');
-      return;
+    
+    // Honeypot Check
+    if (honeypot) {
+        console.log('Bot detected');
+        return;
     }
     
     if (emailStatus === 'taken' && !claimUser) {
@@ -251,7 +259,6 @@ export const RegisterPageNew = () => {
     setGlobalError('');
 
     try {
-      // 1. File Conversion to Base64 (if file exists)
       let documentData = null;
       if (file) {
         const toBase64 = (file) => new Promise((resolve, reject) => {
@@ -263,7 +270,6 @@ export const RegisterPageNew = () => {
         
         try {
             const base64Content = await toBase64(file);
-            // "data:application/pdf;base64,....." -> remove prefix if handled by backend, but usually keep it
             documentData = {
                 name: file.name,
                 type: file.type,
@@ -275,7 +281,6 @@ export const RegisterPageNew = () => {
         }
       }
 
-      // 2. Prepare Payload
       const userType = formData.membership_type === 'organization' ? 'party_member' : formData.membership_type;
       
       const payload = {
@@ -303,7 +308,6 @@ export const RegisterPageNew = () => {
         claim_user_id: claimUser?.id
       };
 
-      // 3. API Call
       const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
       const response = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
@@ -316,18 +320,18 @@ export const RegisterPageNew = () => {
       const result = await response.json();
 
       if (!response.ok) {
+        if (result.error && result.error.includes('metadata')) {
+            throw new Error('Teknik Hata: Veritabanında "metadata" sütunu eksik. Lütfen yöneticiye bildirin.');
+        }
         throw new Error(result.error || 'Kayıt başarısız.');
       }
 
-      // Success logic
       if (result.requiresApproval) {
         setSuccessMessage(result.message);
       } else {
-        // Auto login for citizen
-        // We need to store token manually since we bypassed auth context
         if (result.data?.token) {
             localStorage.setItem('auth_token', result.data.token);
-            window.location.href = '/'; // Hard reload to init auth context
+            window.location.href = '/'; 
         } else {
             navigate('/login-new');
         }
@@ -338,11 +342,6 @@ export const RegisterPageNew = () => {
       setLoading(false);
     }
   };
-
-  // ... (Rest of render functions: renderChoice, renderSearch, renderTypeSelection, renderForm) ...
-  // Same as before, just kept renderers for brevity in this response but I will write FULL file content.
-  
-  // --- RENDERERS ---
 
   if (successMessage) {
     return (
@@ -360,7 +359,7 @@ export const RegisterPageNew = () => {
             <p className="text-blue-800 text-sm leading-relaxed">
               Değerli kullanıcımız, üyelik başvurunuz ve ilettiğiniz belgeler sistemimize güvenli bir şekilde kaydedilmiştir. 
               <br/><br/>
-              Ekibimiz başvurunuzu <strong>en kısa sürede</strong> titizlikle inceleyecek ve sonuç hakkında size e-posta/SMS yoluyla bilgilendirme yapacaktır. Bu süreçte gösterdiğiniz anlayış için teşekkür ederiz.
+              Ekibimiz başvurunuzu <strong>en kısa sürede</strong> titizlikle inceleyecek ve sonuç hakkında size e-posta/SMS yoluyla bilgilendirme yapacaktır.
             </p>
           </div>
           <Button onClick={() => navigate('/')} variant="outline" fullWidth size="lg">Ana Sayfaya Dön</Button>
@@ -369,147 +368,10 @@ export const RegisterPageNew = () => {
     );
   }
 
-  // 0. Initial Choice
-  const renderChoice = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Aramıza Katılın</h1>
-        <p className="text-gray-600">Siyasetin nabzını tutun, şeffaf ve özgür platformda yerinizi alın.</p>
-      </div>
-
-      <div className="grid gap-4">
-        <button
-          onClick={() => setStep(2)}
-          className="flex items-center p-6 bg-white border-2 border-gray-100 rounded-2xl hover:border-primary-blue hover:shadow-lg transition-all group text-left"
-        >
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mr-6 group-hover:scale-110 transition-transform">
-            <User className="w-8 h-8 text-blue-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-primary-blue">Yeni Üye Ol</h3>
-            <p className="text-gray-500 text-sm">Henüz bir profiliniz yoksa buradan yeni hesap oluşturun.</p>
-          </div>
-          <ChevronRight className="w-6 h-6 text-gray-300 group-hover:text-primary-blue" />
-        </button>
-
-        <button
-          onClick={() => setStep(1)}
-          className="flex items-center p-6 bg-white border-2 border-gray-100 rounded-2xl hover:border-purple-500 hover:shadow-lg transition-all group text-left"
-        >
-          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mr-6 group-hover:scale-110 transition-transform">
-            <ShieldCheck className="w-8 h-8 text-purple-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-purple-600">Mevcut Profili Sahiplen</h3>
-            <p className="text-gray-500 text-sm">Adınıza açılmış otomatik profili doğrulayın ve yönetmeye başlayın.</p>
-          </div>
-          <ChevronRight className="w-6 h-6 text-gray-300 group-hover:text-purple-600" />
-        </button>
-      </div>
-      
-      <div className="text-center mt-6">
-        <p className="text-sm text-gray-500">Zaten hesabınız var mı? <a href="/login-new" className="text-primary-blue font-bold hover:underline">Giriş Yap</a></p>
-      </div>
-    </div>
-  );
-
-  // 1. Search Profile (Claim)
-  const renderSearch = () => (
-    <div className="space-y-6">
-      <div className="flex items-center mb-6">
-        <button onClick={() => setStep(0)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
-        </button>
-        <h2 className="text-2xl font-bold">Profilinizi Bulun</h2>
-      </div>
-
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Ad Soyad veya Kullanıcı Adı Ara..."
-          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-0 text-lg"
-          onChange={(e) => handleSearch(e.target.value)}
-        />
-        {isSearching && <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full" />}
-      </div>
-
-      <div className="space-y-3 mt-4">
-        {searchResults.map(user => (
-          <div 
-            key={user.id}
-            onClick={() => {
-              setClaimUser(user);
-              setFormData(prev => ({
-                ...prev,
-                full_name: user.full_name,
-                membership_type: mapUserTypeToMembership(user.user_type, user.politician_type),
-                party_id: user.party_id || '',
-                province: user.province || ''
-              }));
-              setStep(3); // Go to form
-            }} 
-            className="flex items-center p-4 border rounded-xl hover:border-purple-500 cursor-pointer hover:bg-purple-50 transition-all"
-          >
-            <Avatar src={user.avatar_url} size="50px" />
-            <div className="ml-4">
-              <h4 className="font-bold text-gray-900">{user.full_name}</h4>
-              <p className="text-sm text-gray-500">@{user.username} • {user.user_type}</p>
-            </div>
-            <div className="ml-auto">
-              <Button size="sm" variant="outline">Seç</Button>
-            </div>
-          </div>
-        ))}
-        {searchResults.length === 0 && !isSearching && (
-          <div className="text-center py-8 text-gray-500">
-            <p>Aradığınız profili bulamadınız mı?</p>
-            <button onClick={() => setStep(2)} className="text-purple-600 font-bold hover:underline mt-2">
-              Yeni Profil Oluşturun
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // 2. Type Selection
-  const renderTypeSelection = () => (
-    <div className="space-y-6">
-      <div className="flex items-center mb-6">
-        <button onClick={() => setStep(0)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
-        </button>
-        <h2 className="text-2xl font-bold">Üyelik Tipi Seçin</h2>
-      </div>
-
-      <div className="grid gap-3">
-        {MEMBERSHIP_TYPES.map((type) => {
-          const Icon = type.icon;
-          return (
-            <button
-              key={type.id}
-              onClick={() => {
-                setFormData(prev => ({ ...prev, membership_type: type.id }));
-                setStep(3);
-              }}
-              className={`flex items-start p-4 bg-white border-2 border-gray-100 rounded-xl transition-all group text-left ${type.borderColor} hover:shadow-md`}
-            >
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center mr-4 flex-shrink-0 ${type.color}`}>
-                <Icon className="w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 mb-1">{type.label}</h3>
-                <p className="text-xs text-gray-500">{type.desc}</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-600 mt-3" />
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
+  // Helper renderers omitted for brevity, will include full content in Write.
+  // ...
+  // Same logic for choice, search, type selection.
+  
   // 3. Registration Form
   const renderForm = () => {
     const isTeşkilat = formData.membership_type === 'organization';
@@ -517,11 +379,10 @@ export const RegisterPageNew = () => {
     const isPolitician = formData.membership_type === 'politician';
     const isPartyMember = formData.membership_type === 'party_member' || isTeşkilat || isPolitician;
     
-    // Dynamic Role Labels based on selection
     const isDistrictRole = formData.role_type === 'district_chair' || formData.role_type === 'district_mayor';
 
     return (
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex items-center mb-6">
           <button onClick={() => setStep(claimUser ? 1 : 2)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
             <ArrowLeft className="w-6 h-6 text-gray-600" />
@@ -534,7 +395,18 @@ export const RegisterPageNew = () => {
           </div>
         </div>
 
-        {/* Dynamic Fields based on Type */}
+        {/* Honeypot Field (Hidden) */}
+        <input 
+            type="text" 
+            name="website_url_check" 
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            className="opacity-0 absolute -z-10 h-0 w-0"
+            tabIndex={-1}
+            autoComplete="off"
+        />
+
+        {/* Dynamic Fields */}
         {isTeşkilat && (
           <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 mb-4 space-y-4">
             <div>
@@ -557,7 +429,7 @@ export const RegisterPageNew = () => {
             {formData.role_type === 'party_official' && (
               <div>
                 <label className="block text-sm font-bold text-orange-800 mb-1">Görev Ünvanı</label>
-                <input type="text" name="org_position" className="w-full border-orange-200 rounded-lg p-2" onChange={handleInputChange} required placeholder="Örn: Gençlik Kolları Bşk." />
+                <input type="text" name="org_position" className="w-full border-orange-200 rounded-lg p-2" onChange={handleInputChange} required placeholder="Örn: Gençlik Kolları Bşk." maxLength={100} />
               </div>
             )}
             
@@ -579,6 +451,7 @@ export const RegisterPageNew = () => {
               onChange={handleInputChange}
               required
               readOnly={!!claimUser}
+              maxLength={50}
             />
           </div>
 
@@ -595,6 +468,7 @@ export const RegisterPageNew = () => {
                 value={formData.email}
                 onChange={handleInputChange}
                 required
+                maxLength={100}
               />
               <div className="absolute right-3 top-3.5">
                 {emailStatus === 'checking' && <div className="animate-spin w-5 h-5 border-2 border-primary-blue border-t-transparent rounded-full" />}
@@ -648,8 +522,9 @@ export const RegisterPageNew = () => {
               className="w-full border border-gray-300 rounded-lg p-3"
               value={formData.district}
               onChange={handleInputChange}
-              required={isDistrictRole} // Zorunluluk dinamik
+              required={isDistrictRole}
               placeholder={isDistrictRole ? 'Zorunlu alan' : 'Opsiyonel'}
+              maxLength={50}
             />
           </div>
 
@@ -660,20 +535,20 @@ export const RegisterPageNew = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kurum Adı</label>
-                  <input type="text" name="media_outlet" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} required />
+                  <input type="text" name="media_outlet" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} required maxLength={100} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ünvan</label>
-                  <input type="text" name="media_title" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} required />
+                  <input type="text" name="media_title" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} required maxLength={50} />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Web Sitesi</label>
-                <input type="url" name="media_website" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} />
+                <input type="url" name="media_website" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} maxLength={200} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kısa Biyografi</label>
-                <textarea name="media_bio" className="w-full border border-gray-300 rounded-lg p-2" rows="2" onChange={handleInputChange}></textarea>
+                <textarea name="media_bio" className="w-full border border-gray-300 rounded-lg p-2" rows="2" onChange={handleInputChange} maxLength={500}></textarea>
               </div>
             </div>
           )}
@@ -707,7 +582,7 @@ export const RegisterPageNew = () => {
           {(isTeşkilat || isPolitician) && (
             <div className="col-span-1 md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Önceki Görevler (Opsiyonel)</label>
-              <textarea name="previous_roles" className="w-full border border-gray-300 rounded-lg p-3" rows="2" onChange={handleInputChange}></textarea>
+              <textarea name="previous_roles" className="w-full border border-gray-300 rounded-lg p-3" rows="2" onChange={handleInputChange} maxLength={500}></textarea>
             </div>
           )}
 
@@ -722,6 +597,7 @@ export const RegisterPageNew = () => {
                 value={formData.password}
                 onChange={handleInputChange}
                 required
+                maxLength={50}
               />
               <button
                 type="button"
@@ -730,23 +606,6 @@ export const RegisterPageNew = () => {
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
-            </div>
-            
-            <div className="flex flex-wrap gap-2 mt-2">
-              {PASSWORD_RULES.map(rule => {
-                const isValid = rule.validator(formData.password);
-                return (
-                  <span 
-                    key={rule.id} 
-                    className={`text-xs px-2 py-1 rounded-full flex items-center ${
-                      isValid ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}
-                  >
-                    {isValid ? <Check size={10} className="mr-1" /> : <div className="w-2 h-2 rounded-full bg-gray-400 mr-1" />}
-                    {rule.label}
-                  </span>
-                );
-              })}
             </div>
           </div>
 
@@ -763,64 +622,198 @@ export const RegisterPageNew = () => {
               value={formData.password_confirm}
               onChange={handleInputChange}
               required
+              maxLength={50}
             />
-          </div>
-
-          {/* Captcha */}
-          <div className="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="text-blue-600 flex-shrink-0" />
-              <div className="flex-1 flex items-center gap-4">
-                <label className="block text-sm font-bold text-blue-900 whitespace-nowrap">Güvenlik Sorusu:</label>
-                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-blue-200">
-                  <span className="font-mono text-lg font-bold text-blue-800">{captcha.q}</span>
-                  <input
-                    type="number"
-                    style={{ width: '80px', minWidth: '80px' }}
-                    className="border-0 border-b-2 border-blue-300 focus:border-blue-600 focus:ring-0 text-center font-bold text-lg p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    value={captchaInput}
-                    onChange={(e) => setCaptchaInput(e.target.value)}
-                    required
-                    placeholder="?"
-                  />
-                </div>
-              </div>
+            
+            {/* Password Rules moved below confirm */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              {PASSWORD_RULES.map(rule => {
+                const isValid = rule.validator(formData.password);
+                return (
+                  <span 
+                    key={rule.id} 
+                    className={`text-xs px-2 py-1 rounded-full flex items-center transition-colors ${
+                      isValid ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {isValid ? <Check size={10} className="mr-1" /> : <div className="w-2 h-2 rounded-full bg-gray-400 mr-1" />}
+                    {rule.label}
+                  </span>
+                );
+              })}
             </div>
           </div>
         </div>
 
         {globalError && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-3">
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-3 animate-pulse">
             <AlertCircle size={20} />
             <p className="text-sm font-medium">{globalError}</p>
           </div>
         )}
 
-        <Button 
-          type="submit" 
-          variant="primary" 
-          size="lg"
-          fullWidth 
-          loading={loading}
-          disabled={
-            emailStatus === 'taken' || 
-            !formData.password || 
-            formData.password !== formData.password_confirm
-          }
-          className="shadow-xl shadow-blue-200"
-        >
-          {claimUser ? 'Profili Sahiplen ve Kaydol' : 'Kaydı Tamamla'}
-        </Button>
+        <div className="flex justify-center pt-4">
+            <button
+                type="submit"
+                disabled={
+                    loading || 
+                    emailStatus === 'taken' || 
+                    !formData.password || 
+                    formData.password !== formData.password_confirm
+                }
+                className="w-full md:w-2/3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-lg"
+            >
+                {loading ? (
+                    <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
+                ) : (
+                    claimUser ? 'Profili Sahiplen ve Kaydol' : 'Kaydı Tamamla'
+                )}
+            </button>
+        </div>
       </form>
     );
   };
+
+  // 0. Initial Choice
+  const renderChoice = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-black text-gray-900 mb-2">Aramıza Katılın</h1>
+        <p className="text-gray-600">Siyasetin nabzını tutun, şeffaf ve özgür platformda yerinizi alın.</p>
+      </div>
+
+      <div className="grid gap-4">
+        <button
+          onClick={() => setStep(2)}
+          className="flex items-center p-6 bg-white border-2 border-gray-100 rounded-2xl hover:border-primary-blue hover:shadow-lg transition-all group text-left"
+        >
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mr-6 group-hover:scale-110 transition-transform">
+            <User className="w-8 h-8 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-primary-blue">Yeni Üye Ol</h3>
+            <p className="text-gray-500 text-sm">Henüz bir profiliniz yoksa buradan yeni hesap oluşturun.</p>
+          </div>
+          <ChevronRight className="w-6 h-6 text-gray-300 group-hover:text-primary-blue" />
+        </button>
+
+        <button
+          onClick={() => setStep(1)}
+          className="flex items-center p-6 bg-white border-2 border-gray-100 rounded-2xl hover:border-purple-500 hover:shadow-lg transition-all group text-left"
+        >
+          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mr-6 group-hover:scale-110 transition-transform">
+            <ShieldCheck className="w-8 h-8 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-purple-600">Mevcut Profili Sahiplen</h3>
+            <p className="text-gray-500 text-sm">Adınıza açılmış otomatik profili doğrulayın ve yönetmeye başlayın.</p>
+          </div>
+          <ChevronRight className="w-6 h-6 text-gray-300 group-hover:text-purple-600" />
+        </button>
+      </div>
+      
+      <div className="text-center mt-6">
+        <p className="text-sm text-gray-500">Zaten hesabınız var mı? <a href="/login-new" className="text-primary-blue font-bold hover:underline">Giriş Yap</a></p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center p-4 py-10">
       <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 md:p-10 border border-gray-100">
         {step === 0 && renderChoice()}
-        {step === 1 && renderSearch()}
-        {step === 2 && renderTypeSelection()}
+        {step === 1 && handleSearch && renderSearch && renderSearch()} 
+        {/* renderSearch and renderTypeSelection are same as previous logic but simplified call here */}
+        {step === 1 && (
+            <div className="space-y-6">
+              <div className="flex items-center mb-6">
+                <button onClick={() => setStep(0)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
+                  <ArrowLeft className="w-6 h-6 text-gray-600" />
+                </button>
+                <h2 className="text-2xl font-bold">Profilinizi Bulun</h2>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Ad Soyad veya Kullanıcı Adı Ara..."
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-0 text-lg"
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+                {isSearching && <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full" />}
+              </div>
+              <div className="space-y-3 mt-4">
+                {searchResults.map(user => (
+                  <div 
+                    key={user.id}
+                    onClick={() => {
+                      setClaimUser(user);
+                      setFormData(prev => ({
+                        ...prev,
+                        full_name: user.full_name,
+                        membership_type: mapUserTypeToMembership(user.user_type, user.politician_type),
+                        party_id: user.party_id || '',
+                        province: user.province || ''
+                      }));
+                      setStep(3);
+                    }} 
+                    className="flex items-center p-4 border rounded-xl hover:border-purple-500 cursor-pointer hover:bg-purple-50 transition-all"
+                  >
+                    <Avatar src={user.avatar_url} size="50px" />
+                    <div className="ml-4">
+                      <h4 className="font-bold text-gray-900">{user.full_name}</h4>
+                      <p className="text-sm text-gray-500">@{user.username} • {user.user_type}</p>
+                    </div>
+                    <div className="ml-auto">
+                      <Button size="sm" variant="outline">Seç</Button>
+                    </div>
+                  </div>
+                ))}
+                {searchResults.length === 0 && !isSearching && (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Aradığınız profili bulamadınız mı?</p>
+                    <button onClick={() => setStep(2)} className="text-purple-600 font-bold hover:underline mt-2">
+                      Yeni Profil Oluşturun
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+        )}
+        {step === 2 && (
+            <div className="space-y-6">
+              <div className="flex items-center mb-6">
+                <button onClick={() => setStep(0)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
+                  <ArrowLeft className="w-6 h-6 text-gray-600" />
+                </button>
+                <h2 className="text-2xl font-bold">Üyelik Tipi Seçin</h2>
+              </div>
+              <div className="grid gap-3">
+                {MEMBERSHIP_TYPES.map((type) => {
+                  const Icon = type.icon;
+                  return (
+                    <button
+                      key={type.id}
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, membership_type: type.id }));
+                        setStep(3);
+                      }}
+                      className={`flex items-start p-4 bg-white border-2 border-gray-100 rounded-xl transition-all group text-left ${type.borderColor} hover:shadow-md`}
+                    >
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center mr-4 flex-shrink-0 ${type.color}`}>
+                        <Icon className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 mb-1">{type.label}</h3>
+                        <p className="text-xs text-gray-500">{type.desc}</p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-600 mt-3" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+        )}
         {step === 3 && renderForm()}
       </div>
     </div>
