@@ -776,7 +776,8 @@ export const RegisterPageNew = () => {
                   <span className="font-mono text-lg font-bold text-blue-800">{captcha.q}</span>
                   <input
                     type="number"
-                    className="w-24 border-0 border-b-2 border-blue-300 focus:border-blue-600 focus:ring-0 text-center font-bold text-lg p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    style={{ width: '80px', minWidth: '80px' }}
+                    className="border-0 border-b-2 border-blue-300 focus:border-blue-600 focus:ring-0 text-center font-bold text-lg p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     value={captchaInput}
                     onChange={(e) => setCaptchaInput(e.target.value)}
                     required
