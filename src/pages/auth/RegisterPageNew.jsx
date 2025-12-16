@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Eye, EyeOff, Check, X, ChevronRight, AlertCircle, Search, 
-  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, Calendar, CheckCircle 
+  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, CheckCircle 
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Avatar } from '../../components/common/Avatar';
@@ -18,7 +18,7 @@ const PASSWORD_RULES = [
   { id: 'number', label: 'En az 1 rakam', validator: (p) => /[0-9]/.test(p) },
 ];
 
-// Üyelik Tipleri ve İkonları
+// Üyelik Tipleri
 const MEMBERSHIP_TYPES = [
   { 
     id: 'citizen', 
@@ -65,7 +65,7 @@ const MEMBERSHIP_TYPES = [
 export const RegisterPageNew = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { register } = useAuth(); // AuthContext'teki register fonksiyonu FormData desteklemeli veya burada direkt fetch kullanacağız
+  const { register } = useAuth();
   
   // URL Params
   const initialMode = searchParams.get('mode'); // 'claim'
@@ -129,8 +129,13 @@ export const RegisterPageNew = () => {
 
   const loadParties = async () => {
     try {
-      const data = await partiesApi.getAll();
-      setParties(data);
+      // API call to /api/parties
+      const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
+      const res = await fetch(`${apiUrl}/parties`);
+      const data = await res.json();
+      if (data.success) {
+        setParties(data.data);
+      }
     } catch (err) {
       console.error('Parties error:', err);
     }
@@ -185,7 +190,7 @@ export const RegisterPageNew = () => {
 
     const timeout = setTimeout(async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
         const response = await fetch(`${apiUrl}/auth/check-availability?${field}=${encodeURIComponent(value)}`);
         const data = await response.json();
         
@@ -216,7 +221,7 @@ export const RegisterPageNew = () => {
     }
     setIsSearching(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
       const res = await fetch(`${apiUrl}/users?search=${encodeURIComponent(query)}&limit=5`);
       const data = await res.json();
       if (data.success) {
@@ -246,49 +251,66 @@ export const RegisterPageNew = () => {
     setGlobalError('');
 
     try {
-      // Use FormData for file upload support
-      const submitData = new FormData();
-      submitData.append('full_name', formData.full_name);
-      submitData.append('email', formData.email);
-      submitData.append('password', formData.password);
-      
-      const userType = formData.membership_type === 'organization' ? 'party_member' : formData.membership_type;
-      submitData.append('user_type', userType);
-      
-      if (formData.party_id) submitData.append('party_id', formData.party_id);
-      if (formData.province) submitData.append('province', formData.province);
-      if (formData.district) submitData.append('district', formData.district);
-      
-      const polType = formData.role_type || formData.org_position || null;
-      if (polType) submitData.append('politician_type', polType);
-
-      // Metadata construction
-      const metadata = {
-        phone: formData.phone,
-        media_title: formData.media_title,
-        media_outlet: formData.media_outlet,
-        media_website: formData.media_website,
-        media_bio: formData.media_bio,
-        start_date: formData.start_date,
-        previous_roles: formData.previous_roles,
-        bio: formData.bio
-      };
-      submitData.append('metadata', JSON.stringify(metadata));
-
-      if (claimUser) {
-        submitData.append('is_claim', 'true');
-        submitData.append('claim_user_id', claimUser.id);
-      }
-
+      // 1. File Conversion to Base64 (if file exists)
+      let documentData = null;
       if (file) {
-        submitData.append('document', file);
+        const toBase64 = (file) => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+        
+        try {
+            const base64Content = await toBase64(file);
+            // "data:application/pdf;base64,....." -> remove prefix if handled by backend, but usually keep it
+            documentData = {
+                name: file.name,
+                type: file.type,
+                content: base64Content
+            };
+        } catch (e) {
+            console.error('File conversion error', e);
+            throw new Error('Dosya yüklenirken hata oluştu.');
+        }
       }
 
-      // Direct fetch call because context register might not support FormData yet
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      // 2. Prepare Payload
+      const userType = formData.membership_type === 'organization' ? 'party_member' : formData.membership_type;
+      
+      const payload = {
+        full_name: formData.full_name,
+        email: formData.email,
+        password: formData.password,
+        user_type: userType,
+        party_id: formData.party_id,
+        province: formData.province,
+        district: formData.district,
+        politician_type: formData.role_type || formData.org_position || null,
+        metadata: {
+            phone: formData.phone,
+            media_title: formData.media_title,
+            media_outlet: formData.media_outlet,
+            media_website: formData.media_website,
+            media_bio: formData.media_bio,
+            org_position: formData.org_position,
+            start_date: formData.start_date,
+            previous_roles: formData.previous_roles,
+            bio: formData.bio,
+        },
+        document: documentData,
+        is_claim: claimUser ? 'true' : 'false',
+        claim_user_id: claimUser?.id
+      };
+
+      // 3. API Call
+      const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
       const response = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
-        body: submitData, // Content-Type header should NOT be set manually for FormData
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -302,7 +324,13 @@ export const RegisterPageNew = () => {
         setSuccessMessage(result.message);
       } else {
         // Auto login for citizen
-        navigate('/');
+        // We need to store token manually since we bypassed auth context
+        if (result.data?.token) {
+            localStorage.setItem('auth_token', result.data.token);
+            window.location.href = '/'; // Hard reload to init auth context
+        } else {
+            navigate('/login-new');
+        }
       }
     } catch (err) {
       setGlobalError(err.message || 'Kayıt başarısız oldu.');
@@ -311,6 +339,9 @@ export const RegisterPageNew = () => {
     }
   };
 
+  // ... (Rest of render functions: renderChoice, renderSearch, renderTypeSelection, renderForm) ...
+  // Same as before, just kept renderers for brevity in this response but I will write FULL file content.
+  
   // --- RENDERERS ---
 
   if (successMessage) {
@@ -587,7 +618,7 @@ export const RegisterPageNew = () => {
               >
                 <option value="">Seçiniz...</option>
                 {parties.map(p => (
-                  <option key={p.party_id} value={p.party_id}>{p.party_name} ({p.party_short_name})</option>
+                  <option key={p.id || p.party_id} value={p.id || p.party_id}>{p.name || p.party_name} ({p.short_name || p.party_short_name})</option>
                 ))}
               </select>
             </div>

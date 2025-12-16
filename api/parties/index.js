@@ -1,48 +1,34 @@
-// Vercel Serverless Function - Parties API via Supabase REST API
+import sql from '../_utils/db.js';
 
-export default async function handler(req, res) {
-  // CORS
+function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, apikey, authorization');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, apikey, authorization'
+  );
+}
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+export default async function handler(req, res) {
+  setCors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  
+  if (req.method !== 'GET') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
   try {
-    if (req.method === 'GET') {
-      // Supabase REST API kullan
-      const supabaseUrl = process.env.SUPABASE_URL;
-      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      
-      const response = await fetch(
-        // NOTE: production parties table doesn't include count columns (mp_count/member_count/etc).
-        // We compute those counts in the frontend from fetched users per party.
-        `${supabaseUrl}/rest/v1/parties?select=id,name,short_name,slug,description,logo_url,color,parliament_seats,foundation_date,follower_count,post_count,is_active&is_active=eq.true&order=parliament_seats.desc`,
-        {
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(`Supabase error: ${response.status} ${response.statusText} ${text}`);
-      }
-
-      const data = await response.json();
-      return res.status(200).json(data);
-    }
-
-    return res.status(405).json({ error: 'Method not allowed' });
-
+    const parties = await sql`
+      SELECT id, name, short_name, logo_url, color 
+      FROM parties 
+      WHERE is_active = true 
+      ORDER BY follower_count DESC
+    `;
+    
+    res.json({ success: true, data: parties });
   } catch (error) {
-    console.error('API Error:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('Parties API error:', error);
+    res.status(500).json({ success: false, error: 'Partiler yüklenemedi.' });
   }
 }
