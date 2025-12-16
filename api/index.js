@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 
+// Vercel Monolith API - Last Updated: Now
 // --- CONFIG & HELPERS ---
 const JWT_SECRET = process.env.JWT_SECRET || 'polithane-super-secret-key-2024';
 
