@@ -1,12 +1,16 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.js"
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth/[route]?route=:path*"
     },
     {
-      "source": "/(.*)",
-      "destination": "/"
+      "source": "/api/admin/:path*",
+      "destination": "/api/admin/[route]?route=:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/public/[route]?route=:path*"
     }
   ]
 }
