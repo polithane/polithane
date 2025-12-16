@@ -1,0 +1,4 @@
+// AuthContext should support multipart/form-data implicitly if we pass FormData object directly to fetch in component.
+// But RegisterPageNew uses direct fetch now, so we don't need to change AuthContext for register.
+// However, we should ensure AuthContext login function works properly.
+// No changes needed in AuthContext.jsx for this specific task since we bypassed it in RegisterPageNew for FormData support.
