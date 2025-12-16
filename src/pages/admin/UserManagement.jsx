@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Ban, CheckCircle, Eye, Edit, FileText, X } from 'lucide-react';
+import { Search, Filter, Ban, CheckCircle, Eye, Edit, FileText, X, ExternalLink } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
 import { Avatar } from '../../components/common/Avatar';
 
@@ -235,20 +235,31 @@ export const UserManagement = () => {
             
             <div className="p-6 space-y-6">
               {/* Header Info */}
-              <div className="flex items-start gap-4">
-                <Avatar src={selectedUser.avatar_url} size="80px" />
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">{selectedUser.full_name}</h3>
-                  <p className="text-gray-500">@{selectedUser.username || 'user'}</p>
-                  <div className="flex gap-2 mt-2">
-                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                      {selectedUser.user_type}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedUser.is_verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {selectedUser.is_verified ? 'Onaylı Hesap' : 'Onay Bekliyor'}
-                    </span>
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <Avatar src={selectedUser.avatar_url} size="80px" />
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">{selectedUser.full_name}</h3>
+                    <p className="text-gray-500">@{selectedUser.username || 'user'}</p>
+                    <div className="flex gap-2 mt-2">
+                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                        {selectedUser.user_type}
+                      </span>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedUser.is_verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {selectedUser.is_verified ? 'Onaylı Hesap' : 'Onay Bekliyor'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <a 
+                  href={`/profile/${selectedUser.username}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Profili Görüntüle
+                </a>
               </div>
 
               {/* Metadata / Details */}
