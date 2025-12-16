@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,9 +13,7 @@ async function checkMigrationStatus() {
   console.log('🔍 Migration Durumu Kontrol Ediliyor...\n');
   
   // Database kontrolü
-  const sql = neon(process.env.DATABASE_URL);
-  
-  try {
+    try {
     
     // Kullanıcı avatar URL'lerini kontrol et
     const result = await sql`

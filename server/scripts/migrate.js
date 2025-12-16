@@ -2,15 +2,13 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 
 // Load environment variables
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-const sql = neon(process.env.DATABASE_URL);
 
 async function runMigration() {
   console.log('🔄 Database migration başlatılıyor...\n');

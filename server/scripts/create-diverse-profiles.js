@@ -1,15 +1,29 @@
-import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { sql } from '../db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const sql = neon(process.env.DATABASE_URL);
+function assertSafeIdentifier(id) {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id)) throw new Error(`Unsafe SQL identifier: ${id}`);
+  return `"${id}"`;
+}
+
+function buildInsert(table, obj) {
+  const keys = Object.keys(obj).filter((k) => obj[k] !== undefined);
+  const cols = keys.map(assertSafeIdentifier).join(', ');
+  const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+  const values = keys.map((k) => obj[k]);
+  return {
+    text: `INSERT INTO ${assertSafeIdentifier(table)} (${cols}) VALUES (${placeholders})`,
+    values,
+  };
+}
 
 // Türk isimleri
 const turkishNames = {
@@ -204,13 +218,12 @@ async function seedDiverseProfiles() {
     for (let i = 1; i <= 30; i++) {
       const profile = await createProfile('media', i);
       
-      const [user] = await sql`
-        INSERT INTO users ${sql(profile)}
-        ON CONFLICT (username) DO UPDATE SET
-          is_automated = true,
-          bio = ${profile.bio}
-        RETURNING id, username
-      `;
+      const ins = buildInsert('users', profile);
+      const rows = await sql(
+        `${ins.text} ON CONFLICT (username) DO UPDATE SET is_automated = true, bio = EXCLUDED.bio RETURNING id, username`,
+        ins.values
+      );
+      const user = rows[0];
       
       if (user) {
         totalUsers++;
@@ -220,7 +233,8 @@ async function seedDiverseProfiles() {
         const posts = await createPostsForUser(user.id, user.username, postCount);
         
         for (const post of posts) {
-          await sql`INSERT INTO posts ${sql(post)}`;
+          const pIns = buildInsert('posts', post);
+          await sql(pIns.text, pIns.values);
           totalPosts++;
         }
         
@@ -235,13 +249,12 @@ async function seedDiverseProfiles() {
     for (let i = 1; i <= 30; i++) {
       const profile = await createProfile('citizen', i);
       
-      const [user] = await sql`
-        INSERT INTO users ${sql(profile)}
-        ON CONFLICT (username) DO UPDATE SET
-          is_automated = true,
-          bio = ${profile.bio}
-        RETURNING id, username
-      `;
+      const ins = buildInsert('users', profile);
+      const rows = await sql(
+        `${ins.text} ON CONFLICT (username) DO UPDATE SET is_automated = true, bio = EXCLUDED.bio RETURNING id, username`,
+        ins.values
+      );
+      const user = rows[0];
       
       if (user) {
         totalUsers++;
@@ -251,7 +264,8 @@ async function seedDiverseProfiles() {
         const posts = await createPostsForUser(user.id, user.username, postCount);
         
         for (const post of posts) {
-          await sql`INSERT INTO posts ${sql(post)}`;
+          const pIns = buildInsert('posts', post);
+          await sql(pIns.text, pIns.values);
           totalPosts++;
         }
         
@@ -266,13 +280,12 @@ async function seedDiverseProfiles() {
     for (let i = 1; i <= 30; i++) {
       const profile = await createProfile('retired', i);
       
-      const [user] = await sql`
-        INSERT INTO users ${sql(profile)}
-        ON CONFLICT (username) DO UPDATE SET
-          is_automated = true,
-          bio = ${profile.bio}
-        RETURNING id, username
-      `;
+      const ins = buildInsert('users', profile);
+      const rows = await sql(
+        `${ins.text} ON CONFLICT (username) DO UPDATE SET is_automated = true, bio = EXCLUDED.bio RETURNING id, username`,
+        ins.values
+      );
+      const user = rows[0];
       
       if (user) {
         totalUsers++;
@@ -282,7 +295,8 @@ async function seedDiverseProfiles() {
         const posts = await createPostsForUser(user.id, user.username, postCount);
         
         for (const post of posts) {
-          await sql`INSERT INTO posts ${sql(post)}`;
+          const pIns = buildInsert('posts', post);
+          await sql(pIns.text, pIns.values);
           totalPosts++;
         }
         

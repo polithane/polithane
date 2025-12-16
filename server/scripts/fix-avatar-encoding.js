@@ -5,12 +5,10 @@
  * Kiril karakterli dosya isimlerini URL-safe yap
  */
 
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-const sql = neon(process.env.DATABASE_URL);
 
 async function fixAvatarEncoding() {
   try {

@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -7,8 +7,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 dotenv.config({ path: join(__dirname, '../.env') });
-
-const sql = neon(process.env.DATABASE_URL);
 
 async function fixPartyIdType() {
   console.log('🔧 party_id kolonunun tipi düzeltiliyor...\n');

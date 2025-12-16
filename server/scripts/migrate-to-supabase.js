@@ -9,7 +9,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -27,8 +27,6 @@ const supabase = createClient(
 );
 
 // Database client
-const sql = neon(process.env.DATABASE_URL);
-
 const BUCKET_NAME = process.env.SUPABASE_BUCKET_NAME || 'avatars';
 
 /**

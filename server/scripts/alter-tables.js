@@ -1,9 +1,7 @@
 import dotenv from 'dotenv';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 
 dotenv.config();
-const sql = neon(process.env.DATABASE_URL);
-
 console.log('🔧 Veritabanı tablolarını güncelleniyor...\n');
 
 async function alterTables() {

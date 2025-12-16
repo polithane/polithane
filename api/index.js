@@ -4,7 +4,12 @@ import { createClient } from '@supabase/supabase-js';
 
 // Vercel Monolith API - Last Updated: Now
 // --- CONFIG & HELPERS ---
-const JWT_SECRET = process.env.JWT_SECRET || 'polithane-super-secret-key-2024';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-insecure-secret');
+
+function getJwtSecret() {
+  if (!JWT_SECRET) throw new Error('JWT_SECRET is missing in production environment');
+  return JWT_SECRET;
+}
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -14,32 +19,90 @@ function setCors(res) {
 }
 
 function signJwt(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
+}
+
+function getBearerToken(req) {
+  const raw = req.headers?.authorization || req.headers?.Authorization;
+  if (!raw) return null;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const m = String(value).match(/^Bearer\s+(.+)$/i);
+  return m ? m[1] : null;
+}
+
+function verifyJwtFromRequest(req) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+  try {
+    return jwt.verify(token, getJwtSecret());
+  } catch {
+    return null;
+  }
+}
+
+async function readJsonBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function getSupabaseKeys() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !key) throw new Error('Supabase env missing');
+  return { supabaseUrl, key };
 }
 
 async function supabaseRestGet(path, params) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) throw new Error('Supabase env missing');
+  const { supabaseUrl, key } = getSupabaseKeys();
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
   const res = await fetch(`${supabaseUrl}/rest/v1/${path}${qs}`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
   });
   if (!res.ok) { const text = await res.text(); throw new Error(`Supabase Error: ${text}`); }
   return await res.json();
 }
 
-async function supabaseRestUpsert(path, body) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) throw new Error('Supabase env missing');
-  const res = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
-    method: 'POST',
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-    body: JSON.stringify(body),
+async function supabaseRestRequest(method, path, params, body, extraHeaders = {}) {
+  const { supabaseUrl, key } = getSupabaseKeys();
+  const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+  const res = await fetch(`${supabaseUrl}/rest/v1/${path}${qs}`, {
+    method,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...extraHeaders,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) { const text = await res.text(); throw new Error(`Supabase Error: ${text}`); }
-  return await res.json();
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase Error: ${text}`);
+  }
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return await res.json();
+  return null;
+}
+
+async function supabaseRestInsert(path, body) {
+  return await supabaseRestRequest('POST', path, null, body);
+}
+
+async function supabaseRestPatch(path, params, body) {
+  return await supabaseRestRequest('PATCH', path, params, body);
+}
+
+async function supabaseRestDelete(path, params) {
+  return await supabaseRestRequest('DELETE', path, params, undefined);
 }
 
 // --- CONTROLLERS ---
@@ -65,6 +128,55 @@ async function getPosts(req, res) {
     res.json(Array.isArray(data) ? data : []);
 }
 
+async function getPostById(req, res, id) {
+    const rows = await supabaseRestGet('posts', {
+        select: '*,user:users(id,username,full_name,avatar_url,user_type,politician_type,party_id,province,city_code,is_verified,is_active)',
+        id: `eq.${id}`,
+        limit: '1'
+    });
+    const post = rows?.[0];
+    if (!post) return res.status(404).json({ success: false, error: 'Post bulunamadı' });
+    res.json({ success: true, data: post });
+}
+
+async function getPostComments(req, res, postId) {
+    const rows = await supabaseRestGet('comments', {
+        select: '*,user:users(id,username,full_name,avatar_url,is_verified)',
+        post_id: `eq.${postId}`,
+        order: 'created_at.desc'
+    });
+    res.json({ success: true, data: rows || [] });
+}
+
+async function addPostComment(req, res, postId) {
+    const auth = verifyJwtFromRequest(req);
+    if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const body = await readJsonBody(req);
+    const content = (body.content || '').trim();
+    const parent_id = body.parent_id || null;
+    if (!content) return res.status(400).json({ success: false, error: 'Yorum boş olamaz' });
+    const inserted = await supabaseRestInsert('comments', [{
+        post_id: postId,
+        user_id: auth.id,
+        content,
+        parent_id
+    }]);
+    res.status(201).json({ success: true, data: inserted?.[0] || null });
+}
+
+async function togglePostLike(req, res, postId) {
+    const auth = verifyJwtFromRequest(req);
+    if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = auth.id;
+    const existing = await supabaseRestGet('likes', { select: 'id', post_id: `eq.${postId}`, user_id: `eq.${userId}`, limit: '1' }).catch(() => []);
+    if (existing && existing.length > 0) {
+        await supabaseRestDelete('likes', { post_id: `eq.${postId}`, user_id: `eq.${userId}` });
+        return res.json({ success: true, action: 'unliked' });
+    }
+    await supabaseRestInsert('likes', [{ post_id: postId, user_id: userId }]);
+    return res.json({ success: true, action: 'liked' });
+}
+
 async function getParties(req, res) {
     const data = await supabaseRestGet('parties', { select: 'id,name,short_name,logo_url,color,seats,slug', is_active: 'eq.true', order: 'follower_count.desc' });
     res.json(data || []);
@@ -86,8 +198,20 @@ async function getPartyDetail(req, res, id) {
 }
 
 async function getUsers(req, res) {
-    const { search, limit = 20 } = req.query;
-    if (!search || search.length < 3) return res.json( [] );
+    const { search, username, id, limit = 20 } = req.query;
+
+    // Direct lookup by username or id (frontend uses this form)
+    if (username || id) {
+        const key = username ? 'username' : 'id';
+        const value = username ? String(username) : String(id);
+        const rows = await supabaseRestGet('users', { select: '*', [key]: `eq.${value}`, limit: '1' });
+        const user = rows?.[0];
+        if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+        return res.json({ success: true, data: user });
+    }
+
+    // Search list
+    if (!search || String(search).length < 3) return res.json([]);
     const data = await supabaseRestGet('users', {
         select: 'id,username,full_name,avatar_url,user_type,politician_type,party_id,province',
         or: `username.ilike.*${search}*,full_name.ilike.*${search}*`,
@@ -111,6 +235,23 @@ async function getUserDetail(req, res, id) {
     res.json({ success: true, data: user });
 }
 
+async function getUserPosts(req, res, username) {
+    // Resolve user id by username
+    const users = await supabaseRestGet('users', { select: 'id,username', username: `eq.${username}`, limit: '1' });
+    const user = users?.[0];
+    if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+    const { limit = '20', offset = '0' } = req.query;
+    const posts = await supabaseRestGet('posts', {
+        select: '*,user:users(id,username,full_name,avatar_url,user_type,politician_type,party_id,province,city_code,is_verified,is_active)',
+        user_id: `eq.${user.id}`,
+        is_deleted: 'eq.false',
+        order: 'created_at.desc',
+        limit: String(limit),
+        offset: String(offset)
+    });
+    res.json({ success: true, data: posts || [] });
+}
+
 async function authCheckAvailability(req, res) {
     const { email } = req.query;
     const result = { emailAvailable: true };
@@ -122,7 +263,8 @@ async function authCheckAvailability(req, res) {
 }
 
 async function authLogin(req, res) {
-    const { identifier, email, password } = req.body;
+    const body = await readJsonBody(req);
+    const { identifier, email, password } = body;
     const loginValue = (identifier || email || '').trim();
     if (!loginValue || !password) return res.status(400).json({ success: false, error: 'Bilgiler eksik.' });
 
@@ -150,7 +292,8 @@ async function authForgotPassword(req, res) {
 }
 
 async function authRegister(req, res) {
-    const { email, password, full_name, user_type = 'citizen', province, district, party_id, politician_type, metadata = {}, document, is_claim, claim_user_id } = req.body;
+    const body = await readJsonBody(req);
+    const { email, password, full_name, user_type = 'citizen', province, district, party_id, politician_type, metadata = {}, document, is_claim, claim_user_id } = body;
     
     if (!email || !password || !full_name) return res.status(400).json({ success: false, error: 'Eksik bilgi.' });
     
@@ -215,6 +358,32 @@ async function authRegister(req, res) {
     res.status(201).json({ success: true, message: 'Kayıt başarılı.', data: { user, token, requiresApproval: user_type !== 'citizen' } });
 }
 
+async function authMe(req, res) {
+    const auth = verifyJwtFromRequest(req);
+    if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const rows = await supabaseRestGet('users', { select: 'id,username,email,full_name,avatar_url,user_type,politician_type,party_id,province,city_code,is_verified,is_active,is_admin', id: `eq.${auth.id}`, limit: '1' });
+    const user = rows?.[0];
+    if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+    res.json({ success: true, data: { user } });
+}
+
+async function authChangePassword(req, res) {
+    const auth = verifyJwtFromRequest(req);
+    if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const body = await readJsonBody(req);
+    const currentPassword = body.currentPassword;
+    const newPassword = body.newPassword;
+    if (!currentPassword || !newPassword) return res.status(400).json({ success: false, error: 'Eksik bilgi.' });
+    const rows = await supabaseRestGet('users', { select: 'id,password_hash', id: `eq.${auth.id}`, limit: '1' });
+    const user = rows?.[0];
+    if (!user?.password_hash) return res.status(400).json({ success: false, error: 'Şifre değiştirilemiyor.' });
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) return res.status(401).json({ success: false, error: 'Mevcut şifre hatalı.' });
+    const password_hash = await bcrypt.hash(newPassword, 10);
+    await supabaseRestPatch('users', { id: `eq.${auth.id}` }, { password_hash });
+    res.json({ success: true, message: 'Şifre değiştirildi.' });
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setCors(res);
@@ -226,6 +395,18 @@ export default async function handler(req, res) {
       // Public Lists
       if (url === '/api/posts' || url === '/api/posts/') return await getPosts(req, res);
       if (url === '/api/parties' || url === '/api/parties/') return await getParties(req, res);
+
+      // Posts (detail + interactions)
+      if (url.startsWith('/api/posts/') && !url.endsWith('/')) {
+          const rest = url.split('/api/posts/')[1];
+          const parts = rest.split('/').filter(Boolean);
+          const postId = parts[0];
+          const tail = parts[1];
+          if (postId && !tail && req.method === 'GET') return await getPostById(req, res, postId);
+          if (postId && tail === 'like' && req.method === 'POST') return await togglePostLike(req, res, postId);
+          if (postId && tail === 'comments' && req.method === 'GET') return await getPostComments(req, res, postId);
+          if (postId && tail === 'comments' && req.method === 'POST') return await addPostComment(req, res, postId);
+      }
       
       // Detail Pages (Pattern Matching)
       if (url.startsWith('/api/parties/')) {
@@ -235,8 +416,12 @@ export default async function handler(req, res) {
       
       if (url === '/api/users' || url === '/api/users/') return await getUsers(req, res); // Search
       if (url.startsWith('/api/users/')) {
-          const id = url.split('/api/users/')[1];
-          if (id) return await getUserDetail(req, res, id); // Profile
+          const rest = url.split('/api/users/')[1];
+          const parts = rest.split('/').filter(Boolean);
+          const id = parts[0];
+          const tail = parts[1];
+          if (id && tail === 'posts' && req.method === 'GET') return await getUserPosts(req, res, id);
+          if (id && !tail) return await getUserDetail(req, res, id); // Profile
       }
 
       // Auth
@@ -244,6 +429,8 @@ export default async function handler(req, res) {
       if (url === '/api/auth/login' && req.method === 'POST') return await authLogin(req, res);
       if (url === '/api/auth/register' && req.method === 'POST') return await authRegister(req, res);
       if (url === '/api/auth/forgot-password' && req.method === 'POST') return await authForgotPassword(req, res);
+      if (url === '/api/auth/me' && req.method === 'GET') return await authMe(req, res);
+      if (url === '/api/auth/change-password' && req.method === 'POST') return await authChangePassword(req, res);
       if (url === '/api/auth/logout') return res.json({ success: true });
 
       // Health

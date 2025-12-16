@@ -1,9 +1,7 @@
-import { neon } from '@neondatabase/serverless';
+import { sql } from '../db.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-const sql = neon(process.env.DATABASE_URL);
 
 async function fixCategoryConstraint() {
   console.log('🔧 Fixing category constraint...');
