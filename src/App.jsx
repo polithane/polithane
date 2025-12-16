@@ -60,6 +60,7 @@ import { SecuritySettings } from './pages/admin/SecuritySettings';
 import { DatabaseManagement } from './pages/admin/DatabaseManagement';
 import { APISettings } from './pages/admin/APISettings';
 import { PartyManagement } from './pages/admin/PartyManagement';
+import { DeleteConfirmPage } from './pages/DeleteConfirmPage';
 
 function App() {
   return (
@@ -81,6 +82,7 @@ function App() {
         <Route path="/test" element={<><Header /><TestPage /><Footer /><FloatingChat /></>} />
         <Route path="/polifest" element={<><Header /><PoliFestPage /><Footer /><FloatingChat /></>} />
         <Route path="/polifest/:usernameOrId" element={<PoliFestViewerPage />} />
+        <Route path="/delete-confirm" element={<DeleteConfirmPage />} />
         {/* Backward-compatible legacy routes */}
         <Route path="/stories" element={<><Header /><PoliFestPage /><Footer /><FloatingChat /></>} />
         <Route path="/stories/:usernameOrId" element={<PoliFestViewerPage />} />

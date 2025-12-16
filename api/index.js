@@ -370,6 +370,52 @@ function requireAuth(req, res) {
   return auth;
 }
 
+function getPublicAppUrl(req) {
+  const envUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || '';
+  if (envUrl) return String(envUrl).replace(/\/+$/, '');
+  // best-effort from request
+  const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  if (host) return `${proto}://${host}`.replace(/\/+$/, '');
+  return 'https://polithane.vercel.app';
+}
+
+function sha256Hex(input) {
+  // Node runtime includes crypto
+  // eslint-disable-next-line global-require
+  const crypto = require('crypto');
+  return crypto.createHash('sha256').update(String(input)).digest('hex');
+}
+
+async function sendSendGridEmail({ to, subject, html, text }) {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  const from = process.env.SENDGRID_FROM;
+  if (!apiKey || !from) {
+    throw new Error('Email is not configured (SENDGRID_API_KEY / SENDGRID_FROM missing).');
+  }
+  const payload = {
+    personalizations: [{ to: [{ email: to }] }],
+    from: { email: from, name: 'Polithane' },
+    subject,
+    content: [
+      { type: 'text/plain', value: text || '' },
+      { type: 'text/html', value: html || '' },
+    ],
+  };
+  const r = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    throw new Error(`SendGrid Error: ${t}`);
+  }
+}
+
 async function safeUserPatch(userId, patch) {
   const maxTries = 8;
   let attempt = 0;
@@ -532,6 +578,141 @@ async function usersDeactivateMe(req, res) {
   const updated = await safeUserPatch(auth.id, { is_active: false });
   if (!updated || updated.length === 0) return res.status(500).json({ success: false, error: 'Hesap pasifleştirilemedi.' });
   res.json({ success: true });
+}
+
+async function usersRequestDeleteMe(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const ip = getClientIp(req);
+  const rl = rateLimit(`delreq:${auth.id}:${ip}`, { windowMs: 60_000, max: 3 });
+  if (!rl.ok) return res.status(429).json({ success: false, error: 'Çok fazla istek. Lütfen biraz bekleyin.' });
+
+  const rows = await supabaseRestGet('users', { select: 'id,email,metadata,is_active', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+  const me = rows?.[0];
+  if (!me?.email) return res.status(400).json({ success: false, error: 'Email bulunamadı.' });
+
+  const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
+
+  // Generate confirmation token (stored as hash in metadata)
+  // eslint-disable-next-line global-require
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(32).toString('base64url');
+  const tokenHash = sha256Hex(token);
+
+  const now = new Date();
+  const requestedAt = now.toISOString();
+  const confirmExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(); // 24h
+  const scheduledFor = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString(); // 90d
+
+  const nextMeta = {
+    ...meta,
+    delete_request_status: 'pending',
+    delete_request_token_hash: tokenHash,
+    delete_request_requested_at: requestedAt,
+    delete_request_confirm_expires_at: confirmExpiresAt,
+    delete_request_scheduled_for: scheduledFor,
+  };
+
+  const updated = await safeUserPatch(auth.id, { metadata: nextMeta });
+  if (!updated || updated.length === 0) {
+    return res.status(500).json({ success: false, error: 'Bu kurulumda metadata alanı yok; silme talebi kaydedilemedi.' });
+  }
+
+  const appUrl = getPublicAppUrl(req);
+  const confirmUrl = `${appUrl}/delete-confirm?token=${encodeURIComponent(token)}`;
+
+  const subject = 'Polithane – Hesap silme onayı';
+  const text =
+    `Merhaba,\n\n` +
+    `Polithane hesabınız için silme talebi alındı.\n\n` +
+    `Bu talebi onaylamak için 24 saat içinde şu bağlantıya tıklayın:\n${confirmUrl}\n\n` +
+    `Eğer bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+      <h2>Hesap silme onayı</h2>
+      <p>Polithane hesabınız için <strong>silme talebi</strong> aldık.</p>
+      <p>Onaylamak için lütfen <strong>24 saat</strong> içinde aşağıdaki butona tıklayın:</p>
+      <p>
+        <a href="${confirmUrl}" style="display:inline-block;padding:12px 18px;background:#dc2626;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
+          Silme talebini onayla
+        </a>
+      </p>
+      <p style="font-size:12px;color:#6b7280;">Eğer bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>
+    </div>
+  `;
+
+  await sendSendGridEmail({ to: me.email, subject, html, text });
+
+  res.json({ success: true, message: 'Onay e-postası gönderildi. Lütfen e-postanızı kontrol edin.' });
+}
+
+async function usersConfirmDelete(req, res) {
+  const { token } = req.query;
+  const raw = String(token || '').trim();
+  if (!raw) return res.status(400).json({ success: false, error: 'Token eksik.' });
+  const tokenHash = sha256Hex(raw);
+
+  const rows = await supabaseRestGet('users', {
+    select: 'id,email,is_active,metadata',
+    'metadata->>delete_request_token_hash': `eq.${tokenHash}`,
+    'metadata->>delete_request_status': 'eq.pending',
+    limit: '1',
+  }).catch(() => []);
+  const u = rows?.[0];
+  if (!u) return res.status(404).json({ success: false, error: 'Geçersiz veya süresi dolmuş bağlantı.' });
+
+  const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+  const expiresAt = meta.delete_request_confirm_expires_at ? new Date(meta.delete_request_confirm_expires_at) : null;
+  if (expiresAt && Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+    return res.status(400).json({ success: false, error: 'Bu onay bağlantısının süresi dolmuş.' });
+  }
+
+  const now = new Date().toISOString();
+  const scheduledFor = meta.delete_request_scheduled_for || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+  const nextMeta = {
+    ...meta,
+    delete_request_status: 'confirmed',
+    delete_request_confirmed_at: now,
+    delete_request_token_hash: null,
+    delete_request_confirm_expires_at: null,
+    delete_request_scheduled_for: scheduledFor,
+  };
+
+  const updated = await safeUserPatch(u.id, { is_active: false, metadata: nextMeta });
+  if (!updated || updated.length === 0) return res.status(500).json({ success: false, error: 'İşlem tamamlanamadı.' });
+
+  res.json({
+    success: true,
+    message:
+      'Hesabınız silinmek üzere kayda alındı. 90 gün içinde görünürlüğünüz kaldırılacaktır. Bu süre içinde hesabınızı tekrar aktif edebilirsiniz.',
+    scheduled_for: scheduledFor,
+  });
+}
+
+async function usersReactivateMe(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const rows = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+  const me = rows?.[0];
+  const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
+  const status = String(meta.delete_request_status || '');
+  const scheduledFor = meta.delete_request_scheduled_for ? new Date(meta.delete_request_scheduled_for) : null;
+  if (status !== 'confirmed') return res.status(400).json({ success: false, error: 'Aktif bir silme kaydı bulunamadı.' });
+  if (scheduledFor && Number.isFinite(scheduledFor.getTime()) && scheduledFor.getTime() < Date.now()) {
+    return res.status(400).json({ success: false, error: 'Silme süreci tamamlanmış olabilir. Destek ile iletişime geçin.' });
+  }
+  const nextMeta = {
+    ...meta,
+    delete_request_status: 'cancelled',
+    delete_request_cancelled_at: new Date().toISOString(),
+    delete_request_requested_at: null,
+    delete_request_confirmed_at: null,
+    delete_request_scheduled_for: null,
+  };
+  const updated = await safeUserPatch(auth.id, { is_active: true, metadata: nextMeta });
+  const user = updated?.[0] || null;
+  if (user) delete user.password_hash;
+  res.json({ success: true, data: user });
 }
 
 async function supabaseCount(table, params = {}) {
@@ -1301,6 +1482,9 @@ export default async function handler(req, res) {
       if (url === '/api/users/username' && req.method === 'PUT') return await usersUpdateUsername(req, res);
       if (url === '/api/users/me' && req.method === 'PUT') return await usersUpdateMe(req, res);
       if (url === '/api/users/me' && req.method === 'DELETE') return await usersDeactivateMe(req, res);
+      if (url === '/api/users/me/delete-request' && req.method === 'POST') return await usersRequestDeleteMe(req, res);
+      if (url === '/api/users/me/reactivate' && req.method === 'POST') return await usersReactivateMe(req, res);
+      if (url === '/api/users/delete-confirm' && req.method === 'GET') return await usersConfirmDelete(req, res);
       if (url === '/api/users/blocks' && req.method === 'GET') return await usersGetBlocks(req, res);
       if (url === '/api/users/blocks' && req.method === 'POST') return await usersBlock(req, res);
       if (url.startsWith('/api/users/blocks/') && req.method === 'DELETE') {
