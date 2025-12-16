@@ -1,4 +1,28 @@
-import { supabaseRestGet } from '../../_utils/adminAuth.js';
+// Vercel Serverless Function - Posts Controller
+
+// INLINE HELPER (Avoid import issues across directories in Vercel)
+async function supabaseRestGet(path, params) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) throw new Error('Supabase env missing');
+  
+  const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+  const res = await fetch(`${supabaseUrl}/rest/v1/${path}${qs}`, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Supabase error: ${res.status} ${res.statusText} ${text}`);
+  }
+  
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -48,6 +72,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Posts API Error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 }
