@@ -7,6 +7,7 @@ import { AnimatedSlogan } from '../common/AnimatedSlogan';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { apiCall } from '../../utils/api';
+import { getProfilePath } from '../../utils/paths';
 
 export const Header = () => {
   const navigate = useNavigate();
@@ -101,7 +102,7 @@ export const Header = () => {
                           onClick={() => {
                             setShowResults(false);
                             setQ('');
-                            navigate(`/profile/${u.username || u.id}`);
+                            navigate(getProfilePath(u));
                           }}
                         >
                           <Avatar src={u.avatar_url} size="36px" />
@@ -208,12 +209,12 @@ export const Header = () => {
                     {/* User Info */}
                     <div className="px-4 py-3 border-b border-gray-100">
                       <div className="font-bold text-gray-900">{user?.full_name}</div>
-                      <div className="text-sm text-gray-500">@{user?.username || user?.user_id}</div>
+                      <div className="text-sm text-gray-500">@{user?.username || user?.id}</div>
                     </div>
                     
                     {/* Menu Items */}
                     <Link
-                      to={`/profile/${user?.user_id}`}
+                      to={getProfilePath(user)}
                       className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
                       onClick={() => setShowUserMenu(false)}
                     >
