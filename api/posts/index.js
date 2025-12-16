@@ -17,7 +17,9 @@ export default async function handler(req, res) {
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
     if (!supabaseUrl || !supabaseKey) {
+      console.error('Supabase env missing');
       return res.status(500).json({ error: 'Supabase env missing' });
     }
 
@@ -73,13 +75,12 @@ export default async function handler(req, res) {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
-        .filter((id) => /^[0-9a-fA-F-]{10,}$/.test(id));
+        .filter((id) => /^[0-9a-fA-F-]{10,}$/.test(id)); // UUID check
       if (list.length > 0) params.set('user_id', `in.(${list.join(',')})`);
     }
     if (agenda_tag) params.set('agenda_tag', `eq.${agenda_tag}`);
 
     // ordering
-    // expected: created_at.desc OR polit_score.desc etc
     const [orderCol, orderDir] = String(order).split('.');
     if (orderCol) params.set('order', `${orderCol}.${orderDir === 'asc' ? 'asc' : 'desc'}`);
 
@@ -97,10 +98,12 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
+    
+    // Return array directly (Original behavior)
     return res.status(200).json(data);
+    
   } catch (error) {
     console.error('API Error:', error);
     return res.status(500).json({ error: error.message });
   }
 }
-
