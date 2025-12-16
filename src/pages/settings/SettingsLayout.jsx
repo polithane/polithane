@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { User, Lock, Shield, Bell, Palette, Globe, Download, Trash2 } from 'lucide-react';
+import { User, Lock, Shield, Bell, Palette, Globe, Download, Trash2, UserX } from 'lucide-react';
 
 export const SettingsLayout = () => {
   const location = useLocation();
@@ -10,6 +10,7 @@ export const SettingsLayout = () => {
     { path: '/settings/security', icon: Shield, label: 'Güvenlik' },
     { path: '/settings/notifications', icon: Bell, label: 'Bildirimler' },
     { path: '/settings/privacy', icon: Globe, label: 'Gizlilik' },
+    { path: '/settings/blocked', icon: UserX, label: 'Engellenenler' },
     { path: '/settings/appearance', icon: Palette, label: 'Görünüm' },
     { path: '/settings/data', icon: Download, label: 'Verilerim' },
     { path: '/settings/delete', icon: Trash2, label: 'Hesabı Sil' },
