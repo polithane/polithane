@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Save, Lock, Shield, Key } from 'lucide-react';
+import { Save, Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const SecuritySettings = () => {
+  const { changePassword } = useAuth();
   const [passwords, setPasswords] = useState({
     current: '',
     new: '',
@@ -9,16 +11,38 @@ export const SecuritySettings = () => {
   });
   const [twoFactor, setTwoFactor] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess(false);
     if (passwords.new !== passwords.confirm) {
-      alert('Yeni şifreler eşleşmiyor!');
+      setError('Yeni şifreler eşleşmiyor!');
       return;
     }
-    setSuccess(true);
-    setPasswords({ current: '', new: '', confirm: '' });
-    setTimeout(() => setSuccess(false), 3000);
+    if (!passwords.current || !passwords.new) {
+      setError('Lütfen mevcut şifre ve yeni şifreyi girin.');
+      return;
+    }
+    if (String(passwords.new).length < 8) {
+      setError('Yeni şifre en az 8 karakter olmalı.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await changePassword(passwords.current, passwords.new);
+      if (!res?.success) throw new Error(res?.error || 'Şifre değiştirilemedi.');
+      setSuccess(true);
+      setPasswords({ current: '', new: '', confirm: '' });
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (e2) {
+      setError(e2?.message || 'Şifre değiştirilemedi.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -31,8 +55,15 @@ export const SecuritySettings = () => {
         
         <form onSubmit={handlePasswordChange} className="space-y-4">
           {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">
-              ✓ Şifre başarıyla değiştirildi!
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" />
+              Şifre başarıyla değiştirildi!
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              {error}
             </div>
           )}
           
@@ -66,9 +97,13 @@ export const SecuritySettings = () => {
             />
           </div>
           
-          <button type="submit" className="flex items-center gap-2 bg-primary-blue text-white px-6 py-3 rounded-lg hover:bg-blue-600">
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex items-center gap-2 bg-primary-blue text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Save className="w-4 h-4" />
-            Şifreyi Değiştir
+            {loading ? 'Değiştiriliyor...' : 'Şifreyi Değiştir'}
           </button>
         </form>
       </div>
