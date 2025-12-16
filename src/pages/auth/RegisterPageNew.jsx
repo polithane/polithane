@@ -25,7 +25,8 @@ const MEMBERSHIP_TYPES = [
     label: 'Vatandaş', 
     desc: 'Gündemi takip etmek ve etkileşime girmek için.',
     icon: User,
-    color: 'bg-blue-100 text-blue-600',
+    color: 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600',
+    iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600 text-white',
     borderColor: 'hover:border-blue-500'
   },
   { 
@@ -33,7 +34,8 @@ const MEMBERSHIP_TYPES = [
     label: 'Parti Üyesi', 
     desc: 'Parti kimliğinizi doğrulayarak rozet kazanın.',
     icon: Users,
-    color: 'bg-red-100 text-red-600',
+    color: 'bg-gradient-to-br from-red-50 to-red-100 text-red-600',
+    iconBg: 'bg-gradient-to-br from-red-500 to-red-600 text-white',
     borderColor: 'hover:border-red-500'
   },
   { 
@@ -41,7 +43,8 @@ const MEMBERSHIP_TYPES = [
     label: 'Teşkilat / Yönetim', 
     desc: 'İl/İlçe başkanı veya belediye başkanı.',
     icon: Building,
-    color: 'bg-orange-100 text-orange-600',
+    color: 'bg-gradient-to-br from-orange-50 to-orange-100 text-orange-600',
+    iconBg: 'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
     borderColor: 'hover:border-orange-500'
   },
   { 
@@ -49,7 +52,8 @@ const MEMBERSHIP_TYPES = [
     label: 'Milletvekili', 
     desc: 'TBMM üyeleri için resmi hesap.',
     icon: Award,
-    color: 'bg-purple-100 text-purple-600',
+    color: 'bg-gradient-to-br from-purple-50 to-purple-100 text-purple-600',
+    iconBg: 'bg-gradient-to-br from-purple-500 to-purple-600 text-white',
     borderColor: 'hover:border-purple-500'
   },
   { 
@@ -57,7 +61,8 @@ const MEMBERSHIP_TYPES = [
     label: 'Medya Mensubu', 
     desc: 'Gazeteci, yazar ve medya kuruluşları.',
     icon: Mic,
-    color: 'bg-green-100 text-green-600',
+    color: 'bg-gradient-to-br from-green-50 to-green-100 text-green-600',
+    iconBg: 'bg-gradient-to-br from-green-500 to-green-600 text-white',
     borderColor: 'hover:border-green-500'
   }
 ];
@@ -800,9 +805,9 @@ export const RegisterPageNew = () => {
                       }}
                       className={`flex items-start p-4 bg-white border-2 border-gray-100 rounded-xl transition-all group text-left ${type.borderColor} hover:shadow-md`}
                     >
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center mr-4 flex-shrink-0 ${type.color}`}>
-                        <Icon className="w-6 h-6" />
-                      </div>
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mr-5 flex-shrink-0 shadow-lg transform group-hover:scale-110 transition-transform duration-300 ${type.iconBg}`}>
+                <Icon className="w-8 h-8" />
+              </div>
                       <div className="flex-1">
                         <h3 className="font-bold text-gray-900 mb-1">{type.label}</h3>
                         <p className="text-xs text-gray-500">{type.desc}</p>
