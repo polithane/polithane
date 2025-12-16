@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Check, X, ChevronDown, ChevronRight, AlertCircle, Info } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { getParties } from '../../utils/api';
+import { parties as partiesApi } from '../../utils/api';
 import { CITY_CODES } from '../../utils/constants';
 
 // Şifre kuralları
@@ -59,7 +59,7 @@ export const RegisterPageNew = () => {
   useEffect(() => {
     const loadParties = async () => {
       try {
-        const data = await getParties();
+        const data = await partiesApi.getAll();
         setParties(data);
       } catch (err) {
         console.error('Parties load error:', err);
