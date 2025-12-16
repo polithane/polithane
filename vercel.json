@@ -10,7 +10,7 @@
     },
     {
       "source": "/api/:path*",
-      "destination": "/api/public/[route]?route=:path*"
+      "destination": "/api/public/index?route=:path*"
     }
   ]
 }

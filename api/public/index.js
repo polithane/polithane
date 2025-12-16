@@ -4,10 +4,6 @@ import usersList from './_controllers/users_legacy/index.js';
 import usersDetail from './_controllers/users_legacy/[username].js';
 
 export default async function handler(req, res) {
-  const { route } = req.query;
-  const endpoint = Array.isArray(route) ? route[0] : route;
-  const subEndpoint = Array.isArray(route) && route.length > 1 ? route[1] : null;
-
   // CORS (Global for public)
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,6 +14,10 @@ export default async function handler(req, res) {
   );
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const { route } = req.query;
+  const endpoint = Array.isArray(route) ? route[0] : route;
+  const subEndpoint = Array.isArray(route) && route.length > 1 ? route[1] : null;
 
   try {
     switch (endpoint) {
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         }
         return await usersList(req, res);
       default:
-        return res.status(404).json({ error: 'Public endpoint not found: ' + endpoint });
+        return res.status(404).json({ error: 'Public endpoint not found: ' + endpoint, query: req.query });
     }
   } catch (error) {
     console.error('Public Gateway Error:', error);
