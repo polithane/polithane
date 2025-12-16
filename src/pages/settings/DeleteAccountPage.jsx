@@ -176,13 +176,13 @@ export const DeleteAccountPage = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setStep(1);
                   navigate('/');
                 }}
                 className="w-full mt-2 inline-flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-800 font-bold px-5 py-3 rounded-lg"
               >
                 Vazgeç
               </button>
+            </div>
           </div>
         </div>
       </div>
