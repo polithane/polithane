@@ -118,6 +118,33 @@ async function supabaseStorageRequest(method, path, body) {
   return payload;
 }
 
+async function supabaseStorageUploadObject(bucket, objectPath, buffer, contentType) {
+  const { supabaseUrl } = getSupabaseKeys();
+  const key = getSupabaseServiceRoleKey();
+  const safePath = String(objectPath || '').replace(/^\/+/, '');
+  const url = `${supabaseUrl}/storage/v1/object/${bucket}/${safePath}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': contentType || 'application/octet-stream',
+      'x-upsert': 'true',
+    },
+    body: buffer,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    // Return Turkish explanation for common RLS message
+    if (text.toLowerCase().includes('row-level security')) {
+      throw new Error('Yükleme engellendi: Depolama (Storage) izinleri kısıtlı. Sistem yöneticisi bucket izinlerini veya servis anahtarını kontrol etmeli.');
+    }
+    throw new Error(`Depolama hatası: ${text}`);
+  }
+  await res.arrayBuffer().catch(() => null);
+  return true;
+}
+
 async function supabaseRestRequest(method, path, params, body, extraHeaders = {}) {
   const { supabaseUrl, key } = getSupabaseKeys();
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
@@ -770,6 +797,60 @@ async function storageEnsureBucket(req, res) {
     await supabaseStorageRequest('POST', 'bucket', { name, public: isPublic });
   }
   res.json({ success: true, created: !exists, name });
+}
+
+async function usersUploadAvatar(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const dataUrl = String(body?.dataUrl || '');
+  const contentType = String(body?.contentType || '');
+
+  if (!dataUrl.startsWith('data:') || !dataUrl.includes('base64,')) {
+    return res.status(400).json({ success: false, error: 'Geçersiz dosya verisi.' });
+  }
+  const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  const ct = contentType && allowed.has(contentType) ? contentType : dataUrl.slice(5).split(';')[0];
+  if (!allowed.has(ct)) return res.status(400).json({ success: false, error: 'Sadece JPG/PNG/WEBP yükleyebilirsiniz.' });
+
+  const base64 = dataUrl.split('base64,')[1] || '';
+  let buf;
+  try {
+    buf = Buffer.from(base64, 'base64');
+  } catch {
+    return res.status(400).json({ success: false, error: 'Dosya çözümlenemedi.' });
+  }
+  if (!buf || buf.length === 0) return res.status(400).json({ success: false, error: 'Dosya boş.' });
+  if (buf.length > 2 * 1024 * 1024) return res.status(400).json({ success: false, error: 'Dosya boyutu çok büyük (max 2MB).' });
+
+  // Ensure uploads bucket exists (public)
+  try {
+    // reuse internal ensure logic
+    const list = await supabaseStorageRequest('GET', 'bucket', undefined).catch(() => []);
+    const exists = Array.isArray(list) && list.some((b) => b?.name === 'uploads');
+    if (!exists) await supabaseStorageRequest('POST', 'bucket', { name: 'uploads', public: true });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      error:
+        'Profil fotoğrafı yüklenemedi. Depolama ayarları eksik olabilir. Vercel ortamında SUPABASE_SERVICE_ROLE_KEY tanımlı olmalı.',
+    });
+  }
+
+  const ext = ct === 'image/png' ? 'png' : ct === 'image/webp' ? 'webp' : 'jpg';
+  const path = `avatars/${auth.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  try {
+    await supabaseStorageUploadObject('uploads', path, buf, ct);
+  } catch (e) {
+    return res.status(500).json({ success: false, error: String(e?.message || 'Profil fotoğrafı yüklenemedi.') });
+  }
+
+  const { supabaseUrl } = getSupabaseKeys();
+  const publicUrl = `${supabaseUrl}/storage/v1/object/public/uploads/${path}`;
+  const updated = await safeUserPatch(auth.id, { avatar_url: publicUrl });
+  const user = updated?.[0] || null;
+  if (user) delete user.password_hash;
+  return res.json({ success: true, data: user });
 }
 
 async function supabaseCount(table, params = {}) {
@@ -1542,6 +1623,7 @@ export default async function handler(req, res) {
       if (url === '/api/users/me/delete-request' && req.method === 'POST') return await usersRequestDeleteMe(req, res);
       if (url === '/api/users/me/reactivate' && req.method === 'POST') return await usersReactivateMe(req, res);
       if (url === '/api/users/delete-confirm' && req.method === 'GET') return await usersConfirmDelete(req, res);
+      if (url === '/api/users/me/avatar' && req.method === 'POST') return await usersUploadAvatar(req, res);
       if (url === '/api/storage/ensure-bucket' && req.method === 'POST') return await storageEnsureBucket(req, res);
       if (url === '/api/users/blocks' && req.method === 'GET') return await usersGetBlocks(req, res);
       if (url === '/api/users/blocks' && req.method === 'POST') return await usersBlock(req, res);

@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, Upload, Camera, AlertCircle, CheckCircle } from 'lucide-react';
 import { apiCall } from '../../utils/api';
-import { supabase } from '../../services/supabase';
 import { isValidFileSize, isValidFileType } from '../../utils/validators';
 
 export const ProfileSettings = () => {
@@ -51,51 +50,30 @@ export const ProfileSettings = () => {
 
     setUploading(true);
     try {
-      // Use existing bucket; keep avatars under a folder.
-      const bucket = 'uploads';
-      const safeExt = (name) => String(name || '').split('.').pop()?.toLowerCase() || 'jpg';
-      const ext = safeExt(file.name).replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
-      const path = `avatars/${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-
-      const uploadOnce = async () => {
-        const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
-          contentType: file.type || 'image/jpeg',
-          upsert: true,
+      // Upload via our API (service role) to avoid Storage RLS issues.
+      const toDataUrl = (f) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(new Error('Dosya okunamadı.'));
+          reader.readAsDataURL(f);
         });
-        if (upErr) throw upErr;
-      };
-
-      try {
-        await uploadOnce();
-      } catch (err) {
-        const msg = String(err?.message || '');
-        const bucketMissing = msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found');
-        if (bucketMissing) {
-          // Ask backend to create the bucket (requires SUPABASE_SERVICE_ROLE_KEY on Vercel), then retry once.
-          await apiCall('/api/storage/ensure-bucket', {
-            method: 'POST',
-            body: JSON.stringify({ name: bucket, public: true }),
-          });
-          await uploadOnce();
-        } else {
-          throw err;
-        }
-      }
-
-      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-      const publicUrl = data?.publicUrl;
-      if (!publicUrl) throw new Error('Fotoğraf URL alınamadı.');
-
-      const res = await apiCall('/api/users/me', {
-        method: 'PUT',
-        body: JSON.stringify({ avatar_url: publicUrl }),
+      const dataUrl = await toDataUrl(file);
+      const res = await apiCall('/api/users/me/avatar', {
+        method: 'POST',
+        body: JSON.stringify({ dataUrl, contentType: file.type || '' }),
       });
-      if (!res?.success) throw new Error(res?.error || 'Fotoğraf kaydedilemedi.');
+      if (!res?.success) throw new Error(res?.error || 'Fotoğraf yüklenemedi.');
       if (res.data) updateUser(res.data);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2500);
     } catch (e) {
-      setError(e?.message || 'Fotoğraf yüklenemedi.');
+      const msg = String(e?.message || '');
+      if (msg.toLowerCase().includes('row-level security')) {
+        setError('Fotoğraf yüklenemedi: depolama izinleri kısıtlı. Lütfen daha sonra tekrar deneyin.');
+      } else {
+        setError(msg || 'Fotoğraf yüklenemedi.');
+      }
     } finally {
       setUploading(false);
     }
