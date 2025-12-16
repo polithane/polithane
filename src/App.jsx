@@ -34,7 +34,6 @@ import { NotificationSettings } from './pages/settings/NotificationSettings';
 import { PrivacySettings } from './pages/settings/PrivacySettings';
 import { AppearanceSettings } from './pages/settings/AppearanceSettings';
 import { BlockedUsersPage } from './pages/settings/BlockedUsersPage';
-import { DataExportPage } from './pages/settings/DataExportPage';
 import { DeleteAccountPage } from './pages/settings/DeleteAccountPage';
 
 // Admin Pages
@@ -103,7 +102,6 @@ function App() {
           <Route path="privacy" element={<PrivacySettings />} />
           <Route path="blocked" element={<BlockedUsersPage />} />
           <Route path="appearance" element={<AppearanceSettings />} />
-          <Route path="data" element={<DataExportPage />} />
           <Route path="delete" element={<DeleteAccountPage />} />
         </Route>
         

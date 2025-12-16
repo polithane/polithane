@@ -526,42 +526,6 @@ async function usersUnblock(req, res, targetId) {
   res.json({ success: true });
 }
 
-async function usersExportMe(req, res) {
-  const auth = requireAuth(req, res);
-  if (!auth) return;
-
-  const userRows = await supabaseRestGet('users', { select: '*', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
-  const me = userRows?.[0] || null;
-  if (me && me.password_hash) delete me.password_hash;
-
-  const [posts, notifications, messages] = await Promise.all([
-    supabaseRestGet('posts', { select: '*', user_id: `eq.${auth.id}`, order: 'created_at.desc', limit: '200' }).catch(() => []),
-    supabaseRestGet('notifications', { select: '*', user_id: `eq.${auth.id}`, order: 'created_at.desc', limit: '200' }).catch(() => []),
-    supabaseRestGet('messages', {
-      select: '*',
-      or: `(sender_id.eq.${auth.id},receiver_id.eq.${auth.id})`,
-      order: 'created_at.desc',
-      limit: '200',
-    }).catch(() => []),
-  ]);
-
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="polithane-verilerim-${new Date().toISOString().slice(0, 10)}.json"`);
-  res.status(200).send(
-    JSON.stringify(
-      {
-        exported_at: new Date().toISOString(),
-        user: me,
-        posts: Array.isArray(posts) ? posts : [],
-        notifications: Array.isArray(notifications) ? notifications : [],
-        messages: Array.isArray(messages) ? messages : [],
-      },
-      null,
-      2
-    )
-  );
-}
-
 async function usersDeactivateMe(req, res) {
   const auth = requireAuth(req, res);
   if (!auth) return;
@@ -1337,7 +1301,6 @@ export default async function handler(req, res) {
       if (url === '/api/users/username' && req.method === 'PUT') return await usersUpdateUsername(req, res);
       if (url === '/api/users/me' && req.method === 'PUT') return await usersUpdateMe(req, res);
       if (url === '/api/users/me' && req.method === 'DELETE') return await usersDeactivateMe(req, res);
-      if (url === '/api/users/me/export' && req.method === 'GET') return await usersExportMe(req, res);
       if (url === '/api/users/blocks' && req.method === 'GET') return await usersGetBlocks(req, res);
       if (url === '/api/users/blocks' && req.method === 'POST') return await usersBlock(req, res);
       if (url.startsWith('/api/users/blocks/') && req.method === 'DELETE') {
