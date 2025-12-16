@@ -25,7 +25,7 @@ function getPool() {
 }
 
 /**
- * sql helper compatible with the previous "neon" usage:
+ * sql helper:
  * - Tagged template: sql`SELECT * FROM users WHERE id = ${id}`
  * - Direct query: sql('SELECT ... WHERE x = $1', [value])
  */
