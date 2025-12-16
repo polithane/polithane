@@ -66,7 +66,7 @@ async function getPosts(req, res) {
 
 async function getParties(req, res) {
     const data = await supabaseRestGet('parties', { select: 'id,name,short_name,logo_url,color,seats', is_active: 'eq.true', order: 'follower_count.desc' });
-    res.json({ success: true, data: data || [] });
+    res.json(data || []);
 }
 
 async function getUsers(req, res) {
