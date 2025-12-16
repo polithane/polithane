@@ -1,5 +1,4 @@
-import sql from '../../_utils/db.js';
-import { requireAdmin } from '../../_utils/adminAuth.js';
+import { requireAdmin, supabaseRestGet, supabaseRestPatch, supabaseRestDelete, supabaseRestUpsert } from '../../_utils/adminAuth.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -35,35 +34,32 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'No fields to update' });
       }
 
-      // Dynamic update query construction is tricky with sql template literal
-      // Use sql function call with dynamic string
-      const keys = Object.keys(updates);
-      const values = Object.values(updates);
-      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
-      
-      const query = `UPDATE users SET ${setClause} WHERE id = $1 RETURNING *`;
-      const [updated] = await sql(query, [id, ...values]);
+      const updated = await supabaseRestPatch('users', { id: `eq.${id}` }, updates);
 
       // If verifying, create notification
       if (updates.is_verified === true) {
-        await sql`
-          INSERT INTO notifications (user_id, type, content, is_read)
-          VALUES (${id}, 'system', 'Hesabınız onaylandı! Artık Polithane\'nin tüm özelliklerini kullanabilirsiniz.', false)
-        `.catch(() => {}); // Ignore notif error
+        await supabaseRestUpsert('notifications', [{
+            user_id: id,
+            type: 'system',
+            content: 'Hesabınız onaylandı! Artık Polithane\'nin tüm özelliklerini kullanabilirsiniz.',
+            is_read: false
+        }]).catch(() => {});
       }
 
-      res.json({ success: true, data: updated });
+      res.json({ success: true, data: Array.isArray(updated) ? updated[0] : updated });
 
     } else if (req.method === 'DELETE') {
-      if (auth.user.id === id) { // ID check might need type conversion
-         return res.status(400).json({ success: false, error: 'Self deletion not allowed via admin API' });
+      if (auth.user.id === id) { 
+         return res.status(400).json({ success: false, error: 'Self deletion not allowed' });
       }
       
-      await sql`DELETE FROM users WHERE id = ${id}`;
+      await supabaseRestDelete('users', { id: `eq.${id}` });
       res.json({ success: true, message: 'User deleted' });
 
     } else if (req.method === 'GET') {
-      const [user] = await sql`SELECT * FROM users WHERE id = ${id}`;
+      const rows = await supabaseRestGet('users', { id: `eq.${id}`, limit: '1' });
+      const user = Array.isArray(rows) ? rows[0] : rows;
+      
       if (!user) return res.status(404).json({ success: false, error: 'User not found' });
       res.json({ success: true, data: user });
 

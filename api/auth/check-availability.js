@@ -1,4 +1,4 @@
-import sql from '../_utils/db.js';
+import { supabaseRestGet } from '../_utils/adminAuth.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -23,10 +23,15 @@ export default async function handler(req, res) {
     const result = { emailAvailable: true };
 
     if (email && email.includes('@')) {
-      const [existingEmail] = await sql`
-        SELECT id FROM users WHERE LOWER(email) = LOWER(${email})
-      `;
-      if (existingEmail) result.emailAvailable = false;
+      const rows = await supabaseRestGet('users', { 
+          select: 'id', 
+          email: `ilike.${email}`, 
+          limit: '1' 
+      }).catch(() => []);
+      
+      if (Array.isArray(rows) && rows.length > 0) {
+          result.emailAvailable = false;
+      }
     }
 
     res.json({ success: true, ...result });

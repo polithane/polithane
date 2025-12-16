@@ -1,4 +1,4 @@
-import sql from '../_utils/db.js';
+import { supabaseRestGet } from '../_utils/adminAuth.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -19,14 +19,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const parties = await sql`
-      SELECT id, name, short_name, logo_url, color 
-      FROM parties 
-      WHERE is_active = true 
-      ORDER BY follower_count DESC
-    `;
+    const parties = await supabaseRestGet('parties', {
+        select: 'id,name,short_name,logo_url,color',
+        is_active: 'eq.true',
+        order: 'follower_count.desc'
+    });
     
-    res.json({ success: true, data: parties });
+    res.json({ success: true, data: parties || [] });
   } catch (error) {
     console.error('Parties API error:', error);
     res.status(500).json({ success: false, error: 'Partiler yüklenemedi.' });

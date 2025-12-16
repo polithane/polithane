@@ -91,6 +91,25 @@ export async function supabaseRestPatch(path, params, body) {
   return text ? JSON.parse(text) : null;
 }
 
+export async function supabaseRestDelete(path, params) {
+  const cfg = getSupabaseRestConfig();
+  if (!cfg) throw new Error('Supabase env missing');
+  const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+  const res = await fetch(`${cfg.supabaseUrl}/rest/v1/${path}${qs}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: cfg.serviceKey,
+      Authorization: `Bearer ${cfg.serviceKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Supabase error: ${res.status} ${res.statusText} ${text}`);
+  }
+  return true;
+}
+
 export async function getSiteSettings() {
   const rows = await supabaseRestGet('site_settings', {
     select: 'key,value',

@@ -1,4 +1,4 @@
-import sql from '../_utils/db.js';
+import { supabaseRestGet } from '../_utils/adminAuth.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -25,16 +25,13 @@ export default async function handler(req, res) {
         return res.json({ success: true, data: [] });
     }
 
-    const term = `%${search}%`;
-    const users = await sql`
-      SELECT 
-        id, username, full_name, avatar_url, user_type, politician_type, party_id, province
-      FROM users
-      WHERE username ILIKE ${term} OR full_name ILIKE ${term}
-      LIMIT ${Math.min(parseInt(limit), 50)}
-    `;
+    const users = await supabaseRestGet('users', {
+        select: 'id,username,full_name,avatar_url,user_type,politician_type,party_id,province',
+        or: `username.ilike.*${search}*,full_name.ilike.*${search}*`,
+        limit: String(Math.min(parseInt(limit), 50))
+    });
 
-    res.json({ success: true, data: users });
+    res.json({ success: true, data: users || [] });
   } catch (error) {
     console.error('Users Search API error:', error);
     res.status(500).json({ success: false, error: 'Arama sırasında hata oluştu.' });

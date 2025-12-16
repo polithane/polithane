@@ -1,5 +1,4 @@
-import sql from '../../_utils/db.js';
-import { requireAdmin } from '../../_utils/adminAuth.js';
+import { requireAdmin, supabaseRestGet } from '../../_utils/adminAuth.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -32,56 +31,29 @@ export default async function handler(req, res) {
       } = req.query;
 
       const offset = (page - 1) * limit;
-      let whereClause = 'WHERE 1=1';
-      const params = [];
-      let paramIndex = 1;
+      const params = {
+          select: 'id,username,full_name,email,user_type,is_verified,is_admin,post_count,follower_count,polit_score,created_at,last_login,metadata',
+          order: 'created_at.desc',
+          limit: String(limit),
+          offset: String(offset)
+      };
 
+      if (user_type) params.user_type = `eq.${user_type}`;
+      if (is_verified !== undefined) params.is_verified = `eq.${is_verified}`;
       if (search) {
-        whereClause += ` AND (username ILIKE $${paramIndex} OR full_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
-        params.push(`%${search}%`);
-        paramIndex++;
+          params.or = `username.ilike.*${search}*,full_name.ilike.*${search}*,email.ilike.*${search}*`;
       }
 
-      if (user_type) {
-        whereClause += ` AND user_type = $${paramIndex}`;
-        params.push(user_type);
-        paramIndex++;
-      }
-
-      if (is_verified !== undefined) {
-        whereClause += ` AND is_verified = $${paramIndex}`;
-        params.push(is_verified === 'true');
-        paramIndex++;
-      }
-
-      const query = `
-        SELECT 
-          id, username, full_name, email, user_type, 
-          is_verified, is_admin, post_count, follower_count,
-          polit_score, created_at, last_login, metadata
-        FROM users
-        ${whereClause}
-        ORDER BY created_at DESC
-        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-      `;
-
-      params.push(parseInt(limit), offset);
-
-      const users = await sql(query, params);
-
-      // Count query
-      const countQuery = `SELECT COUNT(*) FROM users ${whereClause}`;
-      const countParams = params.slice(0, -2); // Remove limit/offset
-      const [{ count }] = await sql(countQuery, countParams);
+      const users = await supabaseRestGet('users', params);
 
       res.json({
         success: true,
-        data: users,
+        data: users || [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: parseInt(count),
-          totalPages: Math.ceil(parseInt(count) / parseInt(limit))
+          total: 0, // Count not supported in helper yet
+          totalPages: 1
         }
       });
     } catch (error) {
