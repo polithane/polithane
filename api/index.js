@@ -383,9 +383,13 @@ async function safeUserPatch(userId, patch) {
     } catch (e) {
       if (attempt >= maxTries) throw e;
       const msg = String(e?.message || '');
-      const m = msg.match(/column\s+users\.([a-zA-Z0-9_]+)\s+does not exist/i);
-      if (!m) throw e;
-      const col = m[1];
+      // Two common shapes:
+      // - "column users.birth_date does not exist"
+      // - Supabase Error (PGRST204): "Could not find the 'birth_date' column of 'users' in the schema cache"
+      const m1 = msg.match(/column\s+users\.([a-zA-Z0-9_]+)\s+does not exist/i);
+      const m2 = msg.match(/Could not find the '([^']+)' column of 'users'/i);
+      const col = (m1 && m1[1]) || (m2 && m2[1]);
+      if (!col) throw e;
       if (!Object.prototype.hasOwnProperty.call(payload, col)) throw e;
       delete payload[col];
       if (Object.keys(payload).length === 0) return [];

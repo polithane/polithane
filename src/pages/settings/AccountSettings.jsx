@@ -57,12 +57,12 @@ export const AccountSettings = () => {
       }
       
       // Format kontrolü
-      const usernameRegex = /^[a-zA-Z0-9.-]+$/;
+      const usernameRegex = /^[a-zA-Z0-9._-]+$/;
       if (!usernameRegex.test(username)) {
         setUsernameStatus({ 
           checking: false, 
           available: false, 
-          message: 'Sadece harf, rakam, tire (-) ve nokta (.) kullanılabilir' 
+          message: 'Sadece harf, rakam, alt çizgi (_), tire (-) ve nokta (.) kullanılabilir' 
         });
         return;
       }
@@ -125,12 +125,17 @@ export const AccountSettings = () => {
       }
       
       // Diğer alanları DB'ye yaz
+      const baseMeta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
       const other = await apiCall('/api/users/me', {
         method: 'PUT',
         body: JSON.stringify({
           phone: formData.phone,
           city_code: formData.city_code,
-          birth_date: formData.birth_date,
+          // birth_date column may not exist on some schemas; store in metadata to avoid PGRST204 errors.
+          metadata: {
+            ...baseMeta,
+            birth_date: formData.birth_date || null,
+          },
         })
       });
       if (!other.success) {
@@ -212,7 +217,7 @@ export const AccountSettings = () => {
           )}
           
           <p className="text-xs text-gray-500 mt-2">
-            • 3-15 karakter arası • Sadece harf, rakam, tire (-) ve nokta (.) kullanılabilir
+            • 3-15 karakter arası • Sadece harf, rakam, alt çizgi (_), tire (-) ve nokta (.) kullanılabilir
           </p>
         </div>
         
