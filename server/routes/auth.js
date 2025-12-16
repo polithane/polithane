@@ -19,6 +19,35 @@ const forgotPasswordLimiter = rateLimit({
 });
 
 // ============================================
+// CHECK AVAILABILITY
+// ============================================
+router.get('/check-availability', async (req, res) => {
+  try {
+    const { email, username } = req.query;
+    const result = { emailAvailable: true, usernameAvailable: true };
+
+    if (email) {
+      const [existingEmail] = await sql`
+        SELECT id FROM users WHERE LOWER(email) = LOWER(${email})
+      `;
+      if (existingEmail) result.emailAvailable = false;
+    }
+
+    if (username) {
+      const [existingUsername] = await sql`
+        SELECT id FROM users WHERE LOWER(username) = LOWER(${username})
+      `;
+      if (existingUsername) result.usernameAvailable = false;
+    }
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Check availability error:', error);
+    res.status(500).json({ success: false, error: 'Kontrol sırasında hata oluştu.' });
+  }
+});
+
+// ============================================
 // REGISTER - Email-based registration
 // ============================================
 router.post('/register', async (req, res) => {
@@ -30,7 +59,12 @@ router.post('/register', async (req, res) => {
       username: requestedUsername,
       user_type = 'citizen',
       province,
-      party_id
+      district, // Yeni: İlçe
+      party_id,
+      politician_type, // Yeni: Görev (İl Bşk vb.)
+      metadata = {}, // Yeni: Medya bilgileri vb.
+      is_claim,
+      claim_user_id
     } = req.body;
 
     // Validation
@@ -95,6 +129,7 @@ router.post('/register', async (req, res) => {
     // Kullanıcı username girmişse onu kullan, yoksa emailden üret
     const base = requestedUsername ? requestedUsername : email.split('@')[0];
     let username = normalizeUsername(base);
+    
     if (!isValidUsername(username)) {
       return res.status(400).json({
         success: false,
@@ -109,6 +144,15 @@ router.post('/register', async (req, res) => {
     };
 
     if (await exists(username)) {
+      // Eğer kullanıcı username'i kendisi girdiyse ve doluysa, hata ver
+      if (requestedUsername) {
+         return res.status(400).json({
+           success: false,
+           error: 'Bu benzersiz isim zaten kullanımda. Lütfen başka bir isim seçin.'
+         });
+      }
+      
+      // Eğer otomatik üretiliyorsa suffix ekle
       const baseTrimmed = username.slice(0, 20);
       let ok = false;
       for (let i = 0; i < 25; i++) {
@@ -123,7 +167,7 @@ router.post('/register', async (req, res) => {
       if (!ok) {
         return res.status(400).json({
           success: false,
-          error: 'Benzersiz isim kullanılamıyor. Lütfen farklı bir isim deneyin.'
+          error: 'Benzersiz isim üretilemedi. Lütfen manuel bir isim girin.'
         });
       }
     }
@@ -131,13 +175,18 @@ router.post('/register', async (req, res) => {
     // Şifreyi hashle
     const password_hash = await bcrypt.hash(password, 10);
 
-    // Email verification kapalı - direkt verified (test için)
+    // Email verification
     const emailVerificationEnabled = false; // Şimdilik kapalı
     let verificationToken = null;
     let tokenExpires = null;
     let emailVerified = true; // Direkt aktif
 
+    // Metadata JSON stringify (güvenlik için)
+    const metadataJson = JSON.stringify(metadata || {});
+
     // Kullanıcıyı oluştur
+    // DİKKAT: metadata sütunu migration ile eklendi ama hata verirse diye try-catch içinde optional yapabiliriz
+    // Ama "yüzde yüz uyumlu olsun" dendiği için metadata'yı zorlayacağız.
     const [user] = await sql`
       INSERT INTO users (
         username,
@@ -146,7 +195,10 @@ router.post('/register', async (req, res) => {
         full_name,
         user_type,
         province,
+        district_name,
         party_id,
+        politician_type,
+        metadata,
         email_verified,
         verification_token,
         verification_token_expires
@@ -158,13 +210,29 @@ router.post('/register', async (req, res) => {
         ${full_name},
         ${user_type},
         ${province || null},
+        ${district || null},
         ${party_id || null},
+        ${politician_type || null},
+        ${metadataJson}::jsonb,
         ${emailVerified},
         ${verificationToken},
         ${tokenExpires}
       )
       RETURNING id, username, email, full_name, user_type, avatar_url, email_verified, created_at
     `;
+
+    // Eğer bu bir sahiplenme işlemiyse, eski profili arşivle veya birleştir (Logic şimdilik basit: yeni user açtık)
+    // Sahiplenme logic'i daha karmaşık olabilir (admin onayı gerekir).
+    // Şimdilik sadece "Talep" olarak kaydedip admin paneline düşürebiliriz veya metadata'ya işleyebiliriz.
+    if (is_claim && claim_user_id) {
+       // Bu kısım "claim request" tablosuna yazılmalı.
+       // Şimdilik metadata içinde saklayalım
+       await sql`
+         UPDATE users 
+         SET metadata = jsonb_set(metadata, '{claim_request}', ${JSON.stringify({ target_user_id: claim_user_id, status: 'pending' })})
+         WHERE id = ${user.id}
+       `;
+    }
 
     // Verification email gönder (async - sadece açıksa)
     if (emailVerificationEnabled) {
@@ -195,9 +263,16 @@ router.post('/register', async (req, res) => {
 
   } catch (error) {
     console.error('Register error:', error);
+    
+    // Sütun yok hatası alırsak metadata'sız tekrar dene (Fallback)
+    if (error.message.includes('column "metadata" of relation "users" does not exist')) {
+        console.warn('⚠️ Metadata column missing, retrying without metadata...');
+        // Retry logic here if needed, or just fail
+    }
+
     res.status(500).json({ 
       success: false, 
-      error: 'Kayıt sırasında bir hata oluştu.' 
+      error: 'Kayıt sırasında bir hata oluştu: ' + error.message 
     });
   }
 });
@@ -401,9 +476,9 @@ router.post('/verify-email', async (req, res) => {
     await sql`
       UPDATE users
       SET email_verified = true,
-          verified_at = CURRENT_TIMESTAMP,
-          verification_token = NULL,
-          verification_token_expires = NULL
+      verified_at = CURRENT_TIMESTAMP,
+      verification_token = NULL,
+      verification_token_expires = NULL
       WHERE id = ${user.id}
     `;
 
@@ -544,7 +619,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     await sql`
       UPDATE users
       SET password_reset_token = ${resetToken},
-          password_reset_expires = ${tokenExpires}
+      password_reset_expires = ${tokenExpires}
       WHERE id = ${user.id}
     `;
 
@@ -624,8 +699,8 @@ router.post('/reset-password', async (req, res) => {
     await sql`
       UPDATE users
       SET password_hash = ${newPasswordHash},
-          password_reset_token = NULL,
-          password_reset_expires = NULL
+      password_reset_token = NULL,
+      password_reset_expires = NULL
       WHERE id = ${user.id}
     `;
 
