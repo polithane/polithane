@@ -909,6 +909,75 @@ async function adminSendNotification(req, res) {
   res.json({ success: true, sent: targets.length });
 }
 
+// -----------------------
+// SEARCH (Header live search)
+// -----------------------
+
+async function searchAll(req, res) {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 3) return res.json({ success: true, data: { users: [], posts: [], parties: [] } });
+
+  const safe = q.slice(0, 50);
+  const [users, parties] = await Promise.all([
+    supabaseRestGet('users', {
+      select: 'id,username,full_name,avatar_url,user_type,politician_type,party_id,province,is_verified,is_active,party:parties(*)',
+      is_active: 'eq.true',
+      or: `(username.ilike.*${safe}*,full_name.ilike.*${safe}*)`,
+      limit: '8',
+      order: 'polit_score.desc',
+    }).catch(() => []),
+    supabaseRestGet('parties', {
+      select: '*',
+      is_active: 'eq.true',
+      or: `(name.ilike.*${safe}*,short_name.ilike.*${safe}*)`,
+      limit: '6',
+      order: 'follower_count.desc',
+    }).catch(() => []),
+  ]);
+
+  // Posts: try both schema variants
+  let posts = [];
+  try {
+    posts = await supabaseRestGet('posts', {
+      select: '*,user:users(*),party:parties(*)',
+      is_deleted: 'eq.false',
+      or: `(content.ilike.*${safe}*,content_text.ilike.*${safe}*)`,
+      limit: '8',
+      order: 'polit_score.desc',
+    });
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('content_text')) {
+      posts = await supabaseRestGet('posts', {
+        select: '*,user:users(*),party:parties(*)',
+        is_deleted: 'eq.false',
+        content: `ilike.*${safe}*`,
+        limit: '8',
+        order: 'polit_score.desc',
+      }).catch(() => []);
+    } else if (msg.includes('content')) {
+      posts = await supabaseRestGet('posts', {
+        select: '*,user:users(*),party:parties(*)',
+        is_deleted: 'eq.false',
+        content_text: `ilike.*${safe}*`,
+        limit: '8',
+        order: 'polit_score.desc',
+      }).catch(() => []);
+    } else {
+      posts = [];
+    }
+  }
+
+  res.json({
+    success: true,
+    data: {
+      users: Array.isArray(users) ? users : [],
+      posts: Array.isArray(posts) ? posts : [],
+      parties: Array.isArray(parties) ? parties : [],
+    },
+  });
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setCors(res);
@@ -1000,6 +1069,9 @@ export default async function handler(req, res) {
         const postId = url.split('/api/admin/posts/')[1];
         return await adminDeletePost(req, res, postId);
       }
+
+      // Search
+      if (url === '/api/search' && req.method === 'GET') return await searchAll(req, res);
 
       // Health
       if (url === '/api/health') return res.json({ status: 'ok', time: new Date().toISOString() });

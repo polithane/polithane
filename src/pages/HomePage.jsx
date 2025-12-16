@@ -152,8 +152,7 @@ export const HomePage = () => {
   const mpPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'mp'));
   const organizationPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_official'));
   const citizenPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_member' || p.user?.user_type === 'citizen'));
-  const exPoliticianPosts = pickFixedMix([]); // DB'de henüz ex_politician yok
-            const mediaPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'media'));
+  const mediaPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'media'));
   const featuredPosts = posts.length > 0 
     ? posts.filter(p => p.is_featured).sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0)).slice(0, 5) 
     : [];
@@ -166,7 +165,6 @@ export const HomePage = () => {
     const mpsSorted = mpPosts.slice();
     const orgSorted = organizationPosts.slice();
     const citizenSorted = citizenPosts.slice();
-    const expSorted = exPoliticianPosts.slice();
     const mediaSorted = mediaPosts.slice();
     
     const mixed = [];
@@ -174,7 +172,6 @@ export const HomePage = () => {
       mpsSorted.length,
       orgSorted.length,
       citizenSorted.length,
-      expSorted.length,
       mediaSorted.length
     );
     
@@ -183,7 +180,6 @@ export const HomePage = () => {
       if (mpsSorted[i]) mixed.push(mpsSorted[i]);
       if (orgSorted[i]) mixed.push(orgSorted[i]);
       if (citizenSorted[i]) mixed.push(citizenSorted[i]);
-      if (expSorted[i]) mixed.push(expSorted[i]);
       if (mediaSorted[i]) mixed.push(mediaSorted[i]);
     }
     
@@ -196,7 +192,6 @@ export const HomePage = () => {
     { id: 'mps', name: 'Vekiller', posts: mpPosts, color: 'rgba(0, 159, 214, 0.08)' },
     { id: 'organization', name: 'Teşkilat', posts: organizationPosts, color: 'rgba(135, 180, 51, 0.08)' },
     { id: 'citizens', name: 'Vatandaş', posts: citizenPosts, color: 'rgba(229, 229, 229, 0.5)' },
-    { id: 'experience', name: 'Deneyim', posts: exPoliticianPosts, color: 'rgba(212, 160, 23, 0.08)' },
     { id: 'media', name: 'Medya', posts: mediaPosts, color: 'rgba(255, 193, 7, 0.1)' }
   ];
   
@@ -365,27 +360,6 @@ export const HomePage = () => {
               </HorizontalScroll>
             </section>
             
-            {/* DENEYİM GÜNDEMİ */}
-            <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(212, 160, 23, 0.08)' }}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">DENEYİM GÜNDEMİ</h2>
-                <a href="/category/experience" className="text-primary-blue hover:underline text-sm">
-                  Tümünü Gör
-                </a>
-              </div>
-              <HorizontalScroll 
-                autoScroll={true} 
-                scrollInterval={5000}
-                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
-              >
-                {filterConsecutiveTextAudio(exPoliticianPosts, true).map(post => (
-                  <PostCardHorizontal 
-                    key={post.post_id} 
-                    post={post}
-                  />
-                ))}
-              </HorizontalScroll>
-            </section>
             </div>
           </div>
           
