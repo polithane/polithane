@@ -831,6 +831,84 @@ async function deleteMessage(req, res, messageId) {
   res.json({ success: true, data: updated?.[0] || null });
 }
 
+// -----------------------
+// NOTIFICATIONS
+// -----------------------
+
+async function getNotifications(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const { limit = 50, offset = 0 } = req.query;
+  const rows = await supabaseRestGet('notifications', {
+    select: '*,actor:users(*),post:posts(*),comment:comments(*)',
+    user_id: `eq.${auth.id}`,
+    order: 'created_at.desc',
+    limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
+    offset: String(parseInt(offset, 10) || 0),
+  }).catch(() => []);
+  res.json({ success: true, data: rows || [] });
+}
+
+async function markNotificationRead(req, res, id) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const updated = await supabaseRestPatch('notifications', { id: `eq.${id}`, user_id: `eq.${auth.id}` }, { is_read: true });
+  res.json({ success: true, data: updated?.[0] || null });
+}
+
+async function markAllNotificationsRead(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  await supabaseRestPatch('notifications', { user_id: `eq.${auth.id}`, is_read: 'eq.false' }, { is_read: true }).catch(() => {});
+  res.json({ success: true });
+}
+
+async function deleteNotification(req, res, id) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  // Hard delete (safe for user-owned row). If RLS blocks, fallback to mark read.
+  await supabaseRestDelete('notifications', { id: `eq.${id}`, user_id: `eq.${auth.id}` }).catch(async () => {
+    await supabaseRestPatch('notifications', { id: `eq.${id}`, user_id: `eq.${auth.id}` }, { is_read: true }).catch(() => {});
+  });
+  res.json({ success: true });
+}
+
+// Admin: send notification to a user, or broadcast
+async function adminSendNotification(req, res) {
+  requireAdmin(req, res);
+  const body = await readJsonBody(req);
+  const { user_id, type = 'system', title, message, broadcast } = body || {};
+  const t = String(type || 'system').slice(0, 20);
+  const ttl = title ? String(title).slice(0, 255) : null;
+  const msg = message ? String(message).slice(0, 2000) : null;
+  if (!ttl && !msg) return res.status(400).json({ success: false, error: 'Başlık veya mesaj gerekli.' });
+
+  let targets = [];
+  if (broadcast === true) {
+    // broadcast to active users (cap to avoid runaway)
+    const users = await supabaseRestGet('users', { select: 'id', is_active: 'eq.true', limit: '5000' }).catch(() => []);
+    targets = (users || []).map((u) => u.id).filter(Boolean);
+  } else {
+    if (!user_id || !/^\d+$/.test(String(user_id))) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+    targets = [Number(user_id)];
+  }
+
+  const rows = targets.map((uid) => ({
+    user_id: uid,
+    type: t,
+    title: ttl,
+    message: msg,
+    is_read: false,
+  }));
+  // Insert in chunks
+  const chunkSize = 500;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    // eslint-disable-next-line no-await-in-loop
+    await supabaseRestInsert('notifications', rows.slice(i, i + chunkSize));
+  }
+  res.json({ success: true, sent: targets.length });
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setCors(res);
@@ -881,6 +959,18 @@ export default async function handler(req, res) {
       if (url === '/api/auth/change-password' && req.method === 'POST') return await authChangePassword(req, res);
       if (url === '/api/auth/logout') return res.json({ success: true });
 
+      // Notifications
+      if (url === '/api/notifications' && req.method === 'GET') return await getNotifications(req, res);
+      if (url === '/api/notifications/read-all' && req.method === 'POST') return await markAllNotificationsRead(req, res);
+      if (url.startsWith('/api/notifications/') && req.method === 'POST') {
+        const id = url.split('/api/notifications/')[1];
+        return await markNotificationRead(req, res, id);
+      }
+      if (url.startsWith('/api/notifications/') && req.method === 'DELETE') {
+        const id = url.split('/api/notifications/')[1];
+        return await deleteNotification(req, res, id);
+      }
+
       // Messages
       if (url === '/api/messages/conversations' && req.method === 'GET') return await getConversations(req, res);
       if (url.startsWith('/api/messages/send') && req.method === 'POST') return await sendMessage(req, res);
@@ -897,6 +987,7 @@ export default async function handler(req, res) {
       if (url === '/api/admin/stats' && req.method === 'GET') return await adminGetStats(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
       if (url === '/api/admin/posts' && req.method === 'GET') return await adminGetPosts(req, res);
+      if (url === '/api/admin/notifications' && req.method === 'POST') return await adminSendNotification(req, res);
       if (url.startsWith('/api/admin/users/') && req.method === 'PUT') {
         const userId = url.split('/api/admin/users/')[1];
         return await adminUpdateUser(req, res, userId);

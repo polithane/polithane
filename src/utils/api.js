@@ -281,6 +281,35 @@ export const admin = {
       method: 'PUT',
       body: JSON.stringify(settings),
     }),
+
+  // Notifications (admin broadcast / direct)
+  sendNotification: ({ user_id, title, message, type = 'system', broadcast = false }) =>
+    apiCall('/api/admin/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ user_id, title, message, type, broadcast }),
+    }),
+};
+
+// ============================================
+// NOTIFICATIONS API
+// ============================================
+export const notifications = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/notifications${query ? `?${query}` : ''}`);
+  },
+  markRead: (id) =>
+    apiCall(`/api/notifications/${id}`, {
+      method: 'POST',
+    }),
+  markAllRead: () =>
+    apiCall('/api/notifications/read-all', {
+      method: 'POST',
+    }),
+  delete: (id) =>
+    apiCall(`/api/notifications/${id}`, {
+      method: 'DELETE',
+    }),
 };
 
 // ============================================
@@ -306,4 +335,5 @@ export default {
   messages,
   admin,
   parties,
+  notifications,
 };
