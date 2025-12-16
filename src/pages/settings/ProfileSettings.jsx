@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Upload, Camera } from 'lucide-react';
+import { Save, Upload, Camera, AlertCircle, CheckCircle } from 'lucide-react';
 import { apiCall } from '../../utils/api';
+import { supabase } from '../../services/supabase';
+import { isValidFileSize, isValidFileType } from '../../utils/validators';
 
 export const ProfileSettings = () => {
   const { user, updateUser } = useAuth();
   
   const [formData, setFormData] = useState({
     full_name: user?.full_name || '',
-    username: user?.username || '',
     bio: user?.bio || '',
     city_code: user?.city_code || '',
     phone: user?.phone || '',
@@ -17,10 +18,68 @@ export const ProfileSettings = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePickPhoto = () => {
+    setError('');
+    fileRef.current?.click();
+  };
+
+  const handleUploadPhoto = async (file) => {
+    if (!file) return;
+    setError('');
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!isValidFileType(file, allowedTypes)) {
+      setError('Sadece JPG / PNG / WEBP yükleyebilirsiniz.');
+      return;
+    }
+    if (!isValidFileSize(file, 2)) {
+      setError('Dosya boyutu çok büyük (max 2MB).');
+      return;
+    }
+    if (!user?.id) {
+      setError('Kullanıcı bilgisi bulunamadı. Lütfen çıkış yapıp tekrar giriş yapın.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Use existing bucket; keep avatars under a folder.
+      const bucket = 'uploads';
+      const safeExt = (name) => String(name || '').split('.').pop()?.toLowerCase() || 'jpg';
+      const ext = safeExt(file.name).replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
+      const path = `avatars/${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
+        contentType: file.type || 'image/jpeg',
+        upsert: true,
+      });
+      if (upErr) throw upErr;
+
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      const publicUrl = data?.publicUrl;
+      if (!publicUrl) throw new Error('Fotoğraf URL alınamadı.');
+
+      const res = await apiCall('/api/users/me', {
+        method: 'PUT',
+        body: JSON.stringify({ avatar_url: publicUrl }),
+      });
+      if (!res?.success) throw new Error(res?.error || 'Fotoğraf kaydedilemedi.');
+      if (res.data) updateUser(res.data);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2500);
+    } catch (e) {
+      setError(e?.message || 'Fotoğraf yüklenemedi.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -65,21 +124,38 @@ export const ProfileSettings = () => {
               <Camera className="w-10 h-10 text-gray-400" />
             )}
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-            <Upload className="w-4 h-4" />
-            Fotoğraf Yükle
-          </button>
+          <div className="flex flex-col gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => handleUploadPhoto(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              onClick={handlePickPhoto}
+              disabled={uploading}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Upload className="w-4 h-4" />
+              {uploading ? 'Yükleniyor...' : 'Fotoğraf Yükle'}
+            </button>
+            <p className="text-xs text-gray-500">JPG/PNG/WEBP • max 2MB</p>
+          </div>
         </div>
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">
-            ✓ Profil başarıyla güncellendi!
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 flex items-center gap-2">
+            <CheckCircle className="w-5 h-5" />
+            Profil başarıyla güncellendi!
           </div>
         )}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" />
             {error}
           </div>
         )}
@@ -87,11 +163,6 @@ export const ProfileSettings = () => {
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Ad Soyad</label>
           <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none" />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Kullanıcı Adı</label>
-          <input type="text" name="username" value={formData.username} onChange={handleChange} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none" />
         </div>
         
         <div>
