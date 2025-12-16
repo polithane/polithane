@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPartyFlagPath } from '../../utils/imagePaths';
 import { PartyDetailPopup } from '../common/PartyDetailPopup';
 import { CityDetailPopup } from '../common/CityDetailPopup';
+import { CITY_CODES } from '../../utils/constants';
 
 export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   const navigate = useNavigate();
@@ -12,6 +13,11 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   const closeTimeoutRef = useRef(null);
   const isMouseOverPopup = useRef(false);
   
+  const cityNamesList = Object.entries(CITY_CODES).map(([code, name]) => ({
+    code,
+    name
+  })).sort((a, b) => a.code.localeCompare(b.code));
+
   if (!parliamentData || parliamentData.length === 0) return null;
 
   const shortNameToPartySlug = (shortName) => {
@@ -57,8 +63,10 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   };
   
   return (
-    <div className="mb-4 hidden md:block">
-      <div className="flex h-24 overflow-hidden rounded-t-lg border border-gray-300 w-full">
+    <div className="mb-4">
+      {/* Desktop Parliament Bar (hidden on mobile) */}
+      <div className="hidden md:block">
+        <div className="flex h-24 overflow-hidden rounded-t-lg border border-gray-300 w-full">
         {parliamentData.map((party, index) => {
           const widthPercentage = (party.seats / totalSeats) * 100;
           const flagPath = getPartyFlagPath(party.shortName, index + 1);
@@ -150,10 +158,10 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
             </div>
           );
         })}
-      </div>
+        </div>
       
-      <div className="bg-gray-50 px-2 py-2 rounded-b-lg border border-t-0 border-gray-300 overflow-x-auto">
-        <div className="flex gap-0 justify-center">
+        <div className="bg-gray-50 px-2 py-2 rounded-b-lg border border-t-0 border-gray-300 overflow-x-auto">
+          <div className="flex gap-0 justify-center">
           {Array.from({ length: 81 }, (_, i) => {
             const code = i + 1;
             const cityCode = code.toString().padStart(2, '0');
@@ -203,7 +211,34 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               </button>
             );
           })}
+          </div>
         </div>
+      </div>
+
+      {/* Mobile City Selector (visible only on mobile) */}
+      <div className="md:hidden w-full bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+           İl Detaylarına Git
+         </label>
+         <div className="relative">
+           <select
+             className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-blue focus:border-primary-blue block p-2.5 pr-8"
+             onChange={(e) => {
+               if(e.target.value) navigate(`/city/${e.target.value}`);
+             }}
+             defaultValue=""
+           >
+             <option value="" disabled>Bir il seçin...</option>
+             {cityNamesList.map((city) => (
+               <option key={city.code} value={city.code}>
+                 {city.code} - {city.name}
+               </option>
+             ))}
+           </select>
+           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+             <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+           </div>
+         </div>
       </div>
       
       {hoveredParty && (
