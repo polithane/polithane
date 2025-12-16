@@ -458,6 +458,114 @@ async function usersUpdateMe(req, res) {
   res.json({ success: true, data: user });
 }
 
+function parseUserIdsFromMetadata(meta) {
+  const ids = meta?.blocked_user_ids;
+  if (!Array.isArray(ids)) return [];
+  return ids.map((x) => String(x)).filter(Boolean);
+}
+
+async function usersGetBlocks(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const rows = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+  const me = rows?.[0];
+  const meta = me?.metadata || {};
+  const ids = parseUserIdsFromMetadata(meta);
+  if (ids.length === 0) return res.json({ success: true, data: [] });
+
+  // PostgREST in.(...) filter: quote UUID-like ids
+  const isUuidLike = (v) => /^[0-9a-fA-F-]{36}$/.test(String(v));
+  const inList = ids
+    .slice(0, 200)
+    .map((v) => (isUuidLike(v) ? `"${v}"` : v))
+    .join(',');
+  const users = await supabaseRestGet('users', { select: 'id,username,full_name,avatar_url', id: `in.(${inList})` }).catch(() => []);
+  res.json({ success: true, data: Array.isArray(users) ? users : [] });
+}
+
+async function usersBlock(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const target = String(body?.user_id || '').trim();
+  if (!target) return res.status(400).json({ success: false, error: 'user_id zorunlu.' });
+  if (String(target) === String(auth.id)) return res.status(400).json({ success: false, error: 'Kendinizi engelleyemezsiniz.' });
+
+  const rows = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+  const me = rows?.[0];
+  const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
+  const ids = new Set(parseUserIdsFromMetadata(meta));
+  ids.add(String(target));
+
+  const updated = await safeUserPatch(auth.id, { metadata: { ...meta, blocked_user_ids: Array.from(ids) } });
+  if (!updated || updated.length === 0) {
+    return res.status(500).json({ success: false, error: 'Bu kurulumda kullanıcı metadata alanı yok; engelleme kaydedilemedi.' });
+  }
+  res.json({ success: true });
+}
+
+async function usersUnblock(req, res, targetId) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const target = String(targetId || '').trim();
+  if (!target) return res.status(400).json({ success: false, error: 'user_id zorunlu.' });
+
+  const rows = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+  const me = rows?.[0];
+  const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
+  const ids = parseUserIdsFromMetadata(meta).filter((x) => String(x) !== String(target));
+
+  const updated = await safeUserPatch(auth.id, { metadata: { ...meta, blocked_user_ids: ids } });
+  if (!updated || updated.length === 0) {
+    return res.status(500).json({ success: false, error: 'Bu kurulumda kullanıcı metadata alanı yok; engelleme kaydedilemedi.' });
+  }
+  res.json({ success: true });
+}
+
+async function usersExportMe(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+
+  const userRows = await supabaseRestGet('users', { select: '*', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+  const me = userRows?.[0] || null;
+  if (me && me.password_hash) delete me.password_hash;
+
+  const [posts, notifications, messages] = await Promise.all([
+    supabaseRestGet('posts', { select: '*', user_id: `eq.${auth.id}`, order: 'created_at.desc', limit: '200' }).catch(() => []),
+    supabaseRestGet('notifications', { select: '*', user_id: `eq.${auth.id}`, order: 'created_at.desc', limit: '200' }).catch(() => []),
+    supabaseRestGet('messages', {
+      select: '*',
+      or: `(sender_id.eq.${auth.id},receiver_id.eq.${auth.id})`,
+      order: 'created_at.desc',
+      limit: '200',
+    }).catch(() => []),
+  ]);
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="polithane-verilerim-${new Date().toISOString().slice(0, 10)}.json"`);
+  res.status(200).send(
+    JSON.stringify(
+      {
+        exported_at: new Date().toISOString(),
+        user: me,
+        posts: Array.isArray(posts) ? posts : [],
+        notifications: Array.isArray(notifications) ? notifications : [],
+        messages: Array.isArray(messages) ? messages : [],
+      },
+      null,
+      2
+    )
+  );
+}
+
+async function usersDeactivateMe(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const updated = await safeUserPatch(auth.id, { is_active: false });
+  if (!updated || updated.length === 0) return res.status(500).json({ success: false, error: 'Hesap pasifleştirilemedi.' });
+  res.json({ success: true });
+}
+
 async function supabaseCount(table, params = {}) {
   const { supabaseUrl, key } = getSupabaseKeys();
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
@@ -1214,6 +1322,14 @@ export default async function handler(req, res) {
       }
       if (url === '/api/users/username' && req.method === 'PUT') return await usersUpdateUsername(req, res);
       if (url === '/api/users/me' && req.method === 'PUT') return await usersUpdateMe(req, res);
+      if (url === '/api/users/me' && req.method === 'DELETE') return await usersDeactivateMe(req, res);
+      if (url === '/api/users/me/export' && req.method === 'GET') return await usersExportMe(req, res);
+      if (url === '/api/users/blocks' && req.method === 'GET') return await usersGetBlocks(req, res);
+      if (url === '/api/users/blocks' && req.method === 'POST') return await usersBlock(req, res);
+      if (url.startsWith('/api/users/blocks/') && req.method === 'DELETE') {
+        const targetId = url.split('/api/users/blocks/')[1];
+        return await usersUnblock(req, res, targetId);
+      }
       if (url.startsWith('/api/users/')) {
           const rest = url.split('/api/users/')[1];
           const parts = rest.split('/').filter(Boolean);
