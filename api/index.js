@@ -81,6 +81,12 @@ function getSupabaseKeys() {
   return { supabaseUrl, key };
 }
 
+function getSupabaseServiceRoleKey() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is missing');
+  return key;
+}
+
 async function supabaseRestGet(path, params) {
   const { supabaseUrl, key } = getSupabaseKeys();
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
@@ -89,6 +95,27 @@ async function supabaseRestGet(path, params) {
   });
   if (!res.ok) { const text = await res.text(); throw new Error(`Supabase Error: ${text}`); }
   return await res.json();
+}
+
+async function supabaseStorageRequest(method, path, body) {
+  const { supabaseUrl } = getSupabaseKeys();
+  const key = getSupabaseServiceRoleKey();
+  const res = await fetch(`${supabaseUrl}/storage/v1/${path}`, {
+    method,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const ct = res.headers.get('content-type') || '';
+  const text = await res.text().catch(() => '');
+  const payload = ct.includes('application/json') ? (() => { try { return JSON.parse(text || '{}'); } catch { return {}; } })() : {};
+  if (!res.ok) {
+    throw new Error(payload?.message ? `Supabase Storage Error: ${payload.message}` : `Supabase Storage Error: ${text}`);
+  }
+  return payload;
 }
 
 async function supabaseRestRequest(method, path, params, body, extraHeaders = {}) {
@@ -713,6 +740,36 @@ async function usersReactivateMe(req, res) {
   const user = updated?.[0] || null;
   if (user) delete user.password_hash;
   res.json({ success: true, data: user });
+}
+
+async function storageEnsureBucket(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const name = String(body?.name || '').trim();
+  const isPublic = body?.public !== false;
+
+  // Allow-list buckets we manage from the app
+  const allowed = new Set(['uploads', 'politfest']);
+  if (!allowed.has(name)) return res.status(400).json({ success: false, error: 'Geçersiz bucket adı.' });
+
+  try {
+    // If service role is missing, return a helpful error
+    getSupabaseServiceRoleKey();
+  } catch {
+    return res.status(500).json({
+      success: false,
+      error: 'Storage bucket otomatik oluşturulamıyor. Vercel ortamında SUPABASE_SERVICE_ROLE_KEY gerekli.',
+    });
+  }
+
+  // Check existing buckets
+  const list = await supabaseStorageRequest('GET', 'bucket', undefined).catch(() => []);
+  const exists = Array.isArray(list) && list.some((b) => b?.name === name);
+  if (!exists) {
+    await supabaseStorageRequest('POST', 'bucket', { name, public: isPublic });
+  }
+  res.json({ success: true, created: !exists, name });
 }
 
 async function supabaseCount(table, params = {}) {
@@ -1485,6 +1542,7 @@ export default async function handler(req, res) {
       if (url === '/api/users/me/delete-request' && req.method === 'POST') return await usersRequestDeleteMe(req, res);
       if (url === '/api/users/me/reactivate' && req.method === 'POST') return await usersReactivateMe(req, res);
       if (url === '/api/users/delete-confirm' && req.method === 'GET') return await usersConfirmDelete(req, res);
+      if (url === '/api/storage/ensure-bucket' && req.method === 'POST') return await storageEnsureBucket(req, res);
       if (url === '/api/users/blocks' && req.method === 'GET') return await usersGetBlocks(req, res);
       if (url === '/api/users/blocks' && req.method === 'POST') return await usersBlock(req, res);
       if (url.startsWith('/api/users/blocks/') && req.method === 'DELETE') {

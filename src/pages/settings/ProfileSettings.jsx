@@ -57,11 +57,30 @@ export const ProfileSettings = () => {
       const ext = safeExt(file.name).replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
       const path = `avatars/${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
-      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
-        contentType: file.type || 'image/jpeg',
-        upsert: true,
-      });
-      if (upErr) throw upErr;
+      const uploadOnce = async () => {
+        const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
+          contentType: file.type || 'image/jpeg',
+          upsert: true,
+        });
+        if (upErr) throw upErr;
+      };
+
+      try {
+        await uploadOnce();
+      } catch (err) {
+        const msg = String(err?.message || '');
+        const bucketMissing = msg.toLowerCase().includes('bucket') && msg.toLowerCase().includes('not found');
+        if (bucketMissing) {
+          // Ask backend to create the bucket (requires SUPABASE_SERVICE_ROLE_KEY on Vercel), then retry once.
+          await apiCall('/api/storage/ensure-bucket', {
+            method: 'POST',
+            body: JSON.stringify({ name: bucket, public: true }),
+          });
+          await uploadOnce();
+        } else {
+          throw err;
+        }
+      }
 
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
       const publicUrl = data?.publicUrl;
