@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Save, Shield, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -14,6 +14,19 @@ export const SecuritySettings = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const PASSWORD_RULES = useMemo(
+    () => [
+      { id: 'length', label: 'En az 8 karakter', ok: (p) => String(p || '').length >= 8 },
+      { id: 'max', label: 'En fazla 50 karakter', ok: (p) => String(p || '').length <= 50 },
+      { id: 'letter', label: 'En az 1 harf', ok: (p) => /[a-zA-Z]/.test(String(p || '')) },
+      { id: 'number', label: 'En az 1 rakam', ok: (p) => /[0-9]/.test(String(p || '')) },
+    ],
+    []
+  );
+
+  const newPassValid = PASSWORD_RULES.every((r) => r.ok(passwords.new));
+  const confirmMatches = !passwords.confirm || passwords.new === passwords.confirm;
+
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     setError('');
@@ -26,8 +39,8 @@ export const SecuritySettings = () => {
       setError('Lütfen mevcut şifre ve yeni şifreyi girin.');
       return;
     }
-    if (String(passwords.new).length < 8) {
-      setError('Yeni şifre en az 8 karakter olmalı.');
+    if (!newPassValid) {
+      setError('Yeni şifre kurallara uygun değil.');
       return;
     }
 
@@ -84,7 +97,24 @@ export const SecuritySettings = () => {
               value={passwords.new}
               onChange={(e) => setPasswords(prev => ({ ...prev, new: e.target.value }))}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+              maxLength={50}
             />
+            <div className="flex flex-wrap gap-2 mt-3">
+              {PASSWORD_RULES.map((rule) => {
+                const ok = rule.ok(passwords.new);
+                return (
+                  <span
+                    key={rule.id}
+                    className={`text-xs px-2 py-1 rounded-full flex items-center transition-colors ${
+                      ok ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {ok ? <CheckCircle className="w-3 h-3 mr-1" /> : <div className="w-2 h-2 rounded-full bg-gray-400 mr-1" />}
+                    {rule.label}
+                  </span>
+                );
+              })}
+            </div>
           </div>
           
           <div>
@@ -94,12 +124,16 @@ export const SecuritySettings = () => {
               value={passwords.confirm}
               onChange={(e) => setPasswords(prev => ({ ...prev, confirm: e.target.value }))}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+              maxLength={50}
             />
+            {!confirmMatches && (
+              <p className="text-sm text-red-600 mt-2">Şifreler eşleşmiyor.</p>
+            )}
           </div>
           
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !passwords.current || !passwords.new || !passwords.confirm || !confirmMatches || !newPassValid}
             className="flex items-center gap-2 bg-primary-blue text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />

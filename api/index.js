@@ -1018,6 +1018,16 @@ async function authChangePassword(req, res) {
     const currentPassword = body.currentPassword;
     const newPassword = body.newPassword;
     if (!currentPassword || !newPassword) return res.status(400).json({ success: false, error: 'Eksik bilgi.' });
+
+    // Match registration password rules:
+    // - 8-50 chars
+    // - at least 1 letter, 1 number
+    const np = String(newPassword || '');
+    if (np.length < 8) return res.status(400).json({ success: false, error: 'Yeni şifre en az 8 karakter olmalı.' });
+    if (np.length > 50) return res.status(400).json({ success: false, error: 'Yeni şifre en fazla 50 karakter olabilir.' });
+    if (!/[a-zA-Z]/.test(np)) return res.status(400).json({ success: false, error: 'Yeni şifre en az 1 harf içermeli.' });
+    if (!/[0-9]/.test(np)) return res.status(400).json({ success: false, error: 'Yeni şifre en az 1 rakam içermeli.' });
+
     const rows = await supabaseRestGet('users', { select: 'id,password_hash', id: `eq.${auth.id}`, limit: '1' });
     const user = rows?.[0];
     if (!user?.password_hash) return res.status(400).json({ success: false, error: 'Şifre değiştirilemiyor.' });
