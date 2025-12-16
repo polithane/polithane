@@ -67,6 +67,13 @@ export const ProfilePage = () => {
   );
   
   useEffect(() => {
+    // Always start profile page from top (avoid mid-scroll starts)
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch {
+      // noop
+    }
+
     const loadProfile = async () => {
       setLoading(true);
       setError('');
