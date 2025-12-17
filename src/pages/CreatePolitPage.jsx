@@ -43,6 +43,12 @@ export const CreatePolitPage = () => {
     return undefined;
   }, [contentType]);
 
+  const maxFiles = useMemo(() => {
+    if (contentType === 'image') return 10;
+    if (contentType === 'video' || contentType === 'audio') return 1;
+    return 0;
+  }, [contentType]);
+
   // Cleanup streams on unmount / tab change
   useEffect(() => {
     return () => {
@@ -161,6 +167,36 @@ export const CreatePolitPage = () => {
       return;
     }
 
+    // Enforce media requirement for media types
+    if ((contentType === 'video' || contentType === 'image' || contentType === 'audio') && files.length === 0) {
+      toast.error(
+        contentType === 'video'
+          ? 'Video polit için önce video kaydedin.'
+          : contentType === 'audio'
+            ? 'Ses polit için önce ses kaydedin.'
+            : 'Resim polit için en az 1 resim seçin.'
+      );
+      return;
+    }
+
+    // Basic file-type safety checks (client-side)
+    if (contentType === 'video' && files.some((f) => !String(f.type || '').startsWith('video/'))) {
+      toast.error('Video polit için sadece video dosyası kullanılabilir.');
+      return;
+    }
+    if (contentType === 'audio' && files.some((f) => !String(f.type || '').startsWith('audio/'))) {
+      toast.error('Ses polit için sadece ses dosyası kullanılabilir.');
+      return;
+    }
+    if (contentType === 'image' && files.some((f) => !String(f.type || '').startsWith('image/'))) {
+      toast.error('Resim polit için sadece resim dosyası kullanılabilir.');
+      return;
+    }
+    if (contentType === 'image' && files.length > 10) {
+      toast.error('Resim polit için en fazla 10 resim seçebilirsiniz.');
+      return;
+    }
+
     setLoading(true);
     try {
       // Upload media via our API (service role) to avoid Storage RLS issues,
@@ -198,7 +234,7 @@ export const CreatePolitPage = () => {
           return r.data.publicUrl;
         };
 
-        media_urls = await Promise.all(files.slice(0, 5).map(uploadOne));
+        media_urls = await Promise.all(files.slice(0, maxFiles || 1).map(uploadOne));
       }
 
       const result = await postsApi.create({
@@ -363,7 +399,7 @@ export const CreatePolitPage = () => {
                     accept={accept}
                     multiple
                     className="hidden"
-                    onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 5))}
+                    onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 10))}
                   />
                   <input
                     ref={imageCaptureRef}
@@ -371,12 +407,12 @@ export const CreatePolitPage = () => {
                     accept="image/*"
                     capture="environment"
                     className="hidden"
-                    onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 5))}
+                    onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 10))}
                   />
 
                   {files.length > 0 && (
                     <div className="mt-2 text-xs text-gray-600">
-                      {files.slice(0, 5).map((f) => f.name).join(', ')}
+                      {files.slice(0, 10).map((f) => f.name).join(', ')}
                     </div>
                   )}
                 </div>
