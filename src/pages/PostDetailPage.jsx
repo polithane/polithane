@@ -46,6 +46,7 @@ export const PostDetailPage = () => {
   const [editPostText, setEditPostText] = useState('');
   const [savingPost, setSavingPost] = useState(false);
   const [showDeletePost, setShowDeletePost] = useState(false);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
   
   useEffect(() => {
     const load = async () => {
@@ -69,6 +70,11 @@ export const PostDetailPage = () => {
       }
     };
     load();
+  }, [postId]);
+
+  // Reset image selection when switching posts
+  useEffect(() => {
+    setActiveImageIdx(0);
   }, [postId]);
   
   if (loading) {
@@ -107,6 +113,14 @@ export const PostDetailPage = () => {
   };
 
   const isOwnPost = isAuthenticated && currentUser?.id && String(uiPost.user_id) === String(currentUser.id);
+
+  const imageList = useMemo(() => {
+    if (uiPost.content_type !== 'image') return [];
+    const raw = Array.isArray(uiPost.media_url) ? uiPost.media_url : uiPost.media_url ? [uiPost.media_url] : [];
+    return raw.map((x) => String(x || '').trim()).filter(Boolean);
+  }, [uiPost.content_type, uiPost.media_url]);
+  const safeActiveImageIdx = Math.max(0, Math.min(activeImageIdx, Math.max(0, imageList.length - 1)));
+  const activeImageSrc = imageList[safeActiveImageIdx] || imageList[0] || '';
 
   const handleToggleLike = async () => {
     if (!isAuthenticated) {
@@ -244,10 +258,32 @@ export const PostDetailPage = () => {
               )}
               {uiPost.content_type === 'image' && (
                 <div>
-                  {Array.isArray(uiPost.media_url) ? (
-                    <img src={uiPost.media_url[0]} alt="" className="w-full rounded-lg mb-3" />
+                  {activeImageSrc ? (
+                    <>
+                      <img src={activeImageSrc} alt="" className="w-full rounded-lg mb-3" />
+                      {imageList.length > 1 && (
+                        <div className="mb-3 overflow-x-auto">
+                          <div className="flex gap-2 w-max">
+                            {imageList.map((src, idx) => (
+                              <button
+                                key={`${src}_${idx}`}
+                                type="button"
+                                onClick={() => setActiveImageIdx(idx)}
+                                className={`rounded-lg border ${
+                                  idx === safeActiveImageIdx ? 'border-primary-blue ring-2 ring-primary-blue/30' : 'border-gray-200'
+                                } flex-shrink-0`}
+                                style={{ width: 88, height: 88 }}
+                                title={`Resim ${idx + 1}`}
+                              >
+                                <img src={src} alt="" className="w-full h-full object-cover rounded-lg" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <img src={uiPost.media_url} alt="" className="w-full rounded-lg mb-3" />
+                    <div className="text-gray-500 text-sm mb-3">Resim bulunamadı.</div>
                   )}
                   {uiPost.content_text && <p className="text-gray-800">{uiPost.content_text}</p>}
                 </div>
