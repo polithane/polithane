@@ -6,11 +6,22 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
 import { Avatar } from '../components/common/Avatar';
 
+const getIconBaseUrl = () => {
+  const explicit = String(import.meta.env.VITE_ICON_BASE_URL || '').trim();
+  if (explicit) return explicit.replace(/\/+$/, '');
+  const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  if (!supabaseUrl) return '';
+  // Default: icons placed under uploads/ikons in Supabase Storage (public)
+  return `${supabaseUrl}/storage/v1/object/public/uploads/ikons`;
+};
+
+const IKON_BASE = getIconBaseUrl();
+
 const CONTENT_TABS = [
-  { key: 'video', icon: Video, alt: 'Video' },
-  { key: 'image', icon: ImageIcon, alt: 'Resim' },
-  { key: 'audio', icon: Music, alt: 'Ses' },
-  { key: 'text', icon: PenTool, alt: 'Yazı' },
+  { key: 'video', iconSrc: `${IKON_BASE}/videoikon.png`, fallbackIcon: Video, alt: 'Video' },
+  { key: 'image', iconSrc: `${IKON_BASE}/resimikon.png`, fallbackIcon: ImageIcon, alt: 'Resim' },
+  { key: 'audio', iconSrc: `${IKON_BASE}/sesikon.png`, fallbackIcon: Music, alt: 'Ses' },
+  { key: 'text', iconSrc: `${IKON_BASE}/yaziikon.png`, fallbackIcon: PenTool, alt: 'Yazı' },
 ];
 
 export const CreatePolitPage = () => {
@@ -25,6 +36,7 @@ export const CreatePolitPage = () => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
+  const [brokenIcons, setBrokenIcons] = useState({});
 
   // Text constraints
   const TEXT_LIMIT = 350;
@@ -355,7 +367,8 @@ export const CreatePolitPage = () => {
             <div className="flex items-center justify-center gap-5 mb-5">
               {CONTENT_TABS.map((t) => {
                 const active = t.key === contentType;
-                const Icon = t.icon;
+                const FallbackIcon = t.fallbackIcon;
+                const showImage = !!IKON_BASE && !brokenIcons[t.key];
                 return (
                   <button
                     key={t.key}
@@ -364,21 +377,24 @@ export const CreatePolitPage = () => {
                       setContentType(t.key);
                       resetMedia();
                     }}
-                    className={`p-3 rounded-2xl border transition-all ${
-                      active
-                        ? 'bg-primary-blue/10 border-primary-blue shadow-md'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    }`}
+                    className="p-0 bg-transparent border-0 outline-none"
                     title={t.alt}
                   >
-                    <div className="w-[56px] h-[56px] flex items-center justify-center">
-                      <Icon
-                        className={`transition-transform ${
-                          active ? 'scale-110 text-primary-blue' : 'text-gray-700 group-hover:text-gray-900'
-                        }`}
-                        style={{ width: 40, height: 40 }}
+                    {showImage ? (
+                      <img
+                        src={t.iconSrc}
+                        alt={t.alt}
+                        className={`object-contain transition-transform ${active ? 'scale-110' : 'opacity-90 hover:opacity-100'}`}
+                        style={{ width: 56, height: 56 }}
+                        loading="lazy"
+                        onError={() => setBrokenIcons((p) => ({ ...p, [t.key]: true }))}
                       />
-                    </div>
+                    ) : (
+                      <FallbackIcon
+                        className={`transition-transform ${active ? 'scale-110 text-primary-blue' : 'text-gray-700 hover:text-gray-900'}`}
+                        style={{ width: 44, height: 44 }}
+                      />
+                    )}
                   </button>
                 );
               })}
