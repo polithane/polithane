@@ -85,8 +85,8 @@ export const getUserTitle = (user, short = false) => {
  */
 export const isUiVerifiedUser = (user) => {
   if (!user) return false;
-  const raw = !!(user.is_verified ?? user.verification_badge);
-  if (!raw) return false;
+  // Only trust the real DB flag (admin approval). Ignore mock/legacy `verification_badge`.
+  if (user.is_verified !== true) return false;
   const ut = String(user.user_type || '').trim();
   if (!ut) return false;
   if (ut === 'citizen' || ut === 'normal' || ut === 'party_member') return false;

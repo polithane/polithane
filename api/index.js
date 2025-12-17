@@ -1976,7 +1976,9 @@ async function authRegister(req, res) {
         district_name: cleanEmpty(district),
         party_id: cleanEmpty(party_id),
         politician_type: cleanEmpty(politician_type),
-        is_verified: user_type === 'citizen',
+        // Verified is reserved for admin approval (non-citizen account types).
+        // Citizens don't display a verified badge in UI anyway, but keep this false to avoid confusion.
+        is_verified: false,
         is_active: true,
         email_verified: true,
         is_admin: false
@@ -2003,7 +2005,7 @@ async function authRegister(req, res) {
             user_type,
             province: cleanEmpty(province),
             party_id: cleanEmpty(party_id),
-            is_verified: user_type === 'citizen',
+            is_verified: false,
             is_active: true,
             email_verified: true,
             is_admin: false

@@ -87,7 +87,8 @@ export const HomePage = () => {
                 ...p.user,
                 user_id: p.user.id,
                 profile_image: p.user.avatar_url,
-                verification_badge: p.user.is_verified ?? false,
+                // Verified badge is admin-approval only; do not auto-mark users as verified here.
+                verification_badge: false,
                 party_id: p.user.party_id,
                 party: p.user.party_id && partyMap.get(p.user.party_id)
                   ? {
