@@ -52,6 +52,11 @@ export const getUserTitle = (user, short = false) => {
   if (user.user_type === 'politician' && user.politician_type) {
     return getPoliticianTitle(user.politician_type, user.city_code, user.district_name, short);
   }
+
+  // Party officials can also have politician_type roles (provincial/district chair, mayors, etc.)
+  if (user.user_type === 'party_official' && user.politician_type) {
+    return getPoliticianTitle(user.politician_type, user.city_code, user.district_name, short);
+  }
   
   if (user.user_type === 'ex_politician') {
     return 'Deneyimli Siyasetçi';

@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Avatar } from '../components/common/Avatar';
 import { formatNumber, formatPolitScore, formatDate } from '../utils/formatters';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
-import { getUserTitle } from '../utils/titleHelpers';
+import { getPoliticianTitle, getUserTitle } from '../utils/titleHelpers';
 import { getProfilePath } from '../utils/paths';
 import { normalizeUsername } from '../utils/validators';
 import { CITY_CODES } from '../utils/constants';
@@ -21,6 +21,9 @@ export const PartyDetailPage = () => {
   const [partyOfficials, setPartyOfficials] = useState([]);
   const [partyMembers, setPartyMembers] = useState([]);
   const [partyPosts, setPartyPosts] = useState([]);
+  const [filterProvince, setFilterProvince] = useState('');
+  const [filterDistrict, setFilterDistrict] = useState('');
+  const [filterRole, setFilterRole] = useState(''); // for org tab (party officials)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -248,7 +251,33 @@ export const PartyDetailPage = () => {
   };
 
   const profilesForTab = getProfilesForTab();
-  const userIdsForTab = new Set((profilesForTab || []).map((u) => u.user_id));
+
+  // Reset filters when switching main tab
+  useEffect(() => {
+    setFilterProvince('');
+    setFilterDistrict('');
+    setFilterRole('');
+  }, [mainTab]);
+
+  const getDistrictName = (u) => String(u?.district_name || u?.district || '').trim();
+  const filteredProfilesForTab = useMemo(() => {
+    let list = Array.isArray(profilesForTab) ? profilesForTab : [];
+    if (filterProvince) {
+      const p = String(filterProvince || '').trim();
+      list = list.filter((u) => String(u?.province || '').trim() === p);
+    }
+    if ((mainTab === 'members' || mainTab === 'district' || mainTab === 'district_mayor') && filterDistrict) {
+      const d = String(filterDistrict || '').trim();
+      list = list.filter((u) => getDistrictName(u) === d);
+    }
+    if (mainTab === 'org' && filterRole) {
+      const r = String(filterRole || '').trim();
+      list = list.filter((u) => String(u?.politician_type || '').trim() === r);
+    }
+    return list;
+  }, [profilesForTab, filterProvince, filterDistrict, filterRole, mainTab]);
+
+  const userIdsForTab = new Set((filteredProfilesForTab || []).map((u) => u.user_id));
   const postsForTab = (partyPosts || []).filter((p) => userIdsForTab.has(p.user_id));
   const dailyEngagementScore = (p) => {
     const likes = Number(p.like_count || 0);
@@ -263,10 +292,61 @@ export const PartyDetailPage = () => {
   });
 
   const profileGroups = useMemo(() => {
-    if (mainTab === 'mps') return mpsByProvince;
-    return groupByProvince(profilesForTab);
+    if (mainTab === 'mps') {
+      if (!filterProvince) return mpsByProvince;
+      const p = String(filterProvince || '').trim();
+      return (mpsByProvince || []).filter(([prov]) => String(prov || '').trim() === p);
+    }
+    return groupByProvince(filteredProfilesForTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainTab, profilesForTab, mpsByProvince]);
+  }, [mainTab, filteredProfilesForTab, mpsByProvince, filterProvince]);
+
+  const provinceOptions = useMemo(() => {
+    const set = new Set();
+    (profilesForTab || []).forEach((u) => {
+      const p = String(u?.province || '').trim();
+      if (p) set.add(p);
+    });
+    const list = Array.from(set.values());
+    list.sort((a, b) => {
+      const aCode = getPlateCodeFromProvince(a);
+      const bCode = getPlateCodeFromProvince(b);
+      if (aCode && bCode) return Number(aCode) - Number(bCode);
+      if (aCode) return -1;
+      if (bCode) return 1;
+      return a.localeCompare(b, 'tr-TR');
+    });
+    return list;
+  }, [profilesForTab, cityNameToCode]);
+
+  const districtOptions = useMemo(() => {
+    if (!(mainTab === 'members' || mainTab === 'district' || mainTab === 'district_mayor')) return [];
+    const list = Array.isArray(profilesForTab) ? profilesForTab : [];
+    const byProvince = filterProvince
+      ? list.filter((u) => String(u?.province || '').trim() === String(filterProvince || '').trim())
+      : list;
+    const set = new Set();
+    byProvince.forEach((u) => {
+      const d = getDistrictName(u);
+      if (d) set.add(d);
+    });
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'tr-TR'));
+  }, [profilesForTab, mainTab, filterProvince]);
+
+  const roleOptions = useMemo(() => {
+    if (mainTab !== 'org') return [];
+    const set = new Set();
+    (profilesForTab || []).forEach((u) => {
+      const r = String(u?.politician_type || '').trim();
+      if (r) set.add(r);
+    });
+    const list = Array.from(set.values());
+    list.sort((a, b) => a.localeCompare(b, 'tr-TR'));
+    return list.map((code) => ({
+      code,
+      label: getPoliticianTitle(code, null, null, true) || code,
+    }));
+  }, [profilesForTab, mainTab]);
 
   const postGroups = useMemo(() => {
     // group posts by province of post.user (or fallback to party user map by user_id)
@@ -427,6 +507,76 @@ export const PartyDetailPage = () => {
               >
                 Paylaşımlar
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Satır: Filtreler (sekme bazlı) */}
+        {subTab === 'profiles' && (
+          <div className="mb-6">
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <div className="text-sm font-black text-gray-900 whitespace-nowrap">Filtre</div>
+
+                {['mps', 'org', 'members', 'provincial', 'district', 'metro_mayor', 'district_mayor'].includes(mainTab) && (
+                  <select
+                    value={filterProvince}
+                    onChange={(e) => setFilterProvince(e.target.value)}
+                    className="w-full md:w-[260px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none text-sm"
+                  >
+                    <option value="">İl (Tümü)</option>
+                    {provinceOptions.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {(mainTab === 'members' || mainTab === 'district' || mainTab === 'district_mayor') && (
+                  <select
+                    value={filterDistrict}
+                    onChange={(e) => setFilterDistrict(e.target.value)}
+                    className="w-full md:w-[260px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none text-sm"
+                  >
+                    <option value="">İlçe (Tümü)</option>
+                    {districtOptions.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {mainTab === 'org' && (
+                  <select
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                    className="w-full md:w-[260px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none text-sm"
+                  >
+                    <option value="">Görev (Tümü)</option>
+                    {roleOptions.map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {(filterProvince || filterDistrict || filterRole) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterProvince('');
+                      setFilterDistrict('');
+                      setFilterRole('');
+                    }}
+                    className="md:ml-auto px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-900 font-semibold text-sm"
+                  >
+                    Temizle
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

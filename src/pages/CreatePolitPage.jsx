@@ -74,6 +74,8 @@ export const CreatePolitPage = () => {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [brokenIcons, setBrokenIcons] = useState({});
   const [iconTryIndex, setIconTryIndex] = useState({});
+  const [dragImageIdx, setDragImageIdx] = useState(null);
+  const [dragOverImageIdx, setDragOverImageIdx] = useState(null);
 
   // Text constraints
   const TEXT_LIMIT = 350;
@@ -118,6 +120,21 @@ export const CreatePolitPage = () => {
       });
     };
   }, [contentType, files]);
+
+  const reorderFiles = (from, to) => {
+    const f = Number(from);
+    const t = Number(to);
+    if (!Number.isFinite(f) || !Number.isFinite(t)) return;
+    if (f === t) return;
+    setFiles((prev) => {
+      const list = Array.isArray(prev) ? [...prev] : [];
+      if (f < 0 || f >= list.length) return prev;
+      const clampedTo = Math.max(0, Math.min(t, list.length - 1));
+      const [moved] = list.splice(f, 1);
+      list.splice(clampedTo, 0, moved);
+      return list;
+    });
+  };
 
   useEffect(() => {
     // Load agendas from admin-managed list
@@ -502,13 +519,35 @@ export const CreatePolitPage = () => {
                     {imagePreviews.length > 0 ? (
                       <div className="flex gap-2 overflow-x-auto pb-1">
                         {imagePreviews.map((u, idx) => (
-                          <img
+                          <div
                             key={u}
-                            src={u}
-                            alt=""
-                            className="w-24 h-24 rounded-xl object-cover border border-gray-200 flex-shrink-0"
-                            title={`Resim ${idx + 1}`}
-                          />
+                            draggable
+                            onDragStart={() => {
+                              setDragImageIdx(idx);
+                              setDragOverImageIdx(null);
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              if (dragOverImageIdx !== idx) setDragOverImageIdx(idx);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (dragImageIdx === null || dragImageIdx === undefined) return;
+                              reorderFiles(dragImageIdx, idx);
+                              setDragImageIdx(null);
+                              setDragOverImageIdx(null);
+                            }}
+                            onDragEnd={() => {
+                              setDragImageIdx(null);
+                              setDragOverImageIdx(null);
+                            }}
+                            className={`w-24 h-24 rounded-xl flex-shrink-0 border ${
+                              dragOverImageIdx === idx ? 'border-primary-blue ring-2 ring-primary-blue/30' : 'border-gray-200'
+                            }`}
+                            title="Sürükle-bırak ile sırala"
+                          >
+                            <img src={u} alt="" className="w-full h-full rounded-xl object-cover" />
+                          </div>
                         ))}
                       </div>
                     ) : (

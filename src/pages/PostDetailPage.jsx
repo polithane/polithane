@@ -114,11 +114,13 @@ export const PostDetailPage = () => {
 
   const isOwnPost = isAuthenticated && currentUser?.id && String(uiPost.user_id) === String(currentUser.id);
 
-  const imageList = useMemo(() => {
-    if (uiPost.content_type !== 'image') return [];
-    const raw = Array.isArray(uiPost.media_url) ? uiPost.media_url : uiPost.media_url ? [uiPost.media_url] : [];
-    return raw.map((x) => String(x || '').trim()).filter(Boolean);
-  }, [uiPost.content_type, uiPost.media_url]);
+  // IMPORTANT: don't use hooks after early returns (React error #310).
+  const imageList =
+    uiPost.content_type !== 'image'
+      ? []
+      : (Array.isArray(uiPost.media_url) ? uiPost.media_url : uiPost.media_url ? [uiPost.media_url] : [])
+          .map((x) => String(x || '').trim())
+          .filter(Boolean);
   const safeActiveImageIdx = Math.max(0, Math.min(activeImageIdx, Math.max(0, imageList.length - 1)));
   const activeImageSrc = imageList[safeActiveImageIdx] || imageList[0] || '';
 

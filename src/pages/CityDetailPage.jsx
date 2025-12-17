@@ -16,6 +16,7 @@ export const CityDetailPage = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('mps'); // mps, provincial_chairs, district_chairs, metropolitan_mayors, district_mayors, members
   const [activePartyId, setActivePartyId] = useState(null);
+  const [districtFilter, setDistrictFilter] = useState(''); // only for district_* tabs
   const [cityData, setCityData] = useState(null);
   
   useEffect(() => {
@@ -178,6 +179,30 @@ export const CityDetailPage = () => {
     // When switching tabs, default to the party with the most profiles (fair + deterministic).
     setActivePartyId(partyOptions[0]?.partyId || null);
   }, [activeTab, partyOptions]);
+
+  useEffect(() => {
+    // District filter only applies to district chair/mayor tabs
+    if (activeTab !== 'district_chairs' && activeTab !== 'district_mayors') {
+      setDistrictFilter('');
+    }
+  }, [activeTab]);
+
+  const districtOptions = useMemo(() => {
+    if (!cityData) return [];
+    if (activeTab !== 'district_chairs' && activeTab !== 'district_mayors') return [];
+    const selectedPartyId = activePartyId ? String(activePartyId) : null;
+    const list =
+      activeTab === 'district_chairs' ? cityData.districtChairs || [] : cityData.districtMayors || [];
+    const filteredByParty = selectedPartyId
+      ? (list || []).filter((u) => String(u.party_id || '') === selectedPartyId)
+      : list || [];
+    const set = new Set();
+    (filteredByParty || []).forEach((u) => {
+      const d = String(u?.district_name || '').trim();
+      if (d) set.add(d);
+    });
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'tr-TR'));
+  }, [cityData, activeTab, activePartyId]);
   
   if (!cityData) {
     return (
@@ -196,6 +221,12 @@ export const CityDetailPage = () => {
     const filterByParty = (list = []) => {
       if (!selectedPartyId) return list;
       return (list || []).filter((u) => String(u.party_id || '') === selectedPartyId);
+    };
+    const filterByDistrict = (list = []) => {
+      if (!districtFilter) return list;
+      const d = String(districtFilter || '').trim();
+      if (!d) return list;
+      return (list || []).filter((u) => String(u?.district_name || '').trim() === d);
     };
 
     const groupByParty = (list = []) => {
@@ -433,7 +464,7 @@ export const CityDetailPage = () => {
 
     if (activeTab === 'district_chairs') {
       return renderPartyGroupedUserGrid(
-        groupByParty(filterByParty(cityData.districtChairs)),
+        groupByParty(filterByDistrict(filterByParty(cityData.districtChairs))),
         Briefcase,
         'Bu şehirden ilçe başkanı bulunamadı',
         { showDistrictGroups: true }
@@ -450,7 +481,7 @@ export const CityDetailPage = () => {
 
     if (activeTab === 'district_mayors') {
       return renderPartyGroupedUserGrid(
-        groupByParty(filterByParty(cityData.districtMayors)),
+        groupByParty(filterByDistrict(filterByParty(cityData.districtMayors))),
         Building2,
         'Bu şehirden ilçe belediye başkanı bulunamadı'
       );
@@ -588,6 +619,25 @@ export const CityDetailPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sol Kolon - Siyasetçiler */}
           <div className="lg:col-span-2">
+            {(activeTab === 'district_chairs' || activeTab === 'district_mayors') && districtOptions.length > 0 && (
+              <div className="mb-4 bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm font-bold text-gray-900 whitespace-nowrap">İlçe Filtresi</div>
+                  <select
+                    value={districtFilter}
+                    onChange={(e) => setDistrictFilter(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none text-sm"
+                  >
+                    <option value="">Tümü</option>
+                    {districtOptions.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
             {renderTabContent()}
           </div>
           
