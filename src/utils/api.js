@@ -180,6 +180,11 @@ export const posts = {
       method: 'POST',
     }),
 
+  share: (id) =>
+    apiCall(`/api/posts/${id}/share`, {
+      method: 'POST',
+    }),
+
   getComments: (id) => apiCall(`/api/posts/${id}/comments`),
 
   addComment: (id, content, parent_id = null) =>

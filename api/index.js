@@ -303,6 +303,29 @@ async function addPostComment(req, res, postId) {
         is_deleted: pending ? true : false,
     }]);
     const row = inserted?.[0] || null;
+
+    // Notify post owner (no self-notify). We notify even if pending, so owner knows something happened.
+    try {
+      const postRows = await supabaseRestGet('posts', { select: 'id,user_id', id: `eq.${postId}`, limit: '1' }).catch(() => []);
+      const ownerId = postRows?.[0]?.user_id ?? null;
+      if (ownerId && String(ownerId) !== String(auth.id)) {
+        await supabaseRestInsert('notifications', [
+          {
+            user_id: ownerId,
+            actor_id: auth.id,
+            type: 'comment',
+            post_id: postId,
+            comment_id: row?.id || null,
+            title: 'Yeni yorum',
+            message: pending ? 'Paylaşımınıza bir yorum geldi (incelemede).' : 'Paylaşımınıza yorum yaptı.',
+            is_read: false,
+          },
+        ]).catch(() => null);
+      }
+    } catch {
+      // best-effort
+    }
+
     if (pending && row?.id) {
       await notifyAdminsAboutComment({
         type: 'comment_review',
@@ -421,6 +444,40 @@ async function reportPost(req, res, postId) {
   });
 }
 
+async function trackPostShare(req, res, postId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+  // Best-effort increment share_count
+  try {
+    const rows = await supabaseRestGet('posts', { select: 'id,user_id,share_count', id: `eq.${postId}`, limit: '1' }).catch(() => []);
+    const p = rows?.[0] || null;
+    if (p) {
+      const next = Math.max(0, Number(p.share_count || 0) + 1);
+      await supabaseRestPatch('posts', { id: `eq.${postId}` }, { share_count: next }).catch(() => null);
+
+      // notify owner
+      const ownerId = p.user_id || null;
+      if (ownerId && String(ownerId) !== String(auth.id)) {
+        await supabaseRestInsert('notifications', [
+          {
+            user_id: ownerId,
+            actor_id: auth.id,
+            type: 'share',
+            post_id: postId,
+            title: 'Paylaşım',
+            message: 'Paylaşımınızı paylaştı.',
+            is_read: false,
+          },
+        ]).catch(() => null);
+      }
+    }
+  } catch {
+    // noop
+  }
+  return res.json({ success: true });
+}
+
 async function toggleCommentLike(req, res, commentId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -496,6 +553,27 @@ async function togglePostLike(req, res, postId) {
         return res.json({ success: true, action: 'unliked' });
     }
     await supabaseRestInsert('likes', [{ post_id: postId, user_id: userId }]);
+
+    // Notify post owner (no self-notify)
+    try {
+      const postRows = await supabaseRestGet('posts', { select: 'id,user_id', id: `eq.${postId}`, limit: '1' }).catch(() => []);
+      const ownerId = postRows?.[0]?.user_id ?? null;
+      if (ownerId && String(ownerId) !== String(userId)) {
+        await supabaseRestInsert('notifications', [
+          {
+            user_id: ownerId,
+            actor_id: userId,
+            type: 'like',
+            post_id: postId,
+            title: 'Beğeni',
+            message: 'Paylaşımınızı beğendi.',
+            is_read: false,
+          },
+        ]).catch(() => null);
+      }
+    } catch {
+      // best-effort
+    }
     return res.json({ success: true, action: 'liked' });
 }
 
@@ -2312,6 +2390,7 @@ export default async function handler(req, res) {
           if (postId && !tail && req.method === 'PUT') return await updatePost(req, res, postId);
           if (postId && !tail && req.method === 'DELETE') return await deletePost(req, res, postId);
           if (postId && tail === 'like' && req.method === 'POST') return await togglePostLike(req, res, postId);
+          if (postId && tail === 'share' && req.method === 'POST') return await trackPostShare(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'GET') return await getPostComments(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'POST') return await addPostComment(req, res, postId);
           if (postId && tail === 'report' && req.method === 'POST') return await reportPost(req, res, postId);
