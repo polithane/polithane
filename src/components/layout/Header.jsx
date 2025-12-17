@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Search, Bell, MessageCircle, LogIn, Settings, User, Shield, LogOut, ChevronDown, X } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { Search, Bell, MessageCircle, LogIn, Settings, User, Shield, LogOut, ChevronDown, X, CheckCheck, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
@@ -12,9 +12,13 @@ import { getProfilePath } from '../../utils/paths';
 export const Header = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, notifications, loading: notifLoading, fetchNotifications, markAsRead, markAllAsRead, deleteNotification } =
+    useNotifications();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef(null);
+  const notifRef = useRef(null);
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
+  const [notifLimit, setNotifLimit] = useState(10);
 
   const [q, setQ] = useState('');
   const [results, setResults] = useState({ users: [], posts: [], parties: [] });
@@ -26,6 +30,9 @@ export const Header = () => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setShowUserMenu(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -54,6 +61,35 @@ export const Header = () => {
     }, 250);
     return () => clearTimeout(searchTimerRef.current);
   }, [q]);
+
+  const notifItems = useMemo(() => {
+    const list = Array.isArray(notifications) ? notifications : [];
+    return list.slice(0, Math.max(1, notifLimit));
+  }, [notifications, notifLimit]);
+
+  const getNotifTitle = (n) => {
+    if (n?.title) return String(n.title);
+    const t = String(n?.type || 'system');
+    if (t === 'like') return 'Beğeni';
+    if (t === 'comment') return 'Yorum';
+    if (t === 'follow') return 'Takip';
+    if (t === 'mention') return 'Bahsedilme';
+    if (t === 'message') return 'Mesaj';
+    return 'Bildirim';
+  };
+  const getNotifMessage = (n) => {
+    if (n?.message) return String(n.message);
+    if (n?.post?.content_text || n?.post?.content) return String(n.post.content_text ?? n.post.content);
+    return '';
+  };
+  const onOpenNotif = async () => {
+    setShowNotifMenu((v) => !v);
+    setNotifLimit(10);
+    // only fetch when opening
+    if (!showNotifMenu) {
+      await fetchNotifications?.();
+    }
+  };
   
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-200 h-[60px]">
@@ -180,14 +216,120 @@ export const Header = () => {
           {isAuthenticated ? (
             <>
               {/* Bildirimler */}
-              <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <Bell className="w-5 h-5 text-gray-600" />
-                {unreadCount > 0 && (
-                  <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
-                    {unreadCount}
-                  </Badge>
+              <div className="relative" ref={notifRef}>
+                <button
+                  type="button"
+                  onClick={onOpenNotif}
+                  className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Bildirimler"
+                >
+                  <Bell className="w-5 h-5 text-gray-600" />
+                  {unreadCount > 0 && (
+                    <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </button>
+
+                {showNotifMenu && (
+                  <div className="absolute right-0 top-12 w-[360px] bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden z-50">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <div className="font-black text-gray-900">Bildirimler</div>
+                      <div className="flex items-center gap-2">
+                        {unreadCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await markAllAsRead?.();
+                            }}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-black"
+                            title="Tümünü okundu yap"
+                          >
+                            <CheckCheck className="w-4 h-4" />
+                            Okundu
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="max-h-[420px] overflow-y-auto">
+                      {notifLoading && (
+                        <div className="px-4 py-6 text-sm text-gray-600">Bildirimler yükleniyor…</div>
+                      )}
+
+                      {!notifLoading && notifItems.length === 0 && (
+                        <div className="px-4 py-8 text-sm text-gray-600">Henüz bildirim yok.</div>
+                      )}
+
+                      {!notifLoading &&
+                        notifItems.map((n) => {
+                          const id = n?.id ?? n?.notification_id;
+                          const isRead = !!n?.is_read;
+                          const actor = n?.actor || null;
+                          const title = getNotifTitle(n);
+                          const msg = getNotifMessage(n);
+                          const targetPostId = n?.post_id ?? n?.post?.id ?? null;
+
+                          return (
+                            <button
+                              key={String(id)}
+                              type="button"
+                              onClick={async () => {
+                                if (id) await markAsRead?.(id);
+                                setShowNotifMenu(false);
+                                if (targetPostId) {
+                                  navigate(`/post/${targetPostId}`);
+                                  return;
+                                }
+                                if (actor) {
+                                  navigate(getProfilePath(actor));
+                                }
+                              }}
+                              className={`w-full px-4 py-3 flex items-start gap-3 text-left border-b border-gray-100 hover:bg-gray-50 ${
+                                isRead ? '' : 'bg-blue-50/60'
+                              }`}
+                            >
+                              <Avatar src={actor?.avatar_url} size="40px" verified={actor?.is_verified} />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className={`text-sm ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
+                                    {title}
+                                  </div>
+                                  {!isRead && <span className="w-2 h-2 rounded-full bg-primary-blue flex-shrink-0" />}
+                                </div>
+                                {msg && <div className="text-xs text-gray-600 line-clamp-2 mt-0.5">{msg}</div>}
+                              </div>
+
+                              <button
+                                type="button"
+                                className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-700"
+                                title="Sil"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (id) await deleteNotification?.(id);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </button>
+                          );
+                        })}
+                    </div>
+
+                    {Array.isArray(notifications) && notifications.length > 10 && (
+                      <div className="p-3 border-t border-gray-100 bg-white">
+                        <button
+                          type="button"
+                          onClick={() => setNotifLimit((v) => (v >= 50 ? 10 : 50))}
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-800 font-black"
+                        >
+                          {notifLimit >= 50 ? 'Daha az göster' : 'Diğerlerini göster'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </button>
+              </div>
               
               {/* Mesajlar */}
               <button onClick={() => navigate('/messages')} className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
