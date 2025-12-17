@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Save, Bell, Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiCall } from '../../utils/api';
@@ -19,16 +19,41 @@ export const NotificationSettings = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const autoSaveTimer = useRef(null);
+  const didMount = useRef(false);
 
   const savedNotif = useMemo(() => {
     const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
-    return meta.notification_settings && typeof meta.notification_settings === 'object' ? meta.notification_settings : null;
+    if (meta.notification_settings && typeof meta.notification_settings === 'object') return meta.notification_settings;
+    // Fallback: device-local persistence (if metadata column is missing)
+    const local = localStorage.getItem('polithane_notification_settings');
+    if (!local) return null;
+    try {
+      return JSON.parse(local);
+    } catch {
+      return null;
+    }
   }, [user]);
 
   useEffect(() => {
     if (!savedNotif) return;
     setSettings((prev) => ({ ...prev, ...savedNotif }));
   }, [savedNotif]);
+
+  useEffect(() => {
+    if (!didMount.current) {
+      didMount.current = true;
+      return;
+    }
+    // Always persist locally so navigating away doesn't reset
+    localStorage.setItem('polithane_notification_settings', JSON.stringify(settings));
+    // Debounced autosave to backend
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      handleSave();
+    }, 800);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
 
   const handleToggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -55,7 +80,11 @@ export const NotificationSettings = () => {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       } catch (e) {
-        setError(e?.message || 'Kaydedilemedi.');
+        // Keep Turkish + actionable; still kept locally.
+        setError(
+          e?.message ||
+            "Kaydedilemedi. Bu cihazda kaydedildi. Kalıcı çözüm için Supabase'de `users.metadata` sütunu olmalı."
+        );
       } finally {
         setSaving(false);
       }

@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Save, Shield, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { apiCall } from '../../utils/api';
 
 export const SecuritySettings = () => {
-  const { changePassword } = useAuth();
+  const { user, updateUser, changePassword } = useAuth();
   const [passwords, setPasswords] = useState({
     current: '',
     new: '',
@@ -13,6 +14,8 @@ export const SecuritySettings = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saving2fa, setSaving2fa] = useState(false);
+  const saveTimer = useRef(null);
 
   const PASSWORD_RULES = useMemo(
     () => [
@@ -26,6 +29,45 @@ export const SecuritySettings = () => {
 
   const newPassValid = PASSWORD_RULES.every((r) => r.ok(passwords.new));
   const confirmMatches = !passwords.confirm || passwords.new === passwords.confirm;
+
+  useEffect(() => {
+    const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+    const stored = localStorage.getItem('polithane_2fa_enabled');
+    const fromMeta = meta.security_settings?.twoFactorEnabled;
+    if (typeof fromMeta === 'boolean') setTwoFactor(fromMeta);
+    else if (stored != null) setTwoFactor(stored === 'true');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveTwoFactor = async (value) => {
+    // Always persist locally so it doesn't reset on navigation
+    localStorage.setItem('polithane_2fa_enabled', value ? 'true' : 'false');
+    setSaving2fa(true);
+    try {
+      const baseMeta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+      const res = await apiCall('/api/users/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          metadata: {
+            ...baseMeta,
+            security_settings: {
+              ...(baseMeta.security_settings && typeof baseMeta.security_settings === 'object' ? baseMeta.security_settings : {}),
+              twoFactorEnabled: !!value,
+            },
+          },
+        }),
+      });
+      if (res?.success && res.data) updateUser(res.data);
+    } catch (e) {
+      // Keep Turkish + actionable
+      setError(
+        e?.message ||
+          "2FA ayarı sunucuya kaydedilemedi. Bu cihazda kaydedildi. Kalıcı çözüm için Supabase'de `users.metadata` sütunu olmalı."
+      );
+    } finally {
+      setSaving2fa(false);
+    }
+  };
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -157,10 +199,25 @@ export const SecuritySettings = () => {
           <input
             type="checkbox"
             checked={twoFactor}
-            onChange={(e) => setTwoFactor(e.target.checked)}
-            className="w-5 h-5 text-primary-blue rounded"
+            onChange={(e) => {
+              const v = e.target.checked;
+              setTwoFactor(v);
+              if (saveTimer.current) clearTimeout(saveTimer.current);
+              saveTimer.current = setTimeout(() => saveTwoFactor(v), 400);
+            }}
+            className="w-6 h-6 text-primary-blue rounded"
           />
         </label>
+        <div className="flex justify-end mt-4">
+          <button
+            type="button"
+            onClick={() => saveTwoFactor(twoFactor)}
+            disabled={saving2fa}
+            className="px-5 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving2fa ? 'Kaydediliyor...' : 'Kaydet'}
+          </button>
+        </div>
       </div>
     </div>
   );

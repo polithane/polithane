@@ -558,6 +558,14 @@ async function usersUpdateMe(req, res) {
 
   const updated = await safeUserPatch(auth.id, allowed);
   const user = updated?.[0] || null;
+  // If caller tries to write only metadata but schema doesn't have the column, return a clear Turkish error.
+  if (!user && Object.keys(allowed).length === 1 && Object.prototype.hasOwnProperty.call(allowed, 'metadata')) {
+    return res.status(500).json({
+      success: false,
+      error:
+        "Ayarlar kaydedilemedi: Supabase'de `users` tablosunda `metadata` sütunu yok. Çözüm: Supabase SQL Editor'da `server/migrations/006_add_user_metadata.sql` dosyasını çalıştırın (veya `users` tablosuna `metadata` JSONB sütunu ekleyin).",
+    });
+  }
   if (user) delete user.password_hash;
   res.json({ success: true, data: user });
 }
@@ -603,7 +611,11 @@ async function usersBlock(req, res) {
 
   const updated = await safeUserPatch(auth.id, { metadata: { ...meta, blocked_user_ids: Array.from(ids) } });
   if (!updated || updated.length === 0) {
-    return res.status(500).json({ success: false, error: 'Bu kurulumda kullanıcı metadata alanı yok; engelleme kaydedilemedi.' });
+    return res.status(500).json({
+      success: false,
+      error:
+        "Engelleme kaydedilemedi: Supabase'de `users.metadata` sütunu yok. Çözüm: Supabase SQL Editor'da `server/migrations/006_add_user_metadata.sql` dosyasını çalıştırın (veya `users` tablosuna `metadata` JSONB sütunu ekleyin).",
+    });
   }
   res.json({ success: true });
 }
@@ -621,7 +633,11 @@ async function usersUnblock(req, res, targetId) {
 
   const updated = await safeUserPatch(auth.id, { metadata: { ...meta, blocked_user_ids: ids } });
   if (!updated || updated.length === 0) {
-    return res.status(500).json({ success: false, error: 'Bu kurulumda kullanıcı metadata alanı yok; engelleme kaydedilemedi.' });
+    return res.status(500).json({
+      success: false,
+      error:
+        "Engel kaldırılamadı: Supabase'de `users.metadata` sütunu yok. Çözüm: Supabase SQL Editor'da `server/migrations/006_add_user_metadata.sql` dosyasını çalıştırın (veya `users` tablosuna `metadata` JSONB sütunu ekleyin).",
+    });
   }
   res.json({ success: true });
 }

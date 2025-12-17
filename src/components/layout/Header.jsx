@@ -34,7 +34,8 @@ export const Header = () => {
 
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    const term = q.trim();
+    // Case-insensitive + Turkish-safe: normalize to lowercase (İ/ı) before sending to API
+    const term = q.trim().toLocaleLowerCase('tr-TR');
     if (term.length < 3) {
       setResults({ users: [], posts: [], parties: [] });
       setShowResults(false);

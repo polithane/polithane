@@ -134,19 +134,19 @@ export const DeleteAccountPage = () => {
 
             <div className="mt-4 space-y-3">
               <label className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
-                <input type="checkbox" checked={ack1} onChange={(e) => setAck1(e.target.checked)} className="mt-1 w-4 h-4" />
+                <input type="checkbox" checked={ack1} onChange={(e) => setAck1(e.target.checked)} className="mt-0.5 w-6 h-6" />
                 <div className="text-sm text-gray-800">
                   <span className="font-semibold">1)</span> Bu talebin güvenlik nedeniyle e‑posta ile onaylanacağını anladım.
                 </div>
               </label>
               <label className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
-                <input type="checkbox" checked={ack2} onChange={(e) => setAck2(e.target.checked)} className="mt-1 w-4 h-4" />
+                <input type="checkbox" checked={ack2} onChange={(e) => setAck2(e.target.checked)} className="mt-0.5 w-6 h-6" />
                 <div className="text-sm text-gray-800">
                   <span className="font-semibold">2)</span> Onay sonrası hesabım pasif olacak; 90 gün sonunda sitedeki görünürlüğüm kaldırılacak.
                 </div>
               </label>
               <label className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
-                <input type="checkbox" checked={ack3} onChange={(e) => setAck3(e.target.checked)} className="mt-1 w-4 h-4" />
+                <input type="checkbox" checked={ack3} onChange={(e) => setAck3(e.target.checked)} className="mt-0.5 w-6 h-6" />
                 <div className="text-sm text-gray-800">
                   <span className="font-semibold">3)</span> Bu süre içinde istersem hesabımı tekrar aktif edebileceğimi anladım.
                 </div>

@@ -21,7 +21,12 @@ export const BlockedUsersPage = () => {
       if (!res?.success) throw new Error(res?.error || 'Engellenenler yüklenemedi.');
       setBlocked(res.data || []);
     } catch (e) {
-      setError(e?.message || 'Engellenenler yüklenemedi.');
+      const msg = String(e?.message || '');
+      // If server cannot persist blocks (metadata missing), explain clearly.
+      setError(
+        msg ||
+          "Engellenenler kaydedilemiyor. Çözüm: Supabase'de `users` tablosuna `metadata` (JSONB) sütunu eklenmeli ve RLS/policy ayarlanmalı."
+      );
     } finally {
       setLoading(false);
     }

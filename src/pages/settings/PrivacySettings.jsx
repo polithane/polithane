@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Shield, Eye, Lock, Users, Globe, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiCall } from '../../utils/api';
@@ -22,16 +22,38 @@ export const PrivacySettings = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const autoSaveTimer = useRef(null);
+  const didMount = useRef(false);
 
   const savedPrivacy = useMemo(() => {
     const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
-    return meta.privacy_settings && typeof meta.privacy_settings === 'object' ? meta.privacy_settings : null;
+    if (meta.privacy_settings && typeof meta.privacy_settings === 'object') return meta.privacy_settings;
+    const local = localStorage.getItem('polithane_privacy_settings');
+    if (!local) return null;
+    try {
+      return JSON.parse(local);
+    } catch {
+      return null;
+    }
   }, [user]);
 
   useEffect(() => {
     if (!savedPrivacy) return;
     setSettings((prev) => ({ ...prev, ...savedPrivacy }));
   }, [savedPrivacy]);
+
+  useEffect(() => {
+    if (!didMount.current) {
+      didMount.current = true;
+      return;
+    }
+    localStorage.setItem('polithane_privacy_settings', JSON.stringify(settings));
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      handleSave();
+    }, 800);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
 
   const handleToggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -61,7 +83,10 @@ export const PrivacySettings = () => {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (e) {
-      setError(e?.message || 'Kaydedilemedi.');
+      setError(
+        e?.message ||
+          "Kaydedilemedi. Bu cihazda kaydedildi. Kalıcı çözüm için Supabase'de `users.metadata` sütunu olmalı."
+      );
     } finally {
       setSaving(false);
     }
