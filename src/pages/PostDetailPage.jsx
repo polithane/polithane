@@ -216,7 +216,18 @@ export const PostDetailPage = () => {
                 </div>
                 <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
               </div>
-              <FollowButton targetUserId={uiPost.user_id} size="md" />
+              {uiPost.user_id ? (
+                <FollowButton targetUserId={uiPost.user_id} size="md" />
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (uiPost.user) navigate(getProfilePath(uiPost.user));
+                  }}
+                >
+                  Takip Et
+                </Button>
+              )}
             </div>
             
             {/* İçerik */}

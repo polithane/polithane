@@ -684,7 +684,8 @@ async function toggleFollow(req, res, targetId) {
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
   const tid = String(targetId || '').trim();
-  if (!tid || !/^\d+$/.test(tid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  const isValidId = /^\d+$/.test(tid) || /^[0-9a-fA-F-]{36}$/.test(tid);
+  if (!tid || !isValidId) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
   if (String(auth.id) === tid) return res.status(400).json({ success: false, error: 'Kendinizi takip edemezsiniz.' });
 
   // Ensure target exists
@@ -705,12 +706,13 @@ async function toggleFollow(req, res, targetId) {
     return res.json({ success: true, action: 'unfollowed' });
   }
 
-  await supabaseRestInsert('follows', [{ follower_id: auth.id, following_id: Number(tid) }]);
+  // Keep following_id type-agnostic (integer or uuid)
+  await supabaseRestInsert('follows', [{ follower_id: auth.id, following_id: tid }]);
 
   // Notify target user
   await supabaseRestInsert('notifications', [
     {
-      user_id: Number(tid),
+      user_id: tid,
       actor_id: auth.id,
       type: 'follow',
       title: 'Yeni takipçi',
