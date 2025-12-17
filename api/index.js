@@ -514,8 +514,24 @@ async function createPost(req, res) {
     if (content.length > 5000) return res.status(400).json({ success: false, error: 'İçerik çok uzun.' });
 
     // Get party_id from user (if exists)
-    const userRows = await supabaseRestGet('users', { select: 'id,party_id', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
-    const party_id = userRows?.[0]?.party_id ?? null;
+    const userRows = await supabaseRestGet('users', {
+      select: 'id,party_id,user_type,is_verified,is_admin',
+      id: `eq.${auth.id}`,
+      limit: '1',
+    }).catch(() => []);
+    const u = userRows?.[0] || null;
+    const party_id = u?.party_id ?? null;
+
+    // Approval gate: pending accounts can login but cannot post yet.
+    const ut = String(u?.user_type || 'citizen');
+    const pending = !u?.is_admin && ut !== 'citizen' && !u?.is_verified;
+    if (pending) {
+      return res.status(403).json({
+        success: false,
+        error: 'Üyeliğiniz onay bekliyor. Onay gelene kadar Polit Atamazsınız.',
+        code: 'APPROVAL_REQUIRED',
+      });
+    }
 
     // Try schema variants (content/content_text)
     let inserted;
@@ -1252,6 +1268,25 @@ async function storageUploadMedia(req, res) {
   const allowedFolders = new Set(['posts', 'avatars', 'politfest']);
   if (!allowedFolders.has(folder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
 
+  // Approval gate: pending accounts can browse/login but cannot upload post media yet.
+  // (We still allow avatar uploads.)
+  if (folder === 'posts' || folder === 'politfest') {
+    const urows = await supabaseRestGet('users', {
+      select: 'id,user_type,is_verified,is_admin',
+      id: `eq.${auth.id}`,
+      limit: '1',
+    }).catch(() => []);
+    const u = urows?.[0] || null;
+    const ut = String(u?.user_type || 'citizen');
+    const pending = !u?.is_admin && ut !== 'citizen' && !u?.is_verified;
+    if (pending) {
+      return res.status(403).json({
+        success: false,
+        error: 'Üyeliğiniz onaylanana kadar medya yükleyemezsiniz. Onay geldikten sonra Polit Atabilirsiniz.',
+      });
+    }
+  }
+
   if (!dataUrl.startsWith('data:') || !dataUrl.includes('base64,')) {
     return res.status(400).json({ success: false, error: 'Geçersiz dosya verisi.' });
   }
@@ -1677,6 +1712,38 @@ async function authLogin(req, res) {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ success: false, error: 'Şifre hatalı.' });
     
+    // Approval pending: allow login, but ensure user sees a notification.
+    try {
+      const ut = String(user?.user_type || 'citizen');
+      const pending = !user?.is_admin && ut !== 'citizen' && !user?.is_verified;
+      if (pending) {
+        const existing = await supabaseRestGet('notifications', {
+          select: 'id',
+          user_id: `eq.${user.id}`,
+          type: 'eq.approval',
+          limit: '1',
+        }).catch(() => []);
+        if (!Array.isArray(existing) || existing.length === 0) {
+          await supabaseRestInsert('notifications', [
+            {
+              user_id: user.id,
+              type: 'approval',
+              title: 'Üyelik onayı bekleniyor',
+              message: 'Başvurunuz alındı. Admin onayı gelene kadar Polit Atamazsınız; ancak uygulamayı gezebilirsiniz.',
+              is_read: false,
+            },
+          ]).catch(async (err) => {
+            const msg = String(err?.message || '');
+            if (msg.includes('title') || msg.includes('message')) {
+              await supabaseRestInsert('notifications', [{ user_id: user.id, type: 'approval', is_read: false }]).catch(() => {});
+            }
+          });
+        }
+      }
+    } catch {
+      // notification is best-effort; do not block login
+    }
+
     const token = signJwt({ id: user.id, username: user.username, email: user.email, is_admin: !!user.is_admin });
     delete user.password_hash;
     
@@ -1816,6 +1883,24 @@ async function authRegister(req, res) {
         ]).catch(() => {});
       }
     });
+
+    // Approval notification for non-citizen accounts (they can login, but cannot post until approved).
+    if (user_type !== 'citizen') {
+      await supabaseRestInsert('notifications', [
+        {
+          user_id: user.id,
+          type: 'approval',
+          title: 'Üyelik onayı bekleniyor',
+          message: 'Başvurunuz alındı. Admin onayı gelene kadar Polit Atamazsınız; ancak uygulamayı gezebilirsiniz.',
+          is_read: false,
+        },
+      ]).catch(async (err) => {
+        const msg = String(err?.message || '');
+        if (msg.includes('title') || msg.includes('message')) {
+          await supabaseRestInsert('notifications', [{ user_id: user.id, type: 'approval', is_read: false }]).catch(() => {});
+        }
+      });
+    }
 
     const token = signJwt({ id: user.id, username: user.username, email: user.email, user_type: user.user_type, is_admin: !!user.is_admin });
     

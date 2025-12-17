@@ -75,10 +75,14 @@ export const Header = () => {
     if (t === 'follow') return 'Takip';
     if (t === 'mention') return 'Bahsedilme';
     if (t === 'message') return 'Mesaj';
+    if (t === 'approval') return 'Üyelik Onayı';
     return 'Bildirim';
   };
   const getNotifMessage = (n) => {
     if (n?.message) return String(n.message);
+    if (String(n?.type || '') === 'approval') {
+      return 'Üyeliğiniz onay bekliyor. Admin onayı gelene kadar Polit Atamazsınız.';
+    }
     if (n?.post?.content_text || n?.post?.content) return String(n.post.content_text ?? n.post.content);
     return '';
   };

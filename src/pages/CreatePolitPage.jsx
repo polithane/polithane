@@ -10,6 +10,13 @@ export const CreatePolitPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
 
+  const approvalPending = useMemo(() => {
+    if (!isAuthenticated) return false;
+    if (user?.is_admin) return false;
+    const ut = String(user?.user_type || 'citizen');
+    return ut !== 'citizen' && !user?.is_verified;
+  }, [isAuthenticated, user?.is_admin, user?.user_type, user?.is_verified]);
+
   const iconBaseUrl = useMemo(() => {
     try {
       const explicit = String(import.meta.env?.VITE_ICON_BASE_URL || '').trim();
@@ -213,6 +220,11 @@ export const CreatePolitPage = () => {
       return;
     }
 
+    if (approvalPending) {
+      toast.error('Üyeliğiniz onay bekliyor. Onay gelene kadar Polit Atamazsınız.');
+      return;
+    }
+
     if (!content.trim()) {
       toast.error('İçerik boş olamaz.');
       return;
@@ -366,6 +378,16 @@ export const CreatePolitPage = () => {
                         : 'Yazı'}
                 </div>
               </div>
+
+              {approvalPending && (
+                <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                  <div className="text-sm font-black">Üyeliğiniz onay bekliyor</div>
+                  <div className="text-xs mt-1">
+                    Admin onayı gelene kadar <span className="font-semibold">Polit Atamazsınız</span>. Bu süreçte uygulamayı
+                    gezebilirsiniz.
+                  </div>
+                </div>
+              )}
 
             {/* Content type tabs */}
             <div className="flex items-center justify-center gap-5 mb-5">
@@ -665,10 +687,10 @@ export const CreatePolitPage = () => {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || approvalPending}
                 className="w-full py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black disabled:opacity-60"
               >
-                {loading ? 'Paylaşılıyor…' : 'Polit At!'}
+                {approvalPending ? 'Onay bekleniyor' : loading ? 'Paylaşılıyor…' : 'Polit At!'}
               </button>
 
             </form>
