@@ -1144,6 +1144,10 @@ async function safeUserPatch(userId, patch) {
 
 async function usersCheckUsername(req, res, username) {
   const u = String(username || '').trim().toLowerCase();
+  // Rate limit username checks (best-effort)
+  const ip = getClientIp(req);
+  const rl = rateLimit(`check_username:${ip}`, { windowMs: 60_000, max: 60 });
+  if (!rl.ok) return res.status(429).json({ success: false, available: false, message: 'Çok fazla istek. Lütfen biraz bekleyin.' });
   if (!u || u.length < 3) return res.json({ success: true, available: false, message: 'En az 3 karakter olmalı' });
   if (u.length > 15) return res.json({ success: true, available: false, message: 'En fazla 15 karakter olabilir' });
   if (!/^[a-z0-9._-]+$/.test(u)) {
@@ -2043,6 +2047,11 @@ async function authLogin(req, res) {
     const loginValue = (identifier || email || '').trim();
     if (!loginValue || !password) return res.status(400).json({ success: false, error: 'Bilgiler eksik.' });
 
+    // Rate limit login attempts (best-effort, per serverless instance)
+    const ip = getClientIp(req);
+    const rl = rateLimit(`login:${ip}:${String(loginValue).toLowerCase()}`, { windowMs: 60_000, max: 10 });
+    if (!rl.ok) return res.status(429).json({ success: false, error: 'Çok fazla giriş denemesi. Lütfen 1 dakika sonra tekrar deneyin.' });
+
     const users = await supabaseRestGet('users', { 
         select: '*',
         or: `(email.eq.${loginValue},username.eq.${loginValue})`,
@@ -2108,6 +2117,11 @@ async function authRegister(req, res) {
     const { email, password, full_name, user_type = 'citizen', province, district, party_id, politician_type, metadata = {}, document, is_claim, claim_user_id } = body;
     
     if (!email || !password || !full_name) return res.status(400).json({ success: false, error: 'Eksik bilgi.' });
+
+    // Rate limit registrations (best-effort, per serverless instance)
+    const ip = getClientIp(req);
+    const rl = rateLimit(`register:${ip}:${String(email).toLowerCase()}`, { windowMs: 60_000, max: 5 });
+    if (!rl.ok) return res.status(429).json({ success: false, error: 'Çok fazla kayıt denemesi. Lütfen 1 dakika sonra tekrar deneyin.' });
 
     // Server-side email validation (avoid DB checks for invalid emails)
     const emailStr = String(email).trim();
