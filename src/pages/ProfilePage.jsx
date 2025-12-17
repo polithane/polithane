@@ -455,7 +455,7 @@ export const ProfilePage = () => {
           <FollowListModal
             isOpen={showFollowModal}
             onClose={() => setShowFollowModal(false)}
-            userId={userId}
+            userId={user?.user_id || user?.id || userId}
             tab={followModalTab}
           />
           <BlockUserModal
