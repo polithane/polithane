@@ -6,24 +6,29 @@ import { AgendaBar } from '../components/home/AgendaBar';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { HorizontalScroll } from '../components/common/HorizontalScroll';
 import { MediaSidebar } from '../components/media/MediaSidebar';
+import { Avatar } from '../components/common/Avatar';
 import { mockParties } from '../mock/parties';
 import { mockAgendas } from '../mock/agendas';
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export const HomePage = () => {
+  const { user, isAuthenticated } = useAuth();
   const [posts, setPosts] = useState([]);
   const [parties, setParties] = useState([]);
   const [agendas, setAgendas] = useState([]);
   const [users, setUsers] = useState([]);
   const [polifest, setPolifest] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     // Load data from Supabase
     const loadData = async () => {
+      setLoading(true);
       try {
         // Partiler + postlar (tamamı DB - Vercel /api üzerinden)
         const [partiesData, postsData] = await Promise.all([
@@ -113,6 +118,8 @@ export const HomePage = () => {
         setParties(mockParties);
         setAgendas(mockAgendas);
         setPolifest([]);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -197,6 +204,31 @@ export const HomePage = () => {
   
   const activeTab = categories.find(c => c.id === activeCategory);
   
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="container-main py-10">
+          <div className="max-w-xl mx-auto bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center">
+            <div className="flex items-center justify-center mb-4">
+              <Avatar
+                src={isAuthenticated ? (user?.avatar_url || user?.profile_image) : null}
+                alt="Profil"
+                size="84px"
+              />
+            </div>
+            <div className="text-xl font-black text-gray-900">Yükleniyor…</div>
+            <div className="text-sm text-gray-600 mt-1">İçerikler hazırlanıyor, lütfen bekleyin.</div>
+            <div className="mt-6 space-y-3">
+              <div className="h-4 bg-gray-100 rounded-full w-4/5 mx-auto animate-pulse" />
+              <div className="h-4 bg-gray-100 rounded-full w-3/5 mx-auto animate-pulse" />
+              <div className="h-24 bg-gray-100 rounded-2xl w-full animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-6 lg:pr-0">
