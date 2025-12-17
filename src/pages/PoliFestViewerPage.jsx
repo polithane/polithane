@@ -36,14 +36,16 @@ export const PoliFestViewerPage = () => {
 
   useEffect(() => {
     (async () => {
-      // resolve user by id or username
-      const isUuid = /^[0-9a-fA-F-]{10,}$/.test(String(usernameOrId || ''));
-      const profile = isUuid
-        ? await apiCall(`/api/users?id=${encodeURIComponent(usernameOrId)}`).catch(() => null)
-        : await apiCall(`/api/users?username=${encodeURIComponent(usernameOrId)}`).catch(() => null);
-      setUser(profile);
+      // Resolve user by id (numeric/uuid) or username
+      const key = String(usernameOrId || '').trim();
+      const isId = /^\d+$/.test(key) || /^[0-9a-fA-F-]{36}$/.test(key);
+      const profileRes = isId
+        ? await apiCall(`/api/users?id=${encodeURIComponent(key)}`).catch(() => null)
+        : await apiCall(`/api/users?username=${encodeURIComponent(key)}`).catch(() => null);
+      const profile = profileRes?.data ? profileRes.data : profileRes;
+      setUser(profile || null);
 
-      const userId = profile?.id || (isUuid ? usernameOrId : null);
+      const userId = profile?.id || (isId ? key : null);
       if (!userId) return;
 
       const posts = await apiCall(`/api/posts?user_id=${encodeURIComponent(userId)}&limit=20&order=created_at.desc`).catch(
