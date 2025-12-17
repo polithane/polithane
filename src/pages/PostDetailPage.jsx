@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, ThumbsUp } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -521,9 +521,42 @@ export const PostDetailPage = () => {
                       </>
                     )}
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-end gap-2">
+                      {canEditComment(comment) && editingId !== (comment.id || comment.comment_id) && (
+                        <button
+                          type="button"
+                          className="px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-black text-gray-800"
+                          onClick={() => {
+                            setCommentError('');
+                            setEditingId(comment.id || comment.comment_id);
+                            setEditingText(String(comment.content || comment.comment_text || ''));
+                          }}
+                          title="Düzenle (10 dk)"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Pencil className="w-5 h-5" />
+                            Düzenle
+                          </div>
+                        </button>
+                      )}
+
                       <button
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 hover:text-red-600 disabled:opacity-50"
+                        className="flex items-center justify-center w-14 h-14 rounded-2xl border border-gray-200 bg-white hover:bg-red-50 text-gray-700 hover:text-red-600"
+                        type="button"
+                        onClick={() => {
+                          setReporting(comment);
+                          setReportReason('spam');
+                          setReportDetails('');
+                          setReportDone(false);
+                        }}
+                        title="Bildir"
+                      >
+                        <Flag className="w-8 h-8" />
+                      </button>
+
+                      {/* Like button: right-aligned and bigger */}
+                      <button
+                        className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-800 hover:text-primary-blue disabled:opacity-50"
                         type="button"
                         disabled={isPendingComment(comment)}
                         onClick={async () => {
@@ -541,43 +574,9 @@ export const PostDetailPage = () => {
                         }}
                         title={isPendingComment(comment) ? 'Bu yorum incelemede' : 'Beğen'}
                       >
-                        <Heart className="w-6 h-6" />
+                        <ThumbsUp className="w-6 h-6" />
                         <span className="text-base font-black">{formatNumber(comment.like_count)}</span>
                       </button>
-
-                      <div className="flex items-center gap-2">
-                        {canEditComment(comment) && editingId !== (comment.id || comment.comment_id) && (
-                          <button
-                            type="button"
-                            className="px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-black text-gray-800"
-                            onClick={() => {
-                              setCommentError('');
-                              setEditingId(comment.id || comment.comment_id);
-                              setEditingText(String(comment.content || comment.comment_text || ''));
-                            }}
-                            title="Düzenle (10 dk)"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Pencil className="w-5 h-5" />
-                              Düzenle
-                            </div>
-                          </button>
-                        )}
-
-                        <button
-                          className="flex items-center justify-center w-12 h-12 rounded-2xl border border-gray-200 bg-white hover:bg-red-50 text-gray-700 hover:text-red-600"
-                          type="button"
-                          onClick={() => {
-                            setReporting(comment);
-                            setReportReason('spam');
-                            setReportDetails('');
-                            setReportDone(false);
-                          }}
-                          title="Bildir"
-                        >
-                          <Flag className="w-7 h-7" />
-                        </button>
-                      </div>
                     </div>
                   </div>
                 </div>
