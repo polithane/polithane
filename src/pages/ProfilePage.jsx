@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { MoreVertical, Ban, AlertCircle, MessageCircle, Settings, Edit } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
@@ -53,6 +53,7 @@ export const ProfilePage = () => {
   const [error, setError] = useState('');
   const [privacyBlocked, setPrivacyBlocked] = useState(false);
   const [privacyMessage, setPrivacyMessage] = useState('');
+  const [blockedIds, setBlockedIds] = useState([]);
   
   const isOwnProfile = currentUser && (
     userId === 'me' || 
@@ -60,7 +61,11 @@ export const ProfilePage = () => {
     normalizeUsername(username || '') === normalizeUsername(currentUser.username || '')
   );
   
-  const isBlocked = false;
+  const isBlocked = useMemo(() => {
+    if (!user?.id && !user?.user_id) return false;
+    const tid = String(user.user_id || user.id);
+    return (blockedIds || []).map(String).includes(tid);
+  }, [blockedIds, user]);
   
   useEffect(() => {
     // Always start profile page from top (avoid mid-scroll starts)
@@ -154,6 +159,15 @@ export const ProfilePage = () => {
         const resolvedProfileData = profileData?.data ? profileData.data : profileData;
         const normalizedProfile = normalizeUser(resolvedProfileData);
         setUser(normalizedProfile);
+
+        // Load my blocked user ids (for UI state)
+        try {
+          const r = await users.getBlocks().catch(() => null);
+          const list = r?.data || r || [];
+          setBlockedIds(Array.isArray(list) ? list.map((x) => String(x)) : []);
+        } catch {
+          setBlockedIds([]);
+        }
 
         // Apply privacy settings (client-side enforcement)
         const ps =
@@ -249,8 +263,16 @@ export const ProfilePage = () => {
   }
   
   const handleBlock = (userId) => {
-    // TODO: API çağrısı - kullanıcıyı engelle
-    console.log('Kullanıcı engellendi:', userId);
+    (async () => {
+      try {
+        await users.block(userId);
+        setBlockedIds((prev) => Array.from(new Set([...(prev || []), String(userId)])));
+      } catch (e) {
+        console.error(e);
+        // eslint-disable-next-line no-alert
+        alert(e?.message || 'Engelleme işlemi başarısız.');
+      }
+    })();
   };
   
   const handleReport = () => {

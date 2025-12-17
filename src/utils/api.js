@@ -242,6 +242,17 @@ export const users = {
   getFollowers: (userId) => apiCall(`/api/users/${userId}/followers`),
 
   getFollowing: (userId) => apiCall(`/api/users/${userId}/following`),
+
+  getBlocks: () => apiCall('/api/users/blocks'),
+  block: (targetId) =>
+    apiCall('/api/users/blocks', {
+      method: 'POST',
+      body: JSON.stringify({ target_id: targetId }),
+    }),
+  unblock: (targetId) =>
+    apiCall(`/api/users/blocks/${targetId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // ============================================
