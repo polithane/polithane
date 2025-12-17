@@ -815,6 +815,105 @@ async function storageEnsureBucket(req, res) {
   res.json({ success: true, created: !exists, name });
 }
 
+async function storageUploadMedia(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const bucket = String(body?.bucket || 'uploads').trim();
+  const folder = String(body?.folder || 'posts').trim();
+  const dataUrl = String(body?.dataUrl || '');
+  const contentType = String(body?.contentType || '');
+
+  const allowedBuckets = new Set(['uploads', 'politfest']);
+  if (!allowedBuckets.has(bucket)) return res.status(400).json({ success: false, error: 'Geçersiz bucket.' });
+
+  const allowedFolders = new Set(['posts', 'avatars', 'politfest']);
+  if (!allowedFolders.has(folder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+
+  if (!dataUrl.startsWith('data:') || !dataUrl.includes('base64,')) {
+    return res.status(400).json({ success: false, error: 'Geçersiz dosya verisi.' });
+  }
+
+  // Allow common media types
+  const allowedTypes = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'video/webm',
+    'audio/webm',
+    'audio/mpeg',
+    'video/mp4',
+  ]);
+  const ct = contentType && allowedTypes.has(contentType) ? contentType : dataUrl.slice(5).split(';')[0];
+  if (!allowedTypes.has(ct)) {
+    return res.status(400).json({ success: false, error: 'Desteklenmeyen dosya türü.' });
+  }
+
+  const base64 = dataUrl.split('base64,')[1] || '';
+  let buf;
+  try {
+    buf = Buffer.from(base64, 'base64');
+  } catch {
+    return res.status(400).json({ success: false, error: 'Dosya çözümlenemedi.' });
+  }
+  if (!buf || buf.length === 0) return res.status(400).json({ success: false, error: 'Dosya boş.' });
+
+  // Size limit to protect serverless runtime (base64 uploads are heavy)
+  const maxBytes = 12 * 1024 * 1024; // 12MB
+  if (buf.length > maxBytes) {
+    return res.status(400).json({
+      success: false,
+      error: 'Dosya çok büyük. Şimdilik maksimum 12MB medya yükleyebilirsiniz.',
+    });
+  }
+
+  // Ensure service role exists
+  try {
+    getSupabaseServiceRoleKey();
+  } catch {
+    return res.status(500).json({
+      success: false,
+      error:
+        'Medya yüklenemedi: sunucu depolama anahtarı eksik. Vercel ortamında SUPABASE_SERVICE_ROLE_KEY tanımlı olmalı.',
+    });
+  }
+
+  // Ensure bucket exists (public for uploads)
+  try {
+    const list = await supabaseStorageRequest('GET', 'bucket', undefined).catch(() => []);
+    const exists = Array.isArray(list) && list.some((b) => b?.name === bucket);
+    if (!exists) await supabaseStorageRequest('POST', 'bucket', { name: bucket, public: true });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Depolama bucket oluşturulamadı. Lütfen ayarları kontrol edin.' });
+  }
+
+  const ext =
+    ct === 'image/png'
+      ? 'png'
+      : ct === 'image/webp'
+        ? 'webp'
+        : ct === 'image/jpeg'
+          ? 'jpg'
+          : ct === 'video/mp4'
+            ? 'mp4'
+            : ct === 'video/webm'
+              ? 'webm'
+              : ct === 'audio/mpeg'
+                ? 'mp3'
+                : 'webm';
+
+  const objectPath = `${folder}/${auth.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  try {
+    await supabaseStorageUploadObject(bucket, objectPath, buf, ct);
+  } catch (e) {
+    return res.status(500).json({ success: false, error: String(e?.message || 'Medya yüklenemedi.') });
+  }
+
+  const { supabaseUrl } = getSupabaseKeys();
+  const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${objectPath}`;
+  return res.json({ success: true, data: { publicUrl, bucket, path: objectPath } });
+}
+
 async function usersUploadAvatar(req, res) {
   const auth = requireAuth(req, res);
   if (!auth) return;
@@ -1641,6 +1740,7 @@ export default async function handler(req, res) {
       if (url === '/api/users/delete-confirm' && req.method === 'GET') return await usersConfirmDelete(req, res);
       if (url === '/api/users/me/avatar' && req.method === 'POST') return await usersUploadAvatar(req, res);
       if (url === '/api/storage/ensure-bucket' && req.method === 'POST') return await storageEnsureBucket(req, res);
+      if (url === '/api/storage/upload' && req.method === 'POST') return await storageUploadMedia(req, res);
       if (url === '/api/users/blocks' && req.method === 'GET') return await usersGetBlocks(req, res);
       if (url === '/api/users/blocks' && req.method === 'POST') return await usersBlock(req, res);
       if (url.startsWith('/api/users/blocks/') && req.method === 'DELETE') {

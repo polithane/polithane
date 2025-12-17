@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Camera, Square, Circle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { posts as postsApi } from '../utils/api';
-import { supabase } from '../services/supabase';
+import { apiCall, posts as postsApi } from '../utils/api';
 
 const IKON_BASE = 'https://eldoyqgzxgubkyohvquq.supabase.co/storage/v1/object/public/ikons';
 
@@ -164,35 +163,39 @@ export const CreatePolitPage = () => {
 
     setLoading(true);
     try {
-      // Upload media (if any) directly to Supabase Storage (client-side),
-      // then create the post via our /api/posts endpoint (JSON).
+      // Upload media via our API (service role) to avoid Storage RLS issues,
+      // then create the post via /api/posts (JSON).
       let media_urls = [];
 
       if (files.length > 0) {
-        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-          throw new Error('Supabase ayarları eksik. VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY eklenmeli.');
-        }
         if (!user?.id) {
           throw new Error('Kullanıcı bilgisi bulunamadı. Lütfen çıkış yapıp tekrar giriş yapın.');
         }
 
-        const bucket = 'uploads';
-        const safeName = (name) =>
-          String(name || 'file')
-            .replace(/\s+/g, '_')
-            .replace(/[^a-zA-Z0-9._-]/g, '')
-            .slice(-120);
+        const fileToDataUrl = (f) =>
+          new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('Dosya okunamadı.'));
+            reader.readAsDataURL(f);
+          });
 
         const uploadOne = async (file) => {
-          const ext = safeName(file.name).split('.').pop() || 'bin';
-          const path = `posts/${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-          const { error } = await supabase.storage.from(bucket).upload(path, file, {
-            contentType: file.type || 'application/octet-stream',
-            upsert: false,
+          if (file.size > 12 * 1024 * 1024) {
+            throw new Error('Dosya çok büyük. Şimdilik maksimum 12MB medya yükleyebilirsiniz.');
+          }
+          const dataUrl = await fileToDataUrl(file);
+          const r = await apiCall('/api/storage/upload', {
+            method: 'POST',
+            body: JSON.stringify({
+              bucket: 'uploads',
+              folder: 'posts',
+              dataUrl,
+              contentType: file.type || '',
+            }),
           });
-          if (error) throw error;
-          const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-          return data.publicUrl;
+          if (!r?.success) throw new Error(r?.error || 'Medya yüklenemedi.');
+          return r.data.publicUrl;
         };
 
         media_urls = await Promise.all(files.slice(0, 5).map(uploadOne));
@@ -214,7 +217,12 @@ export const CreatePolitPage = () => {
       toast.success('Polit oluşturuldu.');
       navigate('/');
     } catch (err) {
-      toast.error(err?.message || 'Polit oluşturulurken hata oluştu.');
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('row-level security')) {
+        toast.error('Polit atılamadı: depolama izinleri kısıtlı. Lütfen daha sonra tekrar deneyin.');
+      } else {
+        toast.error(msg || 'Polit oluşturulurken hata oluştu.');
+      }
     } finally {
       setLoading(false);
     }
