@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Flag } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -18,8 +18,16 @@ export const PostDetailPage = () => {
   const [comments, setComments] = useState([]);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [newComment, setNewComment] = useState('');
+  const [commentError, setCommentError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [reporting, setReporting] = useState(null);
+  const [reportReason, setReportReason] = useState('spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportDone, setReportDone] = useState(false);
   
   useEffect(() => {
     const load = async () => {
@@ -104,7 +112,12 @@ export const PostDetailPage = () => {
     }
     const text = newComment.trim();
     if (!text) return;
+    if (text.length > 300) {
+      setCommentError('Yorum en fazla 300 karakter olabilir.');
+      return;
+    }
     try {
+      setCommentError('');
       await postsApi.addComment(uiPost.post_id, text);
       setNewComment('');
       const c = await postsApi.getComments(uiPost.post_id).catch(() => null);
@@ -114,8 +127,25 @@ export const PostDetailPage = () => {
       setPost(detail?.data ? detail.data : detail);
     } catch (e) {
       console.error(e);
+      setCommentError(e?.message || 'Yorum gönderilemedi.');
     }
   };
+
+  const nowMs = Date.now();
+  const myCommentCount = useMemo(() => {
+    if (!currentUser?.id) return 0;
+    return (comments || []).filter((c) => String(c.user_id || c.user?.id) === String(currentUser.id)).length;
+  }, [comments, currentUser?.id]);
+
+  const canEditComment = (comment) => {
+    if (!currentUser?.id) return false;
+    if (String(comment.user_id || comment.user?.id) !== String(currentUser.id)) return false;
+    const created = new Date(comment.created_at || 0).getTime();
+    if (!Number.isFinite(created)) return false;
+    return nowMs - created <= 10 * 60 * 1000;
+  };
+
+  const isPendingComment = (comment) => !!comment?.is_deleted;
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -243,10 +273,17 @@ export const PostDetailPage = () => {
                     placeholder="Yorumunuzu yazın..."
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
                     rows="3"
+                    maxLength={300}
                   />
-                  <Button className="mt-2" onClick={handleAddComment}>
-                    Gönder
-                  </Button>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div className="text-xs text-gray-500">
+                      {300 - (newComment?.length || 0)} karakter kaldı • {myCommentCount}/3 yorum
+                    </div>
+                    <Button className="mt-0" onClick={handleAddComment}>
+                      Gönder
+                    </Button>
+                  </div>
+                  {commentError && <div className="mt-2 text-sm text-red-600 font-semibold">{commentError}</div>}
                 </div>
               </div>
             </div>
@@ -261,15 +298,125 @@ export const PostDetailPage = () => {
                       <span className="font-semibold">{comment.user?.full_name}</span>
                       <span className="text-sm text-gray-500">{formatTimeAgo(comment.created_at)}</span>
                     </div>
-                    <p className="text-gray-800 mb-2">{comment.content || comment.comment_text}</p>
-                    <div className="flex items-center gap-4">
-                      <button className="flex items-center gap-1 text-gray-600 hover:text-red-500">
+                    {editingId === (comment.id || comment.comment_id) ? (
+                      <div className="mb-2">
+                        <textarea
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          maxLength={300}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
+                        />
+                        <div className="mt-2 flex items-center justify-end gap-2">
+                          <button
+                            className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 font-semibold"
+                            onClick={() => {
+                              setEditingId(null);
+                              setEditingText('');
+                            }}
+                            type="button"
+                          >
+                            <div className="flex items-center gap-2">
+                              <X className="w-4 h-4" />
+                              Vazgeç
+                            </div>
+                          </button>
+                          <button
+                            className="px-3 py-2 rounded-lg bg-gray-900 hover:bg-black text-white font-black"
+                            onClick={async () => {
+                              const text = editingText.trim();
+                              if (!text) return;
+                              try {
+                                setCommentError('');
+                                await postsApi.updateComment(comment.id || comment.comment_id, text);
+                                setEditingId(null);
+                                setEditingText('');
+                                const c = await postsApi.getComments(uiPost.post_id).catch(() => null);
+                                const rows = c?.data?.data || c?.data || c || [];
+                                setComments(Array.isArray(rows) ? rows : []);
+                              } catch (e) {
+                                setCommentError(e?.message || 'Yorum güncellenemedi.');
+                              }
+                            }}
+                            type="button"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Check className="w-4 h-4" />
+                              Kaydet
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className={`mb-2 ${isPendingComment(comment) ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                          {comment.content || comment.comment_text}
+                        </p>
+                        {isPendingComment(comment) && (
+                          <div className="mb-2 text-xs text-gray-500">
+                            Bu mesaj güvenlik önlemleri nedeniyle sistem tarafından onaylanana kadar diğer kullanıcılara gösterilmez.
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <button
+                        className="flex items-center gap-1 text-gray-600 hover:text-red-500 disabled:opacity-50"
+                        type="button"
+                        disabled={isPendingComment(comment)}
+                        onClick={async () => {
+                          try {
+                            setCommentError('');
+                            const id = comment.id || comment.comment_id;
+                            if (!id) return;
+                            const r = await postsApi.likeComment(id);
+                            setComments((prev) =>
+                              prev.map((c) => ((c.id || c.comment_id) === id ? { ...c, like_count: r?.like_count ?? c.like_count } : c))
+                            );
+                          } catch (e) {
+                            setCommentError(e?.message || 'Beğeni işlemi başarısız.');
+                          }
+                        }}
+                        title={isPendingComment(comment) ? 'Bu yorum incelemede' : 'Beğen'}
+                      >
                         <Heart className="w-4 h-4" />
                         <span className="text-sm">{formatNumber(comment.like_count)}</span>
                       </button>
-                      <button className="flex items-center gap-1 text-gray-600 hover:text-red-500">
-                        <Flag className="w-4 h-4" />
-                      </button>
+
+                      <div className="flex items-center gap-2">
+                        {canEditComment(comment) && editingId !== (comment.id || comment.comment_id) && (
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-bold"
+                            onClick={() => {
+                              setCommentError('');
+                              setEditingId(comment.id || comment.comment_id);
+                              setEditingText(String(comment.content || comment.comment_text || ''));
+                            }}
+                            title="Düzenle (10 dk)"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Pencil className="w-3.5 h-3.5" />
+                              Düzenle
+                            </div>
+                          </button>
+                        )}
+
+                        <button
+                          className="flex items-center gap-1 text-gray-600 hover:text-red-500"
+                          type="button"
+                          onClick={() => {
+                            setReporting(comment);
+                            setReportReason('spam');
+                            setReportDetails('');
+                            setReportDone(false);
+                          }}
+                          title="Bildir"
+                        >
+                          <Flag className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -313,6 +460,65 @@ export const PostDetailPage = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Report modal */}
+      {reporting && (
+        <Modal isOpen={true} onClose={() => setReporting(null)} title="Yorumu Bildir">
+          {reportDone ? (
+            <div className="space-y-3">
+              <div className="text-sm text-gray-800 font-semibold">
+                Bildiriminiz alındı. İnceleme sonrası gerekli işlem yapılacaktır.
+              </div>
+              <Button onClick={() => setReporting(null)}>Kapat</Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-700">Neden bildirmek istiyorsunuz?</div>
+              <select
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="spam">Spam</option>
+                <option value="hakaret">Hakaret / Küfür</option>
+                <option value="taciz">Taciz / Nefret</option>
+                <option value="yaniltici">Yanıltıcı bilgi</option>
+                <option value="zararli_link">Zararlı link</option>
+                <option value="diger">Diğer</option>
+              </select>
+
+              <textarea
+                value={reportDetails}
+                onChange={(e) => setReportDetails(e.target.value)}
+                rows={3}
+                placeholder="İsterseniz kısa bir açıklama ekleyin (opsiyonel)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setReporting(null)}>
+                  Vazgeç
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      setCommentError('');
+                      const id = reporting.id || reporting.comment_id;
+                      await postsApi.reportComment(id, reportReason, reportDetails);
+                      setReportDone(true);
+                    } catch (e) {
+                      setCommentError(e?.message || 'Şikayet gönderilemedi.');
+                      setReporting(null);
+                    }
+                  }}
+                >
+                  Gönder
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 };

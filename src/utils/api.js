@@ -187,6 +187,23 @@ export const posts = {
       method: 'POST',
       body: JSON.stringify({ content, parent_id }),
     }),
+
+  likeComment: (commentId) =>
+    apiCall(`/api/comments/${commentId}/like`, {
+      method: 'POST',
+    }),
+
+  updateComment: (commentId, content) =>
+    apiCall(`/api/comments/${commentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    }),
+
+  reportComment: (commentId, reason, details = '') =>
+    apiCall(`/api/comments/${commentId}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, details }),
+    }),
 };
 
 // ============================================

@@ -219,28 +219,248 @@ async function getPostById(req, res, id) {
 }
 
 async function getPostComments(req, res, postId) {
-    const rows = await supabaseRestGet('comments', {
-        select: '*,user:users(*)',
-        post_id: `eq.${postId}`,
-        order: 'created_at.desc'
-    });
+    // If authenticated, allow returning the user's own "pending" comments as well.
+    // We currently model "pending moderation" as is_deleted=true to hide from others.
+    const auth = verifyJwtFromRequest(req);
+    const params = {
+      select: '*,user:users(*)',
+      post_id: `eq.${postId}`,
+      order: 'created_at.desc',
+    };
+    if (auth?.id) {
+      params.or = `(is_deleted.eq.false,user_id.eq.${auth.id})`;
+    } else {
+      params.is_deleted = 'eq.false';
+    }
+    const rows = await supabaseRestGet('comments', params).catch(() => []);
     res.json({ success: true, data: rows || [] });
+}
+
+function analyzeCommentContent(input) {
+  const text = String(input || '').trim();
+  if (!text) return { ok: false, error: 'Yorum boş olamaz.' };
+  if (text.length > 300) return { ok: false, error: 'Yorum en fazla 300 karakter olabilir.' };
+
+  const lower = text.toLocaleLowerCase('tr-TR');
+
+  // Basic threat heuristics (profanity/harassment/links/code).
+  const reasons = [];
+  if (/(https?:\/\/|www\.)/i.test(text)) reasons.push('link');
+  if (/<\s*script|\bon\w+\s*=|javascript:/i.test(text)) reasons.push('zararlı_kod');
+  if (/\b(select|union|drop|insert|update|delete)\b/i.test(text)) reasons.push('sql');
+  if (/(?:\b(amk|aq|orospu|siktir|yarrak|ibne|piç|kahpe|ananı)\b)/i.test(lower)) reasons.push('hakaret');
+  if (/(?:\b(öl|öldür|vur|kes|tehdit)\b)/i.test(lower)) reasons.push('tehdit');
+
+  const flagged = reasons.length > 0;
+  return { ok: true, text, flagged, reasons };
+}
+
+async function notifyAdminsAboutComment({ type, commentId, postId, actorId, title, message }) {
+  const admins = await supabaseRestGet('users', { select: 'id', is_admin: 'eq.true', limit: '50' }).catch(() => []);
+  const targets = (admins || []).map((a) => a.id).filter(Boolean);
+  if (!targets.length) return;
+  const rows = targets.map((uid) => ({
+    user_id: uid,
+    actor_id: actorId || null,
+    type: String(type || 'system').slice(0, 20),
+    title: title ? String(title).slice(0, 255) : null,
+    message: message ? String(message).slice(0, 2000) : null,
+    post_id: postId || null,
+    comment_id: commentId || null,
+    is_read: false,
+  }));
+  await supabaseRestInsert('notifications', rows).catch(() => null);
 }
 
 async function addPostComment(req, res, postId) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
     const body = await readJsonBody(req);
-    const content = (body.content || '').trim();
+    const analyzed = analyzeCommentContent(body.content || '');
+    if (!analyzed.ok) return res.status(400).json({ success: false, error: analyzed.error });
+    const content = analyzed.text;
     const parent_id = body.parent_id || null;
-    if (!content) return res.status(400).json({ success: false, error: 'Yorum boş olamaz' });
+
+    // Max 3 comments per user per post
+    const existing = await supabaseRestGet('comments', {
+      select: 'id',
+      post_id: `eq.${postId}`,
+      user_id: `eq.${auth.id}`,
+      limit: '4',
+      order: 'created_at.desc',
+    }).catch(() => []);
+    if (Array.isArray(existing) && existing.length >= 3) {
+      return res.status(400).json({ success: false, error: 'Bu gönderiye en fazla 3 yorum yazabilirsiniz.' });
+    }
+
+    // If flagged by filter: save as "pending" (hidden for others) and notify admins
+    const pending = analyzed.flagged;
     const inserted = await supabaseRestInsert('comments', [{
         post_id: postId,
         user_id: auth.id,
         content,
-        parent_id
+        parent_id,
+        is_deleted: pending ? true : false,
     }]);
-    res.status(201).json({ success: true, data: inserted?.[0] || null });
+    const row = inserted?.[0] || null;
+    if (pending && row?.id) {
+      await notifyAdminsAboutComment({
+        type: 'comment_review',
+        commentId: row.id,
+        postId,
+        actorId: auth.id,
+        title: 'Yorum inceleme kuyruğu',
+        message:
+          'Bu yorum güvenlik filtresine takıldı. Admin panelinden inceleyip onaylayabilirsiniz.',
+      });
+    }
+    res.status(201).json({
+      success: true,
+      data: row,
+      pending_review: pending,
+      message: pending
+        ? 'Yorumunuz güvenlik kontrolü nedeniyle incelemeye alındı. Onaylanana kadar diğer kullanıcılara gösterilmez.'
+        : undefined,
+    });
+}
+
+async function updateComment(req, res, commentId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const body = await readJsonBody(req);
+  const analyzed = analyzeCommentContent(body.content || '');
+  if (!analyzed.ok) return res.status(400).json({ success: false, error: analyzed.error });
+
+  const rows = await supabaseRestGet('comments', { select: '*', id: `eq.${commentId}`, limit: '1' }).catch(() => []);
+  const c = rows?.[0];
+  if (!c) return res.status(404).json({ success: false, error: 'Yorum bulunamadı.' });
+  if (String(c.user_id) !== String(auth.id)) return res.status(403).json({ success: false, error: 'Bu yorumu düzenleyemezsiniz.' });
+
+  const createdAt = new Date(c.created_at || c.createdAt || 0);
+  if (!Number.isFinite(createdAt.getTime())) return res.status(400).json({ success: false, error: 'Yorum tarihi okunamadı.' });
+  const tenMin = 10 * 60 * 1000;
+  if (Date.now() - createdAt.getTime() > tenMin) {
+    return res.status(400).json({ success: false, error: 'Yorum düzenleme süresi doldu (10 dakika).' });
+  }
+
+  const pending = analyzed.flagged;
+  const updated = await supabaseRestPatch(
+    'comments',
+    { id: `eq.${commentId}`, user_id: `eq.${auth.id}` },
+    { content: analyzed.text, updated_at: new Date().toISOString(), is_deleted: pending ? true : false }
+  ).catch(() => []);
+  const row = updated?.[0] || null;
+  if (pending && row?.id) {
+    await notifyAdminsAboutComment({
+      type: 'comment_review',
+      commentId: row.id,
+      postId: row.post_id,
+      actorId: auth.id,
+      title: 'Yorum inceleme (düzenleme)',
+      message: 'Düzenlenen yorum güvenlik filtresine takıldı. İnceleyip onaylayabilirsiniz.',
+    });
+  }
+  return res.json({
+    success: true,
+    data: row,
+    pending_review: pending,
+    message: pending
+      ? 'Yorumunuz güvenlik kontrolü nedeniyle incelemeye alındı. Onaylanana kadar diğer kullanıcılara gösterilmez.'
+      : undefined,
+  });
+}
+
+async function reportComment(req, res, commentId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const body = await readJsonBody(req);
+  const reason = String(body?.reason || '').trim();
+  const details = String(body?.details || '').trim();
+  if (!reason) return res.status(400).json({ success: false, error: 'Şikayet nedeni seçmelisiniz.' });
+
+  // Load comment for context (best effort)
+  const rows = await supabaseRestGet('comments', { select: '*', id: `eq.${commentId}`, limit: '1' }).catch(() => []);
+  const c = rows?.[0] || null;
+  const postId = c?.post_id || null;
+
+  await notifyAdminsAboutComment({
+    type: 'comment_report',
+    commentId,
+    postId,
+    actorId: auth.id,
+    title: 'Yorum şikayeti',
+    message: `Neden: ${reason}${details ? `\nNot: ${details}` : ''}`,
+  });
+
+  return res.json({
+    success: true,
+    message: 'Bildiriminiz alındı. İnceleme sonrası gerekli işlem yapılacaktır.',
+  });
+}
+
+async function toggleCommentLike(req, res, commentId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+  // Try to use likes table with comment_id if available
+  let supportsCommentId = true;
+  try {
+    await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${commentId}`, user_id: `eq.${auth.id}`, limit: '1' });
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('comment_id')) supportsCommentId = false;
+  }
+
+  const commentRows = await supabaseRestGet('comments', { select: '*', id: `eq.${commentId}`, limit: '1' }).catch(() => []);
+  const c = commentRows?.[0];
+  if (!c) return res.status(404).json({ success: false, error: 'Yorum bulunamadı.' });
+
+  if (supportsCommentId) {
+    const existing = await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${commentId}`, user_id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+    if (existing && existing.length > 0) {
+      await supabaseRestDelete('likes', { comment_id: `eq.${commentId}`, user_id: `eq.${auth.id}` }).catch(() => null);
+      const next = Math.max(0, Number(c.like_count || 0) - 1);
+      await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { like_count: next }).catch(() => null);
+      return res.json({ success: true, action: 'unliked', like_count: next });
+    }
+    await supabaseRestInsert('likes', [{ comment_id: commentId, user_id: auth.id }]);
+    const next = Number(c.like_count || 0) + 1;
+    await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { like_count: next }).catch(() => null);
+    return res.json({ success: true, action: 'liked', like_count: next });
+  }
+
+  // Fallback: track liked comment ids in user.metadata (requires users.metadata)
+  const users = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+  const me = users?.[0] || null;
+  const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
+  const liked = Array.isArray(meta.liked_comment_ids) ? meta.liked_comment_ids.map(String) : [];
+  const cid = String(commentId);
+  const has = liked.includes(cid);
+  const nextLiked = has ? liked.filter((x) => x !== cid) : [cid, ...liked].slice(0, 5000);
+  const nextCount = Math.max(0, Number(c.like_count || 0) + (has ? -1 : 1));
+
+  await safeUserPatch(auth.id, { metadata: { ...meta, liked_comment_ids: nextLiked } }).catch(() => null);
+  await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { like_count: nextCount }).catch(() => null);
+  return res.json({ success: true, action: has ? 'unliked' : 'liked', like_count: nextCount });
+}
+
+async function adminListPendingComments(req, res) {
+  requireAdmin(req, res);
+  const { limit = 50, offset = 0 } = req.query || {};
+  const rows = await supabaseRestGet('comments', {
+    select: '*,user:users(*),post:posts(*)',
+    is_deleted: 'eq.true',
+    order: 'created_at.desc',
+    limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
+    offset: String(parseInt(offset, 10) || 0),
+  }).catch(() => []);
+  return res.json({ success: true, data: rows || [] });
+}
+
+async function adminApproveComment(req, res, commentId) {
+  requireAdmin(req, res);
+  const updated = await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { is_deleted: false }).catch(() => []);
+  return res.json({ success: true, data: updated?.[0] || null });
 }
 
 async function togglePostLike(req, res, postId) {
@@ -1738,6 +1958,17 @@ export default async function handler(req, res) {
           if (postId && tail === 'comments' && req.method === 'GET') return await getPostComments(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'POST') return await addPostComment(req, res, postId);
       }
+
+      // Comments (edit / report)
+      if (url.startsWith('/api/comments/')) {
+        const rest = url.split('/api/comments/')[1] || '';
+        const parts = rest.split('/').filter(Boolean);
+        const commentId = parts[0];
+        const tail = parts[1];
+        if (commentId && tail === 'like' && req.method === 'POST') return await toggleCommentLike(req, res, commentId);
+        if (commentId && !tail && req.method === 'PUT') return await updateComment(req, res, commentId);
+        if (commentId && tail === 'report' && req.method === 'POST') return await reportComment(req, res, commentId);
+      }
       
       // Detail Pages (Pattern Matching)
       if (url.startsWith('/api/parties/')) {
@@ -1814,6 +2045,7 @@ export default async function handler(req, res) {
       if (url === '/api/admin/parties' && req.method === 'GET') return await adminGetParties(req, res);
       if (url === '/api/admin/parties' && req.method === 'POST') return await adminCreateParty(req, res);
       if (url === '/api/admin/notifications' && req.method === 'POST') return await adminSendNotification(req, res);
+      if (url === '/api/admin/comments/pending' && req.method === 'GET') return await adminListPendingComments(req, res);
       if (url.startsWith('/api/admin/users/') && req.method === 'PUT') {
         const userId = url.split('/api/admin/users/')[1];
         return await adminUpdateUser(req, res, userId);
@@ -1833,6 +2065,13 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/admin/parties/') && req.method === 'DELETE') {
         const partyId = url.split('/api/admin/parties/')[1];
         return await adminDeleteParty(req, res, partyId);
+      }
+      if (url.startsWith('/api/admin/comments/') && req.method === 'POST') {
+        const rest = url.split('/api/admin/comments/')[1] || '';
+        const parts = rest.split('/').filter(Boolean);
+        const commentId = parts[0];
+        const tail = parts[1];
+        if (commentId && tail === 'approve') return await adminApproveComment(req, res, commentId);
       }
 
       // Search
