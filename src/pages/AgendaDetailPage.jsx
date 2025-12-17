@@ -4,9 +4,8 @@ import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { formatNumber, formatPolitScore } from '../utils/formatters';
-import { mockAgendas } from '../mock/agendas';
-import { mockPosts } from '../mock/posts';
 import api from '../utils/api';
+import { apiCall } from '../utils/api';
 
 export const AgendaDetailPage = () => {
   const { agendaSlug } = useParams();
@@ -15,48 +14,23 @@ export const AgendaDetailPage = () => {
   const [category, setCategory] = useState('all');
   
   useEffect(() => {
-    const foundAgenda = mockAgendas.find(a => a.agenda_slug === agendaSlug);
-    setAgenda(foundAgenda);
-    
     (async () => {
-      // Prefer DB posts if available; fallback to mock
-      if (foundAgenda?.agenda_title) {
-        const dbPosts = await api.posts.getAll({ agenda_tag: foundAgenda.agenda_title, limit: 60, order: 'polit_score.desc' }).catch(() => []);
-        if (dbPosts?.length) {
-          const posts = dbPosts.map((p) => ({
-            post_id: p.id,
-            user_id: p.user_id,
-            content_type: p.content_type || 'text',
-            content_text: p.content_text ?? p.content ?? '',
-            media_url: p.media_urls ?? [],
-            thumbnail_url: p.thumbnail_url ?? null,
-            media_duration: p.media_duration ?? null,
-            agenda_tag: p.agenda_tag ?? null,
-            polit_score: p.polit_score ?? 0,
-            view_count: p.view_count ?? 0,
-            like_count: p.like_count ?? 0,
-            dislike_count: p.dislike_count ?? 0,
-            comment_count: p.comment_count ?? 0,
-            share_count: p.share_count ?? 0,
-            is_featured: p.is_featured ?? false,
-            created_at: p.created_at,
-            source_url: p.source_url,
-            user: p.user
-              ? {
-                  ...p.user,
-                  user_id: p.user.id,
-                  profile_image: p.user.avatar_url,
-                  verification_badge: p.user.is_verified ?? false,
-                  party_id: p.user.party_id,
-                }
-              : null,
-          }));
-          setAgendaPosts(posts);
-          return;
-        }
+      // Resolve agenda from admin list (by slug first, fallback to title)
+      const agendaRes = await apiCall('/api/agendas?limit=200').catch(() => null);
+      const list = agendaRes?.data || [];
+      const found =
+        (Array.isArray(list) ? list : []).find((a) => String(a?.slug || '') === String(agendaSlug || '')) ||
+        (Array.isArray(list) ? list : []).find((a) => String(a?.title || '').toLowerCase().replace(/\s+/g, '-') === String(agendaSlug || ''));
+
+      setAgenda(found || null);
+      const title = String(found?.title || '').trim();
+      if (!title) {
+        setAgendaPosts([]);
+        return;
       }
-      const posts = mockPosts.filter(p => p.agenda_tag === foundAgenda?.agenda_title);
-      setAgendaPosts(posts);
+
+      const dbPosts = await api.posts.getAll({ agenda_tag: title, limit: 60, order: 'polit_score.desc' }).catch(() => []);
+      setAgendaPosts(Array.isArray(dbPosts) ? dbPosts : []);
     })();
   }, [agendaSlug]);
   

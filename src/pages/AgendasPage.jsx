@@ -3,14 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { Flame } from 'lucide-react';
 import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
-import { mockAgendas } from '../mock/agendas';
+import { apiCall } from '../utils/api';
 
 export const AgendasPage = () => {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
+  const [agendas, setAgendas] = useState([]);
 
   useEffect(() => {
     (async () => {
+      const agendaRes = await apiCall('/api/agendas?limit=120').catch(() => null);
+      const list = agendaRes?.data || [];
+      setAgendas(Array.isArray(list) ? list : []);
+
       const data = await api.posts.getAll({ limit: 500, order: 'polit_score.desc' }).catch(() => []);
       setPosts(Array.isArray(data) ? data : []);
     })();
@@ -34,17 +39,17 @@ export const AgendasPage = () => {
     return m;
   }, [posts]);
 
-  // Use mock agendas as ordered list of topics, but fill with real posts
+  // Use admin-managed agendas as ordered list of topics, but fill with real posts
   const agendaSections = useMemo(() => {
     const seen = new Set();
     const out = [];
 
-    // 1) prefer mock order
-    for (const a of mockAgendas || []) {
-      const title = a.agenda_title || a.title;
+    // 1) prefer admin order
+    for (const a of agendas || []) {
+      const title = a?.title || '';
       if (!title || seen.has(title)) continue;
       const list = postsByAgenda.get(title) || [];
-      out.push({ title, slug: a.agenda_slug || a.slug, posts: list.slice(0, 12) });
+      out.push({ title, slug: a?.slug || String(title).toLowerCase().replace(/\s+/g, '-'), posts: list.slice(0, 12) });
       seen.add(title);
     }
 
@@ -56,7 +61,7 @@ export const AgendasPage = () => {
     }
 
     return out.filter((s) => (s.posts || []).length > 0);
-  }, [postsByAgenda]);
+  }, [postsByAgenda, agendas]);
 
   return (
     <div className="min-h-screen bg-gray-50">
