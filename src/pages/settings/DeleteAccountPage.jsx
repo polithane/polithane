@@ -129,7 +129,8 @@ export const DeleteAccountPage = () => {
           <div className="flex-1">
             <div className="font-black text-gray-900">Güvenlik Onayı (3 adım)</div>
             <div className="text-sm text-gray-700 mt-1">
-              Hesap silme talebi, e‑posta üzerinden onaylandıktan sonra 90 gün içinde kesin silinmek üzere kaydedilir.
+                Hesap silme talebi, e‑posta üzerinden onaylandıktan sonra hesabınız pasif duruma alınır.
+                Bu andan itibaren profiliniz ve içerikleriniz diğer kullanıcılara görünmez olur. 90 gün sonunda hesap kalıcı silinir.
             </div>
 
             <div className="mt-4 space-y-3">

@@ -184,6 +184,7 @@ async function supabaseRestDelete(path, params) {
 
 async function getPosts(req, res) {
     const { limit = '50', offset = '0', party_id, user_id, user_ids, category, order = 'created_at.desc' } = req.query;
+    const auth = verifyJwtFromRequest(req);
     const params = {
         // Keep selects schema-agnostic: embed with *
         select: '*,user:users(*),party:parties(*)',
@@ -204,10 +205,23 @@ async function getPosts(req, res) {
         if (list.length > 0) params.user_id = `in.(${list.join(',')})`;
     }
     const data = await supabaseRestGet('posts', params);
-    res.json(Array.isArray(data) ? data : []);
+    const rows = Array.isArray(data) ? data : [];
+    // Hide posts belonging to inactive users for everyone except the owner/admin.
+    const filtered = rows.filter((p) => {
+      const owner = p?.user;
+      if (!owner) return true;
+      if (owner.is_active === false) {
+        if (auth?.is_admin) return true;
+        if (auth?.id && String(auth.id) === String(owner.id)) return true;
+        return false;
+      }
+      return true;
+    });
+    res.json(filtered);
 }
 
 async function getPostById(req, res, id) {
+    const auth = verifyJwtFromRequest(req);
     const rows = await supabaseRestGet('posts', {
         select: '*,user:users(*),party:parties(*)',
         id: `eq.${id}`,
@@ -215,6 +229,14 @@ async function getPostById(req, res, id) {
     });
     const post = rows?.[0];
     if (!post) return res.status(404).json({ success: false, error: 'Post bulunamadı' });
+    // If the owner is inactive (e.g. deletion confirmed), hide the post for everyone except the owner/admin.
+    if (post?.user?.is_active === false) {
+      const ownerId = post?.user?.id ?? post?.user_id;
+      const isOwner = auth?.id && ownerId && String(auth.id) === String(ownerId);
+      if (!isOwner && !auth?.is_admin) {
+        return res.status(404).json({ success: false, error: 'Post bulunamadı' });
+      }
+    }
     res.json({ success: true, data: post });
 }
 
@@ -736,6 +758,7 @@ async function getPartyDetail(req, res, id) {
 }
 
 async function getUsers(req, res) {
+    const auth = verifyJwtFromRequest(req);
     const { search, username, id, party_id, user_type, province, limit = 20, offset = 0, order = 'polit_score.desc' } = req.query;
 
     // Direct lookup by username or id (frontend uses this form)
@@ -745,6 +768,12 @@ async function getUsers(req, res) {
         const rows = await supabaseRestGet('users', { select: '*,party:parties(*)', [key]: `eq.${value}`, limit: '1' });
         const user = rows?.[0];
         if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+        if (user?.is_active === false) {
+          const isOwner = auth?.id && String(auth.id) === String(user.id);
+          if (!isOwner && !auth?.is_admin) {
+            return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+          }
+        }
         return res.json({ success: true, data: user });
     }
 
@@ -778,6 +807,7 @@ async function getUsers(req, res) {
 }
 
 async function getUserDetail(req, res, id) {
+    const auth = verifyJwtFromRequest(req);
     // Try username first (most common), then ID
     let user;
     const rows = await supabaseRestGet('users', { select: '*,party:parties(*)', username: `eq.${id}`, limit: '1' });
@@ -789,6 +819,13 @@ async function getUserDetail(req, res, id) {
     }
     
     if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+    // Hide inactive profiles from everyone except the owner/admin (e.g. deletion confirmed).
+    if (user?.is_active === false) {
+      const isOwner = auth?.id && String(auth.id) === String(user.id);
+      if (!isOwner && !auth?.is_admin) {
+        return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+      }
+    }
     res.json({ success: true, data: user });
 }
 
@@ -902,10 +939,17 @@ async function getFollowing(req, res, targetId) {
 }
 
 async function getUserPosts(req, res, username) {
+    const auth = verifyJwtFromRequest(req);
     // Resolve user id by username
-    const users = await supabaseRestGet('users', { select: 'id,username', username: `eq.${username}`, limit: '1' });
+    const users = await supabaseRestGet('users', { select: 'id,username,is_active', username: `eq.${username}`, limit: '1' });
     const user = users?.[0];
     if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+    if (user?.is_active === false) {
+      const isOwner = auth?.id && String(auth.id) === String(user.id);
+      if (!isOwner && !auth?.is_admin) {
+        return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+      }
+    }
     const { limit = '20', offset = '0' } = req.query;
     const posts = await supabaseRestGet('posts', {
         select: '*,user:users(*),party:parties(*)',
@@ -1304,8 +1348,13 @@ async function usersRequestDeleteMe(req, res) {
   const subject = 'Polithane – Hesap silme onayı';
   const text =
     `Merhaba,\n\n` +
-    `Polithane hesabınız için silme talebi alındı.\n\n` +
-    `Bu talebi onaylamak için 24 saat içinde şu bağlantıya tıklayın:\n${confirmUrl}\n\n` +
+    `Polithane hesabınız için hesap silme talebi alındı.\n\n` +
+    `Bu talebi ONAYLAMAK için 24 saat içinde şu bağlantıya tıklayın:\n${confirmUrl}\n\n` +
+    `Onayladıktan sonra:\n` +
+    `- Hesabınız pasif duruma alınır.\n` +
+    `- Profiliniz ve içerikleriniz (paylaşımlar/yorumlar) diğer kullanıcılara görünmez olur.\n` +
+    `- 90 gün boyunca hesabınızı tekrar aktif edebilirsiniz.\n` +
+    `- 90 gün sonunda hesabınız ve verileriniz kalıcı olarak silinir.\n\n` +
     `Eğer bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n`;
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
@@ -1317,6 +1366,15 @@ async function usersRequestDeleteMe(req, res) {
           Silme talebini onayla
         </a>
       </p>
+      <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin:14px 0;">
+        <div style="font-weight:700;margin-bottom:6px;">Onayladıktan sonra ne olur?</div>
+        <ul style="margin:0;padding-left:18px;">
+          <li>Hesabınız <strong>pasif</strong> duruma alınır.</li>
+          <li>Profiliniz ve içerikleriniz (paylaşımlar/yorumlar) <strong>diğer kullanıcılara görünmez</strong> olur.</li>
+          <li><strong>90 gün</strong> boyunca hesabınızı tekrar aktif edebilirsiniz.</li>
+          <li>90 gün sonunda hesabınız ve verileriniz <strong>kalıcı</strong> olarak silinir.</li>
+        </ul>
+      </div>
       <p style="font-size:12px;color:#6b7280;">Eğer bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>
     </div>
   `;
@@ -1364,7 +1422,7 @@ async function usersConfirmDelete(req, res) {
   res.json({
     success: true,
     message:
-      'Hesabınız silinmek üzere kayda alındı. 90 gün içinde görünürlüğünüz kaldırılacaktır. Bu süre içinde hesabınızı tekrar aktif edebilirsiniz.',
+      'Hesabınız silinmek üzere kayda alındı. Hesabınız pasif duruma alındı ve profiliniz/içerikleriniz diğer kullanıcılara görünmez hale getirildi. 90 gün boyunca Ayarlar → Hesabı Sil ekranından hesabınızı tekrar aktif edebilirsiniz. 90 gün sonunda hesabınız ve verileriniz kalıcı olarak silinir.',
     scheduled_for: scheduledFor,
   });
 }

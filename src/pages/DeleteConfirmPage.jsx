@@ -69,8 +69,8 @@ export const DeleteConfirmPage = () => {
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-900">
               <div className="font-bold mb-1">Önemli</div>
               <div className="text-sm">
-                Bu süre boyunca hesabınız pasif bekler. İsterseniz giriş yaparak <strong>Ayarlar → Hesabı Sil</strong> ekranından
-                hesabınızı tekrar aktif edebilirsiniz.
+                Bu süre boyunca hesabınız pasif bekler ve profiliniz/içerikleriniz diğer kullanıcılara görünmez.
+                İsterseniz giriş yaparak <strong>Ayarlar → Hesabı Sil</strong> ekranından hesabınızı tekrar aktif edebilirsiniz.
               </div>
             </div>
             <div className="flex gap-3">
