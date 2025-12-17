@@ -550,6 +550,59 @@ async function createPost(req, res) {
     res.status(201).json({ success: true, data: post });
 }
 
+async function updatePost(req, res, postId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Giriş yapmalısınız.' });
+  const id = String(postId || '').trim();
+  if (!id) return res.status(400).json({ success: false, error: 'Geçersiz paylaşım.' });
+
+  const rows = await supabaseRestGet('posts', { select: '*', id: `eq.${id}`, limit: '1' }).catch(() => []);
+  const post = rows?.[0];
+  if (!post) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
+  if (String(post.user_id) !== String(auth.id)) {
+    return res.status(403).json({ success: false, error: 'Bu paylaşımı düzenleyemezsiniz.' });
+  }
+
+  const body = await readJsonBody(req);
+  const content = String(body?.content_text ?? body?.content ?? post.content_text ?? post.content ?? '').trim();
+  if (!content) return res.status(400).json({ success: false, error: 'İçerik boş olamaz.' });
+  if (content.length > 5000) return res.status(400).json({ success: false, error: 'İçerik çok uzun.' });
+
+  const patch = {
+    content_text: content,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Allow updating tags/category as well
+  if (body?.category !== undefined) patch.category = String(body.category || 'general').trim();
+  if (body?.agenda_tag !== undefined) patch.agenda_tag = String(body.agenda_tag || '').trim() || null;
+
+  // Do not allow changing media_urls for now (handled in separate task about sorting / reordering).
+  const updated = await supabaseRestPatch('posts', { id: `eq.${id}`, user_id: `eq.${auth.id}` }, patch).catch(() => []);
+  return res.json({ success: true, data: updated?.[0] || null });
+}
+
+async function deletePost(req, res, postId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Giriş yapmalısınız.' });
+  const id = String(postId || '').trim();
+  if (!id) return res.status(400).json({ success: false, error: 'Geçersiz paylaşım.' });
+
+  const rows = await supabaseRestGet('posts', { select: '*', id: `eq.${id}`, limit: '1' }).catch(() => []);
+  const post = rows?.[0];
+  if (!post) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
+  if (String(post.user_id) !== String(auth.id)) {
+    return res.status(403).json({ success: false, error: 'Bu paylaşımı silemezsiniz.' });
+  }
+
+  const updated = await supabaseRestPatch(
+    'posts',
+    { id: `eq.${id}`, user_id: `eq.${auth.id}` },
+    { is_deleted: true, updated_at: new Date().toISOString() }
+  ).catch(() => []);
+  return res.json({ success: true, data: updated?.[0] || null });
+}
+
 async function getAgendas(req, res) {
     const { limit = 50, search, is_trending, is_active } = req.query || {};
     const params = {
@@ -2086,6 +2139,8 @@ export default async function handler(req, res) {
           const postId = parts[0];
           const tail = parts[1];
           if (postId && !tail && req.method === 'GET') return await getPostById(req, res, postId);
+          if (postId && !tail && req.method === 'PUT') return await updatePost(req, res, postId);
+          if (postId && !tail && req.method === 'DELETE') return await deletePost(req, res, postId);
           if (postId && tail === 'like' && req.method === 'POST') return await togglePostLike(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'GET') return await getPostComments(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'POST') return await addPostComment(req, res, postId);

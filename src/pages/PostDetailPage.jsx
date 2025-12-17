@@ -41,6 +41,11 @@ export const PostDetailPage = () => {
 
   const commentsRef = useRef(null);
   const commentBoxRef = useRef(null);
+
+  const [showEditPost, setShowEditPost] = useState(false);
+  const [editPostText, setEditPostText] = useState('');
+  const [savingPost, setSavingPost] = useState(false);
+  const [showDeletePost, setShowDeletePost] = useState(false);
   
   useEffect(() => {
     const load = async () => {
@@ -100,6 +105,8 @@ export const PostDetailPage = () => {
     source_url: post.source_url,
     user: post.user || null,
   };
+
+  const isOwnPost = isAuthenticated && currentUser?.id && String(uiPost.user_id) === String(currentUser.id);
 
   const handleToggleLike = async () => {
     if (!isAuthenticated) {
@@ -331,6 +338,29 @@ export const PostDetailPage = () => {
                 Şikayet Et
               </button>
             </div>
+
+            {/* Yönetim (sadece kendi postu) */}
+            {isOwnPost && (
+              <div className="flex justify-end gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditPostText(String(uiPost.content_text || ''));
+                    setShowEditPost(true);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-800 font-bold"
+                >
+                  Düzenle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeletePost(true)}
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold"
+                >
+                  Sil
+                </button>
+              </div>
+            )}
             
             {/* Polit Puan - Sadece P. ile */}
             <div className="mt-4 pt-4 border-t">
@@ -718,6 +748,85 @@ export const PostDetailPage = () => {
           )}
         </Modal>
       )}
+
+      {/* Edit post modal */}
+      <Modal isOpen={showEditPost} onClose={() => setShowEditPost(false)} title="Paylaşımı Düzenle">
+        <div className="space-y-3">
+          <textarea
+            value={editPostText}
+            onChange={(e) => setEditPostText(e.target.value)}
+            rows={6}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
+            maxLength={5000}
+          />
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-500">{5000 - (editPostText?.length || 0)} karakter kaldı</div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowEditPost(false)} disabled={savingPost}>
+                Vazgeç
+              </Button>
+              <Button
+                onClick={async () => {
+                  const text = String(editPostText || '').trim();
+                  if (!text) {
+                    setCommentError('İçerik boş olamaz.');
+                    return;
+                  }
+                  setSavingPost(true);
+                  try {
+                    setCommentError('');
+                    const r = await postsApi.update(uiPost.post_id, { content_text: text });
+                    if (r?.success && r?.data) {
+                      setPost(r.data);
+                    } else {
+                      // fallback: refetch
+                      const detail = await postsApi.getById(uiPost.post_id);
+                      setPost(detail?.data ? detail.data : detail);
+                    }
+                    setShowEditPost(false);
+                  } catch (e) {
+                    setCommentError(e?.message || 'Paylaşım güncellenemedi.');
+                  } finally {
+                    setSavingPost(false);
+                  }
+                }}
+                disabled={savingPost}
+              >
+                {savingPost ? 'Kaydediliyor…' : 'Kaydet'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete post modal */}
+      <Modal isOpen={showDeletePost} onClose={() => setShowDeletePost(false)} title="Paylaşımı Sil">
+        <div className="space-y-4">
+          <div className="text-sm text-gray-800">
+            Bu paylaşımı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDeletePost(false)}>
+              Vazgeç
+            </Button>
+            <Button
+              onClick={async () => {
+                try {
+                  setCommentError('');
+                  await postsApi.delete(uiPost.post_id);
+                  setShowDeletePost(false);
+                  navigate('/');
+                } catch (e) {
+                  setCommentError(e?.message || 'Paylaşım silinemedi.');
+                  setShowDeletePost(false);
+                }
+              }}
+            >
+              Sil
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
