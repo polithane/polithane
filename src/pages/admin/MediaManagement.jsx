@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Upload, Image as ImageIcon, Video, File, Trash2, Download, Eye, Search, Grid, List } from 'lucide-react';
+import { getPlaceholderImage } from '../../utils/imagePaths';
 
 export const MediaManagement = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
@@ -11,7 +12,7 @@ export const MediaManagement = () => {
     {
       id: 1,
       type: 'image',
-      url: 'https://picsum.photos/400/300?random=1',
+      url: getPlaceholderImage('post', 1),
       filename: 'politika-toplanti.jpg',
       size: '2.4 MB',
       uploaded_by: 'Ahmet Yılmaz',
@@ -21,7 +22,7 @@ export const MediaManagement = () => {
     {
       id: 2,
       type: 'video',
-      url: 'https://picsum.photos/400/300?random=2',
+      url: getPlaceholderImage('post', 2),
       filename: 'konusma-videosi.mp4',
       size: '45.8 MB',
       uploaded_by: 'Ayşe Demir',
@@ -31,7 +32,7 @@ export const MediaManagement = () => {
     {
       id: 3,
       type: 'image',
-      url: 'https://picsum.photos/400/300?random=3',
+      url: getPlaceholderImage('post', 3),
       filename: 'basin-aciklamasi.jpg',
       size: '1.8 MB',
       uploaded_by: 'Mehmet Kaya',

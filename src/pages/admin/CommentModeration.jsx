@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Search, Filter, Eye, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { getPlaceholderImage } from '../../utils/imagePaths';
 
 export const CommentModeration = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -10,7 +11,7 @@ export const CommentModeration = () => {
   const mockComments = [
     {
       id: 1,
-      user: { name: 'Ahmet Yılmaz', avatar: 'https://i.pravatar.cc/150?u=1', username: 'ahmetyilmaz' },
+      user: { name: 'Ahmet Yılmaz', avatar: getPlaceholderImage('avatar', 1), username: 'ahmetyilmaz' },
       post_title: 'Ekonomik paket açıklaması yapıldı',
       content: 'Çok güzel bir gelişme, umarım etkili olur.',
       status: 'approved',
@@ -20,7 +21,7 @@ export const CommentModeration = () => {
     },
     {
       id: 2,
-      user: { name: 'Ayşe Demir', avatar: 'https://i.pravatar.cc/150?u=2', username: 'aysedemir' },
+      user: { name: 'Ayşe Demir', avatar: getPlaceholderImage('avatar', 2), username: 'aysedemir' },
       post_title: 'Yeni anayasa değişikliği önerisi',
       content: 'Bu konuda daha fazla tartışma gerekiyor. Acele etmemeliyiz.',
       status: 'pending',
@@ -30,7 +31,7 @@ export const CommentModeration = () => {
     },
     {
       id: 3,
-      user: { name: 'Mehmet Kaya', avatar: 'https://i.pravatar.cc/150?u=3', username: 'mehmetkaya' },
+      user: { name: 'Mehmet Kaya', avatar: getPlaceholderImage('avatar', 3), username: 'mehmetkaya' },
       post_title: 'Dışişleri Bakanı açıklama yaptı',
       content: 'Gerçekten çok kötü bir açıklama, hiç mantıklı değil!!!',
       status: 'reported',
@@ -40,7 +41,7 @@ export const CommentModeration = () => {
     },
     {
       id: 4,
-      user: { name: 'Zeynep Arslan', avatar: 'https://i.pravatar.cc/150?u=4', username: 'zeyneparslan' },
+      user: { name: 'Zeynep Arslan', avatar: getPlaceholderImage('avatar', 4), username: 'zeyneparslan' },
       post_title: 'Eğitim reformu tasarısı',
       content: 'Eğitim sistemimizde köklü değişiklikler yapılması gerekiyor.',
       status: 'approved',

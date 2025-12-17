@@ -180,14 +180,63 @@ export const getAgendaImagePath = (agendaSlug) => {
  * @returns {string} Placeholder URL
  */
 export const getPlaceholderImage = (type = 'avatar', id = 1) => {
-  if (type === 'avatar') {
-    return `https://i.pravatar.cc/150?img=${id}`;
-  }
-  if (type === 'post') {
-    return `https://picsum.photos/800/600?random=${id}`;
-  }
-  if (type === 'hero') {
-    return `https://picsum.photos/1200/300?random=${id}`;
-  }
-  return `https://picsum.photos/400/400?random=${id}`;
+  const safeId = Number.isFinite(Number(id)) ? Number(id) : 1;
+  const colors = ['#009fd6', '#111827', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#14b8a6'];
+  const bg = colors[Math.abs(safeId) % colors.length];
+
+  const svg = (() => {
+    if (type === 'hero') {
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="${bg}" stop-opacity="0.25"/>
+              <stop offset="1" stop-color="${bg}" stop-opacity="0.10"/>
+            </linearGradient>
+          </defs>
+          <rect width="1200" height="300" fill="url(#g)"/>
+          <circle cx="1020" cy="120" r="120" fill="${bg}" opacity="0.12"/>
+          <circle cx="220" cy="210" r="160" fill="${bg}" opacity="0.10"/>
+          <text x="60" y="170" font-family="Arial, sans-serif" font-size="44" font-weight="700" fill="#111827" opacity="0.70">
+            Yükleniyor…
+          </text>
+        </svg>
+      `;
+    }
+
+    if (type === 'post') {
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+          <rect width="800" height="600" fill="#f3f4f6"/>
+          <rect x="40" y="40" width="720" height="520" rx="32" fill="white" stroke="#e5e7eb"/>
+          <circle cx="120" cy="120" r="36" fill="${bg}" opacity="0.25"/>
+          <rect x="180" y="92" width="220" height="20" rx="10" fill="#e5e7eb"/>
+          <rect x="180" y="124" width="160" height="16" rx="8" fill="#f3f4f6"/>
+          <rect x="100" y="200" width="600" height="260" rx="24" fill="${bg}" opacity="0.10"/>
+          <path d="M260 400l90-90 80 80 90-90 120 120H260z" fill="${bg}" opacity="0.22"/>
+          <circle cx="540" cy="292" r="28" fill="${bg}" opacity="0.25"/>
+          <text x="100" y="520" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827" opacity="0.55">
+            Medya bulunamadı
+          </text>
+        </svg>
+      `;
+    }
+
+    // avatar
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="${bg}" stop-opacity="0.30"/>
+            <stop offset="1" stop-color="${bg}" stop-opacity="0.12"/>
+          </linearGradient>
+        </defs>
+        <rect width="150" height="150" rx="32" fill="url(#g)"/>
+        <circle cx="75" cy="62" r="26" fill="${bg}" opacity="0.28"/>
+        <path d="M28 136c10-28 32-42 47-42s37 14 47 42" fill="${bg}" opacity="0.20"/>
+      </svg>
+    `;
+  })();
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`;
 };

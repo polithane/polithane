@@ -78,8 +78,8 @@ export const mockPosts = [
     content_type: 'image',
     content_text: 'İstanbul\'da yaptığımız çalışma ziyaretinden görüntüler - 2 FOTO',
     media_url: [
-      'https://picsum.photos/800/600?random=301',
-      'https://picsum.photos/800/600?random=302'
+      getPostMediaPath('image', 301),
+      getPostMediaPath('image', 302)
     ],
     source_url: 'https://www.cumhuriyet.com.tr/',
     agenda_tag: 'Belediyelere yapılan operasyonlar',
@@ -97,10 +97,10 @@ export const mockPosts = [
     content_type: 'image',
     content_text: 'Meclis oturumundan önemli anlar - 4 FOTO',
     media_url: [
-      'https://picsum.photos/800/600?random=401',
-      'https://picsum.photos/800/600?random=402',
-      'https://picsum.photos/800/600?random=403',
-      'https://picsum.photos/800/600?random=404'
+      getPostMediaPath('image', 401),
+      getPostMediaPath('image', 402),
+      getPostMediaPath('image', 403),
+      getPostMediaPath('image', 404)
     ],
     agenda_tag: 'Ekonomi paketi görüşmeleri',
     polit_score: 2100,
@@ -117,13 +117,13 @@ export const mockPosts = [
     content_type: 'image',
     content_text: 'Etkinlik fotoğrafları - 7 FOTO',
     media_url: [
-      'https://picsum.photos/800/600?random=501',
-      'https://picsum.photos/800/600?random=502',
-      'https://picsum.photos/800/600?random=503',
-      'https://picsum.photos/800/600?random=504',
-      'https://picsum.photos/800/600?random=505',
-      'https://picsum.photos/800/600?random=506',
-      'https://picsum.photos/800/600?random=507'
+      getPostMediaPath('image', 501),
+      getPostMediaPath('image', 502),
+      getPostMediaPath('image', 503),
+      getPostMediaPath('image', 504),
+      getPostMediaPath('image', 505),
+      getPostMediaPath('image', 506),
+      getPostMediaPath('image', 507)
     ],
     agenda_tag: 'Ekonomi paketi görüşmeleri',
     polit_score: 450,
@@ -154,9 +154,9 @@ export const mockPosts = [
     content_type: 'image',
     content_text: 'Parti etkinliğimizden kareler - 3 FOTO',
     media_url: [
-      'https://picsum.photos/800/600?random=701',
-      'https://picsum.photos/800/600?random=702',
-      'https://picsum.photos/800/600?random=703'
+      getPostMediaPath('image', 701),
+      getPostMediaPath('image', 702),
+      getPostMediaPath('image', 703)
     ],
     agenda_tag: 'Ak Parti - MHP resepsiyon tartışması',
     polit_score: 650,
@@ -186,8 +186,8 @@ export const mockPosts = [
     user_id: Math.min(3, mockUsers.length),
     content_type: 'video',
     content_text: 'Genel Başkan olarak yaptığım açıklama',
-    media_url: 'https://picsum.photos/800/600?random=9',
-    thumbnail_url: 'https://picsum.photos/800/600?random=9',
+    media_url: getPostMediaPath('video', 9, false),
+    thumbnail_url: getPostMediaPath('video', 9, true),
     media_duration: 240,
     agenda_tag: 'Ak Parti - MHP resepsiyon tartışması',
     polit_score: 18900,
@@ -338,9 +338,7 @@ export const generateMockPosts = (count = 90, users = mockUsers, parties = mockP
       if (imageCount === 1) {
         post.media_url = getPostMediaPath('image', i);
       } else {
-        post.media_url = Array.from({ length: imageCount }, (_, idx) => 
-          `https://picsum.photos/800/600?random=${i}${idx}`
-        );
+        post.media_url = Array.from({ length: imageCount }, (_, idx) => getPostMediaPath('image', Number(`${i}${idx}`)));
       }
     } else if (contentType === 'video') {
       post.media_url = getPostMediaPath('video', i, false);
@@ -486,8 +484,8 @@ export const getCategoryPosts = (category, allPosts = []) => {
         username: `auto_${category}_${Date.now().toString().slice(-4)}`,
         full_name: `Otomatik Profil (${category})`,
         verification_badge: true,
-        avatar_url: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70) + 1}`,
-        profile_image: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70) + 1}`
+        avatar_url: getProfileImagePath('normal', null, null, 900000 + Math.floor(Math.random() * 10000)),
+        profile_image: getProfileImagePath('normal', null, null, 900000 + Math.floor(Math.random() * 10000))
       };
       if (category === 'mps') {
         syntheticUser = { ...base, user_type: 'politician', politician_type: 'mp' };
