@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import api, { apiCall } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -18,6 +18,27 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const navigate = useNavigate();
 
+  const ensureStorageBuckets = async () => {
+    // Bucket yoksa Supabase Storage "bucket not found" hatası çıkarabiliyor.
+    // Bu çağrı (servis anahtarı varsa) bucket'ları otomatik oluşturur.
+    try {
+      await apiCall('/api/storage/ensure-bucket', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'uploads', public: true }),
+      });
+    } catch {
+      // noop
+    }
+    try {
+      await apiCall('/api/storage/ensure-bucket', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'politfest', public: true }),
+      });
+    } catch {
+      // noop
+    }
+  };
+
   // Initialize auth from localStorage and verify token
   useEffect(() => {
     const initAuth = async () => {
@@ -33,6 +54,7 @@ export const AuthProvider = ({ children }) => {
           if (resolvedUser) {
             setUser(resolvedUser);
             localStorage.setItem('user', JSON.stringify(resolvedUser));
+            await ensureStorageBuckets();
           } else {
             setUser(JSON.parse(storedUser));
           }
@@ -60,6 +82,7 @@ export const AuthProvider = ({ children }) => {
       setUser(data.data.user);
       localStorage.setItem('auth_token', data.data.token);
       localStorage.setItem('user', JSON.stringify(data.data.user));
+      await ensureStorageBuckets();
       
       return { success: true, user: data.data.user };
     } catch (error) {
@@ -84,6 +107,7 @@ export const AuthProvider = ({ children }) => {
       setUser(data.data.user);
       localStorage.setItem('auth_token', data.data.token);
       localStorage.setItem('user', JSON.stringify(data.data.user));
+      await ensureStorageBuckets();
       
       return { success: true, user: data.data.user };
     } catch (error) {
