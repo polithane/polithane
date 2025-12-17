@@ -6,27 +6,31 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
 import { Avatar } from '../components/common/Avatar';
 
-const getIconBaseUrl = () => {
-  const explicit = String(import.meta.env.VITE_ICON_BASE_URL || '').trim();
-  if (explicit) return explicit.replace(/\/+$/, '');
-  const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
-  if (!supabaseUrl) return '';
-  // Default: icons placed under uploads/ikons in Supabase Storage (public)
-  return `${supabaseUrl}/storage/v1/object/public/uploads/ikons`;
-};
-
-const IKON_BASE = getIconBaseUrl();
-
-const CONTENT_TABS = [
-  { key: 'video', iconSrc: `${IKON_BASE}/videoikon.png`, fallbackIcon: Video, alt: 'Video' },
-  { key: 'image', iconSrc: `${IKON_BASE}/resimikon.png`, fallbackIcon: ImageIcon, alt: 'Resim' },
-  { key: 'audio', iconSrc: `${IKON_BASE}/sesikon.png`, fallbackIcon: Music, alt: 'Ses' },
-  { key: 'text', iconSrc: `${IKON_BASE}/yaziikon.png`, fallbackIcon: PenTool, alt: 'Yazı' },
-];
-
 export const CreatePolitPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
+
+  const iconBaseUrl = useMemo(() => {
+    try {
+      const explicit = String(import.meta.env?.VITE_ICON_BASE_URL || '').trim();
+      if (explicit) return explicit.replace(/\/+$/, '');
+      const supabaseUrl = String(import.meta.env?.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
+      if (!supabaseUrl) return '';
+      return `${supabaseUrl}/storage/v1/object/public/uploads/ikons`;
+    } catch {
+      return '';
+    }
+  }, []);
+
+  const contentTabs = useMemo(
+    () => [
+      { key: 'video', iconSrc: iconBaseUrl ? `${iconBaseUrl}/videoikon.png` : '', fallbackIcon: Video, alt: 'Video' },
+      { key: 'image', iconSrc: iconBaseUrl ? `${iconBaseUrl}/resimikon.png` : '', fallbackIcon: ImageIcon, alt: 'Resim' },
+      { key: 'audio', iconSrc: iconBaseUrl ? `${iconBaseUrl}/sesikon.png` : '', fallbackIcon: Music, alt: 'Ses' },
+      { key: 'text', iconSrc: iconBaseUrl ? `${iconBaseUrl}/yaziikon.png` : '', fallbackIcon: PenTool, alt: 'Yazı' },
+    ],
+    [iconBaseUrl]
+  );
 
   const [contentType, setContentType] = useState('video');
   const [content, setContent] = useState('');
@@ -365,10 +369,10 @@ export const CreatePolitPage = () => {
 
             {/* Content type tabs */}
             <div className="flex items-center justify-center gap-5 mb-5">
-              {CONTENT_TABS.map((t) => {
+              {contentTabs.map((t) => {
                 const active = t.key === contentType;
                 const FallbackIcon = t.fallbackIcon;
-                const showImage = !!IKON_BASE && !brokenIcons[t.key];
+                const showImage = !!iconBaseUrl && !brokenIcons[t.key];
                 return (
                   <button
                     key={t.key}
