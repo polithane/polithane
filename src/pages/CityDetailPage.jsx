@@ -206,10 +206,18 @@ export const CityDetailPage = () => {
   
   if (!cityData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-blue mx-auto"></div>
-          <p className="mt-4 text-gray-600">Yükleniyor...</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-20 h-20 rounded-full bg-gray-100 animate-pulse" />
+          </div>
+          <div className="text-xl font-black text-gray-900">Yükleniyor…</div>
+          <div className="text-sm text-gray-600 mt-1">Şehir verileri hazırlanıyor, lütfen bekleyin.</div>
+          <div className="mt-6 space-y-3">
+            <div className="h-4 bg-gray-100 rounded-full w-4/5 mx-auto animate-pulse" />
+            <div className="h-4 bg-gray-100 rounded-full w-3/5 mx-auto animate-pulse" />
+            <div className="h-24 bg-gray-100 rounded-2xl w-full animate-pulse" />
+          </div>
         </div>
       </div>
     );
