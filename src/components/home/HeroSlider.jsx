@@ -24,6 +24,26 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
   
   const currentPost = posts[currentIndex];
   
+  const parseHexColor = (value) => {
+    const s = String(value || '').trim();
+    const m = s.match(/^#([0-9a-fA-F]{6})$/);
+    if (!m) return null;
+    const hex = m[1];
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return { r, g, b };
+  };
+
+  // Basit algı: arka plan açık mı?
+  const isLightColor = (value) => {
+    const rgb = parseHexColor(value);
+    if (!rgb) return false;
+    // relative luminance (approx)
+    const l = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+    return l > 0.62;
+  };
+
   // Background rengi belirleme
   const getBackgroundColor = () => {
     if (currentPost.user?.party_id && currentPost.user?.party?.party_color) {
@@ -55,6 +75,9 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
   };
   
   const bgColor = getBackgroundColor();
+  const sliderIsLight = isLightColor(bgColor);
+  const ctaBgClass = sliderIsLight ? 'bg-gray-900 hover:bg-black' : 'bg-white hover:bg-gray-50';
+  const ctaBorderClass = sliderIsLight ? 'border border-white/10' : 'border border-black/10';
   
   return (
     <div className="mb-4">
@@ -63,11 +86,12 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
         <button
           type="button"
           onClick={() => navigate('/polit-at')}
-          className="w-full h-[52px] rounded-xl bg-primary-blue text-white font-black tracking-wide shadow-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+          className={`w-full h-[100px] rounded-2xl ${ctaBgClass} ${ctaBorderClass} font-black tracking-wide shadow-xl transition-colors flex items-center justify-center gap-3`}
+          style={{ color: bgColor }}
           title="Polit At"
         >
-          <PenTool className="w-5 h-5" />
-          Polit At
+          <PenTool className="w-7 h-7 text-current" />
+          <span className="text-2xl leading-none">Polit At</span>
         </button>
       </div>
 
@@ -130,11 +154,12 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
               e.stopPropagation();
               navigate('/polit-at');
             }}
-            className="h-[56px] px-8 rounded-2xl bg-white/15 hover:bg-white/20 border border-white/25 text-white font-black tracking-wide shadow-xl transition-all flex items-center gap-3"
+            className={`h-full px-10 rounded-2xl ${ctaBgClass} ${ctaBorderClass} font-black tracking-wide shadow-2xl transition-colors flex items-center gap-4`}
+            style={{ color: bgColor }}
             title="Polit At"
           >
-            <PenTool className="w-6 h-6" />
-            Polit At
+            <PenTool className="w-9 h-9 text-current" />
+            <span className="text-3xl leading-none">Polit At</span>
           </button>
         </div>
       </div>
