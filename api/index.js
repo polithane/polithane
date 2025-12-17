@@ -1514,7 +1514,7 @@ async function storageUploadMedia(req, res) {
   const allowedBuckets = new Set(['uploads', 'politfest']);
   if (!allowedBuckets.has(bucket)) return res.status(400).json({ success: false, error: 'Geçersiz bucket.' });
 
-  const allowedFolders = new Set(['posts', 'avatars', 'politfest']);
+  const allowedFolders = new Set(['posts', 'avatars', 'politfest', 'messages']);
   if (!allowedFolders.has(folder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
 
   // Approval gate: pending accounts can browse/login but cannot upload post media yet.
@@ -2336,9 +2336,13 @@ async function getConversations(req, res) {
 
   const byOther = new Map();
   for (const m of rows || []) {
+    // Respect per-user soft deletes
+    if (m.sender_id === userId && m.is_deleted_by_sender === true) continue;
+    if (m.receiver_id === userId && m.is_deleted_by_receiver === true) continue;
+
     const otherId = m.sender_id === userId ? m.receiver_id : m.sender_id;
     if (!otherId) continue;
-    const prev = byOther.get(otherId) || { unread_count: 0 };
+    const prev = byOther.get(otherId) || { unread_count: 0, has_outgoing: false, has_incoming: false };
     const unreadInc = m.receiver_id === userId && m.is_read === false ? 1 : 0;
     if (!byOther.has(otherId)) {
       byOther.set(otherId, {
@@ -2347,11 +2351,17 @@ async function getConversations(req, res) {
         last_message: m.content,
         last_message_time: m.created_at,
         unread_count: unreadInc,
-        message_type: 'regular',
+        has_outgoing: m.sender_id === userId,
+        has_incoming: m.receiver_id === userId,
       });
     } else {
       // since ordered desc, first occurrence is last_message
-      byOther.set(otherId, { ...prev, unread_count: (prev.unread_count || 0) + unreadInc });
+      byOther.set(otherId, {
+        ...prev,
+        unread_count: (prev.unread_count || 0) + unreadInc,
+        has_outgoing: prev.has_outgoing || m.sender_id === userId,
+        has_incoming: prev.has_incoming || m.receiver_id === userId,
+      });
     }
   }
 
@@ -2368,7 +2378,11 @@ async function getConversations(req, res) {
   const userMap = new Map((users || []).map((u) => [u.id, u]));
 
   const out = Array.from(byOther.values())
-    .map((c) => ({ ...c, participant: userMap.get(c.participant_id) || null }))
+    .map((c) => {
+      const message_type = c.has_incoming && !c.has_outgoing ? 'request' : 'regular';
+      const { has_incoming, has_outgoing, ...rest } = c;
+      return { ...rest, message_type, participant: userMap.get(c.participant_id) || null };
+    })
     .sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
 
   res.json({ success: true, data: out });
@@ -2386,10 +2400,88 @@ async function getMessagesBetween(req, res, otherId) {
     limit: '500',
   }).catch(() => []);
 
+  const filtered = (rows || []).filter((m) => {
+    if (m.sender_id === userId && m.is_deleted_by_sender === true) return false;
+    if (m.receiver_id === userId && m.is_deleted_by_receiver === true) return false;
+    return true;
+  });
+
   // mark received messages as read
   await supabaseRestPatch('messages', { receiver_id: `eq.${userId}`, sender_id: `eq.${otherId}`, is_read: 'eq.false' }, { is_read: true }).catch(() => {});
 
-  res.json({ success: true, data: rows || [] });
+  res.json({ success: true, data: filtered });
+}
+
+function safeParseJson(input) {
+  try {
+    return JSON.parse(String(input));
+  } catch {
+    return null;
+  }
+}
+
+async function isBlockedBetween(userId, otherId) {
+  const ids = [Number(userId), Number(otherId)].filter((x) => Number.isFinite(x));
+  if (ids.length !== 2) return false;
+  const rows = await supabaseRestGet('users', { select: 'id,metadata', id: `in.(${ids.join(',')})`, limit: '2' }).catch(() => []);
+  const m = new Map((rows || []).map((u) => [u.id, u?.metadata && typeof u.metadata === 'object' ? u.metadata : {}]));
+  const a = m.get(Number(userId)) || {};
+  const b = m.get(Number(otherId)) || {};
+  const aBlocked = Array.isArray(a.blocked_user_ids) && a.blocked_user_ids.map(String).includes(String(otherId));
+  const bBlocked = Array.isArray(b.blocked_user_ids) && b.blocked_user_ids.map(String).includes(String(userId));
+  return aBlocked || bBlocked;
+}
+
+async function rejectMessageRequest(req, res, otherId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const userId = auth.id;
+  const oid = String(otherId || '').trim();
+  if (!/^\d+$/.test(oid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  // Soft-delete incoming messages for me (this effectively removes the request)
+  await supabaseRestPatch(
+    'messages',
+    { receiver_id: `eq.${userId}`, sender_id: `eq.${oid}`, is_deleted_by_receiver: 'eq.false' },
+    { is_deleted_by_receiver: true }
+  ).catch(() => {});
+  res.json({ success: true });
+}
+
+async function searchMessageUsers(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const q = String(req.query.q || '').trim();
+  if (q.length < 2) return res.json({ success: true, data: [] });
+  const safe = q.slice(0, 50);
+
+  const meRows = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+  const meMeta = meRows?.[0]?.metadata && typeof meRows[0].metadata === 'object' ? meRows[0].metadata : {};
+  const blocked = new Set(Array.isArray(meMeta.blocked_user_ids) ? meMeta.blocked_user_ids.map(String) : []);
+
+  const candidates = await supabaseRestGet('users', {
+    select: 'id,username,full_name,avatar_url,user_type,politician_type,party_id,province,is_verified,is_active,metadata,party:parties(*)',
+    is_active: 'eq.true',
+    or: `(username.ilike.*${safe}*,full_name.ilike.*${safe}*)`,
+    limit: '12',
+    order: 'polit_score.desc',
+  }).catch(() => []);
+
+  const list = (candidates || [])
+    .filter((u) => u && String(u.id) !== String(auth.id))
+    .filter((u) => !blocked.has(String(u.id)))
+    .slice(0, 10);
+
+  // Filter out users who blocked me (best-effort)
+  const out = [];
+  for (const u of list) {
+    const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+    const theirBlocked = Array.isArray(meta.blocked_user_ids) ? meta.blocked_user_ids.map(String) : [];
+    if (theirBlocked.includes(String(auth.id))) continue;
+    // don't leak their metadata
+    const { metadata, ...rest } = u;
+    out.push(rest);
+  }
+  res.json({ success: true, data: out });
 }
 
 async function sendMessage(req, res) {
@@ -2402,8 +2494,31 @@ async function sendMessage(req, res) {
   }
   const body = await readJsonBody(req);
   const receiver_id = body.receiver_id;
-  const content = String(body.content || '').trim();
+  const rawContent = body.content;
+  const attachment = body.attachment && typeof body.attachment === 'object' ? body.attachment : null;
+  const text = typeof rawContent === 'string' ? String(rawContent).trim() : '';
   if (!receiver_id || !/^\d+$/.test(String(receiver_id))) return res.status(400).json({ success: false, error: 'Geçersiz alıcı.' });
+  if (String(receiver_id) === String(auth.id)) return res.status(400).json({ success: false, error: 'Kendinize mesaj gönderemezsiniz.' });
+
+  // Block checks (either direction)
+  const blocked = await isBlockedBetween(auth.id, receiver_id);
+  if (blocked) {
+    return res.status(403).json({ success: false, error: 'Bu kullanıcıyla mesajlaşamazsınız (engelleme mevcut).' });
+  }
+
+  let content = '';
+  if (attachment && attachment.url && attachment.kind) {
+    const url = String(attachment.url || '').trim();
+    const kind = String(attachment.kind || '').trim();
+    if (!url) return res.status(400).json({ success: false, error: 'Dosya bağlantısı eksik.' });
+    if (!/^https?:\/\//i.test(url)) return res.status(400).json({ success: false, error: 'Dosya bağlantısı geçersiz.' });
+    if (kind !== 'image') return res.status(400).json({ success: false, error: 'Şimdilik sadece resim mesajı destekleniyor.' });
+    const payload = { type: kind, url, text: text || '' };
+    content = JSON.stringify(payload);
+  } else {
+    content = String(text || '').trim();
+  }
+
   if (!content) return res.status(400).json({ success: false, error: 'Mesaj boş olamaz.' });
   if (content.length > 2000) return res.status(400).json({ success: false, error: 'Mesaj çok uzun.' });
 
@@ -2689,7 +2804,12 @@ export default async function handler(req, res) {
 
       // Messages
       if (url === '/api/messages/conversations' && req.method === 'GET') return await getConversations(req, res);
+      if (url === '/api/messages/search' && req.method === 'GET') return await searchMessageUsers(req, res);
       if (url.startsWith('/api/messages/send') && req.method === 'POST') return await sendMessage(req, res);
+      if (url.startsWith('/api/messages/requests/') && url.endsWith('/reject') && req.method === 'POST') {
+        const otherId = url.split('/api/messages/requests/')[1].split('/reject')[0];
+        return await rejectMessageRequest(req, res, otherId);
+      }
       if (url.startsWith('/api/messages/') && req.method === 'GET') {
         const otherId = url.split('/api/messages/')[1];
         return await getMessagesBetween(req, res, otherId);

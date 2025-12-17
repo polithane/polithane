@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { formatTimeAgo } from '../utils/formatters';
-import { Search, Send, AlertCircle } from 'lucide-react';
+import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck } from 'lucide-react';
 import { messages as messagesApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
+import { apiCall } from '../utils/api';
 
 export const MessagesPage = () => {
   const { user } = useAuth();
@@ -15,22 +16,25 @@ export const MessagesPage = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [tab, setTab] = useState('regular'); // regular | requests
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  const fileRef = useRef(null);
   
   const [conversations, setConversations] = useState([]);
   
-  // Filter conversations by search query
-  const filteredConversations = searchQuery
-    ? (conversations || []).filter((conv) => {
-        const u = conv.participant;
-        return (
-          (u?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (conv?.last_message || '').toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      })
-    : conversations;
+  const filteredConversations = useMemo(() => {
+    const base = (conversations || []).filter((c) => (tab === 'requests' ? c.message_type === 'request' : c.message_type !== 'request'));
+    if (!searchQuery) return base;
+    return base.filter((conv) => {
+      const u = conv.participant;
+      return (
+        (u?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (conv?.last_message || '').toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    });
+  }, [conversations, tab, searchQuery]);
   
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -91,6 +95,69 @@ export const MessagesPage = () => {
       setError('Mesaj gönderilemedi');
     }
   };
+
+  const safeParseMessage = (message) => {
+    const raw = String(message?.content || '');
+    try {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === 'object' && obj.type === 'image' && obj.url) return obj;
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handlePickImage = () => {
+    setError(null);
+    fileRef.current?.click();
+  };
+
+  const handleSendImage = async (file) => {
+    if (!file || !selectedConv) return;
+    try {
+      setError(null);
+      const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
+      if (!allowed.has(file.type)) throw new Error('Sadece JPG / PNG / WEBP gönderebilirsiniz.');
+      if (file.size > 5 * 1024 * 1024) throw new Error('Resim çok büyük (max 5MB).');
+
+      const toDataUrl = (f) =>
+        new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result || ''));
+          r.onerror = () => reject(new Error('Dosya okunamadı.'));
+          r.readAsDataURL(f);
+        });
+      const dataUrl = await toDataUrl(file);
+
+      const up = await apiCall('/api/storage/upload', {
+        method: 'POST',
+        body: JSON.stringify({ bucket: 'uploads', folder: 'messages', dataUrl, contentType: file.type }),
+      });
+      const url = up?.data?.publicUrl;
+      if (!url) throw new Error('Resim yüklenemedi.');
+
+      const sent = await messagesApi.send(selectedConv.participant_id, '', { kind: 'image', url });
+      if (sent?.success) setMessages((prev) => [...prev, sent.data]);
+      setTimeout(scrollToBottom, 100);
+    } catch (e) {
+      setError(e?.message || 'Resim gönderilemedi');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const handleRejectRequest = async (conv) => {
+    try {
+      await messagesApi.rejectRequest(conv.participant_id);
+      setConversations((prev) => (prev || []).filter((c) => c.participant_id !== conv.participant_id));
+      if (selectedConv?.participant_id === conv.participant_id) {
+        setSelectedConv(null);
+        setMessages([]);
+      }
+    } catch (e) {
+      setError(e?.message || 'İstek reddedilemedi.');
+    }
+  };
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -100,6 +167,26 @@ export const MessagesPage = () => {
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
             <div className="p-4 border-b">
               <h2 className="text-xl font-bold mb-3">Mesajlar</h2>
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setTab('regular')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-bold border ${
+                    tab === 'regular' ? 'bg-blue-50 border-blue-200 text-primary-blue' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Mesajlar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('requests')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-bold border ${
+                    tab === 'requests' ? 'bg-blue-50 border-blue-200 text-primary-blue' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  İstekler
+                </button>
+              </div>
               {/* Search Bar */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -161,6 +248,20 @@ export const MessagesPage = () => {
                               </Badge>
                             )}
                           </div>
+                          {tab === 'requests' && (
+                            <div className="mt-2 flex justify-end">
+                              <button
+                                type="button"
+                                className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-black"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRejectRequest(conv);
+                                }}
+                              >
+                                Reddet
+                              </button>
+                            </div>
+                          )}
                           {conv.is_muted && (
                             <span className="text-xs text-gray-400 mt-1">🔇 Sessize alındı</span>
                           )}
@@ -176,7 +277,7 @@ export const MessagesPage = () => {
               {filteredConversations.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                   <p className="text-gray-500">
-                    {searchQuery ? 'Sonuç bulunamadı' : 'Henüz mesaj yok'}
+                    {searchQuery ? 'Sonuç bulunamadı' : tab === 'requests' ? 'Mesaj isteği yok' : 'Henüz mesaj yok'}
                   </p>
                 </div>
               )}
@@ -203,6 +304,11 @@ export const MessagesPage = () => {
                         {selectedConv.participant?.user_type || 'Kullanıcı'}
                       </p>
                     </div>
+                    {selectedConv.message_type === 'request' && (
+                      <div className="ml-auto text-xs font-black text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                        Mesaj isteği (cevap verirseniz sohbet açılır)
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -236,6 +342,7 @@ export const MessagesPage = () => {
                           
                           const isFromMe = message.sender_id === user?.id;
                           const otherUser = isFromMe ? null : selectedConv?.participant;
+                          const media = safeParseMessage(message);
                           
                           return (
                             <div
@@ -258,13 +365,48 @@ export const MessagesPage = () => {
                                       : 'bg-white text-gray-900 rounded-bl-sm border border-gray-200'
                                   }`}
                                 >
-                                  <p className="text-sm break-words">{message.content || ''}</p>
+                                  {media?.type === 'image' ? (
+                                    <div className="space-y-2">
+                                      {media.text ? <div className="text-sm break-words whitespace-pre-wrap">{media.text}</div> : null}
+                                      <a href={media.url} target="_blank" rel="noreferrer">
+                                        <img
+                                          src={media.url}
+                                          alt="Gönderilen resim"
+                                          className="rounded-xl max-w-full max-h-[260px] object-contain border border-white/20"
+                                        />
+                                      </a>
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm break-words whitespace-pre-wrap">{message.content || ''}</p>
+                                  )}
                                 </div>
                                 
-                                <div className="flex items-center gap-1 mt-1 px-1">
+                                <div className="flex items-center gap-2 mt-1 px-1">
                                   <span className="text-xs text-gray-400">
                                     {message.created_at ? formatTimeAgo(message.created_at) : ''}
                                   </span>
+                                  {isFromMe && (
+                                    <span className="inline-flex items-center gap-1 text-gray-400" title={message.is_read ? 'Görüldü' : 'Gönderildi'}>
+                                      {message.is_read ? <CheckCheck className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+                                    </span>
+                                  )}
+                                  {isFromMe && (
+                                    <button
+                                      type="button"
+                                      className="inline-flex items-center gap-1 text-gray-400 hover:text-red-600"
+                                      title="Mesajı sil"
+                                      onClick={async () => {
+                                        try {
+                                          await messagesApi.delete(message.id);
+                                          setMessages((prev) => prev.filter((m) => m.id !== message.id));
+                                        } catch (e) {
+                                          setError(e?.message || 'Mesaj silinemedi');
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -281,6 +423,13 @@ export const MessagesPage = () => {
                 
                 {/* Message Input */}
                 <div className="p-4 border-t">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => handleSendImage(e.target.files?.[0])}
+                  />
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -290,6 +439,14 @@ export const MessagesPage = () => {
                       placeholder="Mesajınızı yazın..."
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
                     />
+                    <button
+                      type="button"
+                      onClick={handlePickImage}
+                      className="bg-white border border-gray-300 text-gray-800 rounded-lg p-2 hover:bg-gray-50 transition-colors"
+                      title="Resim gönder"
+                    >
+                      <ImageIcon className="w-5 h-5" />
+                    </button>
                     <button
                       onClick={handleSendMessage}
                       disabled={!newMessage.trim()}

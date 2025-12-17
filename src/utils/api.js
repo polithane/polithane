@@ -281,10 +281,20 @@ export const messages = {
 
   getMessages: (userId) => apiCall(`/api/messages/${userId}`),
 
-  send: (receiver_id, content) =>
+  searchUsers: (q) => {
+    const query = new URLSearchParams({ q: String(q || '') }).toString();
+    return apiCall(`/api/messages/search?${query}`);
+  },
+
+  rejectRequest: (otherUserId) =>
+    apiCall(`/api/messages/requests/${otherUserId}/reject`, {
+      method: 'POST',
+    }),
+
+  send: (receiver_id, content, attachment = null) =>
     apiCall('/api/messages/send', {
       method: 'POST',
-      body: JSON.stringify({ receiver_id, content }),
+      body: JSON.stringify({ receiver_id, content, attachment }),
     }),
 
   delete: (messageId) =>
