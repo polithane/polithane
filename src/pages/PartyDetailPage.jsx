@@ -607,7 +607,7 @@ export const PartyDetailPage = () => {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {list.map((post) => (
-                        <PostCardHorizontal key={post.post_id} post={post} fullWidth={true} />
+                        <PostCardHorizontal key={post.post_id ?? post.id} post={post} fullWidth={true} />
                       ))}
                     </div>
                   </div>

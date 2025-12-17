@@ -62,7 +62,7 @@ export const MediaSidebar = ({ posts = [] }) => {
       >
         {mediaPosts.map(post => (
           <PostCardHorizontal 
-            key={post.post_id} 
+            key={post.post_id ?? post.id} 
             post={post}
             fullWidth={true}
           />

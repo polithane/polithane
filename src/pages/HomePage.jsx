@@ -289,7 +289,7 @@ export const HomePage = () => {
                   <div className="flex flex-col gap-3">
                     {activeTab.posts.slice(0, 20).map(post => (
                       <PostCardHorizontal 
-                        key={post.post_id} 
+                        key={post.post_id ?? post.id} 
                         post={post}
                         showCity={activeTab.id === 'mps' || activeTab.id === 'all'}
                         showPartyLogo={activeTab.id !== 'citizens'}
@@ -323,7 +323,7 @@ export const HomePage = () => {
                 >
                   {filterConsecutiveTextAudio(allPosts.slice(0, 30), true).map(post => (
                     <PostCardHorizontal 
-                      key={post.post_id} 
+                      key={post.post_id ?? post.id} 
                       post={post}
                       showCity={post.user?.politician_type === 'mp'}
                       showPartyLogo={post.user?.user_type !== 'normal'}
@@ -347,7 +347,7 @@ export const HomePage = () => {
               >
                 {filterConsecutiveTextAudio(mpPosts, true).map(post => (
                   <PostCardHorizontal 
-                    key={post.post_id} 
+                    key={post.post_id ?? post.id} 
                     post={post}
                     showCity={true}
                     showPartyLogo={true}
@@ -371,7 +371,7 @@ export const HomePage = () => {
               >
                 {filterConsecutiveTextAudio(organizationPosts, true).map(post => (
                   <PostCardHorizontal 
-                    key={post.post_id} 
+                    key={post.post_id ?? post.id} 
                     post={post}
                     showPartyLogo={true}
                   />
@@ -394,7 +394,7 @@ export const HomePage = () => {
               >
                 {filterConsecutiveTextAudio(citizenPosts, true).map(post => (
                   <PostCardHorizontal 
-                    key={post.post_id} 
+                    key={post.post_id ?? post.id} 
                     post={post}
                   />
                 ))}

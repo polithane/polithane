@@ -12,6 +12,7 @@ import { getProfilePath } from '../../utils/paths';
 export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPosition = false }) => {
   const navigate = useNavigate();
   const [showScoreModal, setShowScoreModal] = useState(false);
+  const postId = post?.post_id ?? post?.id;
   
   const getContentIcon = () => {
     switch (post.content_type) {
@@ -29,7 +30,10 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
   return (
     <div 
       className="card-hover p-4 mb-4 w-full relative"
-      onClick={() => navigate(`/post/${post.post_id}`)}
+      onClick={() => {
+        if (!postId) return;
+        navigate(`/post/${postId}`);
+      }}
     >
       {/* Parti Logosu - SAĞ ÜST KÖŞE - Responsive */}
       {post.user?.party_id && post.user?.party?.party_logo && (

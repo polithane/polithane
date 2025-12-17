@@ -143,7 +143,7 @@ export const AdminDashboardNew = () => {
           
           <div className="space-y-3">
             {topPosts.map(post => (
-              <div key={post.post_id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+              <div key={post.post_id ?? post.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-gray-900 truncate">{post.user?.full_name}</div>
                   <div className="text-xs text-gray-500 truncate">{post.content_text?.slice(0, 50)}...</div>

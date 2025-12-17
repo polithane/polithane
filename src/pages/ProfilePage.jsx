@@ -4,6 +4,7 @@ import { MoreVertical, Ban, AlertCircle, MessageCircle, Settings, Edit } from 'l
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
+import { Modal } from '../components/common/Modal';
 import { FollowButton } from '../components/common/FollowButton';
 import { FollowListModal } from '../components/common/FollowListModal';
 import { BlockUserModal } from '../components/common/BlockUserModal';
@@ -54,6 +55,7 @@ export const ProfilePage = () => {
   const [privacyBlocked, setPrivacyBlocked] = useState(false);
   const [privacyMessage, setPrivacyMessage] = useState('');
   const [blockedIds, setBlockedIds] = useState([]);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
   
   const isOwnProfile = currentUser && (
     userId === 'me' || 
@@ -300,6 +302,7 @@ export const ProfilePage = () => {
               src={user.avatar_url || user.profile_image} 
               size="120px" 
               verified={user.verification_badge || user.is_verified}
+              onClick={() => setShowAvatarModal(true)}
             />
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -488,6 +491,22 @@ export const ProfilePage = () => {
           />
         </div>
       </div>
+
+      <Modal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        title="Profil Fotoğrafı"
+        size="medium"
+        className="overflow-hidden"
+      >
+        <div className="flex items-center justify-center">
+          <img
+            src={user?.avatar_url || user?.profile_image || '/ikon.png'}
+            alt={user?.full_name || 'Profil'}
+            className="max-w-full max-h-[70vh] rounded-2xl object-contain bg-gray-50 border border-gray-200"
+          />
+        </div>
+      </Modal>
       
       {/* Tabs */}
       <div className="container-main py-6">
@@ -534,7 +553,7 @@ export const ProfilePage = () => {
         {activeTab === 'posts' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {userPosts.map(post => (
-              <PostCardHorizontal key={post.post_id} post={post} fullWidth={true} />
+              <PostCardHorizontal key={post.post_id ?? post.id} post={post} fullWidth={true} />
             ))}
           </div>
         )}

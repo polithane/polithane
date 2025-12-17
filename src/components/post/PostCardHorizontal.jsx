@@ -39,6 +39,7 @@ const getPlateCodeFromProvince = (provinceName) => {
 export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = false, fullWidth = false, style }) => {
   const navigate = useNavigate();
   const [showScoreModal, setShowScoreModal] = useState(false);
+  const postId = post?.post_id ?? post?.id;
   
   const getContentIcon = () => {
     switch (post.content_type) {
@@ -87,7 +88,10 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
     <div 
       className={`card-hover ${fullWidth ? 'p-3 w-full' : 'p-4'} flex-shrink-0 cursor-pointer flex flex-col min-h-[400px] relative`}
       style={fullWidth ? {} : { scrollSnapAlign: 'start', ...style }}
-      onClick={() => navigate(`/post/${post.post_id}`)}
+      onClick={() => {
+        if (!postId) return;
+        navigate(`/post/${postId}`);
+      }}
     >
       {/* Parti Logosu - SAĞ ÜST KÖŞE - %40 Büyütülmüş */}
       {post.user?.party_id && post.user?.party?.party_logo && (

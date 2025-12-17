@@ -23,6 +23,7 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
   if (!posts || posts.length === 0) return null;
   
   const currentPost = posts[currentIndex];
+  const currentPostId = currentPost?.post_id ?? currentPost?.id;
   
   const parseHexColor = (value) => {
     const s = String(value || '').trim();
@@ -98,7 +99,10 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
       <div 
         className="relative h-[100px] md:h-[120px] rounded-xl overflow-hidden cursor-pointer shadow-lg"
         style={{ backgroundColor: bgColor }}
-        onClick={() => navigate(`/post/${currentPost.post_id}`)}
+        onClick={() => {
+          if (!currentPostId) return;
+          navigate(`/post/${currentPostId}`);
+        }}
       >
       {/* Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent" />

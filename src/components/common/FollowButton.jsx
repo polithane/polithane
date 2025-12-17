@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserPlus, UserCheck, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { users as usersApi } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
   const { user: me, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [followStatus, setFollowStatus] = useState('not_following'); // not_following | following
   const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
@@ -28,7 +31,11 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
 
   const handleFollow = async () => {
     if (!targetUserId) return;
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      toast.error('Takip etmek için giriş yapmalısınız.');
+      navigate('/login-new');
+      return;
+    }
     if (String(me?.id || '') === String(targetUserId)) return;
 
     if (followStatus === 'following') {
@@ -43,6 +50,7 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
       const next = action === 'unfollowed' ? 'not_following' : 'following';
       setFollowStatus(next);
       onChange?.(next);
+      if (next === 'following') toast.success('Başarıyla takip listene eklendi.');
     } catch {
       // noop
     } finally {
@@ -59,6 +67,7 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
       const next = action === 'unfollowed' ? 'not_following' : 'following';
       setFollowStatus(next);
       onChange?.(next);
+      if (next === 'not_following') toast.success('Takipten çıkarıldı.');
     } catch {
       // noop
     } finally {

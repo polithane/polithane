@@ -78,7 +78,7 @@ export const SearchPage = () => {
               <h2 className="text-xl font-bold mb-4">Paylaşımlar</h2>
               <div className="space-y-4">
                 {filteredPosts.map(post => (
-                  <PostCard key={post.post_id} post={post} />
+                  <PostCard key={post.post_id ?? post.id} post={post} />
                 ))}
               </div>
             </div>

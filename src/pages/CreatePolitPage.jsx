@@ -17,26 +17,51 @@ export const CreatePolitPage = () => {
     return ut !== 'citizen' && !user?.is_verified;
   }, [isAuthenticated, user?.is_admin, user?.user_type, user?.is_verified]);
 
-  const iconBaseUrl = useMemo(() => {
+  const iconBaseUrls = useMemo(() => {
     try {
       const explicit = String(import.meta.env?.VITE_ICON_BASE_URL || '').trim();
-      if (explicit) return explicit.replace(/\/+$/, '');
       const supabaseUrl = String(import.meta.env?.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
-      if (!supabaseUrl) return '';
-      return `${supabaseUrl}/storage/v1/object/public/uploads/ikons`;
+      const bases = [];
+      if (explicit) bases.push(explicit.replace(/\/+$/, ''));
+      if (supabaseUrl) {
+        // 1) uploads bucket /ikons folder (our default)
+        bases.push(`${supabaseUrl}/storage/v1/object/public/uploads/ikons`);
+        // 2) ikons bucket (some setups store icons in a dedicated bucket)
+        bases.push(`${supabaseUrl}/storage/v1/object/public/ikons`);
+      }
+      return Array.from(new Set(bases)).filter(Boolean);
     } catch {
-      return '';
+      return [];
     }
   }, []);
 
+  const iconCandidates = useMemo(() => {
+    const join = (base, name) => `${String(base).replace(/\/+$/, '')}/${name}`;
+    const names = {
+      video: ['videoikon.png', 'video.png', 'videoikon.webp', 'video.webp', 'videoikon.jpg', 'video.jpg'],
+      image: ['resimikon.png', 'resim.png', 'resimikon.webp', 'resim.webp', 'resimikon.jpg', 'resim.jpg'],
+      audio: ['sesikon.png', 'ses.png', 'sesikon.webp', 'ses.webp', 'sesikon.jpg', 'ses.jpg'],
+      text: ['yaziikon.png', 'yazi.png', 'yaziikon.webp', 'yazi.webp', 'yaziikon.jpg', 'yazi.jpg'],
+    };
+    const out = {};
+    (['video', 'image', 'audio', 'text'] || []).forEach((k) => {
+      const list = [];
+      for (const b of iconBaseUrls || []) {
+        for (const n of names[k] || []) list.push(join(b, n));
+      }
+      out[k] = Array.from(new Set(list));
+    });
+    return out;
+  }, [iconBaseUrls]);
+
   const contentTabs = useMemo(
     () => [
-      { key: 'video', iconSrc: iconBaseUrl ? `${iconBaseUrl}/videoikon.png` : '', fallbackIcon: Video, alt: 'Video' },
-      { key: 'image', iconSrc: iconBaseUrl ? `${iconBaseUrl}/resimikon.png` : '', fallbackIcon: ImageIcon, alt: 'Resim' },
-      { key: 'audio', iconSrc: iconBaseUrl ? `${iconBaseUrl}/sesikon.png` : '', fallbackIcon: Music, alt: 'Ses' },
-      { key: 'text', iconSrc: iconBaseUrl ? `${iconBaseUrl}/yaziikon.png` : '', fallbackIcon: PenTool, alt: 'Yazı' },
+      { key: 'video', fallbackIcon: Video, alt: 'Video' },
+      { key: 'image', fallbackIcon: ImageIcon, alt: 'Resim' },
+      { key: 'audio', fallbackIcon: Music, alt: 'Ses' },
+      { key: 'text', fallbackIcon: PenTool, alt: 'Yazı' },
     ],
-    [iconBaseUrl]
+    []
   );
 
   const [contentType, setContentType] = useState('video');
@@ -48,6 +73,7 @@ export const CreatePolitPage = () => {
   const [loading, setLoading] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [brokenIcons, setBrokenIcons] = useState({});
+  const [iconTryIndex, setIconTryIndex] = useState({});
 
   // Text constraints
   const TEXT_LIMIT = 350;
@@ -394,7 +420,10 @@ export const CreatePolitPage = () => {
               {contentTabs.map((t) => {
                 const active = t.key === contentType;
                 const FallbackIcon = t.fallbackIcon;
-                const showImage = !!iconBaseUrl && !brokenIcons[t.key];
+                const candidates = iconCandidates?.[t.key] || [];
+                const idx = Number(iconTryIndex?.[t.key] || 0);
+                const iconSrc = candidates[idx] || '';
+                const showImage = !!iconSrc && !brokenIcons[t.key];
                 return (
                   <button
                     key={t.key}
@@ -408,12 +437,19 @@ export const CreatePolitPage = () => {
                   >
                     {showImage ? (
                       <img
-                        src={t.iconSrc}
+                        src={iconSrc}
                         alt={t.alt}
                         className={`object-contain transition-transform ${active ? 'scale-110' : 'opacity-90 hover:opacity-100'}`}
                         style={{ width: 56, height: 56 }}
                         loading="lazy"
-                        onError={() => setBrokenIcons((p) => ({ ...p, [t.key]: true }))}
+                        onError={() => {
+                          const nextIdx = idx + 1;
+                          if (nextIdx < candidates.length) {
+                            setIconTryIndex((p) => ({ ...p, [t.key]: nextIdx }));
+                          } else {
+                            setBrokenIcons((p) => ({ ...p, [t.key]: true }));
+                          }
+                        }}
                       />
                     ) : (
                       <FallbackIcon

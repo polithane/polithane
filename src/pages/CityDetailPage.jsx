@@ -601,7 +601,7 @@ export const CityDetailPage = () => {
               <div className="space-y-4">
                 {cityData.posts.slice(0, 5).map(post => (
                   <PostCardHorizontal 
-                    key={post.post_id}
+                    key={post.post_id ?? post.id}
                     post={post}
                     showCity={false}
                     showPartyLogo={true}
