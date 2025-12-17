@@ -6,7 +6,6 @@ import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
 import { Tooltip } from '../common/Tooltip';
 import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration, getSourceDomain } from '../../utils/formatters';
 import { getUserTitle } from '../../utils/titleHelpers';
-import { getPlaceholderImage } from '../../utils/imagePaths';
 import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
 import { getProfilePath } from '../../utils/paths';
@@ -54,19 +53,32 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
     }
   };
 
-  // Resim URL helper
-  const getImageUrl = (url) => {
-    // Eğer gerçek path varsa kullan
-    if (url && url.startsWith('/assets/')) return url;
-    // Placeholder kullan
-    return getPlaceholderImage('post', post.post_id);
+  const toSafeSrc = (value) => {
+    const s = String(value || '').trim();
+    if (!s) return '';
+    // Supabase public URL / signed URL / CDN
+    if (s.startsWith('https://') || s.startsWith('http://')) return s;
+    // Local public assets (Vite /public)
+    if (s.startsWith('/')) return s;
+    return '';
   };
 
-  const getAvatarUrl = (url) => {
-    // Eğer gerçek path varsa kullan
-    if (url && url.startsWith('/assets/')) return url;
-    // Placeholder kullan
-    return getPlaceholderImage('avatar', post.user_id || 1);
+  const normalizeMediaList = (value) => {
+    const raw = Array.isArray(value) ? value : value ? [value] : [];
+    return raw.map(toSafeSrc).filter(Boolean);
+  };
+
+  const SafeImage = ({ src, className, fallbackIcon = null }) => {
+    const [failed, setFailed] = useState(false);
+    const safeSrc = toSafeSrc(src);
+    if (!safeSrc || failed) {
+      return (
+        <div className={`w-full h-full bg-gray-100 flex items-center justify-center ${className || ''}`}>
+          {fallbackIcon || <ImageIcon className="w-10 h-10 text-gray-400" />}
+        </div>
+      );
+    }
+    return <img src={safeSrc} alt="" className={className} onError={() => setFailed(true)} />;
   };
 
   return (
@@ -201,19 +213,25 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             </div>
           )}
           {post.content_type === CONTENT_TYPES.IMAGE && (() => {
-            // Resimleri array'e çevir (tek resim veya çoklu)
-            const images = Array.isArray(post.media_url) ? post.media_url : [post.media_url];
+            const images = normalizeMediaList(post.media_url);
             const imageCount = images.length;
+
+            // Medya yoksa: örnek/placeholder göstermeyelim
+            if (imageCount === 0) {
+              return (
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                  <div className="text-center">
+                    <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <div className="text-xs text-gray-600 font-semibold">Resim yok</div>
+                  </div>
+                </div>
+              );
+            }
             
             // 1 Resim - Tam alan
             if (imageCount === 1) {
               return (
-                <img 
-                  src={getImageUrl(images[0])} 
-                  alt=""
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.target.src = getPlaceholderImage('post', post.post_id); }}
-                />
+                <SafeImage src={images[0]} className="w-full h-full object-cover" />
               );
             }
             
@@ -222,13 +240,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
               return (
                 <div className="w-full h-full grid grid-cols-2 gap-0.5">
                   {images.slice(0, 2).map((img, idx) => (
-                    <img 
-                      key={idx}
-                      src={getImageUrl(img)} 
-                      alt=""
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.target.src = getPlaceholderImage('post', post.post_id + idx); }}
-                    />
+                    <SafeImage key={idx} src={img} className="w-full h-full object-cover" />
                   ))}
                 </div>
               );
@@ -238,21 +250,10 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             if (imageCount === 3) {
               return (
                 <div className="w-full h-full grid grid-cols-2 gap-0.5">
-                  <img 
-                    src={getImageUrl(images[0])} 
-                    alt=""
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.target.src = getPlaceholderImage('post', post.post_id); }}
-                  />
+                  <SafeImage src={images[0]} className="w-full h-full object-cover" />
                   <div className="grid grid-rows-2 gap-0.5">
                     {images.slice(1, 3).map((img, idx) => (
-                      <img 
-                        key={idx}
-                        src={getImageUrl(img)} 
-                        alt=""
-                        className="w-full h-full object-cover"
-                        onError={(e) => { e.target.src = getPlaceholderImage('post', post.post_id + idx + 1); }}
-                      />
+                      <SafeImage key={idx} src={img} className="w-full h-full object-cover" />
                     ))}
                   </div>
                 </div>
@@ -264,13 +265,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
               return (
                 <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
                   {images.slice(0, 4).map((img, idx) => (
-                    <img 
-                      key={idx}
-                      src={getImageUrl(img)} 
-                      alt=""
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.target.src = getPlaceholderImage('post', post.post_id + idx); }}
-                    />
+                    <SafeImage key={idx} src={img} className="w-full h-full object-cover" />
                   ))}
                 </div>
               );
@@ -280,13 +275,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             return (
               <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
                 {images.slice(0, 3).map((img, idx) => (
-                  <img 
-                    key={idx}
-                    src={getImageUrl(img)} 
-                    alt=""
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.target.src = getPlaceholderImage('post', post.post_id + idx); }}
-                  />
+                  <SafeImage key={idx} src={img} className="w-full h-full object-cover" />
                 ))}
                 {/* Tümü Butonu */}
                 <div className="w-full h-full bg-black bg-opacity-60 flex items-center justify-center cursor-pointer hover:bg-opacity-70 transition-all">
@@ -301,13 +290,10 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
           })()}
           {post.content_type === CONTENT_TYPES.VIDEO && (
             <>
-              <img 
-                src={getImageUrl(post.thumbnail_url || post.media_url)} 
-                alt=""
+              <SafeImage
+                src={toSafeSrc(post.thumbnail_url) || normalizeMediaList(post.media_url)[0] || ''}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.src = getPlaceholderImage('post', post.post_id);
-                }}
+                fallbackIcon={<Video className="w-12 h-12 text-gray-400" />}
               />
               {/* 3D Play Butonu */}
               <div className="absolute inset-0 flex items-center justify-center">

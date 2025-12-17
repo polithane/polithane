@@ -54,12 +54,17 @@ export const HomePage = () => {
         setUsers([]);
 
         // Postları ayarla (tamamı DB)
+        const normalizeMediaUrls = (value) => {
+          const raw = Array.isArray(value) ? value : value ? [value] : [];
+          return raw.map((v) => String(v || '').trim()).filter(Boolean);
+        };
+
         const mapDbPostToUi = (p) => ({
           post_id: p.id,
           user_id: p.user_id,
           content_type: p.content_type || 'text',
           content_text: p.content_text ?? p.content ?? '',
-          media_url: p.media_urls ?? [],
+          media_url: normalizeMediaUrls(p.media_urls),
           thumbnail_url: p.thumbnail_url ?? null,
           media_duration: p.media_duration ?? null,
           agenda_tag: p.agenda_tag ?? null,
