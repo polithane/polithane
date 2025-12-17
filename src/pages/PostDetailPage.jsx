@@ -76,40 +76,27 @@ export const PostDetailPage = () => {
   useEffect(() => {
     setActiveImageIdx(0);
   }, [postId]);
-  
-  if (loading) {
-    return (
-      <div className="container-main py-8">
-        <div className="text-center">Yükleniyor...</div>
-      </div>
-    );
-  }
 
-  if (error || !post) {
-    return (
-      <div className="container-main py-8">
-        <div className="text-center text-gray-700">{error || 'Paylaşım bulunamadı.'}</div>
-      </div>
-    );
-  }
-
+  const isReady = !loading && !error && !!post;
+  const safePost = post || {};
   const uiPost = {
-    post_id: post.post_id ?? post.id,
-    user_id: post.user_id,
-    content_type: post.content_type || (Array.isArray(post.media_urls) && post.media_urls.length > 0 ? 'image' : 'text'),
-    content_text: post.content_text ?? post.content ?? '',
-    media_url: post.media_url ?? post.media_urls ?? [],
-    thumbnail_url: post.thumbnail_url,
-    media_duration: post.media_duration,
-    agenda_tag: post.agenda_tag,
-    polit_score: post.polit_score,
-    view_count: post.view_count,
-    like_count: post.like_count,
-    comment_count: post.comment_count,
-    share_count: post.share_count,
-    created_at: post.created_at,
-    source_url: post.source_url,
-    user: post.user || null,
+    post_id: safePost.post_id ?? safePost.id ?? null,
+    user_id: safePost.user_id ?? null,
+    content_type:
+      safePost.content_type || (Array.isArray(safePost.media_urls) && safePost.media_urls.length > 0 ? 'image' : 'text'),
+    content_text: safePost.content_text ?? safePost.content ?? '',
+    media_url: safePost.media_url ?? safePost.media_urls ?? [],
+    thumbnail_url: safePost.thumbnail_url,
+    media_duration: safePost.media_duration,
+    agenda_tag: safePost.agenda_tag,
+    polit_score: safePost.polit_score,
+    view_count: safePost.view_count,
+    like_count: safePost.like_count,
+    comment_count: safePost.comment_count,
+    share_count: safePost.share_count,
+    created_at: safePost.created_at,
+    source_url: safePost.source_url,
+    user: safePost.user || null,
   };
 
   const isOwnPost = isAuthenticated && currentUser?.id && String(uiPost.user_id) === String(currentUser.id);
@@ -125,6 +112,7 @@ export const PostDetailPage = () => {
   const activeImageSrc = imageList[safeActiveImageIdx] || imageList[0] || '';
 
   const handleToggleLike = async () => {
+    if (!uiPost.post_id) return;
     if (!isAuthenticated) {
       navigate('/login-new');
       return;
@@ -142,6 +130,7 @@ export const PostDetailPage = () => {
   };
 
   const handleAddComment = async () => {
+    if (!uiPost.post_id) return;
     if (!isAuthenticated) {
       navigate('/login-new');
       return;
@@ -221,88 +210,95 @@ export const PostDetailPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-8">
-        <div className="max-w-3xl mx-auto">
-          {/* Kullanıcı Bilgisi */}
-          <div className="card mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Avatar 
-                src={uiPost.user?.avatar_url || uiPost.user?.profile_image} 
-                size="60px" 
-                verified={uiPost.user?.verification_badge || uiPost.user?.is_verified}
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-lg break-words">{uiPost.user?.full_name}</h3>
-                  {uiPost.user?.party_id && uiPost.user?.party?.short_name && (
-                    <Badge variant="secondary" size="small">{uiPost.user.party.short_name}</Badge>
-                  )}
+        {loading ? (
+          <div className="text-center">Yükleniyor...</div>
+        ) : error || !post ? (
+          <div className="text-center text-gray-700">{error || 'Paylaşım bulunamadı.'}</div>
+        ) : (
+          <div className="max-w-3xl mx-auto">
+            {/* Kullanıcı Bilgisi */}
+            <div className="card mb-6">
+              <div className="flex items-center gap-4 mb-4">
+                <Avatar
+                  src={uiPost.user?.avatar_url || uiPost.user?.profile_image}
+                  size="60px"
+                  verified={uiPost.user?.verification_badge || uiPost.user?.is_verified}
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-lg break-words">{uiPost.user?.full_name}</h3>
+                    {uiPost.user?.party_id && uiPost.user?.party?.short_name && (
+                      <Badge variant="secondary" size="small">
+                        {uiPost.user.party.short_name}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
                 </div>
-                <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
+                {uiPost.user_id ? (
+                  <FollowButton targetUserId={uiPost.user_id} size="md" />
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (uiPost.user) navigate(getProfilePath(uiPost.user));
+                    }}
+                  >
+                    Takip Et
+                  </Button>
+                )}
               </div>
-              {uiPost.user_id ? (
-                <FollowButton targetUserId={uiPost.user_id} size="md" />
-              ) : (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (uiPost.user) navigate(getProfilePath(uiPost.user));
-                  }}
-                >
-                  Takip Et
-                </Button>
-              )}
-            </div>
-            
-            {/* İçerik */}
-            <div className="mb-4">
-              {uiPost.content_type === 'text' && (
-                <p className="text-gray-900 text-2xl leading-relaxed font-medium whitespace-pre-wrap">{uiPost.content_text}</p>
-              )}
-              {uiPost.content_type === 'image' && (
-                <div>
-                  {activeImageSrc ? (
-                    <>
-                      <img src={activeImageSrc} alt="" className="w-full rounded-lg mb-3" />
-                      {imageList.length > 1 && (
-                        <div className="mb-3 overflow-x-auto">
-                          <div className="flex gap-2 w-max">
-                            {imageList.map((src, idx) => (
-                              <button
-                                key={`${src}_${idx}`}
-                                type="button"
-                                onClick={() => setActiveImageIdx(idx)}
-                                className={`rounded-lg border ${
-                                  idx === safeActiveImageIdx ? 'border-primary-blue ring-2 ring-primary-blue/30' : 'border-gray-200'
-                                } flex-shrink-0`}
-                                style={{ width: 88, height: 88 }}
-                                title={`Resim ${idx + 1}`}
-                              >
-                                <img src={src} alt="" className="w-full h-full object-cover rounded-lg" />
-                              </button>
-                            ))}
+
+              {/* İçerik */}
+              <div className="mb-4">
+                {uiPost.content_type === 'text' && (
+                  <p className="text-gray-900 text-2xl leading-relaxed font-medium whitespace-pre-wrap">{uiPost.content_text}</p>
+                )}
+                {uiPost.content_type === 'image' && (
+                  <div>
+                    {activeImageSrc ? (
+                      <>
+                        <img src={activeImageSrc} alt="" className="w-full rounded-lg mb-3" />
+                        {imageList.length > 1 && (
+                          <div className="mb-3 overflow-x-auto">
+                            <div className="flex gap-2 w-max">
+                              {imageList.map((src, idx) => (
+                                <button
+                                  key={`${src}_${idx}`}
+                                  type="button"
+                                  onClick={() => setActiveImageIdx(idx)}
+                                  className={`rounded-lg border ${
+                                    idx === safeActiveImageIdx ? 'border-primary-blue ring-2 ring-primary-blue/30' : 'border-gray-200'
+                                  } flex-shrink-0`}
+                                  style={{ width: 88, height: 88 }}
+                                  title={`Resim ${idx + 1}`}
+                                >
+                                  <img src={src} alt="" className="w-full h-full object-cover rounded-lg" />
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-gray-500 text-sm mb-3">Resim bulunamadı.</div>
-                  )}
-                  {uiPost.content_text && <p className="text-gray-800">{uiPost.content_text}</p>}
-                </div>
-              )}
-              {uiPost.content_type === 'video' && (
-                <div>
-                  <ReactPlayer url={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} controls width="100%" />
-                  {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
-                </div>
-              )}
-              {uiPost.content_type === 'audio' && (
-                <div className="bg-gray-100 rounded-lg p-6">
-                  <audio src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} controls className="w-full" />
-                  {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
-                </div>
-              )}
-            </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-gray-500 text-sm mb-3">Resim bulunamadı.</div>
+                    )}
+                    {uiPost.content_text && <p className="text-gray-800">{uiPost.content_text}</p>}
+                  </div>
+                )}
+                {uiPost.content_type === 'video' && (
+                  <div>
+                    <ReactPlayer url={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} controls width="100%" />
+                    {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
+                  </div>
+                )}
+                {uiPost.content_type === 'audio' && (
+                  <div className="bg-gray-100 rounded-lg p-6">
+                    <audio src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} controls className="w-full" />
+                    {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
+                  </div>
+                )}
+              </div>
             
             {/* Gündem */}
             {uiPost.agenda_tag && (
@@ -580,6 +576,7 @@ export const PostDetailPage = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
       
       {/* Polit Puan Detay Modal */}
