@@ -840,6 +840,91 @@ async function getUserPosts(req, res, username) {
     res.json({ success: true, data: posts || [] });
 }
 
+async function resolveUserId(userKey) {
+  const key = String(userKey || '').trim();
+  if (!key) return null;
+  if (/^\d+$/.test(key) || /^[0-9a-fA-F-]{36}$/.test(key)) return key;
+  const rows = await supabaseRestGet('users', { select: 'id', username: `eq.${key}`, limit: '1' }).catch(() => []);
+  return rows?.[0]?.id ?? null;
+}
+
+async function getUserLikedPosts(req, res, userKey) {
+  const uid = await resolveUserId(userKey);
+  if (!uid) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+  const { limit = 50, offset = 0 } = req.query || {};
+  const rows = await supabaseRestGet('likes', {
+    select: 'created_at,post:posts(*,user:users(*),party:parties(*))',
+    user_id: `eq.${uid}`,
+    order: 'created_at.desc',
+    limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
+    offset: String(parseInt(offset, 10) || 0),
+  }).catch(() => []);
+  const list = (rows || [])
+    .map((r) => r.post)
+    .filter((p) => p && p.is_deleted !== true);
+  return res.json({ success: true, data: list });
+}
+
+async function getUserCommentsList(req, res, userKey) {
+  const uid = await resolveUserId(userKey);
+  if (!uid) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+  const auth = verifyJwtFromRequest(req);
+  const isOwner = auth?.id && String(auth.id) === String(uid);
+  const { limit = 50, offset = 0 } = req.query || {};
+  const params = {
+    select: 'id,content,created_at,updated_at,is_deleted,post_id,post:posts(*,user:users(*),party:parties(*))',
+    user_id: `eq.${uid}`,
+    order: 'created_at.desc',
+    limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
+    offset: String(parseInt(offset, 10) || 0),
+  };
+  if (!isOwner) params.is_deleted = 'eq.false';
+  const rows = await supabaseRestGet('comments', params).catch(() => []);
+  const list = (rows || []).filter((c) => c?.post && c.post.is_deleted !== true);
+  return res.json({ success: true, data: list });
+}
+
+async function getUserActivity(req, res, userKey) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const uid = await resolveUserId(userKey === 'me' ? auth.id : userKey);
+  if (!uid) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+  if (String(auth.id) !== String(uid) && !auth.is_admin) {
+    return res.status(403).json({ success: false, error: 'Bu işlem için yetkiniz yok.' });
+  }
+  const userId = uid;
+  const { limit = 50 } = req.query || {};
+  const lim = Math.min(parseInt(limit, 10) || 50, 200);
+
+  const [posts, comments, likes, follows] = await Promise.all([
+    supabaseRestGet('posts', { select: '*,user:users(*),party:parties(*)', user_id: `eq.${userId}`, order: 'created_at.desc', limit: '50' }).catch(() => []),
+    supabaseRestGet('comments', { select: 'id,content,created_at,is_deleted,post:posts(*,user:users(*),party:parties(*))', user_id: `eq.${userId}`, order: 'created_at.desc', limit: '50' }).catch(() => []),
+    supabaseRestGet('likes', { select: 'created_at,post:posts(*,user:users(*),party:parties(*))', user_id: `eq.${userId}`, order: 'created_at.desc', limit: '50' }).catch(() => []),
+    supabaseRestGet('follows', { select: 'created_at,following:users(*)', follower_id: `eq.${userId}`, order: 'created_at.desc', limit: '50' }).catch(() => []),
+  ]);
+
+  const items = [];
+  (posts || []).forEach((p) => {
+    if (!p || p.is_deleted === true) return;
+    items.push({ type: 'post', created_at: p.created_at, post: p });
+  });
+  (comments || []).forEach((c) => {
+    if (!c?.post || c.post.is_deleted === true) return;
+    items.push({ type: 'comment', created_at: c.created_at, comment: c, post: c.post });
+  });
+  (likes || []).forEach((l) => {
+    if (!l?.post || l.post.is_deleted === true) return;
+    items.push({ type: 'like', created_at: l.created_at, post: l.post });
+  });
+  (follows || []).forEach((f) => {
+    if (!f?.following) return;
+    items.push({ type: 'follow', created_at: f.created_at, target_user: f.following });
+  });
+
+  items.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  return res.json({ success: true, data: items.slice(0, lim) });
+}
+
 function requireAdmin(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) {
@@ -2275,6 +2360,9 @@ export default async function handler(req, res) {
           const id = parts[0];
           const tail = parts[1];
           if (id && tail === 'posts' && req.method === 'GET') return await getUserPosts(req, res, id);
+          if (id && tail === 'likes' && req.method === 'GET') return await getUserLikedPosts(req, res, id);
+          if (id && tail === 'comments' && req.method === 'GET') return await getUserCommentsList(req, res, id);
+          if (id && tail === 'activity' && req.method === 'GET') return await getUserActivity(req, res, id);
           if (id && tail === 'follow' && req.method === 'POST') return await toggleFollow(req, res, id);
           if (id && tail === 'follow-stats' && req.method === 'GET') return await getFollowStats(req, res, id);
           if (id && tail === 'followers' && req.method === 'GET') return await getFollowers(req, res, id);

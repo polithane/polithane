@@ -243,6 +243,19 @@ export const users = {
 
   getFollowing: (userId) => apiCall(`/api/users/${userId}/following`),
 
+  getLikes: (userId, params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/users/${userId}/likes${query ? `?${query}` : ''}`);
+  },
+  getComments: (userId, params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/users/${userId}/comments${query ? `?${query}` : ''}`);
+  },
+  getActivity: (userId = 'me', params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/users/${userId}/activity${query ? `?${query}` : ''}`);
+  },
+
   getBlocks: () => apiCall('/api/users/blocks'),
   block: (targetId) =>
     apiCall('/api/users/blocks', {

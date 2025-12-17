@@ -56,6 +56,10 @@ export const ProfilePage = () => {
   const [privacyMessage, setPrivacyMessage] = useState('');
   const [blockedIds, setBlockedIds] = useState([]);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [tabLoading, setTabLoading] = useState(false);
+  const [userComments, setUserComments] = useState([]);
+  const [likedPosts, setLikedPosts] = useState([]);
+  const [activities, setActivities] = useState([]);
   
   const isOwnProfile = currentUser && (
     userId === 'me' || 
@@ -235,6 +239,35 @@ export const ProfilePage = () => {
     
     loadProfile();
   }, [userId, username]);
+
+  useEffect(() => {
+    // Load secondary tabs lazily
+    if (!user?.user_id && !user?.id) return;
+    const uid = user.user_id ?? user.id;
+    (async () => {
+      try {
+        if (activeTab === 'comments') {
+          setTabLoading(true);
+          const r = await users.getComments(uid, { limit: 50 }).catch(() => null);
+          const list = r?.data || r || [];
+          setUserComments(Array.isArray(list) ? list : []);
+        } else if (activeTab === 'likes') {
+          setTabLoading(true);
+          const r = await users.getLikes(uid, { limit: 50 }).catch(() => null);
+          const list = r?.data || r || [];
+          setLikedPosts(Array.isArray(list) ? list : []);
+        } else if (activeTab === 'activity') {
+          if (!isOwnProfile) return;
+          setTabLoading(true);
+          const r = await users.getActivity('me', { limit: 80 }).catch(() => null);
+          const list = r?.data || r || [];
+          setActivities(Array.isArray(list) ? list : []);
+        }
+      } finally {
+        setTabLoading(false);
+      }
+    })();
+  }, [activeTab, user?.user_id, user?.id, isOwnProfile]);
   
   // Loading state
   if (loading) {
@@ -547,6 +580,18 @@ export const ProfilePage = () => {
           >
             Beğendikleri
           </button>
+          {isOwnProfile && (
+            <button
+              className={`pb-3 px-4 font-medium ${
+                activeTab === 'activity'
+                  ? 'text-primary-blue border-b-2 border-primary-blue'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('activity')}
+            >
+              Hareketlerim
+            </button>
+          )}
         </div>
         
         {/* Tab İçerikleri */}
@@ -558,10 +603,125 @@ export const ProfilePage = () => {
           </div>
         )}
         {activeTab === 'comments' && (
-          <div className="text-center text-gray-500 py-8">Yorumlar yakında...</div>
+          <div className="space-y-3">
+            {tabLoading ? (
+              <div className="text-center text-gray-500 py-8">Yükleniyor…</div>
+            ) : userComments.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">Henüz yorum yok.</div>
+            ) : (
+              userComments.map((c) => {
+                const pid = c?.post?.id || c?.post_id;
+                const postText = String(c?.post?.content_text ?? c?.post?.content ?? '').slice(0, 120);
+                return (
+                  <div key={c.id} className="card">
+                    <div className="text-sm text-gray-900 font-semibold mb-2">{c.content}</div>
+                    {pid && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/post/${pid}`)}
+                        className="text-xs text-primary-blue hover:underline"
+                      >
+                        Paylaşıma git: {postText || 'Paylaşım'}
+                      </button>
+                    )}
+                    {c.is_deleted && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        Bu yorum onay sürecinde olabilir; herkese açık görünmeyebilir.
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         )}
         {activeTab === 'likes' && (
-          <div className="text-center text-gray-500 py-8">Beğeniler yakında...</div>
+          <div className="space-y-3">
+            {tabLoading ? (
+              <div className="text-center text-gray-500 py-8">Yükleniyor…</div>
+            ) : likedPosts.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">Henüz beğeni yok.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {likedPosts.map((p) => (
+                  <PostCardHorizontal key={p.post_id ?? p.id} post={p} fullWidth={true} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === 'activity' && isOwnProfile && (
+          <div className="space-y-3">
+            {tabLoading ? (
+              <div className="text-center text-gray-500 py-8">Yükleniyor…</div>
+            ) : activities.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">Henüz hareket yok.</div>
+            ) : (
+              activities.map((a, idx) => {
+                const type = String(a?.type || '');
+                const created = a?.created_at ? new Date(a.created_at).toLocaleString('tr-TR') : '';
+                if (type === 'follow') {
+                  return (
+                    <div key={`${type}_${idx}`} className="card">
+                      <div className="text-sm font-semibold text-gray-900">Takip ettin</div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(getProfilePath(a?.target_user || {}))}
+                        className="text-sm text-primary-blue hover:underline"
+                      >
+                        {a?.target_user?.full_name || a?.target_user?.username || 'Kullanıcı'}
+                      </button>
+                      {created && <div className="text-xs text-gray-500 mt-1">{created}</div>}
+                    </div>
+                  );
+                }
+                if (type === 'like') {
+                  const pid = a?.post?.id || a?.post?.post_id;
+                  return (
+                    <div key={`${type}_${idx}`} className="card">
+                      <div className="text-sm font-semibold text-gray-900">Beğendin</div>
+                      {pid && (
+                        <button type="button" onClick={() => navigate(`/post/${pid}`)} className="text-sm text-primary-blue hover:underline">
+                          Paylaşıma git
+                        </button>
+                      )}
+                      {created && <div className="text-xs text-gray-500 mt-1">{created}</div>}
+                    </div>
+                  );
+                }
+                if (type === 'comment') {
+                  const pid = a?.post?.id || a?.post?.post_id;
+                  return (
+                    <div key={`${type}_${idx}`} className="card">
+                      <div className="text-sm font-semibold text-gray-900">Yorum yaptın</div>
+                      <div className="text-sm text-gray-700 mt-1">{a?.comment?.content}</div>
+                      {pid && (
+                        <button type="button" onClick={() => navigate(`/post/${pid}`)} className="text-sm text-primary-blue hover:underline mt-2">
+                          Paylaşıma git
+                        </button>
+                      )}
+                      {created && <div className="text-xs text-gray-500 mt-1">{created}</div>}
+                    </div>
+                  );
+                }
+                if (type === 'post') {
+                  const pid = a?.post?.id || a?.post?.post_id;
+                  return (
+                    <div key={`${type}_${idx}`} className="card">
+                      <div className="text-sm font-semibold text-gray-900">Paylaşım yaptın</div>
+                      {pid && (
+                        <button type="button" onClick={() => navigate(`/post/${pid}`)} className="text-sm text-primary-blue hover:underline">
+                          Paylaşıma git
+                        </button>
+                      )}
+                      {created && <div className="text-xs text-gray-500 mt-1">{created}</div>}
+                    </div>
+                  );
+                }
+                return null;
+              })
+            )}
+          </div>
         )}
       </div>
     </div>
