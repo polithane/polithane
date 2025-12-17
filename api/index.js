@@ -1101,9 +1101,13 @@ async function safeUserPatch(userId, patch) {
 async function usersCheckUsername(req, res, username) {
   const u = String(username || '').trim().toLowerCase();
   if (!u || u.length < 3) return res.json({ success: true, available: false, message: 'En az 3 karakter olmalı' });
-  if (u.length > 20) return res.json({ success: true, available: false, message: 'En fazla 20 karakter olabilir' });
+  if (u.length > 15) return res.json({ success: true, available: false, message: 'En fazla 15 karakter olabilir' });
   if (!/^[a-z0-9._-]+$/.test(u)) {
-    return res.json({ success: true, available: false, message: 'Sadece a-z, 0-9, . _ - kullanılabilir' });
+    return res.json({
+      success: true,
+      available: false,
+      message: 'Sadece harf (a-z), rakam (0-9), alt çizgi (_), tire (-) ve nokta (.) kullanılabilir',
+    });
   }
   const rows = await supabaseRestGet('users', { select: 'id', username: `eq.${u}`, limit: '1' }).catch(() => []);
   const available = !(Array.isArray(rows) && rows.length > 0);
@@ -1116,8 +1120,13 @@ async function usersUpdateUsername(req, res) {
   const body = await readJsonBody(req);
   const u = String(body?.username || '').trim().toLowerCase();
   if (!u || u.length < 3) return res.status(400).json({ success: false, error: 'Kullanıcı adı en az 3 karakter olmalı.' });
-  if (u.length > 20) return res.status(400).json({ success: false, error: 'Kullanıcı adı en fazla 20 karakter olabilir.' });
-  if (!/^[a-z0-9._-]+$/.test(u)) return res.status(400).json({ success: false, error: 'Sadece a-z, 0-9, . _ - kullanılabilir.' });
+  if (u.length > 15) return res.status(400).json({ success: false, error: 'Kullanıcı adı en fazla 15 karakter olabilir.' });
+  if (!/^[a-z0-9._-]+$/.test(u)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Sadece harf (a-z), rakam (0-9), alt çizgi (_), tire (-) ve nokta (.) kullanılabilir.',
+    });
+  }
 
   const exists = await supabaseRestGet('users', { select: 'id', username: `eq.${u}`, limit: '1' }).catch(() => []);
   if (Array.isArray(exists) && exists[0] && String(exists[0].id) !== String(auth.id)) {
