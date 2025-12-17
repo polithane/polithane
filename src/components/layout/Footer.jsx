@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export const Footer = () => {
   return (
     <footer className="bg-neutral-anthracite text-white py-8 mt-16">
@@ -13,18 +15,18 @@ export const Footer = () => {
           <div>
             <h4 className="font-semibold mb-3">Hakkımızda</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-white">Hakkımızda</a></li>
-              <li><a href="#" className="hover:text-white">Misyonumuz</a></li>
-              <li><a href="#" className="hover:text-white">İletişim</a></li>
+              <li><Link to="/about" className="hover:text-white">Hakkımızda</Link></li>
+              <li><Link to="/mission" className="hover:text-white">Misyonumuz</Link></li>
+              <li><Link to="/contact" className="hover:text-white">İletişim</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-semibold mb-3">Yasal</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-white">Kullanım Şartları</a></li>
-              <li><a href="#" className="hover:text-white">Gizlilik Politikası</a></li>
-              <li><a href="#" className="hover:text-white">Çerez Politikası</a></li>
+              <li><Link to="/terms" className="hover:text-white">Kullanım Şartları</Link></li>
+              <li><Link to="/privacy-policy" className="hover:text-white">Gizlilik Politikası</Link></li>
+              <li><Link to="/cookie-policy" className="hover:text-white">Çerez Politikası</Link></li>
             </ul>
           </div>
           

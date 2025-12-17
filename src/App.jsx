@@ -61,6 +61,12 @@ import { DatabaseManagement } from './pages/admin/DatabaseManagement';
 import { APISettings } from './pages/admin/APISettings';
 import { PartyManagement } from './pages/admin/PartyManagement';
 import { DeleteConfirmPage } from './pages/DeleteConfirmPage';
+import { AboutPage } from './pages/AboutPage';
+import { MissionPage } from './pages/MissionPage';
+import { ContactPage } from './pages/ContactPage';
+import { TermsPage } from './pages/TermsPage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { CookiePolicyPage } from './pages/CookiePolicyPage';
 
 function App() {
   return (
@@ -83,6 +89,12 @@ function App() {
         <Route path="/polifest" element={<><Header /><PoliFestPage /><Footer /><FloatingChat /></>} />
         <Route path="/polifest/:usernameOrId" element={<PoliFestViewerPage />} />
         <Route path="/delete-confirm" element={<DeleteConfirmPage />} />
+        <Route path="/about" element={<><Header /><AboutPage /><Footer /><FloatingChat /></>} />
+        <Route path="/mission" element={<><Header /><MissionPage /><Footer /><FloatingChat /></>} />
+        <Route path="/contact" element={<><Header /><ContactPage /><Footer /><FloatingChat /></>} />
+        <Route path="/terms" element={<><Header /><TermsPage /><Footer /><FloatingChat /></>} />
+        <Route path="/privacy-policy" element={<><Header /><PrivacyPolicyPage /><Footer /><FloatingChat /></>} />
+        <Route path="/cookie-policy" element={<><Header /><CookiePolicyPage /><Footer /><FloatingChat /></>} />
         {/* Backward-compatible legacy routes */}
         <Route path="/stories" element={<><Header /><PoliFestPage /><Footer /><FloatingChat /></>} />
         <Route path="/stories/:usernameOrId" element={<PoliFestViewerPage />} />
