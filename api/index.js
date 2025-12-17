@@ -645,6 +645,113 @@ async function getUserDetail(req, res, id) {
     res.json({ success: true, data: user });
 }
 
+async function getFollowStats(req, res, targetId) {
+  const auth = verifyJwtFromRequest(req);
+  const tid = String(targetId || '').trim();
+  if (!tid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+
+  // validate target exists
+  const targetRows = await supabaseRestGet('users', { select: 'id,is_active', id: `eq.${tid}`, limit: '1' }).catch(() => []);
+  const target = targetRows?.[0];
+  if (!target) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+
+  const followers = await supabaseCount('follows', { following_id: `eq.${tid}` }).catch(() => 0);
+  const following = await supabaseCount('follows', { follower_id: `eq.${tid}` }).catch(() => 0);
+
+  let isFollowing = false;
+  if (auth?.id) {
+    const existing = await supabaseRestGet('follows', {
+      select: 'id',
+      follower_id: `eq.${auth.id}`,
+      following_id: `eq.${tid}`,
+      limit: '1',
+    }).catch(() => []);
+    isFollowing = Array.isArray(existing) && existing.length > 0;
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      followers_count: followers,
+      following_count: following,
+      is_following: isFollowing,
+    },
+  });
+}
+
+async function toggleFollow(req, res, targetId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+  const tid = String(targetId || '').trim();
+  if (!tid || !/^\d+$/.test(tid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  if (String(auth.id) === tid) return res.status(400).json({ success: false, error: 'Kendinizi takip edemezsiniz.' });
+
+  // Ensure target exists
+  const targetRows = await supabaseRestGet('users', { select: 'id,full_name,is_active', id: `eq.${tid}`, limit: '1' }).catch(() => []);
+  const target = targetRows?.[0];
+  if (!target) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+  if (target.is_active === false) return res.status(400).json({ success: false, error: 'Bu kullanıcı aktif değil.' });
+
+  const existing = await supabaseRestGet('follows', {
+    select: 'id',
+    follower_id: `eq.${auth.id}`,
+    following_id: `eq.${tid}`,
+    limit: '1',
+  }).catch(() => []);
+
+  if (Array.isArray(existing) && existing.length > 0) {
+    await supabaseRestDelete('follows', { follower_id: `eq.${auth.id}`, following_id: `eq.${tid}` }).catch(() => null);
+    return res.json({ success: true, action: 'unfollowed' });
+  }
+
+  await supabaseRestInsert('follows', [{ follower_id: auth.id, following_id: Number(tid) }]);
+
+  // Notify target user
+  await supabaseRestInsert('notifications', [
+    {
+      user_id: Number(tid),
+      actor_id: auth.id,
+      type: 'follow',
+      title: 'Yeni takipçi',
+      message: 'Sizi takip etmeye başladı.',
+      is_read: false,
+    },
+  ]).catch(() => null);
+
+  return res.json({ success: true, action: 'followed' });
+}
+
+async function getFollowers(req, res, targetId) {
+  const tid = String(targetId || '').trim();
+  if (!tid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  const { limit = 50, offset = 0 } = req.query || {};
+  const rows = await supabaseRestGet('follows', {
+    select: 'follower:users(*)',
+    following_id: `eq.${tid}`,
+    order: 'created_at.desc',
+    limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
+    offset: String(parseInt(offset, 10) || 0),
+  }).catch(() => []);
+  const list = (rows || []).map((r) => r.follower).filter(Boolean);
+  return res.json({ success: true, data: list });
+}
+
+async function getFollowing(req, res, targetId) {
+  const tid = String(targetId || '').trim();
+  if (!tid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  const { limit = 50, offset = 0 } = req.query || {};
+  const rows = await supabaseRestGet('follows', {
+    select: 'following:users(*)',
+    follower_id: `eq.${tid}`,
+    order: 'created_at.desc',
+    limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
+    offset: String(parseInt(offset, 10) || 0),
+  }).catch(() => []);
+  const list = (rows || []).map((r) => r.following).filter(Boolean);
+  return res.json({ success: true, data: list });
+}
+
 async function getUserPosts(req, res, username) {
     // Resolve user id by username
     const users = await supabaseRestGet('users', { select: 'id,username', username: `eq.${username}`, limit: '1' });
@@ -2026,6 +2133,10 @@ export default async function handler(req, res) {
           const id = parts[0];
           const tail = parts[1];
           if (id && tail === 'posts' && req.method === 'GET') return await getUserPosts(req, res, id);
+          if (id && tail === 'follow' && req.method === 'POST') return await toggleFollow(req, res, id);
+          if (id && tail === 'follow-stats' && req.method === 'GET') return await getFollowStats(req, res, id);
+          if (id && tail === 'followers' && req.method === 'GET') return await getFollowers(req, res, id);
+          if (id && tail === 'following' && req.method === 'GET') return await getFollowing(req, res, id);
           if (id && !tail) return await getUserDetail(req, res, id); // Profile
       }
 

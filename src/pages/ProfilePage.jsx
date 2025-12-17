@@ -10,7 +10,6 @@ import { BlockUserModal } from '../components/common/BlockUserModal';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { formatNumber, formatPolitScore } from '../utils/formatters';
 import { getUserTitle } from '../utils/titleHelpers';
-import { getFollowStats, mockBlockedUsers } from '../mock/follows';
 import { useAuth } from '../contexts/AuthContext';
 import { users, posts } from '../utils/api';
 import { CITY_CODES, FEATURE_FLAGS } from '../utils/constants';
@@ -61,10 +60,7 @@ export const ProfilePage = () => {
     normalizeUsername(username || '') === normalizeUsername(currentUser.username || '')
   );
   
-  const isBlocked = mockBlockedUsers.some(b => 
-    (b.blocker_id === 'currentUser' && b.blocked_id === user?.id) ||
-    (b.blocked_id === 'currentUser' && b.blocker_id === user?.id)
-  );
+  const isBlocked = false;
   
   useEffect(() => {
     // Always start profile page from top (avoid mid-scroll starts)
@@ -198,8 +194,21 @@ export const ProfilePage = () => {
           setUserPosts([]);
         }
         
-        const stats = getFollowStats(resolvedProfileData?.id || userId);
-        setFollowStats(stats);
+        try {
+          const profileDbId = resolvedProfileData?.id ?? resolvedProfileData?.user_id ?? userId;
+          if (profileDbId) {
+            const statsRes = await users.getFollowStats(profileDbId).catch(() => null);
+            const stats = statsRes?.data || statsRes;
+            if (stats?.followers_count !== undefined) {
+              setFollowStats({
+                followers_count: stats.followers_count || 0,
+                following_count: stats.following_count || 0,
+              });
+            }
+          }
+        } catch {
+          // noop
+        }
       } catch (err) {
         console.error('Profile load error:', err);
         setError('Profil yüklenirken bir hata oluştu');
@@ -242,11 +251,6 @@ export const ProfilePage = () => {
   const handleBlock = (userId) => {
     // TODO: API çağrısı - kullanıcıyı engelle
     console.log('Kullanıcı engellendi:', userId);
-    mockBlockedUsers.push({
-      blocker_id: 'currentUser',
-      blocked_id: userId,
-      created_at: new Date().toISOString()
-    });
   };
   
   const handleReport = () => {

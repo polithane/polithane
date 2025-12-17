@@ -1,18 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Users, UserCheck } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { FollowButton } from './FollowButton';
-import { getFollowers, getFollowing } from '../../mock/follows';
 import { getUserTitle } from '../../utils/titleHelpers';
 import { useNavigate } from 'react-router-dom';
+import { users as usersApi } from '../../utils/api';
+import { getProfilePath } from '../../utils/paths';
 
 export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(tab); // followers, following
-  
-  const followers = getFollowers(userId);
-  const following = getFollowing(userId);
-  
+  const [loading, setLoading] = useState(false);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveTab(tab);
+  }, [isOpen, tab]);
+
+  useEffect(() => {
+    if (!isOpen || !userId) return;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = activeTab === 'followers' ? await usersApi.getFollowers(userId) : await usersApi.getFollowing(userId);
+        const list = r?.data || r?.data?.data || r || [];
+        if (activeTab === 'followers') setFollowers(Array.isArray(list) ? list : []);
+        else setFollowing(Array.isArray(list) ? list : []);
+      } catch {
+        if (activeTab === 'followers') setFollowers([]);
+        else setFollowing([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [isOpen, userId, activeTab]);
+
   const displayList = activeTab === 'followers' ? followers : following;
   
   if (!isOpen) return null;
@@ -70,7 +94,9 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
         
         {/* Liste */}
         <div className="flex-1 overflow-y-auto p-4">
-          {displayList.length === 0 ? (
+          {loading ? (
+            <div className="text-sm text-gray-600">Yükleniyor…</div>
+          ) : displayList.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 {activeTab === 'followers' ? (
@@ -86,10 +112,10 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
           ) : (
             <div className="space-y-3">
               {displayList.map(user => (
-                <div key={user.user_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div key={user.user_id || user.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div
                     onClick={() => {
-                      navigate(`/profile/${user.user_id}`);
+                      navigate(getProfilePath(user));
                       onClose();
                     }}
                     className="cursor-pointer"
@@ -104,7 +130,7 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
                   <div className="flex-1 min-w-0">
                     <h4
                       onClick={() => {
-                        navigate(`/profile/${user.user_id}`);
+                        navigate(getProfilePath(user));
                         onClose();
                       }}
                       className="font-semibold text-sm text-gray-900 hover:text-primary-blue cursor-pointer truncate"
@@ -119,7 +145,7 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
                   {/* Kendi profilindeysek takip butonu gösterme */}
                   {userId !== 'currentUser' && (
                     <div className="flex-shrink-0">
-                      <FollowButton targetUserId={user.user_id} size="sm" />
+                      <FollowButton targetUserId={user.user_id || user.id} size="sm" />
                     </div>
                   )}
                 </div>

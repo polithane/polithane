@@ -10,6 +10,7 @@ import ReactPlayer from 'react-player';
 import { posts as postsApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getProfilePath } from '../utils/paths';
+import { FollowButton } from '../components/common/FollowButton';
 
 export const PostDetailPage = () => {
   const { postId } = useParams();
@@ -215,15 +216,7 @@ export const PostDetailPage = () => {
                 </div>
                 <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (uiPost.user) navigate(getProfilePath(uiPost.user));
-                  else navigate(`/profile/${uiPost.user_id}`);
-                }}
-              >
-                Takip Et
-              </Button>
+              <FollowButton targetUserId={uiPost.user_id} size="md" />
             </div>
             
             {/* İçerik */}

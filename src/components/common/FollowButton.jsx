@@ -1,53 +1,69 @@
-import { useState } from 'react';
-import { UserPlus, UserMinus, UserCheck, Clock, Ban } from 'lucide-react';
-import { getFollowStatus, isBlocked, mockProfileSettings } from '../../mock/follows';
+import { useEffect, useState } from 'react';
+import { UserPlus, UserCheck, Loader2 } from 'lucide-react';
+import { users as usersApi } from '../../utils/api';
+import { useAuth } from '../../contexts/AuthContext';
 
-export const FollowButton = ({ targetUserId, currentUserId = 'currentUser', size = 'md' }) => {
-  const initialStatus = getFollowStatus(currentUserId, targetUserId);
-  const blocked = isBlocked(currentUserId, targetUserId);
-  const [followStatus, setFollowStatus] = useState(initialStatus);
+export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
+  const { user: me, isAuthenticated } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [followStatus, setFollowStatus] = useState('not_following'); // not_following | following
   const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
-  
-  if (blocked) {
-    return (
-      <button
-        disabled
-        className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed"
-      >
-        <Ban className="w-4 h-4" />
-        Engellenmiş
-      </button>
-    );
-  }
-  
-  const handleFollow = () => {
-    if (followStatus === 'not_following') {
-      // Hedef kullanıcı özel hesap mı?
-      const isPrivate = mockProfileSettings.is_private; // Gerçekte targetUserId'nin ayarları kontrol edilmeli
-      
-      if (isPrivate) {
-        setFollowStatus('pending');
-        // TODO: API çağrısı - takip isteği gönder
-        console.log('Takip isteği gönderildi:', targetUserId);
-      } else {
-        setFollowStatus('following');
-        // TODO: API çağrısı - direkt takip et
-        console.log('Takip edildi:', targetUserId);
+
+  useEffect(() => {
+    (async () => {
+      if (!targetUserId) return;
+      if (!isAuthenticated) {
+        setFollowStatus('not_following');
+        return;
       }
-    } else if (followStatus === 'following') {
+      try {
+        const r = await usersApi.getFollowStats(targetUserId);
+        const data = r?.data || r;
+        setFollowStatus(data?.is_following ? 'following' : 'not_following');
+      } catch {
+        setFollowStatus('not_following');
+      }
+    })();
+  }, [targetUserId, isAuthenticated]);
+
+  const handleFollow = async () => {
+    if (!targetUserId) return;
+    if (!isAuthenticated) return;
+    if (String(me?.id || '') === String(targetUserId)) return;
+
+    if (followStatus === 'following') {
       setShowUnfollowConfirm(true);
-    } else if (followStatus === 'pending') {
-      setFollowStatus('not_following');
-      // TODO: API çağrısı - takip isteğini iptal et
-      console.log('Takip isteği iptal edildi:', targetUserId);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const r = await usersApi.follow(targetUserId);
+      const action = r?.action || r?.data?.action;
+      const next = action === 'unfollowed' ? 'not_following' : 'following';
+      setFollowStatus(next);
+      onChange?.(next);
+    } catch {
+      // noop
+    } finally {
+      setLoading(false);
     }
   };
-  
-  const handleUnfollow = () => {
-    setFollowStatus('not_following');
+
+  const handleUnfollow = async () => {
     setShowUnfollowConfirm(false);
-    // TODO: API çağrısı - takipten çık
-    console.log('Takipten çıkıldı:', targetUserId);
+    setLoading(true);
+    try {
+      const r = await usersApi.follow(targetUserId);
+      const action = r?.action || r?.data?.action;
+      const next = action === 'unfollowed' ? 'not_following' : 'following';
+      setFollowStatus(next);
+      onChange?.(next);
+    } catch {
+      // noop
+    } finally {
+      setLoading(false);
+    }
   };
   
   // Size variants
@@ -93,22 +109,11 @@ export const FollowButton = ({ targetUserId, currentUserId = 'currentUser', size
     return (
       <button
         onClick={handleFollow}
+        disabled={!isAuthenticated || loading}
         className={`flex items-center gap-2 ${sizeClasses[size]} bg-primary-blue hover:bg-blue-600 text-white rounded-lg font-semibold transition-all duration-200 transform hover:scale-105`}
       >
-        <UserPlus className={iconSizes[size]} />
+        {loading ? <Loader2 className={`${iconSizes[size]} animate-spin`} /> : <UserPlus className={iconSizes[size]} />}
         Takip Et
-      </button>
-    );
-  }
-  
-  if (followStatus === 'pending') {
-    return (
-      <button
-        onClick={handleFollow}
-        className={`flex items-center gap-2 ${sizeClasses[size]} bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors`}
-      >
-        <Clock className={iconSizes[size]} />
-        İstek Gönderildi
       </button>
     );
   }
@@ -117,9 +122,10 @@ export const FollowButton = ({ targetUserId, currentUserId = 'currentUser', size
     return (
       <button
         onClick={handleFollow}
+        disabled={!isAuthenticated || loading}
         className={`flex items-center gap-2 ${sizeClasses[size]} bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors`}
       >
-        <UserCheck className={iconSizes[size]} />
+        {loading ? <Loader2 className={`${iconSizes[size]} animate-spin`} /> : <UserCheck className={iconSizes[size]} />}
         Takip Ediliyor
       </button>
     );

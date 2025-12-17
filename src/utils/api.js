@@ -232,6 +232,8 @@ export const users = {
       method: 'POST',
     }),
 
+  getFollowStats: (userId) => apiCall(`/api/users/${userId}/follow-stats`),
+
   getPosts: (username, params = {}) => {
     const query = new URLSearchParams(params).toString();
     return apiCall(`/api/users/${username}/posts${query ? `?${query}` : ''}`);
