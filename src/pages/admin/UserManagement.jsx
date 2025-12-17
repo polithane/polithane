@@ -365,16 +365,173 @@ export const UserManagement = () => {
                   <label className="text-xs font-bold text-gray-500 uppercase">Kayıt Tarihi</label>
                   <p className="font-medium">{new Date(selectedUser.created_at).toLocaleDateString('tr-TR')}</p>
                 </div>
-                {selectedUser.metadata && Object.entries(selectedUser.metadata).map(([key, value]) => {
-                  if (key === 'document_path' || key === 'document_original_name' || typeof value === 'object') return null;
-                  return (
-                    <div key={key}>
-                      <label className="text-xs font-bold text-gray-500 uppercase">{key.replace(/_/g, ' ')}</label>
-                      <p className="font-medium">{value}</p>
+                {selectedUser.party_id && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Parti</label>
+                    <p className="font-medium">{selectedUser.party?.name || selectedUser.party?.party_name || selectedUser.party_id}</p>
+                  </div>
+                )}
+                {(selectedUser.province || selectedUser.city_code) && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase">İl</label>
+                    <p className="font-medium">{selectedUser.province || selectedUser.city_code}</p>
+                  </div>
+                )}
+                {selectedUser.district_name && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase">İlçe</label>
+                    <p className="font-medium">{selectedUser.district_name}</p>
+                  </div>
+                )}
+                {selectedUser.bio && (
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Biyografi</label>
+                    <p className="font-medium whitespace-pre-wrap">{selectedUser.bio}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Role-specific details */}
+              {(() => {
+                const meta = selectedUser.metadata && typeof selectedUser.metadata === 'object' ? selectedUser.metadata : {};
+                const blocks = [];
+
+                // Teşkilat / görev bilgileri
+                if (selectedUser.user_type === 'party_official' || selectedUser.user_type === 'mp' || selectedUser.user_type === 'politician') {
+                  const startDate = meta.start_date || meta.startDate || null;
+                  const orgPosition = meta.org_position || meta.orgPosition || null;
+                  const previousRoles = meta.previous_roles || null;
+                  const bio = meta.bio || null;
+
+                  blocks.push(
+                    <div key="role" className="bg-white border border-gray-200 rounded-2xl p-6">
+                      <div className="font-black text-gray-900 mb-3">Görev Bilgileri</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedUser.politician_type && (
+                          <div>
+                            <div className="text-xs font-bold text-gray-500 uppercase">Görev (Tip)</div>
+                            <div className="font-medium">{selectedUser.politician_type}</div>
+                          </div>
+                        )}
+                        {orgPosition && (
+                          <div>
+                            <div className="text-xs font-bold text-gray-500 uppercase">Görev Ünvanı</div>
+                            <div className="font-medium">{String(orgPosition)}</div>
+                          </div>
+                        )}
+                        {startDate && (
+                          <div>
+                            <div className="text-xs font-bold text-gray-500 uppercase">Göreve Başlama</div>
+                            <div className="font-medium">{String(startDate)}</div>
+                          </div>
+                        )}
+                        {previousRoles && (
+                          <div className="md:col-span-2">
+                            <div className="text-xs font-bold text-gray-500 uppercase">Önceki Görevler</div>
+                            <div className="font-medium whitespace-pre-wrap">{String(previousRoles)}</div>
+                          </div>
+                        )}
+                        {bio && (
+                          <div className="md:col-span-2">
+                            <div className="text-xs font-bold text-gray-500 uppercase">Ek Biyografi</div>
+                            <div className="font-medium whitespace-pre-wrap">{String(bio)}</div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
-                })}
-              </div>
+                }
+
+                // Medya bilgileri
+                if (selectedUser.user_type === 'media') {
+                  const title = meta.media_title || null;
+                  const outlet = meta.media_outlet || null;
+                  const website = meta.media_website || null;
+                  const mediaBio = meta.media_bio || null;
+                  blocks.push(
+                    <div key="media" className="bg-white border border-gray-200 rounded-2xl p-6">
+                      <div className="font-black text-gray-900 mb-3">Medya Bilgileri</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {title && (
+                          <div>
+                            <div className="text-xs font-bold text-gray-500 uppercase">Ünvan</div>
+                            <div className="font-medium">{String(title)}</div>
+                          </div>
+                        )}
+                        {outlet && (
+                          <div>
+                            <div className="text-xs font-bold text-gray-500 uppercase">Kurum</div>
+                            <div className="font-medium">{String(outlet)}</div>
+                          </div>
+                        )}
+                        {website && (
+                          <div className="md:col-span-2">
+                            <div className="text-xs font-bold text-gray-500 uppercase">Web</div>
+                            <div className="font-medium break-all">{String(website)}</div>
+                          </div>
+                        )}
+                        {mediaBio && (
+                          <div className="md:col-span-2">
+                            <div className="text-xs font-bold text-gray-500 uppercase">Biyografi</div>
+                            <div className="font-medium whitespace-pre-wrap">{String(mediaBio)}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Remaining metadata (safe, primitive only)
+                const hiddenKeys = new Set([
+                  'document_path',
+                  'document_original_name',
+                  'start_date',
+                  'startDate',
+                  'org_position',
+                  'orgPosition',
+                  'previous_roles',
+                  'media_title',
+                  'media_outlet',
+                  'media_website',
+                  'media_bio',
+                  'bio',
+                  'roles',
+                ]);
+                const extra = Object.entries(meta || {}).filter(([k, v]) => !hiddenKeys.has(k) && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'));
+                if (extra.length > 0) {
+                  blocks.push(
+                    <div key="meta" className="bg-white border border-gray-200 rounded-2xl p-6">
+                      <div className="font-black text-gray-900 mb-3">Diğer Bilgiler</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {extra.map(([k, v]) => (
+                          <div key={k}>
+                            <div className="text-xs font-bold text-gray-500 uppercase">{k.replace(/_/g, ' ')}</div>
+                            <div className="font-medium">{String(v)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Roles array
+                if (Array.isArray(meta.roles) && meta.roles.length > 0) {
+                  blocks.push(
+                    <div key="roles" className="bg-white border border-gray-200 rounded-2xl p-6">
+                      <div className="font-black text-gray-900 mb-3">Roller</div>
+                      <div className="flex flex-wrap gap-2">
+                        {meta.roles.map((r, idx) => (
+                          <span key={`${r}-${idx}`} className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-sm font-semibold text-gray-800">
+                            {String(r)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return blocks.length > 0 ? <div className="space-y-4">{blocks}</div> : null;
+              })()}
 
               {/* Document Download Section */}
               {selectedUser.metadata?.document_path && (
