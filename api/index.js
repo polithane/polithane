@@ -297,6 +297,11 @@ async function notifyAdminsAboutComment({ type, commentId, postId, actorId, titl
 async function addPostComment(req, res, postId) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const ip = getClientIp(req);
+    const rl = rateLimit(`comment:${auth.id}:${ip}`, { windowMs: 60_000, max: 10 });
+    if (!rl.ok) {
+      return res.status(429).json({ success: false, error: 'Çok fazla yorum denemesi. Lütfen 1 dakika sonra tekrar deneyin.' });
+    }
     const body = await readJsonBody(req);
     const analyzed = analyzeCommentContent(body.content || '');
     if (!analyzed.ok) return res.status(400).json({ success: false, error: analyzed.error });
@@ -602,6 +607,11 @@ async function togglePostLike(req, res, postId) {
 async function createPost(req, res) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const ip = getClientIp(req);
+    const rl = rateLimit(`post:${auth.id}:${ip}`, { windowMs: 60_000, max: 5 });
+    if (!rl.ok) {
+      return res.status(429).json({ success: false, error: 'Çok fazla paylaşım denemesi. Lütfen 1 dakika sonra tekrar deneyin.' });
+    }
     const body = await readJsonBody(req);
 
     const content = String(body.content_text ?? body.content ?? '').trim();
@@ -1490,6 +1500,11 @@ async function storageEnsureBucket(req, res) {
 async function storageUploadMedia(req, res) {
   const auth = requireAuth(req, res);
   if (!auth) return;
+  const ip = getClientIp(req);
+  const rl = rateLimit(`upload:${auth.id}:${ip}`, { windowMs: 60_000, max: 20 });
+  if (!rl.ok) {
+    return res.status(429).json({ success: false, error: 'Çok fazla yükleme denemesi. Lütfen 1 dakika sonra tekrar deneyin.' });
+  }
   const body = await readJsonBody(req);
   const bucket = String(body?.bucket || 'uploads').trim();
   const folder = String(body?.folder || 'posts').trim();
@@ -2380,6 +2395,11 @@ async function getMessagesBetween(req, res, otherId) {
 async function sendMessage(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const ip = getClientIp(req);
+  const rl = rateLimit(`msg:${auth.id}:${ip}`, { windowMs: 60_000, max: 30 });
+  if (!rl.ok) {
+    return res.status(429).json({ success: false, error: 'Çok fazla mesaj denemesi. Lütfen 1 dakika sonra tekrar deneyin.' });
+  }
   const body = await readJsonBody(req);
   const receiver_id = body.receiver_id;
   const content = String(body.content || '').trim();
