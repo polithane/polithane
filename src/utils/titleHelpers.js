@@ -79,6 +79,21 @@ export const getUserTitle = (user, short = false) => {
 };
 
 /**
+ * UI doğrulama rozeti kuralı:
+ * - Vatandaş/normal/parti üyesi gibi standart hesaplarda rozet gösterme.
+ * - Rozet sadece admin onayı sonrası (is_verified=true) ve normal üye olmayan tiplerde görünür.
+ */
+export const isUiVerifiedUser = (user) => {
+  if (!user) return false;
+  const raw = !!(user.is_verified ?? user.verification_badge);
+  if (!raw) return false;
+  const ut = String(user.user_type || '').trim();
+  if (!ut) return false;
+  if (ut === 'citizen' || ut === 'normal' || ut === 'party_member') return false;
+  return true;
+};
+
+/**
  * Kısa ünvan - Sadece temel bilgi
  * @param {string} politicianType - Politician tipi
  * @returns {string} Kısa ünvan

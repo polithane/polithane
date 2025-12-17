@@ -10,7 +10,7 @@ import { FollowListModal } from '../components/common/FollowListModal';
 import { BlockUserModal } from '../components/common/BlockUserModal';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { formatNumber, formatPolitScore } from '../utils/formatters';
-import { getUserTitle } from '../utils/titleHelpers';
+import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 import { useAuth } from '../contexts/AuthContext';
 import { users, posts } from '../utils/api';
 import { CITY_CODES, FEATURE_FLAGS } from '../utils/constants';
@@ -334,13 +334,12 @@ export const ProfilePage = () => {
             <Avatar 
               src={user.avatar_url || user.profile_image} 
               size="120px" 
-              verified={user.verification_badge || user.is_verified}
+              verified={isUiVerifiedUser(user)}
               onClick={() => setShowAvatarModal(true)}
             />
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h1 className="text-2xl md:text-3xl font-bold break-words">{user.full_name}</h1>
-                {user.verification_badge && <Badge variant="primary">Doğrulanmış</Badge>}
                 {user.party_id && user.party?.party_logo && (
                   <Link
                     to={`/party/${user.party.party_slug || user.party.party_id || user.party_id}`}

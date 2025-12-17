@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { apiCall } from '../../utils/api';
 import { getProfilePath } from '../../utils/paths';
+import { isUiVerifiedUser } from '../../utils/titleHelpers';
 
 export const Header = () => {
   const navigate = useNavigate();
@@ -146,12 +147,11 @@ export const Header = () => {
                             navigate(getProfilePath(u));
                           }}
                         >
-                          <Avatar src={u.avatar_url} size="36px" />
+                          <Avatar src={u.avatar_url} size="36px" verified={isUiVerifiedUser(u)} />
                           <div className="min-w-0 flex-1">
                             <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
                             <div className="text-xs text-gray-500 truncate">@{u.username}</div>
                           </div>
-                          {u.is_verified && <Badge variant="primary" size="small">Doğr.</Badge>}
                         </button>
                       ))}
                     </div>
@@ -293,7 +293,7 @@ export const Header = () => {
                                 isRead ? '' : 'bg-blue-50/60'
                               }`}
                             >
-                              <Avatar src={actor?.avatar_url} size="40px" verified={actor?.is_verified} />
+                              <Avatar src={actor?.avatar_url} size="40px" verified={isUiVerifiedUser(actor)} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
                                   <div className={`text-sm ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>

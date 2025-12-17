@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Users, UserCheck } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { FollowButton } from './FollowButton';
-import { getUserTitle } from '../../utils/titleHelpers';
+import { getUserTitle, isUiVerifiedUser } from '../../utils/titleHelpers';
 import { useNavigate } from 'react-router-dom';
 import { users as usersApi } from '../../utils/api';
 import { getProfilePath } from '../../utils/paths';
@@ -123,7 +123,7 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
                     <Avatar 
                       src={user.avatar_url || user.profile_image} 
                       size="48px"
-                      verified={user.verification_badge}
+                      verified={isUiVerifiedUser(user)}
                     />
                   </div>
                   

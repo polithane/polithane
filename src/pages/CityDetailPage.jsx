@@ -6,7 +6,7 @@ import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { CITY_CODES } from '../utils/constants';
-import { getUserTitle } from '../utils/titleHelpers';
+import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 import { formatPolitScore } from '../utils/formatters';
 import { apiCall } from '../utils/api';
 import { getProfilePath } from '../utils/paths';
@@ -283,7 +283,7 @@ export const CityDetailPage = () => {
                       <Avatar 
                         src={mp.profile_image} 
                         size="56px"
-                        verified={mp.verification_badge}
+                        verified={isUiVerifiedUser(mp)}
                         className="flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
@@ -359,7 +359,7 @@ export const CityDetailPage = () => {
                         <Avatar
                           src={u.avatar_url || u.profile_image}
                           size="56px"
-                          verified={u.verification_badge}
+                          verified={isUiVerifiedUser(u)}
                           className="flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
@@ -424,7 +424,7 @@ export const CityDetailPage = () => {
                               <Avatar
                                 src={u.avatar_url || u.profile_image}
                                 size="56px"
-                                verified={u.verification_badge}
+                                verified={isUiVerifiedUser(u)}
                                 className="flex-shrink-0"
                               />
                               <div className="flex-1 min-w-0">

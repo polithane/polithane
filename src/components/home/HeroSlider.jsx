@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Image as ImageIcon, Video, Music, PenTool } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { formatPolitScore } from '../../utils/formatters';
-import { getUserTitle } from '../../utils/titleHelpers';
+import { getUserTitle, isUiVerifiedUser } from '../../utils/titleHelpers';
 import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
 
@@ -113,7 +113,7 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
           <Avatar 
             src={currentPost.user?.avatar_url || currentPost.user?.profile_image} 
             size="48px" 
-            verified={currentPost.user?.verification_badge}
+            verified={isUiVerifiedUser(currentPost.user)}
             className="border-2 border-white/30 flex-shrink-0"
           />
           <div className="flex-1 min-w-0">

@@ -119,7 +119,7 @@ export const UserManagement = () => {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue"
           >
             <option value="">Doğrulama Durumu</option>
-            <option value="true">Doğrulanmış</option>
+            <option value="true">Onaylı</option>
             <option value="false">Bekleyen/Doğrulanmamış</option>
           </select>
 

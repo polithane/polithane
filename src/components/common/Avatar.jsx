@@ -66,10 +66,10 @@ export const Avatar = ({
       {/* Doğrulama Rozeti - Sağ alt köşe */}
       {verified && (
         <div 
-          className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-0.5 flex items-center justify-center"
+          className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-0.5 flex items-center justify-center"
           style={{ width: `${badgeSize}px`, height: `${badgeSize}px` }}
         >
-          <Check className="text-white" style={{ width: `${badgeSize * 0.6}px`, height: `${badgeSize * 0.6}px` }} />
+          <Check className="text-blue-700" style={{ width: `${badgeSize * 0.6}px`, height: `${badgeSize * 0.6}px` }} />
         </div>
       )}
     </div>

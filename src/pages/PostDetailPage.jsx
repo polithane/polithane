@@ -11,6 +11,7 @@ import { posts as postsApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getProfilePath } from '../utils/paths';
 import { FollowButton } from '../components/common/FollowButton';
+import { isUiVerifiedUser } from '../utils/titleHelpers';
 
 export const PostDetailPage = () => {
   const { postId } = useParams();
@@ -222,7 +223,7 @@ export const PostDetailPage = () => {
                 <Avatar
                   src={uiPost.user?.avatar_url || uiPost.user?.profile_image}
                   size="60px"
-                  verified={uiPost.user?.verification_badge || uiPost.user?.is_verified}
+                  verified={isUiVerifiedUser(uiPost.user)}
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -452,7 +453,7 @@ export const PostDetailPage = () => {
             <div className="space-y-4">
               {comments.map(comment => (
                 <div key={comment.id || comment.comment_id} className="flex gap-3">
-                  <Avatar src={comment.user?.avatar_url || comment.user?.profile_image} size="40px" verified={comment.user?.verification_badge || comment.user?.is_verified} />
+                  <Avatar src={comment.user?.avatar_url || comment.user?.profile_image} size="40px" verified={isUiVerifiedUser(comment.user)} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold">{comment.user?.full_name}</span>

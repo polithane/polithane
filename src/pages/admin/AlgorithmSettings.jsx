@@ -234,7 +234,7 @@ export const AlgorithmSettings = () => {
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={testData.isVerified} onChange={(e) => setTestData(prev => ({ ...prev, isVerified: e.target.checked }))} className="w-4 h-4" />
-                    <span className="text-sm">Doğrulanmış</span>
+                    <span className="text-sm">Onaylı</span>
                   </label>
                   
                   <label className="flex items-center gap-2">

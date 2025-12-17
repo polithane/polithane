@@ -825,8 +825,6 @@ export const RegisterPageNew = () => {
         </div>
 
         {step === 0 && renderChoice()}
-        {step === 1 && handleSearch && renderSearch && renderSearch()} 
-        {/* renderSearch and renderTypeSelection are same as previous logic but simplified call here */}
         {step === 1 && (
             <div className="space-y-6">
               <div className="flex items-center mb-6">

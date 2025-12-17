@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Avatar } from '../components/common/Avatar';
+import { isUiVerifiedUser } from '../utils/titleHelpers';
 
 const pretty = (v) => JSON.stringify(v, null, 2);
 
@@ -53,7 +54,7 @@ export const TestPage = () => {
 
         {sampleUser && (
           <div className="card mb-4 flex items-center gap-3">
-            <Avatar src={sampleUser.avatar_url} size="56px" verified={sampleUser.is_verified} />
+            <Avatar src={sampleUser.avatar_url} size="56px" verified={isUiVerifiedUser(sampleUser)} />
             <div className="min-w-0 flex-1">
               <div className="font-bold truncate">{sampleUser.full_name}</div>
               <div className="text-xs text-gray-600 truncate">@{sampleUser.username}</div>

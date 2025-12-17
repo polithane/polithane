@@ -1,5 +1,6 @@
 import { X, Ban, AlertTriangle } from 'lucide-react';
 import { Avatar } from './Avatar';
+import { isUiVerifiedUser } from '../../utils/titleHelpers';
 
 export const BlockUserModal = ({ isOpen, onClose, user, onConfirm }) => {
   if (!isOpen || !user) return null;
@@ -22,7 +23,7 @@ export const BlockUserModal = ({ isOpen, onClose, user, onConfirm }) => {
           <Avatar 
             src={user.avatar_url || user.profile_image} 
             size="48px"
-            verified={user.verification_badge}
+            verified={isUiVerifiedUser(user)}
           />
           <div>
             <h4 className="font-semibold text-gray-900">{user.full_name}</h4>

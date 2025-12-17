@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { apiCall } from '../utils/api';
+import { isUiVerifiedUser } from '../utils/titleHelpers';
 
 const DEFAULT_DURATION_MS = 5000;
 
@@ -81,7 +82,7 @@ export const PoliFestViewerPage = () => {
       {/* header */}
       <div className="absolute top-0 left-0 right-0 px-3 pt-6 flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          <Avatar src={user?.avatar_url} size="36px" verified={user?.is_verified} />
+          <Avatar src={user?.avatar_url} size="36px" verified={isUiVerifiedUser(user)} />
           <div className="min-w-0">
             <div className="text-sm font-bold truncate">{user?.full_name || 'PoliFest'}</div>
             <div className="text-xs text-white/70 truncate">@{user?.username || '-'}</div>

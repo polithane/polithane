@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
 import { Avatar } from '../components/common/Avatar';
+import { isUiVerifiedUser } from '../utils/titleHelpers';
 
 export const CreatePolitPage = () => {
   const navigate = useNavigate();
@@ -400,7 +401,7 @@ export const CreatePolitPage = () => {
                   <Avatar
                     src={user?.avatar_url}
                     size="44px"
-                    verified={user?.is_verified}
+                    verified={isUiVerifiedUser(user)}
                     className="border border-gray-200 flex-shrink-0"
                   />
                   <div className="min-w-0">

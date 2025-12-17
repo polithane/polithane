@@ -5,6 +5,7 @@ import { mockConversations, mockMessages, generateMockMessages, mockMessageSetti
 import { mockUsers } from '../../mock/users';
 import { formatTimeAgo } from '../../utils/formatters';
 import { useNavigate } from 'react-router-dom';
+import { isUiVerifiedUser } from '../../utils/titleHelpers';
 
 export const FloatingChat = () => {
   const navigate = useNavigate();
@@ -190,7 +191,7 @@ export const FloatingChat = () => {
                     <Avatar 
                       src={user.avatar_url || user.profile_image} 
                       size="48px"
-                      verified={user.verification_badge}
+                      verified={isUiVerifiedUser(user)}
                     />
                     {/* Online Status */}
                     {Math.random() > 0.5 && (
@@ -279,7 +280,7 @@ export const FloatingChat = () => {
                     <Avatar 
                       src={user.avatar_url || user.profile_image} 
                       size="48px"
-                      verified={user.verification_badge}
+                      verified={isUiVerifiedUser(user)}
                     />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-sm text-gray-900">

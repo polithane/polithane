@@ -4,7 +4,7 @@ import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
 import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration, getSourceDomain } from '../../utils/formatters';
-import { getUserTitle } from '../../utils/titleHelpers';
+import { getUserTitle, isUiVerifiedUser } from '../../utils/titleHelpers';
 import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
 import { getProfilePath } from '../../utils/paths';
@@ -69,7 +69,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             <Avatar 
               src={post.user?.avatar_url || post.user?.profile_image} 
               size="40px" 
-              verified={post.user?.verification_badge || post.user?.is_verified}
+              verified={isUiVerifiedUser(post.user)}
             />
           </div>
           <div className="flex-1 min-w-0">

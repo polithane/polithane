@@ -4,6 +4,7 @@ import { Input } from '../components/common/Input';
 import { PostCard } from '../components/post/PostCard';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
+import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { mockPosts } from '../mock/posts';
 import { mockUsers } from '../mock/users';
 import { mockAgendas } from '../mock/agendas';
@@ -61,7 +62,7 @@ export const SearchPage = () => {
               <div className="space-y-3">
                 {filteredUsers.map(user => (
                   <div key={user.user_id} className="card flex items-center gap-4">
-                    <Avatar src={user.avatar_url || user.profile_image} size="48px" verified={user.verification_badge} />
+                    <Avatar src={user.avatar_url || user.profile_image} size="48px" verified={isUiVerifiedUser(user)} />
                     <div className="flex-1">
                       <h3 className="font-semibold">{user.full_name}</h3>
                       <p className="text-sm text-gray-500">@{user.username}</p>

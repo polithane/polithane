@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, Check, XCircle } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { getFollowRequests } from '../../mock/follows';
-import { getUserTitle } from '../../utils/titleHelpers';
+import { getUserTitle, isUiVerifiedUser } from '../../utils/titleHelpers';
 import { useNavigate } from 'react-router-dom';
 
 export const FollowRequestsModal = ({ isOpen, onClose }) => {
@@ -64,7 +64,7 @@ export const FollowRequestsModal = ({ isOpen, onClose }) => {
                     <Avatar 
                       src={user.avatar_url || user.profile_image} 
                       size="48px"
-                      verified={user.verification_badge}
+                      verified={isUiVerifiedUser(user)}
                     />
                   </div>
                   

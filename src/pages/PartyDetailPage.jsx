@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Avatar } from '../components/common/Avatar';
 import { formatNumber, formatPolitScore, formatDate } from '../utils/formatters';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
-import { getPoliticianTitle, getUserTitle } from '../utils/titleHelpers';
+import { getPoliticianTitle, getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 import { getProfilePath } from '../utils/paths';
 import { normalizeUsername } from '../utils/validators';
 import { CITY_CODES } from '../utils/constants';
@@ -639,7 +639,7 @@ export const PartyDetailPage = () => {
                               <Avatar
                                 src={u.avatar_url || u.profile_image}
                                 size="56px"
-                                verified={u.verification_badge || u.is_verified}
+                                verified={isUiVerifiedUser(u)}
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="font-bold truncate">{u.full_name}</div>
@@ -696,7 +696,7 @@ export const PartyDetailPage = () => {
                         className="card cursor-pointer hover:shadow-md transition-shadow flex items-center gap-3"
                         onClick={() => navigate(getProfilePath(u))}
                       >
-                        <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={u.verification_badge || u.is_verified} />
+                        <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={isUiVerifiedUser(u)} />
                         <div className="min-w-0 flex-1">
                           <div className="font-bold truncate">{u.full_name}</div>
                           <div className="text-xs text-gray-600 truncate">@{normalizeUsername(u.username) || '-'}</div>

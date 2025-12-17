@@ -7,6 +7,7 @@ import { formatTimeAgo } from '../utils/formatters';
 import { Search, Send, AlertCircle } from 'lucide-react';
 import { messages as messagesApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { isUiVerifiedUser } from '../utils/titleHelpers';
 
 export const MessagesPage = () => {
   const { user } = useAuth();
@@ -139,7 +140,7 @@ export const MessagesPage = () => {
                         <Avatar 
                           src={user.avatar_url || user.profile_image} 
                           size="48px"
-                          verified={user.verification_badge}
+                          verified={isUiVerifiedUser(user)}
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
@@ -192,7 +193,7 @@ export const MessagesPage = () => {
                     <Avatar 
                       src={selectedConv.participant?.avatar_url || selectedConv.participant?.profile_image} 
                       size="40px"
-                      verified={selectedConv.participant?.verification_badge || selectedConv.participant?.is_verified}
+                      verified={isUiVerifiedUser(selectedConv.participant)}
                     />
                     <div>
                       <h3 className="font-semibold">
