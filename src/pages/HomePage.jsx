@@ -56,7 +56,11 @@ export const HomePage = () => {
         // Postları ayarla (tamamı DB)
         const normalizeMediaUrls = (value) => {
           const raw = Array.isArray(value) ? value : value ? [value] : [];
-          return raw.map((v) => String(v || '').trim()).filter(Boolean);
+          const isPlaceholderPostAsset = (s) =>
+            s.startsWith('/assets/posts/') || s === '/assets/default/post_image.jpg' || s === '/assets/default/post.jpg';
+          return raw
+            .map((v) => String(v || '').trim())
+            .filter((s) => s && !isPlaceholderPostAsset(s));
         };
 
         const mapDbPostToUi = (p) => ({

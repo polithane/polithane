@@ -56,6 +56,8 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   const toSafeSrc = (value) => {
     const s = String(value || '').trim();
     if (!s) return '';
+    // Demo/seed post görsellerini "örnek resim" olarak göstermeyelim
+    if (s.startsWith('/assets/posts/') || s === '/assets/default/post_image.jpg' || s === '/assets/default/post.jpg') return '';
     // Supabase public URL / signed URL / CDN
     if (s.startsWith('https://') || s.startsWith('http://')) return s;
     // Local public assets (Vite /public)
