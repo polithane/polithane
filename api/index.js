@@ -398,6 +398,29 @@ async function reportComment(req, res, commentId) {
   });
 }
 
+async function reportPost(req, res, postId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const body = await readJsonBody(req);
+  const reason = String(body?.reason || '').trim();
+  const details = String(body?.details || '').trim();
+  if (!reason) return res.status(400).json({ success: false, error: 'Şikayet nedeni seçmelisiniz.' });
+
+  await notifyAdminsAboutComment({
+    type: 'post_report',
+    commentId: null,
+    postId,
+    actorId: auth.id,
+    title: 'Gönderi şikayeti',
+    message: `Neden: ${reason}${details ? `\nNot: ${details}` : ''}`,
+  });
+
+  return res.json({
+    success: true,
+    message: 'Bildiriminiz alındı. İnceleme sonrası gerekli işlem yapılacaktır.',
+  });
+}
+
 async function toggleCommentLike(req, res, commentId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -1957,6 +1980,7 @@ export default async function handler(req, res) {
           if (postId && tail === 'like' && req.method === 'POST') return await togglePostLike(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'GET') return await getPostComments(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'POST') return await addPostComment(req, res, postId);
+          if (postId && tail === 'report' && req.method === 'POST') return await reportPost(req, res, postId);
       }
 
       // Comments (edit / report)

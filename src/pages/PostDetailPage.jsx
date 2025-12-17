@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
@@ -9,6 +9,7 @@ import { formatNumber, formatPolitScore, formatTimeAgo, formatDate, formatDurati
 import ReactPlayer from 'react-player';
 import { posts as postsApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { getProfilePath } from '../utils/paths';
 
 export const PostDetailPage = () => {
   const { postId } = useParams();
@@ -28,6 +29,17 @@ export const PostDetailPage = () => {
   const [reportReason, setReportReason] = useState('spam');
   const [reportDetails, setReportDetails] = useState('');
   const [reportDone, setReportDone] = useState(false);
+
+  const [showShare, setShowShare] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const [reportingPost, setReportingPost] = useState(false);
+  const [postReportReason, setPostReportReason] = useState('spam');
+  const [postReportDetails, setPostReportDetails] = useState('');
+  const [postReportDone, setPostReportDone] = useState(false);
+
+  const commentsRef = useRef(null);
+  const commentBoxRef = useRef(null);
   
   useEffect(() => {
     const load = async () => {
@@ -146,6 +158,41 @@ export const PostDetailPage = () => {
   };
 
   const isPendingComment = (comment) => !!comment?.is_deleted;
+
+  const postUrl = (() => {
+    try {
+      return `${window.location.origin}/post/${uiPost.post_id}`;
+    } catch {
+      return `/post/${uiPost.post_id}`;
+    }
+  })();
+
+  const copyToClipboard = async (text) => {
+    const t = String(text || '');
+    if (!t) return false;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(t);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+    try {
+      const el = document.createElement('textarea');
+      el.value = t;
+      el.setAttribute('readonly', 'true');
+      el.style.position = 'fixed';
+      el.style.left = '-9999px';
+      document.body.appendChild(el);
+      el.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(el);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -168,7 +215,13 @@ export const PostDetailPage = () => {
                 </div>
                 <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
               </div>
-              <Button variant="outline" onClick={() => navigate(`/profile/${uiPost.user_id}`)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (uiPost.user) navigate(getProfilePath(uiPost.user));
+                  else navigate(`/profile/${uiPost.user_id}`);
+                }}
+              >
                 Takip Et
               </Button>
             </div>
@@ -225,13 +278,34 @@ export const PostDetailPage = () => {
               </button>
               
               {/* YORUM */}
-              <button className="flex items-center justify-center gap-2 bg-gradient-to-br from-primary-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <button
+                onClick={() => {
+                  commentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  setTimeout(() => commentBoxRef.current?.focus?.(), 250);
+                }}
+                className="flex items-center justify-center gap-2 bg-gradient-to-br from-primary-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
                 <MessageCircle className="w-4 h-4" />
                 <span className="text-sm font-bold">YORUM ({formatNumber(uiPost.comment_count)})</span>
               </button>
               
               {/* PAYLAŞ */}
-              <button className="flex items-center justify-center gap-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <button
+                onClick={async () => {
+                  setShareCopied(false);
+                  // If native share exists, offer it first
+                  try {
+                    if (navigator?.share) {
+                      await navigator.share({ title: 'Polithane', url: postUrl });
+                      return;
+                    }
+                  } catch {
+                    // ignore
+                  }
+                  setShowShare(true);
+                }}
+                className="flex items-center justify-center gap-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
                 <Share2 className="w-4 h-4" />
                 <span className="text-sm font-bold">PAYLAŞ ({formatNumber(uiPost.share_count || 0)})</span>
               </button>
@@ -239,7 +313,16 @@ export const PostDetailPage = () => {
             
             {/* Şikayet Et - Alt Satırda */}
             <div className="flex justify-end mt-3">
-              <button className="flex items-center gap-2 text-gray-500 hover:text-red-500 text-sm font-medium transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  setReportingPost(true);
+                  setPostReportReason('spam');
+                  setPostReportDetails('');
+                  setPostReportDone(false);
+                }}
+                className="flex items-center gap-2 text-gray-500 hover:text-red-500 text-sm font-medium transition-colors"
+              >
                 <Flag className="w-4 h-4" />
                 Şikayet Et
               </button>
@@ -263,11 +346,12 @@ export const PostDetailPage = () => {
             <h3 className="text-xl font-bold mb-4">Yorumlar ({comments.length})</h3>
             
             {/* Yorum Ekleme */}
-            <div className="mb-6 pb-6 border-b">
+            <div ref={commentsRef} className="mb-6 pb-6 border-b scroll-mt-24">
               <div className="flex gap-3">
                 <Avatar src={currentUser?.avatar_url || currentUser?.profile_image} size="40px" />
                 <div className="flex-1">
                   <textarea
+                    ref={commentBoxRef}
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Yorumunuzu yazın..."
@@ -509,6 +593,117 @@ export const PostDetailPage = () => {
                     } catch (e) {
                       setCommentError(e?.message || 'Şikayet gönderilemedi.');
                       setReporting(null);
+                    }
+                  }}
+                >
+                  Gönder
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* Share modal */}
+      <Modal isOpen={showShare} onClose={() => setShowShare(false)} title="Paylaş">
+        <div className="space-y-4">
+          <div className="text-sm text-gray-700">
+            Bu polit linki:
+            <div className="mt-2 p-3 rounded-lg bg-gray-50 border border-gray-200 break-all text-xs text-gray-800">
+              {postUrl}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <a
+              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(postUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3 rounded-xl bg-black text-white font-black text-center hover:bg-gray-900"
+            >
+              X
+            </a>
+            <a
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3 rounded-xl bg-[#1877F2] text-white font-black text-center hover:opacity-90"
+            >
+              Facebook
+            </a>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(postUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3 rounded-xl bg-[#25D366] text-white font-black text-center hover:opacity-90"
+            >
+              WhatsApp
+            </a>
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await copyToClipboard(postUrl);
+                setShareCopied(ok);
+              }}
+              className="px-4 py-3 rounded-xl border border-gray-300 text-gray-900 font-black hover:bg-gray-50"
+            >
+              {shareCopied ? 'Kopyalandı' : 'Kopyala'}
+            </button>
+          </div>
+
+          <div className="text-xs text-gray-500">
+            Instagram web üzerinden direkt paylaşımı desteklemez; linki kopyalayıp Instagram’da paylaşabilirsiniz.
+          </div>
+        </div>
+      </Modal>
+
+      {/* Post report modal */}
+      {reportingPost && (
+        <Modal isOpen={true} onClose={() => setReportingPost(false)} title="Paylaşımı Şikayet Et">
+          {postReportDone ? (
+            <div className="space-y-3">
+              <div className="text-sm text-gray-800 font-semibold">
+                Bildiriminiz alındı. İnceleme sonrası gerekli işlem yapılacaktır.
+              </div>
+              <Button onClick={() => setReportingPost(false)}>Kapat</Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-700">Neden şikayet etmek istiyorsunuz?</div>
+              <select
+                value={postReportReason}
+                onChange={(e) => setPostReportReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="spam">Spam</option>
+                <option value="hakaret">Hakaret / Küfür</option>
+                <option value="taciz">Taciz / Nefret</option>
+                <option value="yaniltici">Yanıltıcı bilgi</option>
+                <option value="zararli_link">Zararlı link</option>
+                <option value="diger">Diğer</option>
+              </select>
+
+              <textarea
+                value={postReportDetails}
+                onChange={(e) => setPostReportDetails(e.target.value)}
+                rows={3}
+                placeholder="İsterseniz kısa bir açıklama ekleyin (opsiyonel)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setReportingPost(false)}>
+                  Vazgeç
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      setCommentError('');
+                      await postsApi.reportPost(uiPost.post_id, postReportReason, postReportDetails);
+                      setPostReportDone(true);
+                    } catch (e) {
+                      setCommentError(e?.message || 'Şikayet gönderilemedi.');
+                      setReportingPost(false);
                     }
                   }}
                 >

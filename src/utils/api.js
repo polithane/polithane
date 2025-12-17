@@ -204,6 +204,12 @@ export const posts = {
       method: 'POST',
       body: JSON.stringify({ reason, details }),
     }),
+
+  reportPost: (postId, reason, details = '') =>
+    apiCall(`/api/posts/${postId}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, details }),
+    }),
 };
 
 // ============================================
