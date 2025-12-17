@@ -22,6 +22,8 @@ export const CreatePolitPage = () => {
   const [contentType, setContentType] = useState('video');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('general');
+  const [agendaTag, setAgendaTag] = useState(''); // '' => Gündem dışı
+  const [agendas, setAgendas] = useState([]);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -69,6 +71,20 @@ export const CreatePolitPage = () => {
       });
     };
   }, [contentType, files]);
+
+  useEffect(() => {
+    // Load agendas from admin-managed list
+    (async () => {
+      try {
+        const res = await apiCall('/api/agendas?limit=80');
+        const list = Array.isArray(res) ? res : res?.data || [];
+        setAgendas(Array.isArray(list) ? list : []);
+      } catch (e) {
+        setAgendas([]);
+        // Do not hard-fail the page; user can still post as "Gündem dışı"
+      }
+    })();
+  }, []);
 
   // Cleanup streams on unmount / tab change
   useEffect(() => {
@@ -263,6 +279,7 @@ export const CreatePolitPage = () => {
         content_type: contentType,
         content_text: content,
         category,
+        agenda_tag: agendaTag || null,
         media_urls,
       });
       if (result?.success && result?.data?.id) {
@@ -434,19 +451,42 @@ export const CreatePolitPage = () => {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Gündem/Kategori</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
-                >
-                  <option value="general">Genel</option>
-                  <option value="mps">Vekiller</option>
-                  <option value="organization">Teşkilat</option>
-                  <option value="citizens">Vatandaş</option>
-                  <option value="media">Medya</option>
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Gündem</label>
+                  <select
+                    value={agendaTag}
+                    onChange={(e) => setAgendaTag(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
+                  >
+                    <option value="">Gündem dışı</option>
+                    {agendas
+                      .filter((a) => a?.is_active !== false)
+                      .map((a) => (
+                        <option key={a.id || a.slug || a.title} value={a.title || ''}>
+                          {a.title}
+                        </option>
+                      ))}
+                  </select>
+                  <div className="mt-1 text-[11px] text-gray-500">
+                    Gündem listesi admin panelindeki gündemlerden gelir. Bulamazsanız “Gündem dışı” seçebilirsiniz.
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Kategori</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
+                  >
+                    <option value="general">Genel</option>
+                    <option value="mps">Vekiller</option>
+                    <option value="organization">Teşkilat</option>
+                    <option value="citizens">Vatandaş</option>
+                    <option value="media">Medya</option>
+                  </select>
+                </div>
               </div>
 
               {/* VIDEO: Kayda Başla */}

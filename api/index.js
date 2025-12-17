@@ -263,6 +263,7 @@ async function createPost(req, res) {
 
     const content = String(body.content_text ?? body.content ?? '').trim();
     const category = String(body.category || 'general').trim();
+    const agenda_tag = String(body.agenda_tag || '').trim() || null;
     const media_urls = Array.isArray(body.media_urls) ? body.media_urls : [];
     const content_type = String(body.content_type || (media_urls.length > 0 ? 'image' : 'text')).trim();
 
@@ -282,6 +283,7 @@ async function createPost(req, res) {
         content_type,
         content_text: content,
         category,
+        agenda_tag,
         media_urls,
         is_deleted: false
       }]);
@@ -293,6 +295,7 @@ async function createPost(req, res) {
           party_id,
           content,
           category,
+          agenda_tag,
           media_urls,
           is_deleted: false
         }]);
@@ -302,6 +305,20 @@ async function createPost(req, res) {
     }
     const post = inserted?.[0] || null;
     res.status(201).json({ success: true, data: post });
+}
+
+async function getAgendas(req, res) {
+    const { limit = 50, search, is_trending, is_active } = req.query || {};
+    const params = {
+      select: '*',
+      limit: String(Math.min(Math.max(parseInt(limit) || 50, 1), 200)),
+      order: 'trending_score.desc',
+    };
+    if (String(is_active || 'true') === 'true') params.is_active = 'eq.true';
+    if (String(is_trending || '') === 'true') params.is_trending = 'eq.true';
+    if (search && String(search).trim().length >= 2) params.title = `ilike.*${String(search).trim()}*`;
+    const rows = await supabaseRestGet('agendas', params).catch(() => []);
+    res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
 }
 
 async function getParties(req, res) {
@@ -1707,6 +1724,7 @@ export default async function handler(req, res) {
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);
       if ((url === '/api/posts' || url === '/api/posts/') && req.method === 'GET') return await getPosts(req, res);
+      if ((url === '/api/agendas' || url === '/api/agendas/') && req.method === 'GET') return await getAgendas(req, res);
       if (url === '/api/parties' || url === '/api/parties/') return await getParties(req, res);
 
       // Posts (detail + interactions)
