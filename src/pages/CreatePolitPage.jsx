@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Square, Circle, Trash2 } from 'lucide-react';
+import { Camera, Square, Circle, Trash2, X, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
+import { Avatar } from '../components/common/Avatar';
 
 const IKON_BASE = 'https://eldoyqgzxgubkyohvquq.supabase.co/storage/v1/object/public/ikons';
 
@@ -23,6 +24,7 @@ export const CreatePolitPage = () => {
   const [category, setCategory] = useState('general');
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [imagePreviews, setImagePreviews] = useState([]);
 
   // Text constraints
   const TEXT_LIMIT = 350;
@@ -48,6 +50,25 @@ export const CreatePolitPage = () => {
     if (contentType === 'video' || contentType === 'audio') return 1;
     return 0;
   }, [contentType]);
+
+  useEffect(() => {
+    // Generate preview URLs for selected images (and cleanup)
+    if (contentType !== 'image') {
+      setImagePreviews([]);
+      return;
+    }
+    const urls = (files || []).slice(0, 10).map((f) => URL.createObjectURL(f));
+    setImagePreviews(urls);
+    return () => {
+      urls.forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {
+          // noop
+        }
+      });
+    };
+  }, [contentType, files]);
 
   // Cleanup streams on unmount / tab change
   useEffect(() => {
@@ -265,17 +286,58 @@ export const CreatePolitPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
       <div className="container-main py-6">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
-            <div className="mb-4">
-              <h1 className="text-2xl font-black text-gray-900">Polit At</h1>
-              <p className="text-sm text-gray-600">Video, resim, ses veya metin paylaş.</p>
+          <div className="bg-white/90 backdrop-blur border border-gray-200 rounded-3xl shadow-xl overflow-hidden">
+            {/* Top bar */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="p-2 rounded-xl hover:bg-gray-100"
+                title="Kapat"
+              >
+                <X className="w-6 h-6 text-gray-700" />
+              </button>
+              <div className="text-center">
+                <div className="text-lg font-black text-gray-900">Polit At</div>
+                <div className="text-[11px] text-gray-500">Sosyal medya gibi hızlı paylaş</div>
+              </div>
+              <div className="w-10" />
             </div>
 
+            <div className="p-5">
+              {/* Identity row */}
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar
+                    src={user?.avatar_url}
+                    size="44px"
+                    verified={user?.is_verified}
+                    className="border border-gray-200 flex-shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <div className="font-black text-gray-900 truncate">{user?.full_name || 'Misafir'}</div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {isAuthenticated ? 'Paylaşım yapıyorsun' : 'Polit atmak için giriş yap'}
+                    </div>
+                  </div>
+                </div>
+                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-blue-50 border border-blue-100 text-blue-700 text-xs font-black">
+                  <Sparkles className="w-4 h-4" />
+                  {contentType === 'video'
+                    ? 'Video'
+                    : contentType === 'image'
+                      ? 'Resim'
+                      : contentType === 'audio'
+                        ? 'Ses'
+                        : 'Yazı'}
+                </div>
+              </div>
+
             {/* Content type tabs */}
-            <div className="flex items-center justify-center gap-6 mb-4">
+            <div className="flex items-center justify-center gap-5 mb-5">
               {CONTENT_TABS.map((t) => {
                 const active = t.key === contentType;
                 return (
@@ -286,14 +348,20 @@ export const CreatePolitPage = () => {
                       setContentType(t.key);
                       resetMedia();
                     }}
-                    className="p-0 bg-transparent border-0 outline-none"
+                    className={`p-3 rounded-2xl border transition-all ${
+                      active
+                        ? 'bg-primary-blue/10 border-primary-blue shadow-md'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    }`}
                     title={t.alt}
                   >
                     <img
                       src={t.iconSrc}
                       alt={t.alt}
-                      className={`object-contain transition-transform ${active ? 'scale-110' : 'opacity-80 hover:opacity-100'}`}
-                      style={{ width: 32, height: 32 }}
+                      className={`object-contain transition-transform ${
+                        active ? 'scale-110 opacity-100' : 'opacity-90 hover:opacity-100'
+                      }`}
+                      style={{ width: 56, height: 56 }}
                       loading="lazy"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
@@ -305,6 +373,67 @@ export const CreatePolitPage = () => {
             </div>
 
             <form onSubmit={onSubmit} className="space-y-4">
+              {/* Preview area */}
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                {contentType === 'video' && (
+                  <>
+                    <div className="text-xs font-black text-gray-700 mb-2">Video Önizleme</div>
+                    {recordedUrl ? (
+                      <video src={recordedUrl} controls className="w-full rounded-xl bg-black" />
+                    ) : (
+                      <div className="text-sm text-gray-600">
+                        <span className="font-semibold">Kayda Başla</span> ile videonu çek ve burada önizle.
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {contentType === 'audio' && (
+                  <>
+                    <div className="text-xs font-black text-gray-700 mb-2">Ses Önizleme</div>
+                    {recordedUrl ? (
+                      <audio src={recordedUrl} controls className="w-full" />
+                    ) : (
+                      <div className="text-sm text-gray-600">
+                        <span className="font-semibold">Kayda Başla</span> ile ses kaydı al.
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {contentType === 'image' && (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-black text-gray-700">Resim Önizleme</div>
+                      <div className="text-[11px] text-gray-500">
+                        {Math.min(files.length, 10)}/{10}
+                      </div>
+                    </div>
+                    {imagePreviews.length > 0 ? (
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {imagePreviews.map((u, idx) => (
+                          <img
+                            key={u}
+                            src={u}
+                            alt=""
+                            className="w-24 h-24 rounded-xl object-cover border border-gray-200 flex-shrink-0"
+                            title={`Resim ${idx + 1}`}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600">Resim ekleyince burada gözükecek.</div>
+                    )}
+                  </>
+                )}
+
+                {contentType === 'text' && (
+                  <div className="text-sm text-gray-600">
+                    <span className="font-semibold">Yazı</span> politin anında yayınlanır. Net ve kısa yaz.
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Gündem/Kategori</label>
                 <select
@@ -360,12 +489,6 @@ export const CreatePolitPage = () => {
                       </button>
                     )}
                   </div>
-
-                  {recordedUrl && (
-                    <div className="mt-3">
-                      <video src={recordedUrl} controls className="w-full rounded-xl bg-black" />
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -412,7 +535,7 @@ export const CreatePolitPage = () => {
 
                   {files.length > 0 && (
                     <div className="mt-2 text-xs text-gray-600">
-                      {files.slice(0, 10).map((f) => f.name).join(', ')}
+                      <span className="font-semibold">{Math.min(files.length, 10)}</span> resim seçildi.
                     </div>
                   )}
                 </div>
@@ -458,12 +581,6 @@ export const CreatePolitPage = () => {
                       </button>
                     )}
                   </div>
-
-                  {recordedUrl && (
-                    <div className="mt-3">
-                      <audio src={recordedUrl} controls className="w-full" />
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -499,17 +616,11 @@ export const CreatePolitPage = () => {
                 {loading ? 'Paylaşılıyor…' : 'Polit At!'}
               </button>
 
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="w-full py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
-              >
-                Geri
-              </button>
             </form>
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };
