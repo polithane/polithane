@@ -596,9 +596,32 @@ export const ProfilePage = () => {
         {/* Tab İçerikleri */}
         {activeTab === 'posts' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {userPosts.map(post => (
-              <PostCardHorizontal key={post.post_id ?? post.id} post={post} fullWidth={true} />
-            ))}
+            {userPosts.map((post) => {
+              const pid = post?.post_id ?? post?.id;
+              return (
+                <div key={pid ?? post.post_id ?? post.id} className="space-y-2">
+                  <PostCardHorizontal post={post} fullWidth={true} />
+                  {isOwnProfile && pid && !post?.is_deleted && (
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/post/${pid}?edit=1`)}
+                        className="px-3 py-2 rounded-lg text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800"
+                      >
+                        Düzenle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/post/${pid}?delete=1`)}
+                        className="px-3 py-2 rounded-lg text-sm font-semibold bg-red-50 hover:bg-red-100 text-red-700"
+                      >
+                        Sil
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
         {activeTab === 'comments' && (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, ThumbsUp } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
@@ -16,6 +16,7 @@ import { isUiVerifiedUser } from '../utils/titleHelpers';
 export const PostDetailPage = () => {
   const { postId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: currentUser, isAuthenticated } = useAuth();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
@@ -111,6 +112,27 @@ export const PostDetailPage = () => {
           .filter(Boolean);
   const safeActiveImageIdx = Math.max(0, Math.min(activeImageIdx, Math.max(0, imageList.length - 1)));
   const activeImageSrc = imageList[safeActiveImageIdx] || imageList[0] || '';
+
+  const queryFlags = useMemo(() => {
+    const q = new URLSearchParams(location.search || '');
+    return {
+      openEdit: q.get('edit') === '1',
+      openDelete: q.get('delete') === '1',
+    };
+  }, [location.search]);
+
+  // Allow deep-linking to edit/delete for the owner (e.g. from Profile).
+  useEffect(() => {
+    if (!isReady || !isOwnPost) return;
+    if (queryFlags.openEdit && !showEditPost) {
+      setEditPostText(uiPost.content_text || '');
+      setShowEditPost(true);
+    }
+    if (queryFlags.openDelete && !showDeletePost) {
+      setShowDeletePost(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady, isOwnPost, queryFlags.openEdit, queryFlags.openDelete]);
 
   const handleToggleLike = async () => {
     if (!uiPost.post_id) return;
