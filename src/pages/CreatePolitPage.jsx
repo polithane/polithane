@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Square, Circle, Trash2, X, Sparkles } from 'lucide-react';
+import { Camera, Square, Circle, Trash2, X, Sparkles, Video, Image as ImageIcon, Music, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
 import { Avatar } from '../components/common/Avatar';
 
-const IKON_BASE = 'https://eldoyqgzxgubkyohvquq.supabase.co/storage/v1/object/public/ikons';
-
 const CONTENT_TABS = [
-  { key: 'video', iconSrc: `${IKON_BASE}/videoikon.png`, alt: 'Video' },
-  { key: 'image', iconSrc: `${IKON_BASE}/resimikon.png`, alt: 'Resim' },
-  { key: 'audio', iconSrc: `${IKON_BASE}/sesikon.png`, alt: 'Ses' },
-  { key: 'text', iconSrc: `${IKON_BASE}/yaziikon.png`, alt: 'Yazı' },
+  { key: 'video', icon: Video, alt: 'Video' },
+  { key: 'image', icon: ImageIcon, alt: 'Resim' },
+  { key: 'audio', icon: Music, alt: 'Ses' },
+  { key: 'text', icon: PenTool, alt: 'Yazı' },
 ];
 
 export const CreatePolitPage = () => {
@@ -357,6 +355,7 @@ export const CreatePolitPage = () => {
             <div className="flex items-center justify-center gap-5 mb-5">
               {CONTENT_TABS.map((t) => {
                 const active = t.key === contentType;
+                const Icon = t.icon;
                 return (
                   <button
                     key={t.key}
@@ -372,18 +371,14 @@ export const CreatePolitPage = () => {
                     }`}
                     title={t.alt}
                   >
-                    <img
-                      src={t.iconSrc}
-                      alt={t.alt}
-                      className={`object-contain transition-transform ${
-                        active ? 'scale-110 opacity-100' : 'opacity-90 hover:opacity-100'
-                      }`}
-                      style={{ width: 56, height: 56 }}
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
+                    <div className="w-[56px] h-[56px] flex items-center justify-center">
+                      <Icon
+                        className={`transition-transform ${
+                          active ? 'scale-110 text-primary-blue' : 'text-gray-700 group-hover:text-gray-900'
+                        }`}
+                        style={{ width: 40, height: 40 }}
+                      />
+                    </div>
                   </button>
                 );
               })}
