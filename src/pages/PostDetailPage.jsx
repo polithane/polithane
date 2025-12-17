@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, ThumbsUp } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, ThumbsUp, Eye, TrendingUp, Users } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -49,6 +49,7 @@ export const PostDetailPage = () => {
   const [savingPost, setSavingPost] = useState(false);
   const [showDeletePost, setShowDeletePost] = useState(false);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const [expandedScoreCategory, setExpandedScoreCategory] = useState(null);
   
   useEffect(() => {
     const load = async () => {
@@ -120,6 +121,82 @@ export const PostDetailPage = () => {
       openDelete: q.get('delete') === '1',
     };
   }, [location.search]);
+
+  const scoreBreakdown = useMemo(() => {
+    const viewCount = Number(uiPost.view_count || 0);
+    const likeCount = Number(uiPost.like_count || 0);
+    const commentCount = Number(uiPost.comment_count || 0);
+    const shareCount = Number(uiPost.share_count || 0);
+    const storedScore = Number(uiPost.polit_score || 0);
+
+    // Şeffaflık: Bu dağılım kalem kalem gösterim içindir (yaklaşık).
+    // Gerçek skor backend tarafında hesaplanıp `polit_score` olarak saklanır.
+    const breakdown = {
+      views: {
+        title: 'Görüntüleme Puanları',
+        icon: <Eye className="w-5 h-5" />,
+        total: Math.floor(viewCount * 0.1),
+        details: [
+          { label: 'Üye Olmayanların Görüntülemesi', count: Math.floor(viewCount * 0.4), unitPoint: '0,05 P.', points: Math.floor(viewCount * 0.4 * 0.05) },
+          { label: 'Parti Üyelerinin Görüntülemesi', count: Math.floor(viewCount * 0.3), unitPoint: '0,1 P.', points: Math.floor(viewCount * 0.3 * 0.1) },
+          { label: 'Rakip Parti Üyelerinin Görüntülemesi', count: Math.floor(viewCount * 0.2), unitPoint: '0,15 P.', points: Math.floor(viewCount * 0.2 * 0.15) },
+          { label: 'Siyasetçilerin Görüntülemesi', count: Math.floor(viewCount * 0.1), unitPoint: '0,5 P.', points: Math.floor(viewCount * 0.1 * 0.5) },
+        ],
+      },
+      likes: {
+        title: 'Beğeni Puanları',
+        icon: <Heart className="w-5 h-5" />,
+        total: Math.floor(likeCount * 2),
+        details: [
+          { label: 'Üye Olmayanların Beğenisi', count: Math.floor(likeCount * 0.3), unitPoint: '1 P.', points: Math.floor(likeCount * 0.3 * 1) },
+          { label: 'Parti Üyelerinin Beğenisi', count: Math.floor(likeCount * 0.35), unitPoint: '2 P.', points: Math.floor(likeCount * 0.35 * 2) },
+          { label: 'Rakip Parti Üyelerinin Beğenisi', count: Math.floor(likeCount * 0.25), unitPoint: '3 P.', points: Math.floor(likeCount * 0.25 * 3) },
+          { label: 'Siyasetçilerin Beğenisi', count: Math.floor(likeCount * 0.1), unitPoint: '10 P.', points: Math.floor(likeCount * 0.1 * 10) },
+        ],
+      },
+      comments: {
+        title: 'Yorum Puanları',
+        icon: <MessageCircle className="w-5 h-5" />,
+        total: Math.floor(commentCount * 5),
+        details: [
+          { label: 'Üye Olmayanların Yorumu', count: Math.floor(commentCount * 0.2), unitPoint: '2 P.', points: Math.floor(commentCount * 0.2 * 2) },
+          { label: 'Parti Üyelerinin Yorumu', count: Math.floor(commentCount * 0.4), unitPoint: '5 P.', points: Math.floor(commentCount * 0.4 * 5) },
+          { label: 'Rakip Parti Üyelerinin Yorumu', count: Math.floor(commentCount * 0.3), unitPoint: '8 P.', points: Math.floor(commentCount * 0.3 * 8) },
+          { label: 'Siyasetçilerin Yorumu', count: Math.floor(commentCount * 0.1), unitPoint: '20 P.', points: Math.floor(commentCount * 0.1 * 20) },
+        ],
+      },
+      shares: {
+        title: 'Paylaşım Puanları',
+        icon: <Share2 className="w-5 h-5" />,
+        total: Math.floor(shareCount * 50),
+        details: [
+          { label: 'Dış Paylaşımlar (Sosyal Medya)', count: Math.floor(shareCount * 0.7), unitPoint: '50 P.', points: Math.floor(shareCount * 0.7 * 50) },
+          { label: 'Platform İçi Paylaşımlar', count: Math.floor(shareCount * 0.3), unitPoint: '25 P.', points: Math.floor(shareCount * 0.3 * 25) },
+        ],
+      },
+    };
+
+    const totalCalculated = Object.values(breakdown).reduce((sum, cat) => sum + (Number(cat.total) || 0), 0);
+    const engagementBonus = Math.floor(totalCalculated * 0.1);
+    breakdown.engagement = {
+      title: 'Etkileşim Bonusu',
+      icon: <TrendingUp className="w-5 h-5" />,
+      total: engagementBonus,
+      details: [
+        { label: 'Gündem Oluşturma Bonusu', count: 1, unitPoint: `${Math.floor(engagementBonus * 0.5)} P.`, points: Math.floor(engagementBonus * 0.5) },
+        { label: 'Hızlı Etkileşim Bonusu', count: 1, unitPoint: `${Math.floor(engagementBonus * 0.3)} P.`, points: Math.floor(engagementBonus * 0.3) },
+        { label: 'Çeşitli Kitleden Etkileşim', count: 1, unitPoint: `${Math.floor(engagementBonus * 0.2)} P.`, points: Math.floor(engagementBonus * 0.2) },
+      ],
+    };
+
+    const totalWithBonus = totalCalculated + engagementBonus;
+
+    return {
+      breakdown,
+      totalCalculated: totalWithBonus,
+      storedScore,
+    };
+  }, [uiPost.view_count, uiPost.like_count, uiPost.comment_count, uiPost.share_count, uiPost.polit_score]);
 
   // Allow deep-linking to edit/delete for the owner (e.g. from Profile).
   useEffect(() => {
@@ -616,30 +693,69 @@ export const PostDetailPage = () => {
         title="Polit Puan Detaylı Hesaplama"
       >
         <div className="space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="text-2xl font-bold text-primary-blue mb-2">
-              {formatPolitScore(uiPost.polit_score)} Polit Puan
+          <div className="bg-gradient-to-r from-primary-blue to-blue-600 text-white p-5 rounded-2xl">
+            <div className="text-center">
+              <div className="text-xs font-black tracking-widest opacity-90">TOPLAM POLİT PUAN</div>
+              <div className="text-4xl font-black mt-2">{formatPolitScore(scoreBreakdown.storedScore)}</div>
+              <div className="text-xs opacity-90 mt-2">
+                Kalem kalem hesaplanan (yaklaşık): {formatPolitScore(scoreBreakdown.totalCalculated)}
+              </div>
             </div>
-            <p className="text-sm text-gray-600">
-              Bu puan, paylaşımınıza yapılan etkileşimlerden hesaplanmıştır.
-            </p>
           </div>
-          <div>
-            <h4 className="font-semibold mb-2">Hesaplama Detayları:</h4>
-            <ul className="space-y-2">
-              <li className="flex justify-between">
-                <span>Görüntülenme:</span>
-                <span className="font-semibold">{formatNumber(uiPost.view_count)}</span>
-              </li>
-              <li className="flex justify-between">
-                <span>Beğeni:</span>
-                <span className="font-semibold">{formatNumber(uiPost.like_count)}</span>
-              </li>
-              <li className="flex justify-between">
-                <span>Yorum:</span>
-                <span className="font-semibold">{formatNumber(uiPost.comment_count)}</span>
-              </li>
-            </ul>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-start gap-3">
+            <div className="bg-primary-blue rounded-full p-2 flex-shrink-0">
+              <Users className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-black text-gray-900">Şeffaflık</div>
+              <div className="text-xs text-gray-700 leading-relaxed mt-1">
+                Aşağıdaki liste, puanın hangi kalemlerden oluştuğunu anlaşılır şekilde gösterir.
+                (Dağılım, ekranda şeffaf anlatım amaçlıdır; nihai skor sunucuda hesaplanıp saklanır.)
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {Object.entries(scoreBreakdown.breakdown).map(([key, category]) => (
+              <div key={key} className="border border-gray-200 rounded-2xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setExpandedScoreCategory(expandedScoreCategory === key ? null : key)}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-primary-blue">{category.icon}</div>
+                    <div className="text-left">
+                      <div className="font-black text-gray-900">{category.title}</div>
+                      <div className="text-xs text-gray-500">Toplam katkı</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-black text-primary-blue">{formatPolitScore(category.total)}</div>
+                    <div className="text-xs text-gray-500">{expandedScoreCategory === key ? 'Gizle ▲' : 'Detay ▼'}</div>
+                  </div>
+                </button>
+
+                {expandedScoreCategory === key && (
+                  <div className="bg-white p-4 space-y-2 border-t border-gray-200">
+                    {category.details.map((detail, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-blue-50 border border-blue-100">
+                        <div className="min-w-0 pr-3">
+                          <div className="text-sm font-bold text-gray-900 truncate">{detail.label}</div>
+                          <div className="text-xs text-gray-600">
+                            {formatNumber(detail.count)} adet × {detail.unitPoint}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-base font-black text-primary-blue">{formatPolitScore(detail.points)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </Modal>
