@@ -1679,6 +1679,120 @@ async function adminUpdateUser(req, res, userId) {
   res.json({ success: true, data: updated?.[0] || null });
 }
 
+function normalizePersonKey(input) {
+  return String(input || '')
+    .trim()
+    .toLocaleLowerCase('tr-TR')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u')
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeAvatarKey(url) {
+  const s = String(url || '').trim();
+  if (!s) return '';
+  // strip query params to avoid signed url mismatches
+  return s.split('?')[0];
+}
+
+async function adminFindDuplicateUsers(req, res) {
+  requireAdmin(req, res);
+  const { limit = 5000 } = req.query || {};
+  const lim = Math.min(Math.max(parseInt(limit, 10) || 5000, 200), 5000);
+
+  const rows = await supabaseRestGet('users', {
+    select: 'id,username,full_name,email,avatar_url,user_type,politician_type,party_id,province,district_name,is_active,is_verified,created_at,metadata,polit_score',
+    limit: String(lim),
+    order: 'created_at.asc',
+  }).catch(() => []);
+
+  const groups = new Map();
+  for (const u of rows || []) {
+    const nameKey = normalizePersonKey(u?.full_name);
+    const avatarKey = normalizeAvatarKey(u?.avatar_url);
+    if (!nameKey || !avatarKey) continue;
+    const key = `${nameKey}__${avatarKey}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(u);
+  }
+
+  const out = [];
+  for (const [key, list] of groups.entries()) {
+    if (!Array.isArray(list) || list.length < 2) continue;
+    out.push({
+      key,
+      count: list.length,
+      users: list,
+    });
+  }
+  // biggest groups first
+  out.sort((a, b) => (b.count || 0) - (a.count || 0));
+  res.json({ success: true, data: out });
+}
+
+async function adminDedupeUsers(req, res) {
+  requireAdmin(req, res);
+  const body = await readJsonBody(req);
+  const primaryId = String(body?.primaryId || '').trim();
+  const duplicateIds = Array.isArray(body?.duplicateIds) ? body.duplicateIds.map((x) => String(x).trim()).filter(Boolean) : [];
+  const dryRun = body?.dryRun === true;
+  if (!/^\d+$/.test(primaryId)) return res.status(400).json({ success: false, error: 'Geçersiz primaryId.' });
+  if (duplicateIds.length === 0) return res.status(400).json({ success: false, error: 'duplicateIds gerekli.' });
+  if (duplicateIds.some((id) => !/^\d+$/.test(id))) return res.status(400).json({ success: false, error: 'Geçersiz duplicateIds.' });
+  if (duplicateIds.includes(primaryId)) return res.status(400).json({ success: false, error: 'primaryId duplicateIds içinde olamaz.' });
+
+  const primaryRows = await supabaseRestGet('users', { select: '*', id: `eq.${primaryId}`, limit: '1' }).catch(() => []);
+  const primary = primaryRows?.[0] || null;
+  if (!primary) return res.status(404).json({ success: false, error: 'Primary kullanıcı bulunamadı.' });
+
+  const dupRows = await supabaseRestGet('users', { select: '*', id: `in.(${duplicateIds.join(',')})`, limit: String(duplicateIds.length) }).catch(() => []);
+  const dups = Array.isArray(dupRows) ? dupRows : [];
+
+  // Merge role hints into metadata.roles (best-effort)
+  const roleLabels = new Set();
+  const addRole = (u) => {
+    const ut = String(u?.user_type || '').trim();
+    const pt = String(u?.politician_type || '').trim();
+    if (ut) roleLabels.add(ut);
+    if (pt) roleLabels.add(pt);
+  };
+  addRole(primary);
+  dups.forEach(addRole);
+
+  const primaryMeta = primary?.metadata && typeof primary.metadata === 'object' ? primary.metadata : {};
+  const existingRoles = Array.isArray(primaryMeta.roles) ? primaryMeta.roles.map(String) : [];
+  const mergedRoles = Array.from(new Set([...existingRoles, ...Array.from(roleLabels)])).filter(Boolean);
+
+  const plan = {
+    primaryId,
+    duplicateIds,
+    mergedRoles,
+    actions: duplicateIds.map((id) => ({ id, set_is_active: false, set_metadata: { merged_into: primaryId } })),
+  };
+  if (dryRun) return res.json({ success: true, dryRun: true, data: plan });
+
+  // Update primary metadata
+  try {
+    await supabaseRestPatch('users', { id: `eq.${primaryId}` }, { metadata: { ...primaryMeta, roles: mergedRoles } }).catch(() => null);
+  } catch {
+    // ignore if metadata column missing
+  }
+
+  // Deactivate duplicates + mark metadata (best-effort)
+  for (const id of duplicateIds) {
+    // eslint-disable-next-line no-await-in-loop
+    await supabaseRestPatch('users', { id: `eq.${id}` }, { is_active: false }).catch(() => null);
+    // eslint-disable-next-line no-await-in-loop
+    await supabaseRestPatch('users', { id: `eq.${id}` }, { metadata: { merged_into: primaryId } }).catch(() => null);
+  }
+
+  return res.json({ success: true, data: plan });
+}
+
 async function adminDeleteUser(req, res, userId) {
   requireAdmin(req, res);
   const updated = await supabaseRestPatch('users', { id: `eq.${userId}` }, { is_active: false });
@@ -2487,6 +2601,8 @@ export default async function handler(req, res) {
       // Admin
       if (url === '/api/admin/stats' && req.method === 'GET') return await adminGetStats(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
+      if (url === '/api/admin/users/duplicates' && req.method === 'GET') return await adminFindDuplicateUsers(req, res);
+      if (url === '/api/admin/users/dedupe' && req.method === 'POST') return await adminDedupeUsers(req, res);
       if (url === '/api/admin/posts' && req.method === 'GET') return await adminGetPosts(req, res);
       if (url === '/api/admin/parties' && req.method === 'GET') return await adminGetParties(req, res);
       if (url === '/api/admin/parties' && req.method === 'POST') return await adminCreateParty(req, res);

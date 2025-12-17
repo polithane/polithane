@@ -20,6 +20,10 @@ export const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Duplicate users (same name + avatar)
+  const [dupLoading, setDupLoading] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState([]);
+
   useEffect(() => {
     fetchUsers();
   }, [pagination.page, filters, searchQuery]);
@@ -78,6 +82,44 @@ export const UserManagement = () => {
     }
   };
 
+  const loadDuplicates = async () => {
+    try {
+      setDupLoading(true);
+      const r = await adminApi.getDuplicateUsers({ limit: 5000 }).catch(() => null);
+      const list = r?.data || r?.data?.data || [];
+      setDuplicateGroups(Array.isArray(list) ? list : []);
+    } catch (e) {
+      console.error(e);
+      setDuplicateGroups([]);
+    } finally {
+      setDupLoading(false);
+    }
+  };
+
+  const dedupeGroup = async (group) => {
+    const arr = Array.isArray(group?.users) ? group.users : [];
+    if (arr.length < 2) return;
+    // Choose primary: active + highest polit_score
+    const sorted = [...arr].sort((a, b) => {
+      const aActive = a?.is_active === false ? 0 : 1;
+      const bActive = b?.is_active === false ? 0 : 1;
+      if (aActive !== bActive) return bActive - aActive;
+      return (Number(b?.polit_score || 0) || 0) - (Number(a?.polit_score || 0) || 0);
+    });
+    const primary = sorted[0];
+    const dupIds = sorted.slice(1).map((u) => u.id).filter(Boolean);
+    if (!primary?.id || dupIds.length === 0) return;
+    if (!confirm(`Bu gruptaki ${dupIds.length} mükerrer hesabı pasife almak istiyor musunuz?\n\nPrimary: ${primary.full_name} (@${primary.username})`)) return;
+    try {
+      await adminApi.dedupeUsers({ primaryId: primary.id, duplicateIds: dupIds, dryRun: false });
+      alert('Mükerrer hesaplar pasife alındı.');
+      await loadDuplicates();
+      await fetchUsers();
+    } catch (e) {
+      alert('İşlem başarısız: ' + (e?.message || 'Bilinmeyen hata'));
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
@@ -85,7 +127,58 @@ export const UserManagement = () => {
           <h1 className="text-3xl font-black text-gray-900 mb-2">Kullanıcı Yönetimi</h1>
           <p className="text-gray-600">Toplam {pagination.total || 0} kullanıcı</p>
         </div>
+        <button
+          type="button"
+          onClick={loadDuplicates}
+          className="px-4 py-2 rounded-lg border border-gray-300 text-gray-800 font-semibold hover:bg-gray-50"
+        >
+          Mükerrerleri Bul
+        </button>
       </div>
+
+      {dupLoading && (
+        <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4 text-sm text-gray-600">
+          Mükerrer hesaplar aranıyor…
+        </div>
+      )}
+      {!dupLoading && duplicateGroups.length > 0 && (
+        <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-black text-gray-900">Mükerrer Hesaplar</div>
+            <div className="text-xs text-gray-500">{duplicateGroups.length} grup</div>
+          </div>
+          <div className="space-y-3 max-h-[320px] overflow-y-auto">
+            {duplicateGroups.slice(0, 20).map((g) => (
+              <div key={g.key} className="p-3 rounded-lg border border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {g.users?.[0]?.full_name || 'Aynı kişi'} ({g.count})
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dedupeGroup(g)}
+                    className="px-3 py-2 rounded-lg bg-gray-900 hover:bg-black text-white text-xs font-black"
+                  >
+                    Teke Düşür
+                  </button>
+                </div>
+                <div className="mt-2 flex gap-2 overflow-x-auto">
+                  {(g.users || []).map((u) => (
+                    <div key={u.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1">
+                      <Avatar src={u.avatar_url} size="28px" />
+                      <div className="text-xs text-gray-800 font-semibold whitespace-nowrap">@{u.username || u.id}</div>
+                      {u.is_active === false && <span className="text-[10px] text-gray-500">(pasif)</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[11px] text-gray-500">
+                  Not: Bu işlem mükerrer hesapları pasife alır ve rollerini primary kullanıcıya metadata olarak ekler.
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">

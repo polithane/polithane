@@ -305,6 +305,17 @@ export const admin = {
     return apiCall(`/api/admin/users${query ? `?${query}` : ''}`);
   },
 
+  getDuplicateUsers: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/users/duplicates${query ? `?${query}` : ''}`);
+  },
+
+  dedupeUsers: ({ primaryId, duplicateIds, dryRun = true }) =>
+    apiCall('/api/admin/users/dedupe', {
+      method: 'POST',
+      body: JSON.stringify({ primaryId, duplicateIds, dryRun }),
+    }),
+
   updateUser: (userId, data) =>
     apiCall(`/api/admin/users/${userId}`, {
       method: 'PUT',
