@@ -749,6 +749,107 @@ async function getAgendas(req, res) {
     if (String(is_active || 'true') === 'true') params.is_active = 'eq.true';
     if (String(is_trending || '') === 'true') params.is_trending = 'eq.true';
     if (search && String(search).trim().length >= 2) params.title = `ilike.*${String(search).trim()}*`;
+
+    // If agendas table is empty in a fresh deployment, bootstrap a starter list once.
+    // This keeps the UI usable without requiring manual DB seeding, while still storing
+    // the final source of truth in the `agendas` table.
+    //
+    // Safety:
+    // - Only runs when table count is 0
+    // - Uses deterministic slugs (unique) and best-effort insert
+    // - Never blocks or fails the request on errors
+    if (!search && String(is_trending || '') !== 'true') {
+      try {
+        const total = await supabaseCount('agendas', { select: 'id' }).catch(() => 0);
+        if (Number(total || 0) === 0) {
+          const slugifyAgenda = (input) => {
+            const s = String(input || '').trim().toLowerCase();
+            const map = { ç: 'c', ğ: 'g', ı: 'i', i: 'i', ö: 'o', ş: 's', ü: 'u' };
+            return s
+              .split('')
+              .map((ch) => map[ch] ?? ch)
+              .join('')
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/-+/g, '-')
+              .replace(/^-|-$/g, '')
+              .slice(0, 200);
+          };
+
+          const DEFAULT_TITLES = [
+            'Asgari ücret 2026',
+            'Emekli maaş zamları',
+            'Kira artış oranı',
+            'Enflasyon verileri',
+            'Vergi düzenlemeleri',
+            'Ekonomi paketi',
+            'Deprem bölgesi destekleri',
+            'Kentsel dönüşüm',
+            'Eğitim sistemi reformu',
+            'MEB öğretmen atamaları',
+            'Üniversite kontenjanları',
+            'Sağlık randevu sistemi',
+            'SGK düzenlemeleri',
+            'Genç işsizlik',
+            'Göç ve sığınmacı politikaları',
+            'Dış politika açıklamaları',
+            'AB ilişkileri',
+            'NATO gündemi',
+            'Savunma sanayi projeleri',
+            'Terörle mücadele',
+            'Anayasa değişikliği',
+            'Yargı reformu',
+            'Basın özgürlüğü',
+            'Sosyal medya yasası',
+            'Yerel yönetimler',
+            'Belediye bütçeleri',
+            'İstanbul projeleri',
+            'Ankara projeleri',
+            'Ulaşım zamları',
+            'Elektrik fiyatları',
+            'Doğalgaz fiyatları',
+            'Akaryakıt zamları',
+            'Tarım destekleri',
+            'Çiftçi borçları',
+            'Gıda fiyatları',
+            'Kur korumalı mevduat',
+            'Faiz kararı',
+            'Merkez Bankası',
+            'Borsa gündemi',
+            'Konut kredileri',
+            'Kadın hakları',
+            'Çocuk güvenliği',
+            'Hayvan hakları',
+            'İklim krizi',
+            'Orman yangınları',
+            'Su kaynakları',
+            'Turizm sezonu',
+            'Spor kulüpleri',
+            'Seçim sistemi',
+            'Parti içi tartışmalar',
+          ];
+
+          const nowIso = new Date().toISOString();
+          const seed = DEFAULT_TITLES.slice(0, 50).map((title, idx) => ({
+            title,
+            slug: slugifyAgenda(title),
+            description: null,
+            post_count: 0,
+            total_polit_score: 0,
+            trending_score: Math.max(0, 5000 - idx * 50),
+            is_trending: true,
+            is_active: true,
+            created_at: nowIso,
+            updated_at: nowIso,
+          }));
+
+          // Best-effort insert; ignore if it fails due to schema/rls/env issues.
+          await supabaseRestInsert('agendas', seed).catch(() => null);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     const rows = await supabaseRestGet('agendas', params).catch(() => []);
     res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
 }
