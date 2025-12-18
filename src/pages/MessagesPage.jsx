@@ -3,15 +3,19 @@ import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
+import { Modal } from '../components/common/Modal';
 import { formatTimeAgo } from '../utils/formatters';
 import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck } from 'lucide-react';
 import { messages as messagesApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { apiCall } from '../utils/api';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export const MessagesPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [selectedConv, setSelectedConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -23,6 +27,14 @@ export const MessagesPage = () => {
   const fileRef = useRef(null);
   
   const [conversations, setConversations] = useState([]);
+
+  // Compose modal
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeContacts, setComposeContacts] = useState([]);
+  const [composeLoading, setComposeLoading] = useState(false);
+  const [composeQuery, setComposeQuery] = useState('');
+  const [composeResults, setComposeResults] = useState([]);
+  const composeTimerRef = useRef(null);
   
   const filteredConversations = useMemo(() => {
     const base = (conversations || []).filter((c) => (tab === 'requests' ? c.message_type === 'request' : c.message_type !== 'request'));
@@ -76,6 +88,89 @@ export const MessagesPage = () => {
     };
     load();
   }, [user?.id]);
+
+  // Deep-link: /messages?to=<id> should open conversation (or start one)
+  useEffect(() => {
+    const to = new URLSearchParams(location.search || '').get('to');
+    if (!to) return;
+    const targetId = String(to || '').trim();
+    if (!targetId) return;
+
+    const existing = (conversations || []).find((c) => String(c?.participant_id) === targetId);
+    if (existing) {
+      setTab('regular');
+      setSelectedConv(existing);
+      return;
+    }
+
+    // If not in list yet, fetch user and create a temporary conversation object.
+    (async () => {
+      try {
+        const r = await apiCall(`/api/users?id=${encodeURIComponent(targetId)}`).catch(() => null);
+        const u = r?.data || r?.data?.data || r?.data?.user || r?.data?.user?.data || r?.data || r;
+        const participant = u?.id ? u : r?.data;
+        if (!participant?.id) return;
+        const stub = {
+          conversation_id: `${user?.id || 'me'}-${participant.id}`,
+          participant_id: participant.id,
+          last_message: '',
+          last_message_time: null,
+          unread_count: 0,
+          message_type: 'regular',
+          participant,
+        };
+        setTab('regular');
+        setSelectedConv(stub);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [location.search, conversations, user?.id]);
+
+  const openCompose = async () => {
+    setShowCompose(true);
+    setComposeQuery('');
+    setComposeResults([]);
+    setComposeLoading(true);
+    try {
+      const r = await messagesApi.getContacts({ limit: 60 }).catch(() => null);
+      const list = r?.data || r?.data?.data || [];
+      setComposeContacts(Array.isArray(list) ? list : []);
+    } catch {
+      setComposeContacts([]);
+    } finally {
+      setComposeLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showCompose) return;
+    if (composeTimerRef.current) clearTimeout(composeTimerRef.current);
+    const q = String(composeQuery || '').trim();
+    if (q.length < 2) {
+      setComposeResults([]);
+      return;
+    }
+    composeTimerRef.current = setTimeout(async () => {
+      try {
+        const r = await messagesApi.searchUsers(q);
+        if (r?.success) setComposeResults(r.data || []);
+      } catch {
+        setComposeResults([]);
+      }
+    }, 250);
+    return () => clearTimeout(composeTimerRef.current);
+  }, [composeQuery, showCompose]);
+
+  const startConversationWith = (u) => {
+    const id = u?.id;
+    if (!id) return;
+    setShowCompose(false);
+    setComposeQuery('');
+    setComposeResults([]);
+    // Use URL param so refresh works and we keep it simple.
+    navigate(`/messages?to=${encodeURIComponent(id)}`);
+  };
   
   // Send message
   const handleSendMessage = async () => {
@@ -166,7 +261,16 @@ export const MessagesPage = () => {
           {/* Konuşma Listesi */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
             <div className="p-4 border-b">
-              <h2 className="text-xl font-bold mb-3">Mesajlar</h2>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h2 className="text-xl font-bold">Mesajlar</h2>
+                <button
+                  type="button"
+                  onClick={openCompose}
+                  className="px-3 py-2 rounded-lg bg-primary-blue hover:bg-blue-600 text-white text-sm font-black"
+                >
+                  Mesaj Gönder
+                </button>
+              </div>
               <div className="flex gap-2 mb-3">
                 <button
                   type="button"
@@ -469,6 +573,75 @@ export const MessagesPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Compose modal */}
+      <Modal isOpen={showCompose} onClose={() => setShowCompose(false)} title="Yeni Mesaj">
+        <div className="space-y-4">
+          <div>
+            <div className="text-sm font-semibold text-gray-700 mb-2">Kime?</div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                value={composeQuery}
+                onChange={(e) => setComposeQuery(e.target.value)}
+                placeholder="İsim veya kullanıcı adı ara…"
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
+              />
+            </div>
+            <div className="mt-1 text-xs text-gray-500">
+              Takipleştiklerin en üstte; ayrıca arama ile herkese mesaj başlatabilirsin (izin varsa).
+            </div>
+          </div>
+
+          {composeLoading && <div className="text-sm text-gray-600">Kişiler yükleniyor…</div>}
+
+          {!composeLoading && composeQuery.trim().length < 2 && (
+            <div className="space-y-2">
+              <div className="text-xs font-black text-gray-500 uppercase">Takipleştiklerin</div>
+              {composeContacts.length === 0 && <div className="text-sm text-gray-600">Takipleştiğin kişi yok.</div>}
+              <div className="max-h-[320px] overflow-y-auto space-y-2">
+                {composeContacts.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-left"
+                    onClick={() => startConversationWith(u)}
+                  >
+                    <Avatar src={u.avatar_url} size="40px" verified={isUiVerifiedUser(u)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
+                      <div className="text-xs text-gray-500 truncate">@{u.username}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!composeLoading && composeQuery.trim().length >= 2 && (
+            <div className="space-y-2">
+              <div className="text-xs font-black text-gray-500 uppercase">Arama Sonuçları</div>
+              {composeResults.length === 0 && <div className="text-sm text-gray-600">Sonuç bulunamadı.</div>}
+              <div className="max-h-[320px] overflow-y-auto space-y-2">
+                {composeResults.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-left"
+                    onClick={() => startConversationWith(u)}
+                  >
+                    <Avatar src={u.avatar_url} size="40px" verified={isUiVerifiedUser(u)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
+                      <div className="text-xs text-gray-500 truncate">@{u.username}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };

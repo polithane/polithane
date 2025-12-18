@@ -66,6 +66,19 @@ export const ProfilePage = () => {
     String(userId || '') === String(currentUser.id || '') ||
     normalizeUsername(username || '') === normalizeUsername(currentUser.username || '')
   );
+
+  const canShowMessageButton = useMemo(() => {
+    if (isOwnProfile) return false;
+    if (!user) return false;
+    const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+    const ps = meta.privacy_settings && typeof meta.privacy_settings === 'object' ? meta.privacy_settings : {};
+    const rule = String(ps.allowMessages || 'everyone');
+    if (rule === 'none') return false;
+    if (rule === 'everyone') return true;
+    if (rule === 'followers') return !!followStats?.is_following;
+    if (rule === 'following') return !!followStats?.is_followed_by;
+    return true;
+  }, [user, isOwnProfile, followStats?.is_following, followStats?.is_followed_by]);
   
   const isBlocked = useMemo(() => {
     if (!user?.id && !user?.user_id) return false;
@@ -223,6 +236,8 @@ export const ProfilePage = () => {
               setFollowStats({
                 followers_count: stats.followers_count || 0,
                 following_count: stats.following_count || 0,
+                is_following: !!stats.is_following,
+                is_followed_by: !!stats.is_followed_by,
               });
             }
           }
@@ -465,12 +480,20 @@ export const ProfilePage = () => {
               ) : (
                 <>
                   <FollowButton targetUserId={user?.user_id || userId} size="md" />
-                  <button
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg p-2 transition-colors"
-                    title="Mesaj Gönder"
-                  >
-                    <MessageCircle className="w-5 h-5" />
-                  </button>
+                  {canShowMessageButton && (
+                    <button
+                      type="button"
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg p-2 transition-colors"
+                      title="Mesaj Gönder"
+                      onClick={() => {
+                        const tid = user?.user_id || user?.id || userId;
+                        if (!tid) return;
+                        navigate(`/messages?to=${encodeURIComponent(tid)}`);
+                      }}
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                    </button>
+                  )}
                   
                   {/* Menü */}
                   <div className="relative">

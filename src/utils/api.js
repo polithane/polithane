@@ -281,6 +281,11 @@ export const messages = {
 
   getMessages: (userId) => apiCall(`/api/messages/${userId}`),
 
+  getContacts: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/messages/contacts${query ? `?${query}` : ''}`);
+  },
+
   searchUsers: (q) => {
     const query = new URLSearchParams({ q: String(q || '') }).toString();
     return apiCall(`/api/messages/search?${query}`);
