@@ -67,7 +67,6 @@ export const CreatePolitPage = () => {
 
   const [contentType, setContentType] = useState('video');
   const [content, setContent] = useState('');
-  const [category, setCategory] = useState('general');
   const [agendaTag, setAgendaTag] = useState(''); // '' => Gündem dışı
   const [agendas, setAgendas] = useState([]);
   const [files, setFiles] = useState([]);
@@ -348,7 +347,8 @@ export const CreatePolitPage = () => {
         content: content,
         content_type: contentType,
         content_text: content,
-        category,
+        // Category selection removed from UI; keep a safe default for backend compatibility.
+        category: 'general',
         agenda_tag: agendaTag || null,
         media_urls,
       });
@@ -564,41 +564,24 @@ export const CreatePolitPage = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Gündem</label>
-                  <select
-                    value={agendaTag}
-                    onChange={(e) => setAgendaTag(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
-                  >
-                    <option value="">Gündem dışı</option>
-                    {agendas
-                      .filter((a) => a?.is_active !== false)
-                      .map((a) => (
-                        <option key={a.id || a.slug || a.title} value={a.title || ''}>
-                          {a.title}
-                        </option>
-                      ))}
-                  </select>
-                  <div className="mt-1 text-[11px] text-gray-500">
-                    Gündem listesi admin panelindeki gündemlerden gelir. Bulamazsanız “Gündem dışı” seçebilirsiniz.
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Kategori</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
-                  >
-                    <option value="general">Genel</option>
-                    <option value="mps">Vekiller</option>
-                    <option value="organization">Teşkilat</option>
-                    <option value="citizens">Vatandaş</option>
-                    <option value="media">Medya</option>
-                  </select>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Gündem</label>
+                <select
+                  value={agendaTag}
+                  onChange={(e) => setAgendaTag(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
+                >
+                  <option value="">Gündem dışı</option>
+                  {agendas
+                    .filter((a) => a?.is_active !== false)
+                    .map((a) => (
+                      <option key={a.id || a.slug || a.title} value={a.title || ''}>
+                        {a.title}
+                      </option>
+                    ))}
+                </select>
+                <div className="mt-1 text-[11px] text-gray-500">
+                  Gündem listesi admin panelindeki gündemlerden gelir. Bulamazsanız “Gündem dışı” seçebilirsiniz.
                 </div>
               </div>
 
