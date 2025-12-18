@@ -128,13 +128,9 @@ export const PolitScoreDetailModal = ({ post, onClose }) => {
                 {expandedCategory === key && (
                   <div className="bg-white p-4 space-y-3 border-t border-gray-200">
                     {category.details.map((detail, idx) => (
-                      <button
+                      <div
                         key={idx}
-                        className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
-                        onClick={() => {
-                          // Burada detaylı liste açılabilir (örn: kimin beğendiğini göster)
-                          alert(`${detail.label} detayları geliştirilecek`);
-                        }}
+                        className="w-full flex items-center justify-between p-3 bg-blue-50 rounded-lg"
                       >
                         <div className="text-left flex-1">
                           <p className="text-sm font-medium text-gray-900">{detail.label}</p>
@@ -143,12 +139,9 @@ export const PolitScoreDetailModal = ({ post, onClose }) => {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-bold text-primary-blue group-hover:scale-110 transition-transform">
-                            {formatPolitScore(detail.points)}
-                          </p>
-                          <p className="text-xs text-gray-500 group-hover:text-primary-blue">Listele →</p>
+                          <p className="text-lg font-bold text-primary-blue">{formatPolitScore(detail.points)}</p>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
