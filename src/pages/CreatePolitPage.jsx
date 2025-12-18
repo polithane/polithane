@@ -470,7 +470,8 @@ export const CreatePolitPage = () => {
                     >
                       <div
                         className={[
-                          'rounded-[22px] bg-white/80 backdrop-blur border',
+                          // No background behind icon "buttons" (keep only border/shape)
+                          'rounded-[22px] bg-transparent border',
                           'w-20 h-20 sm:w-28 sm:h-28 md:w-[140px] md:h-[140px]',
                           'flex items-center justify-center',
                           'transition-transform duration-200',
