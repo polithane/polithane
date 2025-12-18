@@ -1070,6 +1070,75 @@ function requireAdmin(req, res) {
   return auth;
 }
 
+async function adminBootstrap(req, res) {
+  // One-time recovery endpoint for initial admin access.
+  // Protected by an env token; do NOT leave this enabled without a strong token.
+  const expected = String(process.env.ADMIN_BOOTSTRAP_TOKEN || '').trim();
+  if (!expected) {
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
+  const provided = String(req.headers['x-admin-bootstrap-token'] || '').trim();
+  if (!provided || provided !== expected) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+
+  const ip = getClientIp(req);
+  const rl = rateLimit(`admin_bootstrap:${ip}`, { windowMs: 60_000, max: 5 });
+  if (!rl.ok) return res.status(429).json({ success: false, error: 'Çok fazla istek. Lütfen biraz bekleyin.' });
+
+  const body = await readJsonBody(req);
+  const password = String(body?.password || '').trim();
+  if (!password || password.length < 8) {
+    return res.status(400).json({ success: false, error: 'Geçerli bir şifre gönderin (en az 8 karakter).' });
+  }
+
+  const username = 'admin';
+  const email = 'admin@polithane.com';
+  const full_name = 'Admin';
+
+  const password_hash = await bcrypt.hash(password, 10);
+
+  // If the user already exists (by email or username), update it. Otherwise create it.
+  const existing = await supabaseRestGet('users', {
+    select: 'id',
+    or: `(email.eq.${email},username.eq.${username})`,
+    limit: '1',
+  }).catch(() => []);
+
+  let row = null;
+  if (Array.isArray(existing) && existing[0]?.id) {
+    const updated = await supabaseRestPatch(
+      'users',
+      { id: `eq.${existing[0].id}` },
+      { username, email, full_name, password_hash, is_admin: true, is_active: true }
+    ).catch(() => []);
+    row = updated?.[0] || null;
+  } else {
+    const inserted = await supabaseRestInsert('users', [
+      {
+        username,
+        email,
+        full_name,
+        password_hash,
+        user_type: 'admin',
+        is_admin: true,
+        is_active: true,
+        is_verified: true,
+        email_verified: true,
+      },
+    ]).catch(() => []);
+    row = inserted?.[0] || null;
+  }
+
+  if (!row) return res.status(500).json({ success: false, error: 'Admin hesabı oluşturulamadı.' });
+  if (row) delete row.password_hash;
+  return res.json({
+    success: true,
+    message: 'Admin hesabı güncellendi. Artık admin@polithane.com ile giriş yapabilirsiniz.',
+    data: { id: row.id, username: row.username, email: row.email, full_name: row.full_name },
+  });
+}
+
 function requireAuth(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) {
@@ -3043,6 +3112,7 @@ export default async function handler(req, res) {
       }
 
       // Admin
+      if (url === '/api/admin/bootstrap' && req.method === 'POST') return await adminBootstrap(req, res);
       if (url === '/api/admin/stats' && req.method === 'GET') return await adminGetStats(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
       if (url === '/api/admin/users/duplicates' && req.method === 'GET') return await adminFindDuplicateUsers(req, res);
