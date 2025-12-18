@@ -383,6 +383,18 @@ export const admin = {
     apiCall(`/api/admin/parties/${partyId}`, {
       method: 'DELETE',
     }),
+
+  getPartyHierarchy: (partyId) => apiCall(`/api/admin/parties/${partyId}/hierarchy`),
+  assignPartyUnit: (partyId, payload) =>
+    apiCall(`/api/admin/parties/${partyId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
+  unassignPartyUnit: (partyId, payload) =>
+    apiCall(`/api/admin/parties/${partyId}/unassign`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
 };
 
 // ============================================

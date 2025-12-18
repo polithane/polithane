@@ -2046,6 +2046,229 @@ async function adminDeleteParty(req, res, partyId) {
   res.json({ success: true, data: updated?.[0] || null });
 }
 
+async function adminFetchAllPartyUsers(partyId) {
+  const pid = String(partyId || '').trim();
+  if (!/^\d+$/.test(pid)) return [];
+  const pageSize = 1000;
+  const maxPages = 10;
+  let out = [];
+  for (let page = 0; page < maxPages; page += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const chunk = await supabaseRestGet('users', {
+      select:
+        'id,username,full_name,email,avatar_url,user_type,politician_type,province,district_name,party_id,is_active,is_verified,metadata,polit_score',
+      party_id: `eq.${pid}`,
+      order: 'polit_score.desc',
+      limit: String(pageSize),
+      offset: String(page * pageSize),
+    }).catch(() => []);
+    if (Array.isArray(chunk) && chunk.length > 0) out = out.concat(chunk);
+    if (!Array.isArray(chunk) || chunk.length < pageSize) break;
+  }
+  return out;
+}
+
+function normalizeMeta(obj) {
+  return obj && typeof obj === 'object' ? obj : {};
+}
+
+function collectPartyUnitAssignments(partyId, users) {
+  const pid = Number(partyId);
+  const out = [];
+  for (const u of users || []) {
+    const meta = normalizeMeta(u?.metadata);
+    const list = Array.isArray(meta.party_units) ? meta.party_units : [];
+    for (const unit of list) {
+      if (!unit || Number(unit.party_id) !== pid) continue;
+      out.push({
+        user_id: u.id,
+        username: u.username,
+        full_name: u.full_name,
+        avatar_url: u.avatar_url,
+        user_type: u.user_type,
+        politician_type: u.politician_type,
+        unit,
+      });
+    }
+  }
+  return out;
+}
+
+function groupBy(list, keyFn) {
+  const m = new Map();
+  (list || []).forEach((item) => {
+    const k = keyFn(item);
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(item);
+  });
+  return Array.from(m.entries());
+}
+
+async function adminGetPartyHierarchy(req, res, partyId) {
+  requireAdmin(req, res);
+  const pid = String(partyId || '').trim();
+  if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
+
+  const partyRows = await supabaseRestGet('parties', { select: '*', id: `eq.${pid}`, limit: '1' }).catch(() => []);
+  const party = partyRows?.[0] || null;
+  if (!party) return res.status(404).json({ success: false, error: 'Parti bulunamadı.' });
+
+  const users = await adminFetchAllPartyUsers(pid);
+
+  const mps = (users || []).filter((u) => String(u.user_type) === 'mp');
+  const officials = (users || []).filter((u) => String(u.user_type) === 'party_official');
+  const members = (users || []).filter((u) => String(u.user_type) === 'party_member');
+
+  const provincialChairs = officials.filter((u) => String(u.politician_type) === 'provincial_chair');
+  const districtChairs = officials.filter((u) => String(u.politician_type) === 'district_chair');
+  const metroMayors = officials.filter((u) => String(u.politician_type) === 'metropolitan_mayor');
+  const districtMayors = officials.filter((u) => String(u.politician_type) === 'district_mayor');
+  const orgOfficials = officials.filter((u) => String(u.politician_type) === 'party_official');
+
+  const counts = {
+    total_users: users.length,
+    mps: mps.length,
+    party_officials: officials.length,
+    party_members: members.length,
+    provincial_chairs: provincialChairs.length,
+    district_chairs: districtChairs.length,
+    metropolitan_mayors: metroMayors.length,
+    district_mayors: districtMayors.length,
+  };
+
+  const assignments = collectPartyUnitAssignments(pid, users);
+
+  res.json({
+    success: true,
+    data: {
+      party,
+      counts,
+      users: {
+        mps,
+        officials,
+        members,
+      },
+      groups: {
+        provincial_chairs_by_province: groupBy(provincialChairs, (u) => String(u.province || 'Bilinmiyor')),
+        district_chairs_by_province: groupBy(districtChairs, (u) => String(u.province || 'Bilinmiyor')),
+        district_mayors_by_province: groupBy(districtMayors, (u) => String(u.province || 'Bilinmiyor')),
+        metro_mayors_by_province: groupBy(metroMayors, (u) => String(u.province || 'Bilinmiyor')),
+        org_officials_by_province: groupBy(orgOfficials, (u) => String(u.province || 'Bilinmiyor')),
+      },
+      assignments,
+    },
+  });
+}
+
+async function adminAssignPartyUnit(req, res, partyId) {
+  requireAdmin(req, res);
+  const pid = String(partyId || '').trim();
+  if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
+
+  const body = await readJsonBody(req);
+  const targetUserId = String(body?.user_id || '').trim();
+  const unit = body?.unit && typeof body.unit === 'object' ? body.unit : null;
+  if (!/^\d+$/.test(targetUserId)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  if (!unit) return res.status(400).json({ success: false, error: 'unit zorunlu.' });
+
+  const unitType = String(unit.unit_type || '').trim();
+  if (!unitType) return res.status(400).json({ success: false, error: 'unit_type zorunlu.' });
+
+  const province = unit.province ? String(unit.province).slice(0, 100) : null;
+  const district = unit.district_name ? String(unit.district_name).slice(0, 100) : null;
+  const title = unit.title ? String(unit.title).slice(0, 120) : null;
+
+  const contact = unit.contact && typeof unit.contact === 'object' ? unit.contact : {};
+  const cleanContact = {
+    phone: contact.phone ? String(contact.phone).slice(0, 30) : null,
+    whatsapp: contact.whatsapp ? String(contact.whatsapp).slice(0, 40) : null,
+    email: contact.email ? String(contact.email).slice(0, 255) : null,
+    website: contact.website ? String(contact.website).slice(0, 255) : null,
+    twitter: contact.twitter ? String(contact.twitter).slice(0, 120) : null,
+    instagram: contact.instagram ? String(contact.instagram).slice(0, 120) : null,
+  };
+
+  const rows = await supabaseRestGet('users', { select: 'id,party_id,metadata', id: `eq.${targetUserId}`, limit: '1' }).catch(() => []);
+  const u = rows?.[0] || null;
+  if (!u) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+  if (String(u.party_id || '') !== String(pid)) {
+    return res.status(400).json({ success: false, error: 'Bu kullanıcı seçili partiye bağlı değil.' });
+  }
+
+  const meta = normalizeMeta(u.metadata);
+  const list = Array.isArray(meta.party_units) ? meta.party_units : [];
+
+  const key = `${pid}:${unitType}:${province || ''}:${district || ''}`;
+  const nextUnit = {
+    party_id: Number(pid),
+    unit_type: unitType,
+    province,
+    district_name: district,
+    title,
+    contact: cleanContact,
+    key,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Replace existing assignment with same key for that user (idempotent)
+  const kept = list.filter((x) => !(x && String(x.key || '') === key));
+  const nextMeta = { ...meta, party_units: [...kept, nextUnit] };
+
+  let updated;
+  try {
+    updated = await supabaseRestPatch('users', { id: `eq.${targetUserId}` }, { metadata: nextMeta }).catch(() => []);
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('metadata')) {
+      return res.status(500).json({
+        success: false,
+        error:
+          "Atama kaydedilemedi: Supabase'de `users` tablosunda `metadata` sütunu yok. Çözüm: `server/migrations/006_add_user_metadata.sql` dosyasını Supabase SQL Editor'da çalıştırın.",
+      });
+    }
+    throw e;
+  }
+
+  res.json({ success: true, data: updated?.[0] || null });
+}
+
+async function adminUnassignPartyUnit(req, res, partyId) {
+  requireAdmin(req, res);
+  const pid = String(partyId || '').trim();
+  if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
+
+  const body = await readJsonBody(req);
+  const targetUserId = String(body?.user_id || '').trim();
+  const key = String(body?.key || '').trim();
+  if (!/^\d+$/.test(targetUserId)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  if (!key) return res.status(400).json({ success: false, error: 'key zorunlu.' });
+
+  const rows = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${targetUserId}`, limit: '1' }).catch(() => []);
+  const u = rows?.[0] || null;
+  if (!u) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+
+  const meta = normalizeMeta(u.metadata);
+  const list = Array.isArray(meta.party_units) ? meta.party_units : [];
+  const next = list.filter((x) => !(x && String(x.key || '') === key));
+  const nextMeta = { ...meta, party_units: next };
+
+  let updated;
+  try {
+    updated = await supabaseRestPatch('users', { id: `eq.${targetUserId}` }, { metadata: nextMeta }).catch(() => []);
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('metadata')) {
+      return res.status(500).json({
+        success: false,
+        error:
+          "Atama kaldırılamadı: Supabase'de `users` tablosunda `metadata` sütunu yok. Çözüm: `server/migrations/006_add_user_metadata.sql` dosyasını Supabase SQL Editor'da çalıştırın.",
+      });
+    }
+    throw e;
+  }
+  res.json({ success: true, data: updated?.[0] || null });
+}
+
 async function authCheckAvailability(req, res) {
     const { email } = req.query;
     const result = { emailAvailable: true };
@@ -2829,6 +3052,21 @@ export default async function handler(req, res) {
       if (url === '/api/admin/parties' && req.method === 'POST') return await adminCreateParty(req, res);
       if (url === '/api/admin/notifications' && req.method === 'POST') return await adminSendNotification(req, res);
       if (url === '/api/admin/comments/pending' && req.method === 'GET') return await adminListPendingComments(req, res);
+      if (url.startsWith('/api/admin/parties/') && req.method === 'GET') {
+        const rest = url.split('/api/admin/parties/')[1] || '';
+        const parts = rest.split('/').filter(Boolean);
+        const pid = parts[0];
+        const tail = parts[1];
+        if (pid && tail === 'hierarchy') return await adminGetPartyHierarchy(req, res, pid);
+      }
+      if (url.startsWith('/api/admin/parties/') && req.method === 'POST') {
+        const rest = url.split('/api/admin/parties/')[1] || '';
+        const parts = rest.split('/').filter(Boolean);
+        const pid = parts[0];
+        const tail = parts[1];
+        if (pid && tail === 'assign') return await adminAssignPartyUnit(req, res, pid);
+        if (pid && tail === 'unassign') return await adminUnassignPartyUnit(req, res, pid);
+      }
       if (url.startsWith('/api/admin/users/') && req.method === 'PUT') {
         const userId = url.split('/api/admin/users/')[1];
         return await adminUpdateUser(req, res, userId);

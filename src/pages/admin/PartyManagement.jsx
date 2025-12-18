@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Search, Save, Trash2, X, Flag, AlertCircle } from 'lucide-react';
+import { Plus, Search, Save, Trash2, X, Flag, AlertCircle, Layers, UserCheck, MapPin, Building2, Mail, Phone, Globe } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
 
 export const PartyManagement = () => {
@@ -34,6 +34,40 @@ export const PartyManagement = () => {
     };
   }, [editParty]);
   const [editDraft, setEditDraft] = useState(null);
+
+  // Advanced hierarchy modal
+  const [hierOpen, setHierOpen] = useState(false);
+  const [hierParty, setHierParty] = useState(null);
+  const [hierLoading, setHierLoading] = useState(false);
+  const [hierData, setHierData] = useState(null);
+  const [assignDraft, setAssignDraft] = useState({
+    user_id: '',
+    unit_type: 'provincial_chair',
+    province: '',
+    district_name: '',
+    title: '',
+    contact_phone: '',
+    contact_email: '',
+    contact_website: '',
+  });
+
+  const openHierarchy = async (party) => {
+    setHierParty(party);
+    setHierOpen(true);
+    setHierLoading(true);
+    setHierData(null);
+    setError('');
+    try {
+      const r = await adminApi.getPartyHierarchy(party.id);
+      if (!r?.success) throw new Error(r?.error || 'Hiyerarşi yüklenemedi.');
+      setHierData(r.data || null);
+    } catch (e) {
+      setError(e?.message || 'Hiyerarşi yüklenemedi.');
+      setHierData(null);
+    } finally {
+      setHierLoading(false);
+    }
+  };
 
   const load = async (page = pagination.page) => {
     setLoading(true);
@@ -331,6 +365,14 @@ export const PartyManagement = () => {
                   <td className="px-5 py-3">
                     <div className="flex justify-end gap-2">
                       <button
+                        onClick={() => openHierarchy(p)}
+                        className="px-3 py-2 rounded-lg bg-gray-900 hover:bg-black text-white font-semibold inline-flex items-center gap-2"
+                        title="Gelişmiş hiyerarşi / iletişim"
+                      >
+                        <Layers className="w-4 h-4" />
+                        Gelişmiş
+                      </button>
+                      <button
                         onClick={() => setEditParty(p)}
                         className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 font-semibold"
                       >
@@ -431,6 +473,286 @@ export const PartyManagement = () => {
                   <Save className="w-5 h-5" />
                   Kaydet
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hierOpen && hierParty && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b flex items-center justify-between">
+              <div>
+                <div className="text-xs text-gray-500 font-semibold">Gelişmiş Yönetim</div>
+                <div className="text-xl font-black text-gray-900 flex items-center gap-2">
+                  <Layers className="w-6 h-6 text-primary-blue" />
+                  {hierParty.name}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setHierOpen(false);
+                  setHierParty(null);
+                  setHierData(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-5 grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5">
+              <div className="space-y-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                  <div className="font-black text-gray-900 mb-2 flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-primary-blue" />
+                    Yetki / İrtibat Ataması
+                  </div>
+                  <div className="text-xs text-gray-600 mb-3">
+                    Seçtiğiniz kullanıcıya birim görevi ve iletişim bilgisi atanır (kullanıcı metadata alanına kaydedilir).
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-600">Kullanıcı</label>
+                      <select
+                        value={assignDraft.user_id}
+                        onChange={(e) => setAssignDraft((p) => ({ ...p, user_id: e.target.value }))}
+                        className="mt-1 w-full border border-gray-300 rounded-xl p-3 bg-white"
+                      >
+                        <option value="">Seçiniz...</option>
+                        {(hierData?.users?.officials || []).map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.full_name} (@{u.username}) — {u.politician_type || u.user_type}
+                          </option>
+                        ))}
+                        {(hierData?.users?.mps || []).map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.full_name} (@{u.username}) — mp
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-600">Birim Tipi</label>
+                      <select
+                        value={assignDraft.unit_type}
+                        onChange={(e) => setAssignDraft((p) => ({ ...p, unit_type: e.target.value }))}
+                        className="mt-1 w-full border border-gray-300 rounded-xl p-3 bg-white"
+                      >
+                        <option value="provincial_chair">İl Başkanı</option>
+                        <option value="district_chair">İlçe Başkanı</option>
+                        <option value="metropolitan_mayor">Büyükşehir Belediye Başkanı</option>
+                        <option value="district_mayor">İlçe Belediye Başkanı</option>
+                        <option value="party_official">Teşkilat Görevlisi</option>
+                        <option value="mp">Milletvekili</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-600">İl</label>
+                        <input
+                          value={assignDraft.province}
+                          onChange={(e) => setAssignDraft((p) => ({ ...p, province: e.target.value }))}
+                          className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                          placeholder="Örn: Ankara"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-600">İlçe (ops.)</label>
+                        <input
+                          value={assignDraft.district_name}
+                          onChange={(e) => setAssignDraft((p) => ({ ...p, district_name: e.target.value }))}
+                          className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                          placeholder="Örn: Çankaya"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-600">Ünvan (ops.)</label>
+                      <input
+                        value={assignDraft.title}
+                        onChange={(e) => setAssignDraft((p) => ({ ...p, title: e.target.value }))}
+                        className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                        placeholder="Örn: İl Başkan Yard."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                          <Phone className="w-4 h-4" /> Telefon (ops.)
+                        </label>
+                        <input
+                          value={assignDraft.contact_phone}
+                          onChange={(e) => setAssignDraft((p) => ({ ...p, contact_phone: e.target.value }))}
+                          className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                          placeholder="05xx..."
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                          <Mail className="w-4 h-4" /> E‑posta (ops.)
+                        </label>
+                        <input
+                          value={assignDraft.contact_email}
+                          onChange={(e) => setAssignDraft((p) => ({ ...p, contact_email: e.target.value }))}
+                          className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                          placeholder="ornek@..."
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Globe className="w-4 h-4" /> Web (ops.)
+                      </label>
+                      <input
+                        value={assignDraft.contact_website}
+                        onChange={(e) => setAssignDraft((p) => ({ ...p, contact_website: e.target.value }))}
+                        className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                        placeholder="https://..."
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={hierLoading || !assignDraft.user_id || !assignDraft.unit_type}
+                      onClick={async () => {
+                        try {
+                          setHierLoading(true);
+                          const payload = {
+                            user_id: Number(assignDraft.user_id),
+                            unit: {
+                              unit_type: assignDraft.unit_type,
+                              province: assignDraft.province || null,
+                              district_name: assignDraft.district_name || null,
+                              title: assignDraft.title || null,
+                              contact: {
+                                phone: assignDraft.contact_phone || null,
+                                email: assignDraft.contact_email || null,
+                                website: assignDraft.contact_website || null,
+                              },
+                            },
+                          };
+                          const r = await adminApi.assignPartyUnit(hierParty.id, payload);
+                          if (!r?.success) throw new Error(r?.error || 'Atama kaydedilemedi.');
+                          const fresh = await adminApi.getPartyHierarchy(hierParty.id);
+                          if (fresh?.success) setHierData(fresh.data || null);
+                          setAssignDraft((p) => ({ ...p, title: '', district_name: '', contact_phone: '', contact_email: '', contact_website: '' }));
+                        } catch (e) {
+                          setError(e?.message || 'Atama kaydedilemedi.');
+                        } finally {
+                          setHierLoading(false);
+                        }
+                      }}
+                      className="w-full bg-primary-blue hover:bg-blue-600 text-white font-black px-4 py-3 rounded-xl disabled:opacity-50"
+                    >
+                      {hierLoading ? 'Kaydediliyor…' : 'Ata / Kaydet'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {hierLoading && (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 text-gray-600">Yükleniyor…</div>
+                )}
+
+                {!hierLoading && hierData && (
+                  <>
+                    <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                      <div className="font-black text-gray-900 mb-2">Özet</div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                          <div className="text-xs text-gray-500">Vekil</div>
+                          <div className="text-xl font-black">{hierData.counts.mps}</div>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                          <div className="text-xs text-gray-500">Teşkilat</div>
+                          <div className="text-xl font-black">{hierData.counts.party_officials}</div>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                          <div className="text-xs text-gray-500">İl Başkanı</div>
+                          <div className="text-xl font-black">{hierData.counts.provincial_chairs}</div>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                          <div className="text-xs text-gray-500">İlçe Başkanı</div>
+                          <div className="text-xl font-black">{hierData.counts.district_chairs}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                      <div className="font-black text-gray-900 mb-3 flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-primary-blue" />
+                        Atamalar (Yetki/İletişim)
+                      </div>
+                      {(hierData.assignments || []).length === 0 ? (
+                        <div className="text-sm text-gray-600">Henüz bir atama yok.</div>
+                      ) : (
+                        <div className="space-y-3">
+                          {(hierData.assignments || []).map((a, idx) => {
+                            const unit = a.unit || {};
+                            const contact = unit.contact || {};
+                            return (
+                              <div key={`${a.user_id}-${unit.key}-${idx}`} className="border border-gray-200 rounded-xl p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start gap-3">
+                                    <Avatar src={a.avatar_url} size="44px" />
+                                    <div className="min-w-0">
+                                      <div className="font-black text-gray-900 truncate">{a.full_name}</div>
+                                      <div className="text-xs text-gray-500 truncate">@{a.username}</div>
+                                      <div className="text-xs text-gray-700 mt-1 inline-flex items-center gap-2">
+                                        <span className="px-2 py-1 rounded-full bg-blue-50 border border-blue-100 text-primary-blue font-bold">
+                                          {unit.unit_type}
+                                        </span>
+                                        {unit.province && (
+                                          <span className="inline-flex items-center gap-1 text-gray-600">
+                                            <MapPin className="w-3 h-3" /> {unit.province}
+                                          </span>
+                                        )}
+                                        {unit.district_name && <span className="text-gray-600">/ {unit.district_name}</span>}
+                                      </div>
+                                      {unit.title && <div className="text-xs text-gray-700 mt-1">{unit.title}</div>}
+                                      <div className="mt-2 text-xs text-gray-600 space-y-1">
+                                        {contact.phone && <div><Phone className="w-3 h-3 inline-block mr-1" /> {contact.phone}</div>}
+                                        {contact.email && <div><Mail className="w-3 h-3 inline-block mr-1" /> {contact.email}</div>}
+                                        {contact.website && <div><Globe className="w-3 h-3 inline-block mr-1" /> {contact.website}</div>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        setHierLoading(true);
+                                        const r = await adminApi.unassignPartyUnit(hierParty.id, { user_id: a.user_id, key: unit.key });
+                                        if (!r?.success) throw new Error(r?.error || 'Kaldırılamadı.');
+                                        const fresh = await adminApi.getPartyHierarchy(hierParty.id);
+                                        if (fresh?.success) setHierData(fresh.data || null);
+                                      } catch (e) {
+                                        setError(e?.message || 'Kaldırılamadı.');
+                                      } finally {
+                                        setHierLoading(false);
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-black"
+                                  >
+                                    Kaldır
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
