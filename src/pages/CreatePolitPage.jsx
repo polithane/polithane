@@ -78,7 +78,8 @@ export const CreatePolitPage = () => {
     []
   );
 
-  const [contentType, setContentType] = useState('video');
+  // Start with no selection (user must pick a content type)
+  const [contentType, setContentType] = useState('');
   const [content, setContent] = useState('');
   const [agendaTag, setAgendaTag] = useState(''); // '' => Gündem dışı
   const [agendas, setAgendas] = useState([]);
@@ -276,6 +277,11 @@ export const CreatePolitPage = () => {
       return;
     }
 
+    if (!contentType) {
+      toast.error('Önce bir içerik türü seçin (Video/Resim/Ses/Yazı).');
+      return;
+    }
+
     if (approvalPending) {
       toast.error('Üyeliğiniz onay bekliyor. Onay gelene kadar Polit Atamazsınız.');
       return;
@@ -433,7 +439,9 @@ export const CreatePolitPage = () => {
                       ? 'Resim'
                       : contentType === 'audio'
                         ? 'Ses'
-                        : 'Yazı'}
+                        : contentType === 'text'
+                          ? 'Yazı'
+                          : 'Tür seç'}
                 </div>
               </div>
 
@@ -532,6 +540,11 @@ export const CreatePolitPage = () => {
             <form onSubmit={onSubmit} className="space-y-4">
               {/* Preview area */}
               <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4">
+                {!contentType && (
+                  <div className="text-sm text-gray-700">
+                    Önce yukarıdan bir <span className="font-semibold">içerik türü</span> seç: Video, Resim, Ses veya Yazı.
+                  </div>
+                )}
                 {contentType === 'video' && (
                   <>
                     <div className="text-xs font-black text-gray-700 mb-2">Video Önizleme</div>
@@ -790,7 +803,13 @@ export const CreatePolitPage = () => {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={6}
-                  placeholder={contentType === 'text' ? 'Ne düşünüyorsun? (Maks. 350 karakter)' : 'Açıklama ekleyin (önerilir)'}
+                  placeholder={
+                    contentType === 'text'
+                      ? 'Ne düşünüyorsun? (Maks. 350 karakter)'
+                      : contentType
+                        ? 'Açıklama ekleyin (önerilir)'
+                        : 'Önce bir içerik türü seçin, sonra yazın…'
+                  }
                   maxLength={contentType === 'text' ? TEXT_LIMIT : undefined}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue outline-none resize-none bg-white/95"
                 />
@@ -803,10 +822,10 @@ export const CreatePolitPage = () => {
 
               <button
                 type="submit"
-                disabled={loading || approvalPending}
+                disabled={loading || approvalPending || !contentType}
                 className="w-full py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black disabled:opacity-60"
               >
-                {approvalPending ? 'Onay bekleniyor' : loading ? 'Paylaşılıyor…' : 'Polit At!'}
+                {!contentType ? 'Önce tür seç' : approvalPending ? 'Onay bekleniyor' : loading ? 'Paylaşılıyor…' : 'Polit At!'}
               </button>
 
             </form>
