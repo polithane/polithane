@@ -12,6 +12,12 @@ export const AgendaDetailPage = () => {
   const [agenda, setAgenda] = useState(null);
   const [agendaPosts, setAgendaPosts] = useState([]);
   const [category, setCategory] = useState('all');
+
+  const agendaTitle = String(agenda?.title || agenda?.agenda_title || '').trim();
+  const agendaScore = Number(agenda?.total_polit_score ?? agenda?.polit_score ?? 0);
+  const agendaPostCount = Number(agenda?.post_count ?? 0);
+  // Some older mock data used `participant_count`; API doesn't guarantee it.
+  const agendaParticipantCount = Number(agenda?.participant_count ?? 0);
   
   useEffect(() => {
     (async () => {
@@ -23,7 +29,7 @@ export const AgendaDetailPage = () => {
         (Array.isArray(list) ? list : []).find((a) => String(a?.title || '').toLowerCase().replace(/\s+/g, '-') === String(agendaSlug || ''));
 
       setAgenda(found || null);
-      const title = String(found?.title || '').trim();
+      const title = String(found?.title || found?.agenda_title || '').trim();
       if (!title) {
         setAgendaPosts([]);
         return;
@@ -48,23 +54,25 @@ export const AgendaDetailPage = () => {
         {/* Gündem Header */}
         <div className="card mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold">{agenda.agenda_title}</h1>
+            <h1 className="text-3xl font-bold">{agendaTitle}</h1>
             <Button variant="outline">Takip Et</Button>
           </div>
           
           <div className="flex gap-8">
             <div>
-              <div className="text-2xl font-bold">{formatNumber(agenda.post_count)}</div>
+              <div className="text-2xl font-bold">{formatNumber(agendaPostCount)}</div>
               <div className="text-sm text-gray-500">Paylaşım</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-primary-blue">{formatPolitScore(agenda.total_polit_score)}</div>
+              <div className="text-2xl font-bold text-primary-blue">{formatPolitScore(agendaScore)}</div>
               <div className="text-sm text-gray-500">Toplam Polit Puan</div>
             </div>
-            <div>
-              <div className="text-2xl font-bold">{formatNumber(agenda.participant_count)}</div>
-              <div className="text-sm text-gray-500">Katılımcı</div>
-            </div>
+            {agendaParticipantCount > 0 && (
+              <div>
+                <div className="text-2xl font-bold">{formatNumber(agendaParticipantCount)}</div>
+                <div className="text-sm text-gray-500">Katılımcı</div>
+              </div>
+            )}
           </div>
         </div>
         

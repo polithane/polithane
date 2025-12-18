@@ -151,7 +151,7 @@ export const AgendaBar = ({ agendas = [] }) => {
                     {getAgendaTitle(agenda)}
                   </span>
                 </div>
-                <span className="text-xs bg-gray-100 px-2 py-1 rounded-full font-semibold text-gray-700 flex-shrink-0 ml-2">
+                <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded-full font-black flex-shrink-0 ml-2">
                   {formatPolitScore(getAgendaScore(agenda))}
                 </span>
               </button>
