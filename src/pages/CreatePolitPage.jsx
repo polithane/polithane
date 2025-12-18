@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Square, Circle, Trash2, X, Sparkles, Video, Image as ImageIcon, Music, PenTool } from 'lucide-react';
+import {
+  Camera,
+  Trash2,
+  X,
+  Sparkles,
+  Video,
+  Image as ImageIcon,
+  Music,
+  PenTool,
+  UploadCloud,
+  Mic,
+  StopCircle,
+  Flame,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
@@ -373,10 +386,11 @@ export const CreatePolitPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
       <div className="container-main py-6">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white/90 backdrop-blur border border-gray-200 rounded-3xl shadow-xl overflow-hidden">
+          <div className="relative rounded-[28px] p-[2px] bg-gradient-to-br from-primary-blue/70 via-indigo-400/70 to-emerald-400/70 shadow-2xl">
+            <div className="bg-white/90 backdrop-blur rounded-[26px] overflow-hidden">
             {/* Top bar */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <button
@@ -434,7 +448,7 @@ export const CreatePolitPage = () => {
               )}
 
             {/* Content type tabs */}
-            <div className="flex items-center justify-center gap-5 mb-5">
+            <div className="flex items-center justify-center gap-4 sm:gap-6 mb-5">
               {contentTabs.map((t) => {
                 const active = t.key === contentType;
                 const FallbackIcon = t.fallbackIcon;
@@ -450,31 +464,66 @@ export const CreatePolitPage = () => {
                       setContentType(t.key);
                       resetMedia();
                     }}
-                    className="p-0 bg-transparent border-0 outline-none"
+                    className="group p-0 bg-transparent border-0 outline-none"
                     title={t.alt}
                   >
-                    {showImage ? (
-                      <img
-                        src={iconSrc}
-                        alt={t.alt}
-                        className={`object-contain transition-transform ${active ? 'scale-110' : 'opacity-90 hover:opacity-100'}`}
-                        style={{ width: 56, height: 56 }}
-                        loading="lazy"
-                        onError={() => {
-                          const nextIdx = idx + 1;
-                          if (nextIdx < candidates.length) {
-                            setIconTryIndex((p) => ({ ...p, [t.key]: nextIdx }));
-                          } else {
-                            setBrokenIcons((p) => ({ ...p, [t.key]: true }));
-                          }
-                        }}
-                      />
-                    ) : (
-                      <FallbackIcon
-                        className={`transition-transform ${active ? 'scale-110 text-primary-blue' : 'text-gray-700 hover:text-gray-900'}`}
-                        style={{ width: 44, height: 44 }}
-                      />
-                    )}
+                    <div
+                      className={[
+                        'relative rounded-3xl p-[2px] transition-all',
+                        active ? 'bg-gradient-to-br from-primary-blue via-indigo-400 to-emerald-400 shadow-lg' : 'bg-transparent',
+                      ].join(' ')}
+                    >
+                      <div
+                        className={[
+                          'rounded-[22px] bg-white/80 backdrop-blur border',
+                          'w-20 h-20 sm:w-28 sm:h-28 md:w-[140px] md:h-[140px]',
+                          'flex items-center justify-center',
+                          'transition-transform duration-200',
+                          'hover:scale-[1.08]',
+                          active ? 'border-white/50' : 'border-gray-200 hover:border-gray-300',
+                        ].join(' ')}
+                      >
+                        {showImage ? (
+                          <img
+                            src={iconSrc}
+                            alt={t.alt}
+                            className={[
+                              'object-contain',
+                              'w-14 h-14 sm:w-20 sm:h-20 md:w-[125px] md:h-[125px]',
+                              'transition-transform duration-200',
+                              active ? 'scale-[1.03]' : 'opacity-95 group-hover:opacity-100',
+                            ].join(' ')}
+                            loading="lazy"
+                            onError={() => {
+                              const nextIdx = idx + 1;
+                              if (nextIdx < candidates.length) {
+                                setIconTryIndex((p) => ({ ...p, [t.key]: nextIdx }));
+                              } else {
+                                setBrokenIcons((p) => ({ ...p, [t.key]: true }));
+                              }
+                            }}
+                          />
+                        ) : (
+                          <FallbackIcon
+                            className={[
+                              'transition-transform duration-200',
+                              'w-10 h-10 sm:w-14 sm:h-14 md:w-[86px] md:h-[86px]',
+                              active ? 'text-primary-blue scale-[1.06]' : 'text-gray-700 group-hover:text-gray-900',
+                            ].join(' ')}
+                          />
+                        )}
+                      </div>
+                      <div className="mt-2 text-center text-[11px] sm:text-xs font-black tracking-tight">
+                        <span className={active ? 'text-primary-blue' : 'text-gray-600 group-hover:text-gray-800'}>
+                          {t.alt}
+                        </span>
+                      </div>
+                      {active && (
+                        <div className="absolute -top-2 -right-2 rounded-full bg-primary-blue text-white shadow-lg px-2 py-1 text-[10px] font-black">
+                          Seçili
+                        </div>
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -482,7 +531,7 @@ export const CreatePolitPage = () => {
 
             <form onSubmit={onSubmit} className="space-y-4">
               {/* Preview area */}
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4">
                 {contentType === 'video' && (
                   <>
                     <div className="text-xs font-black text-gray-700 mb-2">Video Önizleme</div>
@@ -566,20 +615,25 @@ export const CreatePolitPage = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Gündem</label>
-                <select
-                  value={agendaTag}
-                  onChange={(e) => setAgendaTag(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
-                >
-                  <option value="">Gündem dışı</option>
-                  {agendas
-                    .filter((a) => a?.is_active !== false)
-                    .map((a) => (
-                      <option key={a.id || a.slug || a.title} value={a.title || ''}>
-                        {a.title}
-                      </option>
-                    ))}
-                </select>
+                <div className="relative rounded-xl p-[2px] bg-gradient-to-r from-primary-blue/70 via-indigo-400/70 to-emerald-400/70">
+                  <select
+                    value={agendaTag}
+                    onChange={(e) => setAgendaTag(e.target.value)}
+                    className="w-full px-4 py-3 pr-11 bg-white/95 border border-transparent rounded-[10px] focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue outline-none"
+                  >
+                    <option value="">Gündem dışı</option>
+                    {agendas
+                      .filter((a) => a?.is_active !== false)
+                      .map((a) => (
+                        <option key={a.id || a.slug || a.title} value={a.title || ''}>
+                          {a.title}
+                        </option>
+                      ))}
+                  </select>
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-primary-blue">
+                    <Flame className="w-5 h-5" />
+                  </div>
+                </div>
                 <div className="mt-1 text-[11px] text-gray-500">
                   Gündem listesi admin panelindeki gündemlerden gelir. Bulamazsanız “Gündem dışı” seçebilirsiniz.
                 </div>
@@ -597,7 +651,7 @@ export const CreatePolitPage = () => {
                         className="flex-1 py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <Circle className="w-4 h-4" />
+                          <Video className="w-5 h-5" />
                           Kayda Başla
                         </div>
                       </button>
@@ -608,7 +662,7 @@ export const CreatePolitPage = () => {
                         className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <Square className="w-4 h-4" />
+                          <StopCircle className="w-5 h-5" />
                           Kaydı Durdur
                         </div>
                       </button>
@@ -638,7 +692,10 @@ export const CreatePolitPage = () => {
                       onClick={() => imageUploadRef.current?.click()}
                       className="py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black"
                     >
-                      Resim Yükle
+                      <div className="flex items-center justify-center gap-2">
+                        <UploadCloud className="w-5 h-5" />
+                        Resim Yükle
+                      </div>
                     </button>
                     <button
                       type="button"
@@ -646,7 +703,7 @@ export const CreatePolitPage = () => {
                       className="py-3 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-800 font-black"
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <Camera className="w-4 h-4" />
+                        <Camera className="w-5 h-5" />
                         Resim Çek
                       </div>
                     </button>
@@ -689,7 +746,7 @@ export const CreatePolitPage = () => {
                         className="flex-1 py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <Circle className="w-4 h-4" />
+                          <Mic className="w-5 h-5" />
                           Kayda Başla
                         </div>
                       </button>
@@ -700,7 +757,7 @@ export const CreatePolitPage = () => {
                         className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <Square className="w-4 h-4" />
+                          <StopCircle className="w-5 h-5" />
                           Kaydı Durdur
                         </div>
                       </button>
@@ -735,7 +792,7 @@ export const CreatePolitPage = () => {
                   rows={6}
                   placeholder={contentType === 'text' ? 'Ne düşünüyorsun? (Maks. 350 karakter)' : 'Açıklama ekleyin (önerilir)'}
                   maxLength={contentType === 'text' ? TEXT_LIMIT : undefined}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue outline-none resize-none bg-white/95"
                 />
                 {contentType === 'text' && (
                   <div className="mt-2 text-[11px] text-gray-500">
@@ -756,6 +813,7 @@ export const CreatePolitPage = () => {
           </div>
         </div>
       </div>
+    </div>
     </div>
     </div>
   );
