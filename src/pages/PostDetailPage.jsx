@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, ThumbsUp, Eye, TrendingUp, Users } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -418,7 +418,7 @@ export const PostDetailPage = () => {
             <div className="grid grid-cols-3 gap-2 pt-4 border-t">
               {/* BEĞEN - Özel Vurgulu */}
               <button onClick={handleToggleLike} className="flex items-center justify-center gap-2 bg-gradient-to-br from-red-500 via-pink-500 to-red-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                <Heart className="w-4 h-4" fill="currentColor" />
+                <Heart className="w-6 h-6" fill="currentColor" />
                 <span className="text-sm font-bold">BEĞEN ({formatNumber(uiPost.like_count)})</span>
               </button>
               
@@ -430,7 +430,7 @@ export const PostDetailPage = () => {
                 }}
                 className="flex items-center justify-center gap-2 bg-gradient-to-br from-primary-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                <MessageCircle className="w-4 h-4" />
+                <MessageCircle className="w-6 h-6" />
                 <span className="text-sm font-bold">YORUM ({formatNumber(uiPost.comment_count)})</span>
               </button>
               
@@ -459,7 +459,7 @@ export const PostDetailPage = () => {
                 }}
                 className="flex items-center justify-center gap-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                <Share2 className="w-4 h-4" />
+                <Share2 className="w-6 h-6" />
                 <span className="text-sm font-bold">PAYLAŞ ({formatNumber(uiPost.share_count || 0)})</span>
               </button>
             </div>
@@ -554,9 +554,26 @@ export const PostDetailPage = () => {
                 <div key={comment.id || comment.comment_id} className="flex gap-3">
                   <Avatar src={comment.user?.avatar_url || comment.user?.profile_image} size="40px" verified={isUiVerifiedUser(comment.user)} />
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold">{comment.user?.full_name}</span>
-                      <span className="text-sm text-gray-500">{formatTimeAgo(comment.created_at)}</span>
+                    <div className="relative">
+                      <div className="flex items-center gap-2 mb-1 pr-9">
+                        <span className="font-semibold">{comment.user?.full_name}</span>
+                        <span className="text-sm text-gray-500">{formatTimeAgo(comment.created_at)}</span>
+                      </div>
+
+                      {/* Report flag: top-right of the comment area (no button background) */}
+                      <button
+                        type="button"
+                        className="absolute right-0 top-0 text-gray-400 hover:text-red-600 transition-colors"
+                        onClick={() => {
+                          setReporting(comment);
+                          setReportReason('spam');
+                          setReportDetails('');
+                          setReportDone(false);
+                        }}
+                        title="Bildir"
+                      >
+                        <Flag className="w-6 h-6" />
+                      </button>
                     </div>
                     {editingId === (comment.id || comment.comment_id) ? (
                       <div className="mb-2">
@@ -639,23 +656,9 @@ export const PostDetailPage = () => {
                         </button>
                       )}
 
+                      {/* Like button: red heart + count (no square background) */}
                       <button
-                        className="flex items-center justify-center w-14 h-14 rounded-2xl border border-gray-200 bg-white hover:bg-red-50 text-gray-700 hover:text-red-600"
-                        type="button"
-                        onClick={() => {
-                          setReporting(comment);
-                          setReportReason('spam');
-                          setReportDetails('');
-                          setReportDone(false);
-                        }}
-                        title="Bildir"
-                      >
-                        <Flag className="w-8 h-8" />
-                      </button>
-
-                      {/* Like button: right-aligned and bigger */}
-                      <button
-                        className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-800 hover:text-primary-blue disabled:opacity-50"
+                        className="flex items-center gap-1.5 text-red-600 hover:text-red-700 disabled:opacity-50"
                         type="button"
                         disabled={isPendingComment(comment)}
                         onClick={async () => {
@@ -673,8 +676,8 @@ export const PostDetailPage = () => {
                         }}
                         title={isPendingComment(comment) ? 'Bu yorum incelemede' : 'Beğen'}
                       >
-                        <ThumbsUp className="w-6 h-6" />
-                        <span className="text-base font-black">{formatNumber(comment.like_count)}</span>
+                        <Heart className="w-6 h-6" fill="currentColor" />
+                        <span className="text-base font-black text-gray-800">{formatNumber(comment.like_count)}</span>
                       </button>
                     </div>
                   </div>
