@@ -526,11 +526,6 @@ export const CreatePolitPage = () => {
                           {t.alt}
                         </span>
                       </div>
-                      {active && (
-                        <div className="absolute -top-2 -right-2 rounded-full bg-primary-blue text-white shadow-lg px-2 py-1 text-[10px] font-black">
-                          Seçili
-                        </div>
-                      )}
                     </div>
                   </button>
                 );
