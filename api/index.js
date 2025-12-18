@@ -295,8 +295,6 @@ async function notifyAdminsAboutComment({ type, commentId, postId, actorId, titl
     user_id: uid,
     actor_id: actorId || null,
     type: String(type || 'system').slice(0, 20),
-    title: title ? String(title).slice(0, 255) : null,
-    message: message ? String(message).slice(0, 2000) : null,
     post_id: postId || null,
     comment_id: commentId || null,
     is_read: false,
@@ -353,8 +351,6 @@ async function addPostComment(req, res, postId) {
             type: 'comment',
             post_id: postId,
             comment_id: row?.id || null,
-            title: 'Yeni yorum',
-            message: pending ? 'Paylaşımınıza bir yorum geldi (incelemede).' : 'Paylaşımınıza yorum yaptı.',
             is_read: false,
           },
         ]).catch(() => null);
@@ -502,8 +498,6 @@ async function trackPostShare(req, res, postId) {
             actor_id: auth.id,
             type: 'share',
             post_id: postId,
-            title: 'Paylaşım',
-            message: 'Paylaşımınızı paylaştı.',
             is_read: false,
           },
         ]).catch(() => null);
@@ -602,8 +596,6 @@ async function togglePostLike(req, res, postId) {
             actor_id: userId,
             type: 'like',
             post_id: postId,
-            title: 'Beğeni',
-            message: 'Paylaşımınızı beğendi.',
             is_read: false,
           },
         ]).catch(() => null);

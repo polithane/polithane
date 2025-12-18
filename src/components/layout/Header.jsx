@@ -103,6 +103,7 @@ export const Header = () => {
     const t = String(n?.type || 'system');
     if (t === 'like') return 'Beğeni';
     if (t === 'comment') return 'Yorum';
+    if (t === 'share') return 'Paylaşım';
     if (t === 'follow') return 'Takip';
     if (t === 'mention') return 'Bahsedilme';
     if (t === 'message') return 'Mesaj';
