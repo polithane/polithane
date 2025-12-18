@@ -221,14 +221,18 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
            İl Detaylarına Git
          </label>
          <div className="relative">
+           {/* TR plate styling (visual only) */}
+           <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 rounded-l-lg bg-[#0B3D91] flex items-center justify-center">
+             <span className="text-[10px] font-black tracking-wide text-white">TR</span>
+           </div>
            <select
-             className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-blue focus:border-primary-blue block p-2.5 pr-8"
+             className="w-full appearance-none bg-white border-2 border-gray-900/80 text-gray-900 text-sm rounded-lg focus:ring-primary-blue focus:border-primary-blue block py-2.5 pr-9 pl-12 shadow-sm"
              onChange={(e) => {
                if(e.target.value) navigate(`/city/${e.target.value}`);
              }}
              defaultValue=""
            >
-             <option value="" disabled>Bir il seçin...</option>
+             <option value="" disabled>Plaka Seç</option>
              {cityNamesList.map((city) => (
                <option key={city.code} value={city.code}>
                  {city.code} - {city.name}
