@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Eye, Heart, MessageCircle, Share2, Video, Image as ImageIcon, Music, FileText } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
 import { Tooltip } from '../common/Tooltip';
+import { Modal } from '../common/Modal';
 import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration, getSourceDomain } from '../../utils/formatters';
 import { getUserTitle, isUiVerifiedUser } from '../../utils/titleHelpers';
 import { useNavigate, Link } from 'react-router-dom';
 import { CONTENT_TYPES } from '../../utils/constants';
 import { getProfilePath } from '../../utils/paths';
 import { CITY_CODES } from '../../utils/constants';
+import { posts as postsApi } from '../../utils/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const normalizeCityName = (name) =>
   String(name || '')
@@ -39,7 +42,21 @@ const getPlateCodeFromProvince = (provinceName) => {
 export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = false, fullWidth = false, style }) => {
   const navigate = useNavigate();
   const [showScoreModal, setShowScoreModal] = useState(false);
+  const { isAuthenticated } = useAuth();
   const postId = post?.post_id ?? post?.id;
+
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [likeCount, setLikeCount] = useState(Number(post?.like_count || 0));
+  const [isLiked, setIsLiked] = useState(Boolean(post?.is_liked));
+
+  const postUrl = useMemo(() => {
+    try {
+      return `${window.location.origin}/post/${postId}`;
+    } catch {
+      return `/post/${postId}`;
+    }
+  }, [postId]);
   
   const getContentIcon = () => {
     switch (post.content_type) {
@@ -82,6 +99,52 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       );
     }
     return <img src={safeSrc} alt="" className={className} onError={() => setFailed(true)} />;
+  };
+
+  const copyToClipboard = async (text) => {
+    const t = String(text || '');
+    if (!t) return false;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(t);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+    try {
+      const el = document.createElement('textarea');
+      el.value = t;
+      el.setAttribute('readonly', 'true');
+      el.style.position = 'fixed';
+      el.style.left = '-9999px';
+      document.body.appendChild(el);
+      el.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(el);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleToggleLike = async (e) => {
+    e?.stopPropagation?.();
+    if (!postId) return;
+    if (!isAuthenticated) {
+      navigate('/login-new');
+      return;
+    }
+    try {
+      const r = await postsApi.like(postId);
+      if (r?.success) {
+        const nextLiked = r?.action === 'liked' ? true : r?.action === 'unliked' ? false : !isLiked;
+        setIsLiked(nextLiked);
+        setLikeCount((prev) => Math.max(0, Number(prev || 0) + (nextLiked ? 1 : -1)));
+      }
+    } catch {
+      // ignore (best-effort)
+    }
   };
 
   return (
@@ -418,20 +481,53 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       {/* Alt Etkileşim Çubuğu */}
       <div className="flex items-center justify-between pt-2 border-t border-gray-200">
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-xs">
+          <button
+            type="button"
+            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!postId) return;
+              // View count is incremented on detail fetch (server-side best effort)
+              navigate(`/post/${postId}`);
+            }}
+            title="Detayı aç"
+          >
             <Eye className="w-3 h-3" />
             <span>{formatNumber(post.view_count)}</span>
           </button>
-          <button className="flex items-center gap-1 text-gray-600 hover:text-red-500 text-xs">
-            <Heart className="w-3 h-3" />
-            <span>{formatNumber(post.like_count)}</span>
+          <button
+            type="button"
+            className={`flex items-center gap-1 text-xs ${isLiked ? 'text-red-600' : 'text-gray-600 hover:text-red-500'}`}
+            onClick={handleToggleLike}
+            title={isLiked ? 'Beğeniyi geri al' : 'Beğen'}
+          >
+            <Heart className="w-3 h-3" fill={isLiked ? 'currentColor' : 'none'} />
+            <span>{formatNumber(likeCount)}</span>
           </button>
-          <button className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-xs">
+          <button
+            type="button"
+            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!postId) return;
+              navigate(`/post/${postId}?comment=1`);
+            }}
+            title="Yorum yap"
+          >
             <MessageCircle className="w-3 h-3" />
             <span>{formatNumber(post.comment_count)}</span>
           </button>
         </div>
-        <button className="text-gray-600 hover:text-primary-blue">
+        <button
+          type="button"
+          className="text-gray-600 hover:text-primary-blue"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShareCopied(false);
+            setShareOpen(true);
+          }}
+          title="Paylaş"
+        >
           <Share2 className="w-3 h-3" />
         </button>
       </div>
@@ -453,6 +549,72 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
           onClose={() => setShowScoreModal(false)}
         />
       )}
+
+      {/* Share modal (no navigation) */}
+      <Modal isOpen={shareOpen} onClose={() => setShareOpen(false)} title="Paylaş">
+        <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="text-sm text-gray-700">
+            Bu polit linki:
+            <div className="mt-2 p-3 rounded-lg bg-gray-50 border border-gray-200 break-all text-xs text-gray-800">
+              {postUrl}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(postUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3 rounded-xl bg-[#25D366] text-white font-black text-center hover:opacity-90"
+              onClick={(e) => e.stopPropagation()}
+            >
+              WhatsApp
+            </a>
+            <a
+              href={`https://t.me/share/url?url=${encodeURIComponent(postUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3 rounded-xl bg-[#229ED9] text-white font-black text-center hover:opacity-90"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Telegram
+            </a>
+            <a
+              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(postUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3 rounded-xl bg-black text-white font-black text-center hover:bg-gray-900"
+              onClick={(e) => e.stopPropagation()}
+            >
+              X
+            </a>
+            <a
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3 rounded-xl bg-[#1877F2] text-white font-black text-center hover:opacity-90"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Facebook
+            </a>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                const ok = await copyToClipboard(postUrl);
+                setShareCopied(ok);
+              }}
+              className="col-span-2 px-4 py-3 rounded-xl border border-gray-300 text-gray-900 font-black hover:bg-gray-50"
+            >
+              {shareCopied ? 'Kopyalandı' : 'Kopyala'}
+            </button>
+          </div>
+
+          <div className="text-xs text-gray-500">
+            Instagram web üzerinden direkt paylaşımı desteklemez; linki kopyalayıp Instagram’da paylaşabilirsiniz.
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

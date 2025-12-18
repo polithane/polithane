@@ -237,6 +237,16 @@ async function getPostById(req, res, id) {
         return res.status(404).json({ success: false, error: 'Post bulunamadı' });
       }
     }
+
+    // View tracking (best-effort): increment view_count on detail fetch.
+    // IMPORTANT: Never fail the request if RLS/env prevents updates.
+    try {
+      const cur = Number(post?.view_count || 0);
+      const next = cur + 1;
+      supabaseRestPatch('posts', { id: `eq.${id}` }, { view_count: next }).catch(() => null);
+    } catch {
+      // ignore
+    }
     res.json({ success: true, data: post });
 }
 
