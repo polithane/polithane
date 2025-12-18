@@ -956,6 +956,7 @@ async function getFollowStats(req, res, targetId) {
   const following = await supabaseCount('follows', { follower_id: `eq.${tid}` }).catch(() => 0);
 
   let isFollowing = false;
+  let isFollowedBy = false;
   if (auth?.id) {
     const existing = await supabaseRestGet('follows', {
       select: 'id',
@@ -964,6 +965,15 @@ async function getFollowStats(req, res, targetId) {
       limit: '1',
     }).catch(() => []);
     isFollowing = Array.isArray(existing) && existing.length > 0;
+
+    // Does the target follow me?
+    const reverse = await supabaseRestGet('follows', {
+      select: 'id',
+      follower_id: `eq.${tid}`,
+      following_id: `eq.${auth.id}`,
+      limit: '1',
+    }).catch(() => []);
+    isFollowedBy = Array.isArray(reverse) && reverse.length > 0;
   }
 
   return res.json({
@@ -972,8 +982,49 @@ async function getFollowStats(req, res, targetId) {
       followers_count: followers,
       following_count: following,
       is_following: isFollowing,
+      is_followed_by: isFollowedBy,
     },
   });
+}
+
+async function getMessageContacts(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const userId = String(auth.id);
+  const { limit = 50 } = req.query || {};
+  const lim = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+
+  // Mutual follows (takipleşme): follower_id=userId AND following_id in myFollowing,
+  // and follower_id in myFollowers AND following_id=userId.
+  const [myFollowing, myFollowers] = await Promise.all([
+    supabaseRestGet('follows', { select: 'following_id', follower_id: `eq.${userId}`, limit: '500' }).catch(() => []),
+    supabaseRestGet('follows', { select: 'follower_id', following_id: `eq.${userId}`, limit: '500' }).catch(() => []),
+  ]);
+
+  const followingSet = new Set((myFollowing || []).map((r) => String(r.following_id)).filter(Boolean));
+  const mutualIds = Array.from(
+    new Set((myFollowers || []).map((r) => String(r.follower_id)).filter((id) => id && followingSet.has(id)))
+  ).slice(0, lim);
+
+  if (mutualIds.length === 0) return res.json({ success: true, data: [] });
+
+  const users = await supabaseRestGet('users', {
+    select: 'id,username,full_name,avatar_url,user_type,politician_type,party_id,province,is_verified,is_active,metadata,party:parties(*)',
+    id: `in.(${mutualIds.join(',')})`,
+    is_active: 'eq.true',
+    order: 'polit_score.desc',
+    limit: String(mutualIds.length),
+  }).catch(() => []);
+
+  // Do not leak metadata in responses
+  const out = (users || [])
+    .filter(Boolean)
+    .map((u) => {
+      const { metadata, ...rest } = u;
+      return rest;
+    });
+
+  return res.json({ success: true, data: out });
 }
 
 async function toggleFollow(req, res, targetId) {
@@ -2901,6 +2952,48 @@ async function sendMessage(req, res) {
     return res.status(403).json({ success: false, error: 'Bu kullanıcıyla mesajlaşamazsınız (engelleme mevcut).' });
   }
 
+  // Respect receiver message privacy settings (users.metadata.privacy_settings.allowMessages)
+  try {
+    const recvRows = await supabaseRestGet('users', { select: 'id,is_active,metadata', id: `eq.${receiver_id}`, limit: '1' }).catch(() => []);
+    const recv = recvRows?.[0] || null;
+    if (!recv || recv.is_active === false) {
+      return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+    }
+    const meta = recv?.metadata && typeof recv.metadata === 'object' ? recv.metadata : {};
+    const ps = meta.privacy_settings && typeof meta.privacy_settings === 'object' ? meta.privacy_settings : {};
+    const rule = String(ps.allowMessages || 'everyone');
+
+    if (rule === 'none') {
+      return res.status(403).json({ success: false, error: 'Bu kullanıcı mesaj almayı kapattı.' });
+    }
+    if (rule === 'followers') {
+      // Only people who follow the receiver can message
+      const r = await supabaseRestGet('follows', {
+        select: 'id',
+        follower_id: `eq.${auth.id}`,
+        following_id: `eq.${receiver_id}`,
+        limit: '1',
+      }).catch(() => []);
+      if (!Array.isArray(r) || r.length === 0) {
+        return res.status(403).json({ success: false, error: 'Bu kullanıcı yalnızca takipçilerinden mesaj alıyor.' });
+      }
+    }
+    if (rule === 'following') {
+      // Only people the receiver follows can message (i.e. receiver follows me)
+      const r = await supabaseRestGet('follows', {
+        select: 'id',
+        follower_id: `eq.${receiver_id}`,
+        following_id: `eq.${auth.id}`,
+        limit: '1',
+      }).catch(() => []);
+      if (!Array.isArray(r) || r.length === 0) {
+        return res.status(403).json({ success: false, error: 'Bu kullanıcı yalnızca takip ettiklerinden mesaj alıyor.' });
+      }
+    }
+  } catch {
+    // Best-effort only; do not fail hard.
+  }
+
   let content = '';
   if (attachment && attachment.url && attachment.kind) {
     const url = String(attachment.url || '').trim();
@@ -3199,6 +3292,7 @@ export default async function handler(req, res) {
 
       // Messages
       if (url === '/api/messages/conversations' && req.method === 'GET') return await getConversations(req, res);
+      if (url === '/api/messages/contacts' && req.method === 'GET') return await getMessageContacts(req, res);
       if (url === '/api/messages/search' && req.method === 'GET') return await searchMessageUsers(req, res);
       if (url.startsWith('/api/messages/send') && req.method === 'POST') return await sendMessage(req, res);
       if (url.startsWith('/api/messages/requests/') && url.endsWith('/reject') && req.method === 'POST') {
