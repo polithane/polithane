@@ -4,7 +4,6 @@ import {
   Camera,
   Trash2,
   X,
-  Sparkles,
   Video,
   Image as ImageIcon,
   Music,
@@ -416,7 +415,7 @@ export const CreatePolitPage = () => {
 
             <div className="p-5">
               {/* Identity row */}
-              <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar
                     src={user?.avatar_url}
@@ -430,18 +429,6 @@ export const CreatePolitPage = () => {
                       {isAuthenticated ? 'Paylaşım yapıyorsun' : 'Polit atmak için giriş yap'}
                     </div>
                   </div>
-                </div>
-                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-blue-50 border border-blue-100 text-blue-700 text-xs font-black">
-                  <Sparkles className="w-4 h-4" />
-                  {contentType === 'video'
-                    ? 'Video'
-                    : contentType === 'image'
-                      ? 'Resim'
-                      : contentType === 'audio'
-                        ? 'Ses'
-                        : contentType === 'text'
-                          ? 'Yazı'
-                          : 'Tür seç'}
                 </div>
               </div>
 
