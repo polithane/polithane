@@ -1253,35 +1253,110 @@ async function adminBootstrap(req, res) {
   const password_hash = await bcrypt.hash(password, 10);
 
   // If the user already exists (by email or username), update it. Otherwise create it.
-  const existing = await supabaseRestGet('users', {
-    select: 'id',
-    or: `(email.eq.${email},username.eq.${username})`,
-    limit: '1',
-  }).catch(() => []);
+  // NOTE: This endpoint must work across slightly different schemas (some environments
+  // don't allow user_type='admin', some may miss optional columns).
+  let existing = [];
+  try {
+    existing = await supabaseRestGet('users', {
+      select: 'id',
+      or: `(email.eq.${email},username.eq.${username})`,
+      limit: '1',
+    });
+  } catch (e) {
+    const msg = String(e?.message || '');
+    return res.status(500).json({
+      success: false,
+      error: 'Admin bootstrap DB erişimi başarısız.',
+      debug: msg.slice(0, 600),
+    });
+  }
 
   let row = null;
   if (Array.isArray(existing) && existing[0]?.id) {
-    const updated = await supabaseRestPatch(
-      'users',
-      { id: `eq.${existing[0].id}` },
-      { username, email, full_name, password_hash, is_admin: true, is_active: true }
-    ).catch(() => []);
-    row = updated?.[0] || null;
+    try {
+      const updated = await supabaseRestPatch(
+        'users',
+        { id: `eq.${existing[0].id}` },
+        { username, email, full_name, password_hash, is_admin: true, is_active: true }
+      );
+      row = updated?.[0] || null;
+    } catch (e) {
+      const msg = String(e?.message || '');
+      // Common issue: environments where users.is_admin doesn't exist
+      if (msg.toLowerCase().includes('is_admin') && msg.toLowerCase().includes('column')) {
+        return res.status(500).json({
+          success: false,
+          error:
+            "Admin hesabı güncellenemedi: Supabase'de `users.is_admin` sütunu yok gibi görünüyor. Çözüm: Supabase SQL Editor'da `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin boolean default false;` çalıştırın.",
+          debug: msg.slice(0, 600),
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        error: 'Admin hesabı güncellenemedi.',
+        debug: msg.slice(0, 600),
+      });
+    }
   } else {
-    const inserted = await supabaseRestInsert('users', [
-      {
-        username,
-        email,
-        full_name,
-        password_hash,
-        user_type: 'admin',
-        is_admin: true,
-        is_active: true,
-        is_verified: true,
-        email_verified: true,
-      },
-    ]).catch(() => []);
-    row = inserted?.[0] || null;
+    const base = {
+      username,
+      email,
+      full_name,
+      password_hash,
+      is_admin: true,
+      is_active: true,
+      is_verified: true,
+      email_verified: true,
+    };
+
+    // Try multiple variants to survive schema differences:
+    // - Some DBs disallow user_type='admin' via check constraint; do NOT use it.
+    // - Some DBs may not have email_verified / is_verified columns.
+    // - Some DBs may not have is_admin column (then we must instruct the operator).
+    const variants = [
+      { ...base, user_type: 'citizen' },
+      { ...base, user_type: 'normal' },
+      { ...base }, // rely on DB default for user_type
+      { ...base, is_verified: undefined }, // will be stripped below
+      { ...base, email_verified: undefined }, // will be stripped below
+    ];
+
+    const stripUndef = (obj) => {
+      const out = {};
+      for (const [k, v] of Object.entries(obj)) {
+        if (v !== undefined) out[k] = v;
+      }
+      return out;
+    };
+
+    let lastErr = '';
+    for (const v of variants) {
+      try {
+        const inserted = await supabaseRestInsert('users', [stripUndef(v)]);
+        row = inserted?.[0] || null;
+        if (row) break;
+      } catch (e) {
+        lastErr = String(e?.message || '');
+        // If is_admin column is missing, no retry will fix admin access.
+        if (lastErr.toLowerCase().includes('is_admin') && lastErr.toLowerCase().includes('column')) {
+          return res.status(500).json({
+            success: false,
+            error:
+              "Admin hesabı oluşturulamadı: Supabase'de `users.is_admin` sütunu yok gibi görünüyor. Çözüm: Supabase SQL Editor'da `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin boolean default false;` çalıştırın.",
+            debug: lastErr.slice(0, 600),
+          });
+        }
+        // continue trying next variant
+      }
+    }
+
+    if (!row) {
+      return res.status(500).json({
+        success: false,
+        error: 'Admin hesabı oluşturulamadı.',
+        debug: String(lastErr || 'unknown').slice(0, 600),
+      });
+    }
   }
 
   if (!row) return res.status(500).json({ success: false, error: 'Admin hesabı oluşturulamadı.' });
