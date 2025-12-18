@@ -15,6 +15,7 @@ export const Header = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { unreadCount, notifications, loading: notifLoading, fetchNotifications, markAsRead, markAllAsRead, deleteNotification } =
     useNotifications();
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef(null);
   const notifRef = useRef(null);
@@ -62,6 +63,35 @@ export const Header = () => {
     }, 250);
     return () => clearTimeout(searchTimerRef.current);
   }, [q]);
+
+  // Poll message unread count (header badge)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setMessageUnreadCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadUnread = async () => {
+      try {
+        if (document?.hidden) return;
+        const r = await apiCall('/api/messages/conversations').catch(() => null);
+        const list = r?.data || [];
+        const total = (Array.isArray(list) ? list : []).reduce((sum, c) => sum + (Number(c?.unread_count || 0) || 0), 0);
+        if (!cancelled) setMessageUnreadCount(total);
+      } catch {
+        if (!cancelled) setMessageUnreadCount(0);
+      }
+    };
+
+    loadUnread();
+    const interval = setInterval(loadUnread, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
 
   const notifItems = useMemo(() => {
     const list = Array.isArray(notifications) ? notifications : [];
@@ -338,6 +368,11 @@ export const Header = () => {
               {/* Mesajlar */}
               <button onClick={() => navigate('/messages')} className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <MessageCircle className="w-5 h-5 text-gray-600" />
+                {messageUnreadCount > 0 && (
+                  <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
+                    {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                  </Badge>
+                )}
               </button>
               
               {/* Kullanıcı Menü */}
