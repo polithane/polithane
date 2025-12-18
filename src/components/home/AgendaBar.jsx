@@ -8,6 +8,11 @@ export const AgendaBar = ({ agendas = [] }) => {
   const [visibleCount, setVisibleCount] = useState(4); // Başlangıçta 4 gündem (3 gündem + 1 reklam)
   
   if (!agendas || agendas.length === 0) return null;
+
+  const getAgendaId = (a) => a?.agenda_id ?? a?.id ?? a?.slug ?? a?.agenda_slug ?? a?.title ?? a?.agenda_title;
+  const getAgendaTitle = (a) => a?.agenda_title ?? a?.title ?? '';
+  const getAgendaSlug = (a) => a?.agenda_slug ?? a?.slug ?? '';
+  const getAgendaScore = (a) => a?.total_polit_score ?? a?.polit_score ?? 0;
   
   const showMore = () => {
     setVisibleCount(prev => Math.min(prev + 10, agendas.length));
@@ -36,16 +41,26 @@ export const AgendaBar = ({ agendas = [] }) => {
     
     return (
       <button
-        key={agenda.agenda_id}
-        onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-1 min-w-0 h-[36px]"
+        key={getAgendaId(agenda)}
+        onClick={() => navigate(`/agenda/${getAgendaSlug(agenda)}`)}
+        className="group flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-1 min-w-0 h-[36px]"
       >
         {fireIcon && <span className="flex-shrink-0">{fireIcon}</span>}
         <span className="text-xs font-medium truncate text-left flex-1">
-          {agenda.agenda_title}
+          {getAgendaTitle(agenda)}
         </span>
-        <span className="text-[10px] bg-gray-100 hover:bg-white hover:text-primary-blue px-1.5 py-0.5 rounded-full font-semibold transition-colors flex-shrink-0">
-          {formatPolitScore(agenda.total_polit_score)}
+        <span
+          className={[
+            'text-[10px] px-1.5 py-0.5 rounded-full font-black transition-colors flex-shrink-0',
+            // Always high-contrast
+            'bg-gray-900 text-white',
+            // When hovering the agenda button, invert for contrast on blue
+            'group-hover:bg-white group-hover:text-primary-blue',
+            // When hovering the score itself, keep contrast regardless
+            'hover:bg-black hover:text-white',
+          ].join(' ')}
+        >
+          {formatPolitScore(getAgendaScore(agenda))}
         </span>
       </button>
     );
@@ -85,8 +100,8 @@ export const AgendaBar = ({ agendas = [] }) => {
           {/* İlk 3 Gündem */}
           {visibleAgendas.slice(0, 3).map((agenda, index) => (
             <button
-              key={agenda.agenda_id}
-              onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
+              key={getAgendaId(agenda)}
+              onClick={() => navigate(`/agenda/${getAgendaSlug(agenda)}`)}
               className="flex-shrink-0 px-3 py-1.5 bg-white border-2 border-primary-blue text-primary-blue rounded-full text-xs font-semibold shadow-sm whitespace-nowrap flex items-center gap-1"
             >
               <Flame 
@@ -100,7 +115,10 @@ export const AgendaBar = ({ agendas = [] }) => {
                   animation: `pulse ${index === 0 ? '0.3s' : index === 1 ? '0.6s' : '1s'} cubic-bezier(0.4, 0, 0.6, 1) infinite`
                 }}
               />
-              {agenda.agenda_title}
+              <span className="truncate max-w-[140px]">{getAgendaTitle(agenda)}</span>
+              <span className="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded-full font-black">
+                {formatPolitScore(getAgendaScore(agenda))}
+              </span>
             </button>
           ))}
           
@@ -118,8 +136,8 @@ export const AgendaBar = ({ agendas = [] }) => {
           <div className="space-y-2">
             {visibleAgendas.slice(4).map((agenda, index) => (
               <button
-                key={agenda.agenda_id}
-                onClick={() => navigate(`/agenda/${agenda.agenda_slug}`)}
+                key={getAgendaId(agenda)}
+                onClick={() => navigate(`/agenda/${getAgendaSlug(agenda)}`)}
                 className="w-full flex items-center justify-between px-3 py-2.5 bg-white border border-gray-200 rounded-lg hover:border-primary-blue hover:bg-blue-50 transition-all"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -130,11 +148,11 @@ export const AgendaBar = ({ agendas = [] }) => {
                     />
                   )}
                   <span className="text-sm font-medium text-gray-900 truncate">
-                    {agenda.agenda_title}
+                    {getAgendaTitle(agenda)}
                   </span>
                 </div>
                 <span className="text-xs bg-gray-100 px-2 py-1 rounded-full font-semibold text-gray-700 flex-shrink-0 ml-2">
-                  {formatPolitScore(agenda.total_polit_score)}
+                  {formatPolitScore(getAgendaScore(agenda))}
                 </span>
               </button>
             ))}

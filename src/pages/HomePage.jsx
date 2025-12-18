@@ -105,8 +105,17 @@ export const HomePage = () => {
 
         setPosts((postsData || []).map(mapDbPostToUi));
 
-        // Agendas için şimdilik mock data kullan
-        setAgendas(mockAgendas);
+        // Agendas: load from admin-managed list (fallback to mock)
+        try {
+          const agendaRes = await apiCall('/api/agendas?limit=80').catch(() => null);
+          const list = agendaRes?.data || [];
+          const normalized = (Array.isArray(list) ? list : [])
+            .filter((a) => a?.is_active !== false)
+            .slice(0, 80);
+          setAgendas(normalized.length > 0 ? normalized : mockAgendas);
+        } catch {
+          setAgendas(mockAgendas);
+        }
 
         // PoliFest: real profiles from DB (no mock)
         const polifestUsers = await apiCall(
