@@ -20,6 +20,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
 
   const [shareOpen, setShareOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [shareTextCopied, setShareTextCopied] = useState(false);
   const [likeCount, setLikeCount] = useState(Number(post?.like_count || 0));
   const [isLiked, setIsLiked] = useState(Boolean(post?.is_liked));
 
@@ -30,6 +31,26 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
       return `/post/${postId}`;
     }
   }, [postId]);
+
+  const shareText = useMemo(() => {
+    const author = String(post?.user?.full_name || '').trim();
+    const agenda = String(post?.agenda_tag || '').trim();
+    const score = formatPolitScore(post?.polit_score || 0);
+    const content = String(post?.content_text || post?.content || '').trim();
+    const excerpt = content ? truncate(content, 160) : 'Bir polit paylaşıldı.';
+    const lines = [
+      author ? `${author}` : null,
+      agenda ? `Gündem: ${agenda}` : null,
+      `Polit Puan: ${score}`,
+      '',
+      excerpt,
+      '',
+      `Polithane'de gör: ${postUrl}`,
+    ].filter((x) => x !== null);
+    return lines.join('\n');
+  }, [post?.user?.full_name, post?.agenda_tag, post?.polit_score, post?.content_text, post?.content, postUrl]);
+
+  const encodedShareText = useMemo(() => encodeURIComponent(shareText), [shareText]);
 
   const copyToClipboard = async (text) => {
     const t = String(text || '');
@@ -324,6 +345,15 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           onClick={(e) => {
             e.stopPropagation();
             setShareCopied(false);
+            setShareTextCopied(false);
+            // Track share (best-effort) so the post owner gets a notification.
+            try {
+              if (isAuthenticated && postId) {
+                postsApi.share(postId).catch(() => null);
+              }
+            } catch {
+              // ignore
+            }
             setShareOpen(true);
           }}
           title="Paylaş"
@@ -353,15 +383,15 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
       <Modal isOpen={shareOpen} onClose={() => setShareOpen(false)} title="Paylaş">
         <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
           <div className="text-sm text-gray-700">
-            Bu polit linki:
+            Paylaşım metni:
             <div className="mt-2 p-3 rounded-lg bg-gray-50 border border-gray-200 break-all text-xs text-gray-800">
-              {postUrl}
+              {shareText}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <a
-              href={`https://wa.me/?text=${encodeURIComponent(postUrl)}`}
+              href={`https://wa.me/?text=${encodedShareText}`}
               target="_blank"
               rel="noreferrer"
               className="px-4 py-3 rounded-xl bg-[#25D366] text-white font-black text-center hover:opacity-90"
@@ -370,7 +400,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
               WhatsApp
             </a>
             <a
-              href={`https://t.me/share/url?url=${encodeURIComponent(postUrl)}`}
+              href={`https://t.me/share/url?url=${encodeURIComponent(postUrl)}&text=${encodedShareText}`}
               target="_blank"
               rel="noreferrer"
               className="px-4 py-3 rounded-xl bg-[#229ED9] text-white font-black text-center hover:opacity-90"
@@ -379,7 +409,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
               Telegram
             </a>
             <a
-              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(postUrl)}`}
+              href={`https://twitter.com/intent/tweet?text=${encodedShareText}`}
               target="_blank"
               rel="noreferrer"
               className="px-4 py-3 rounded-xl bg-black text-white font-black text-center hover:bg-gray-900"
@@ -396,6 +426,15 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             >
               Facebook
             </a>
+            <a
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(postUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3 rounded-xl bg-[#0A66C2] text-white font-black text-center hover:opacity-90"
+              onClick={(e) => e.stopPropagation()}
+            >
+              LinkedIn
+            </a>
             <button
               type="button"
               onClick={async (e) => {
@@ -403,9 +442,20 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
                 const ok = await copyToClipboard(postUrl);
                 setShareCopied(ok);
               }}
-              className="col-span-2 px-4 py-3 rounded-xl border border-gray-300 text-gray-900 font-black hover:bg-gray-50"
+              className="px-4 py-3 rounded-xl border border-gray-300 text-gray-900 font-black hover:bg-gray-50"
             >
-              {shareCopied ? 'Kopyalandı' : 'Kopyala'}
+              {shareCopied ? 'Link Kopyalandı' : 'Linki Kopyala'}
+            </button>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                const ok = await copyToClipboard(shareText);
+                setShareTextCopied(ok);
+              }}
+              className="px-4 py-3 rounded-xl border border-gray-300 text-gray-900 font-black hover:bg-gray-50"
+            >
+              {shareTextCopied ? 'Metin Kopyalandı' : 'Metni Kopyala'}
             </button>
           </div>
 

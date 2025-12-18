@@ -834,57 +834,105 @@ export const PostDetailPage = () => {
       {/* Share modal */}
       <Modal isOpen={showShare} onClose={() => setShowShare(false)} title="Paylaş">
         <div className="space-y-4">
-          <div className="text-sm text-gray-700">
-            Bu polit linki:
-            <div className="mt-2 p-3 rounded-lg bg-gray-50 border border-gray-200 break-all text-xs text-gray-800">
-              {postUrl}
-            </div>
-          </div>
+          {(() => {
+            const author = String(uiPost?.user?.full_name || '').trim();
+            const agenda = String(uiPost?.agenda_tag || '').trim();
+            const score = formatPolitScore(uiPost?.polit_score || 0);
+            const content = String(uiPost?.content_text || uiPost?.content || '').trim();
+            const excerpt = content ? (content.length > 160 ? `${content.slice(0, 160)}…` : content) : 'Bir polit paylaşıldı.';
+            const shareText = [
+              author ? `${author}` : null,
+              agenda ? `Gündem: ${agenda}` : null,
+              `Polit Puan: ${score}`,
+              '',
+              excerpt,
+              '',
+              `Polithane'de gör: ${postUrl}`,
+            ].filter((x) => x !== null).join('\n');
+            const encodedShareText = encodeURIComponent(shareText);
 
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(postUrl)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-3 rounded-xl bg-black text-white font-black text-center hover:bg-gray-900"
-            >
-              X
-            </a>
-            <a
-              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-3 rounded-xl bg-[#1877F2] text-white font-black text-center hover:opacity-90"
-            >
-              Facebook
-            </a>
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(postUrl)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-3 rounded-xl bg-[#25D366] text-white font-black text-center hover:opacity-90"
-            >
-              WhatsApp
-            </a>
-            <button
-              type="button"
-              onClick={async () => {
-                // Track share (best-effort) so the post owner gets a notification.
-                try {
-                  if (isAuthenticated && uiPost.post_id) {
-                    await postsApi.share(uiPost.post_id);
-                  }
-                } catch {
-                  // ignore
-                }
-                const ok = await copyToClipboard(postUrl);
-                setShareCopied(ok);
-              }}
-              className="px-4 py-3 rounded-xl border border-gray-300 text-gray-900 font-black hover:bg-gray-50"
-            >
-              {shareCopied ? 'Kopyalandı' : 'Kopyala'}
-            </button>
-          </div>
+            return (
+              <>
+                <div className="text-sm text-gray-700">
+                  Paylaşım metni:
+                  <div className="mt-2 p-3 rounded-lg bg-gray-50 border border-gray-200 break-all text-xs text-gray-800">
+                    {shareText}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={`https://wa.me/?text=${encodedShareText}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-3 rounded-xl bg-[#25D366] text-white font-black text-center hover:opacity-90"
+                  >
+                    WhatsApp
+                  </a>
+                  <a
+                    href={`https://t.me/share/url?url=${encodeURIComponent(postUrl)}&text=${encodedShareText}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-3 rounded-xl bg-[#229ED9] text-white font-black text-center hover:opacity-90"
+                  >
+                    Telegram
+                  </a>
+                  <a
+                    href={`https://twitter.com/intent/tweet?text=${encodedShareText}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-3 rounded-xl bg-black text-white font-black text-center hover:bg-gray-900"
+                  >
+                    X
+                  </a>
+                  <a
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-3 rounded-xl bg-[#1877F2] text-white font-black text-center hover:opacity-90"
+                  >
+                    Facebook
+                  </a>
+                  <a
+                    href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(postUrl)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-3 rounded-xl bg-[#0A66C2] text-white font-black text-center hover:opacity-90"
+                  >
+                    LinkedIn
+                  </a>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      // Track share (best-effort) so the post owner gets a notification.
+                      try {
+                        if (isAuthenticated && uiPost.post_id) {
+                          await postsApi.share(uiPost.post_id);
+                        }
+                      } catch {
+                        // ignore
+                      }
+                      const ok = await copyToClipboard(postUrl);
+                      setShareCopied(ok);
+                    }}
+                    className="px-4 py-3 rounded-xl border border-gray-300 text-gray-900 font-black hover:bg-gray-50"
+                  >
+                    {shareCopied ? 'Link Kopyalandı' : 'Linki Kopyala'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await copyToClipboard(shareText);
+                      setShareCopied(ok);
+                    }}
+                    className="px-4 py-3 rounded-xl border border-gray-300 text-gray-900 font-black hover:bg-gray-50"
+                  >
+                    Metni Kopyala
+                  </button>
+                </div>
+              </>
+            );
+          })()}
 
           <div className="text-xs text-gray-500">
             Instagram web üzerinden direkt paylaşımı desteklemez; linki kopyalayıp Instagram’da paylaşabilirsiniz.
