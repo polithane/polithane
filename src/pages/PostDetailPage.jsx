@@ -75,15 +75,6 @@ export const PostDetailPage = () => {
     load();
   }, [postId]);
 
-  // If user came from a "comment" shortcut, jump to comment box after load.
-  useEffect(() => {
-    if (!isReady) return;
-    const q = new URLSearchParams(location.search || '');
-    if (q.get('comment') !== '1') return;
-    commentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setTimeout(() => commentBoxRef.current?.focus?.(), 250);
-  }, [isReady, location.search]);
-
   // Reset image selection when switching posts
   useEffect(() => {
     setActiveImageIdx(0);
@@ -110,6 +101,15 @@ export const PostDetailPage = () => {
     source_url: safePost.source_url,
     user: safePost.user || null,
   };
+
+  // If user came from a "comment" shortcut, jump to comment box after load.
+  useEffect(() => {
+    if (!isReady) return;
+    const q = new URLSearchParams(location.search || '');
+    if (q.get('comment') !== '1') return;
+    commentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => commentBoxRef.current?.focus?.(), 250);
+  }, [isReady, location.search]);
 
   const isOwnPost = isAuthenticated && currentUser?.id && String(uiPost.user_id) === String(currentUser.id);
 
