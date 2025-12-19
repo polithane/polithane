@@ -8,10 +8,10 @@
  * - Seeds a professional permission model (roles + permissions)
  * - Creates initial admin user:
  *     username: yusuf
- *     password: 21314151
+ *     password: (from env INITIAL_ADMIN_PASSWORD)
  *
  * Run:
- *   node server/scripts/setup-admin-rbac-and-initial-admin.js
+ *   INITIAL_ADMIN_PASSWORD="..." node server/scripts/setup-admin-rbac-and-initial-admin.js
  */
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
@@ -224,7 +224,10 @@ async function main() {
     // create initial admin user (yusuf)
     const username = 'yusuf';
     const email = 'yusuf@polithane.local';
-    const password = '21314151';
+    const password = String(process.env.INITIAL_ADMIN_PASSWORD || '').trim();
+    if (!password || password.length < 10) {
+      throw new Error('INITIAL_ADMIN_PASSWORD is required and should be at least 10 characters.');
+    }
     const fullName = 'Yusuf (Admin)';
 
     const existing = await client.query(`select id from public.users where username=$1 limit 1`, [username]);
@@ -255,7 +258,7 @@ async function main() {
 
     await client.query('commit');
     console.log('✅ RBAC + security settings ready');
-    console.log('✅ Initial admin ensured:', { username: 'yusuf', password: '21314151' });
+    console.log('✅ Initial admin ensured:', { username: 'yusuf' });
   } catch (e) {
     await client.query('rollback');
     throw e;
