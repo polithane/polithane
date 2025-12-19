@@ -158,6 +158,7 @@ export const HomePage = () => {
       if (!need) continue;
       list
         .filter((p) => (p.content_type || 'text') === t && !used.has(p.post_id))
+        .sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0)))
         .slice(0, need)
         .forEach((p) => {
           used.add(p.post_id);
@@ -167,6 +168,7 @@ export const HomePage = () => {
     if (selected.length < 10) {
       list
         .filter((p) => !used.has(p.post_id))
+        .sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0)))
         .slice(0, 10 - selected.length)
         .forEach((p) => {
           used.add(p.post_id);
@@ -176,10 +178,14 @@ export const HomePage = () => {
     return selected;
   };
 
-  const mpPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'mp'));
-  const organizationPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_official'));
-  const citizenPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_member' || p.user?.user_type === 'citizen'));
-  const mediaPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'media'));
+  const mpPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'mp').sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0))));
+  const organizationPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_official').sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0))));
+  const citizenPosts = pickFixedMix(
+    posts
+      .filter((p) => p.user?.user_type === 'party_member' || p.user?.user_type === 'citizen')
+      .sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0)))
+  );
+  const mediaPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'media').sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0))));
   const featuredPosts = posts.length > 0 
     ? posts.filter(p => p.is_featured).sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0)).slice(0, 5) 
     : [];
