@@ -320,7 +320,7 @@ async function notifyAdminsAboutComment({ type, commentId, postId, actorId, titl
     comment_id: commentId || null,
     is_read: false,
   }));
-  await supabaseRestInsert('notifications', rows).catch(() => null);
+  await supabaseInsertNotifications(rows).catch(() => null);
 }
 
 async function addPostComment(req, res, postId) {
@@ -365,7 +365,7 @@ async function addPostComment(req, res, postId) {
       const postRows = await supabaseRestGet('posts', { select: 'id,user_id', id: `eq.${postId}`, limit: '1' }).catch(() => []);
       const ownerId = postRows?.[0]?.user_id ?? null;
       if (ownerId && String(ownerId) !== String(auth.id)) {
-        await supabaseRestInsert('notifications', [
+        await supabaseInsertNotifications([
           {
             user_id: ownerId,
             actor_id: auth.id,
@@ -513,7 +513,7 @@ async function trackPostShare(req, res, postId) {
       // notify owner
       const ownerId = p.user_id || null;
       if (ownerId && String(ownerId) !== String(auth.id)) {
-        await supabaseRestInsert('notifications', [
+        await supabaseInsertNotifications([
           {
             user_id: ownerId,
             actor_id: auth.id,
@@ -611,7 +611,7 @@ async function togglePostLike(req, res, postId) {
       const postRows = await supabaseRestGet('posts', { select: 'id,user_id', id: `eq.${postId}`, limit: '1' }).catch(() => []);
       const ownerId = postRows?.[0]?.user_id ?? null;
       if (ownerId && String(ownerId) !== String(userId)) {
-        await supabaseRestInsert('notifications', [
+        await supabaseInsertNotifications([
           {
             user_id: ownerId,
             actor_id: userId,
