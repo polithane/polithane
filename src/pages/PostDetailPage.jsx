@@ -102,6 +102,20 @@ export const PostDetailPage = () => {
     user: safePost.user || null,
   };
 
+  const agendaSlug = useMemo(() => {
+    if (!uiPost.agenda_tag) return '';
+    return String(uiPost.agenda_tag)
+      .toLowerCase()
+      .replace(/ç/g, 'c')
+      .replace(/ğ/g, 'g')
+      .replace(/ı/g, 'i')
+      .replace(/ö/g, 'o')
+      .replace(/ş/g, 's')
+      .replace(/ü/g, 'u')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }, [uiPost.agenda_tag]);
+
   // If user came from a "comment" shortcut, jump to comment box after load.
   useEffect(() => {
     if (!isReady) return;
@@ -411,9 +425,17 @@ export const PostDetailPage = () => {
             
             {/* Gündem */}
             {uiPost.agenda_tag && (
-              <Badge variant="primary" className="mb-4">
-                {uiPost.agenda_tag}
-              </Badge>
+              <button
+                type="button"
+                className="mb-4 inline-block"
+                onClick={() => {
+                  if (!agendaSlug) return;
+                  navigate(`/agenda/${agendaSlug}`);
+                }}
+                title="Gündem sayfasına git"
+              >
+                <Badge variant="primary">{uiPost.agenda_tag}</Badge>
+              </button>
             )}
 
             {/* Kaynak / Otomatik paylaşım şeffaflık satırı */}
