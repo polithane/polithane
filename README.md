@@ -30,7 +30,7 @@ npm run preview
 
 - **DB/Auth/Storage/Realtime**: Supabase
 - **Web hosting**: Vercel
-- **Harici e-posta**: SendGrid (şimdilik)
+- **Harici e-posta**: SMTP (mail.polithane.com)
 - **Kural**: Bu karar sabittir; projeye başka bir veritabanı/hosting sağlayıcısı eklenmez ve migrasyon önerilmez.
 
 ## 📦 Teknolojiler

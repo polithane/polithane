@@ -15,9 +15,11 @@ export const SiteSettings = () => {
     allowMessages: true,
     // Email ayarları
     email_verification_enabled: 'true',
-    email_service_provider: 'gmail',
+    email_service_provider: 'smtp',
     email_from_address: 'noreply@polithane.com',
     email_from_name: 'Polithane',
+    email_smtp_host: 'mail.polithane.com',
+    email_smtp_port: '587',
     email_smtp_user: '',
     email_smtp_password: '',
     socialLinks: {
@@ -76,6 +78,8 @@ export const SiteSettings = () => {
           email_service_provider: settings.email_service_provider,
           email_from_address: settings.email_from_address,
           email_from_name: settings.email_from_name,
+              email_smtp_host: settings.email_smtp_host,
+              email_smtp_port: settings.email_smtp_port,
           email_smtp_user: settings.email_smtp_user,
           email_smtp_password: settings.email_smtp_password,
         })
@@ -158,52 +162,56 @@ export const SiteSettings = () => {
                     onChange={(e) => handleChange('email_service_provider', e.target.value)}
                     className="w-full px-4 py-2 border rounded-lg"
                   >
-                    <option value="gmail">Gmail</option>
-                    <option value="sendgrid">SendGrid</option>
-                    <option value="aws-ses">AWS SES</option>
+                    <option value="smtp">SMTP (mail.polithane.com)</option>
                   </select>
                 </div>
 
-                {/* Gmail ayarları */}
-                {settings.email_service_provider === 'gmail' && (
+                {/* SMTP ayarları */}
+                {settings.email_service_provider === 'smtp' && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium mb-2">Gmail Adresi</label>
+                      <label className="block text-sm font-medium mb-2">SMTP Sunucu</label>
+                      <input
+                        type="text"
+                        value={settings.email_smtp_host}
+                        onChange={(e) => handleChange('email_smtp_host', e.target.value)}
+                        className="w-full px-4 py-2 border rounded-lg"
+                        placeholder="mail.polithane.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">SMTP Port</label>
+                      <input
+                        type="text"
+                        value={settings.email_smtp_port}
+                        onChange={(e) => handleChange('email_smtp_port', e.target.value)}
+                        className="w-full px-4 py-2 border rounded-lg"
+                        placeholder="587"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Önerilen: 587 (STARTTLS)</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">SMTP Kullanıcı</label>
                       <input
                         type="email"
                         value={settings.email_smtp_user}
                         onChange={(e) => handleChange('email_smtp_user', e.target.value)}
                         className="w-full px-4 py-2 border rounded-lg"
-                        placeholder="sizin-gmail@gmail.com"
+                        placeholder="bilgi@polithane.com"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2">Gmail App Password</label>
+                      <label className="block text-sm font-medium mb-2">SMTP Şifre</label>
                       <input
                         type="password"
                         value={settings.email_smtp_password}
                         onChange={(e) => handleChange('email_smtp_password', e.target.value)}
                         className="w-full px-4 py-2 border rounded-lg"
-                        placeholder="abcd efgh ijkl mnop"
+                        placeholder="••••••••"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
-                        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:underline">
-                          Gmail App Password oluşturmak için tıklayın
-                        </a>
-                      </p>
-                    </div>
-
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <p className="text-sm font-semibold text-yellow-800 mb-2">📝 Gmail App Password Nasıl Oluşturulur?</p>
-                      <ol className="text-xs text-yellow-700 space-y-1 ml-4 list-decimal">
-                        <li>Google hesabınıza gidin</li>
-                        <li>Security → 2-Step Verification (Aktif edin)</li>
-                        <li>Security → App passwords</li>
-                        <li>"Select app" → "Mail" seçin</li>
-                        <li>"Select device" → "Other" → "Polithane" yazın</li>
-                        <li>Generate → 16 haneli şifreyi yukarıya yapıştırın</li>
-                      </ol>
                     </div>
                   </>
                 )}

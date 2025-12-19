@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
 
 // Vercel Monolith API - Last Updated: Now
 // --- CONFIG & HELPERS ---
@@ -15,7 +16,10 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, apikey, authorization');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, apikey, authorization, x-admin-bootstrap-token'
+  );
 }
 
 function signJwt(payload) {
@@ -1435,33 +1439,43 @@ function sha256Hex(input) {
   return crypto.createHash('sha256').update(String(input)).digest('hex');
 }
 
-async function sendSendGridEmail({ to, subject, html, text }) {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const from = process.env.SENDGRID_FROM;
-  if (!apiKey || !from) {
-    throw new Error('Email is not configured (SENDGRID_API_KEY / SENDGRID_FROM missing).');
+let _smtpTransporter = null;
+function getSmtpTransporter() {
+  if (_smtpTransporter) return _smtpTransporter;
+  const host = String(process.env.SMTP_HOST || 'mail.polithane.com').trim();
+  const port = parseInt(String(process.env.SMTP_PORT || '587'), 10) || 587;
+  const user = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '').trim();
+  const secure = port === 465;
+
+  if (!host || !user || !pass) {
+    throw new Error('SMTP is not configured (SMTP_HOST/SMTP_USER/SMTP_PASS missing).');
   }
-  const payload = {
-    personalizations: [{ to: [{ email: to }] }],
-    from: { email: from, name: 'Polithane' },
-    subject,
-    content: [
-      { type: 'text/plain', value: text || '' },
-      { type: 'text/html', value: html || '' },
-    ],
-  };
-  const r = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
+
+  _smtpTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    requireTLS: !secure,
+    // In some hosting environments, STARTTLS negotiation is picky; keep defaults but set servername.
+    tls: { servername: host },
   });
-  if (!r.ok) {
-    const t = await r.text().catch(() => '');
-    throw new Error(`SendGrid Error: ${t}`);
-  }
+  return _smtpTransporter;
+}
+
+async function sendEmail({ to, subject, html, text }) {
+  const transporter = getSmtpTransporter();
+  const fromEmail = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim();
+  if (!fromEmail) throw new Error('SMTP_FROM (or EMAIL_FROM) is missing.');
+  const mail = {
+    from: `Polithane <${fromEmail}>`,
+    to: String(to || '').trim(),
+    subject: String(subject || '').trim(),
+    text: text ? String(text) : undefined,
+    html: html ? String(html) : undefined,
+  };
+  await transporter.sendMail(mail);
 }
 
 async function safeUserPatch(userId, patch) {
@@ -1732,7 +1746,7 @@ async function usersRequestDeleteMe(req, res) {
     </div>
   `;
 
-  await sendSendGridEmail({ to: me.email, subject, html, text });
+  await sendEmail({ to: me.email, subject, html, text });
 
   res.json({ success: true, message: 'Onay e-postası gönderildi. Lütfen e-postanızı kontrol edin.' });
 }
@@ -2685,8 +2699,139 @@ async function authForgotPassword(req, res) {
     const rl = rateLimit(`forgot:${ip}`, { windowMs: 60_000, max: 3 });
     if (!rl.ok) return res.status(429).json({ success: false, error: 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyin.' });
 
+    const body = await readJsonBody(req);
+    const emailRaw = String(body?.email || '').trim();
     // Keep response generic to prevent user enumeration.
-    res.json({ success: true, message: 'Eğer bu e-posta kayıtlıysa, sıfırlama bağlantısı gönderilecektir.' });
+    const okResponse = () =>
+      res.json({ success: true, message: 'Eğer bu e-posta kayıtlıysa, sıfırlama bağlantısı gönderilecektir.' });
+    if (!emailRaw) return okResponse();
+
+    try {
+      const email = emailRaw.toLowerCase();
+      const rows = await supabaseRestGet('users', { select: 'id,email,metadata', email: `eq.${email}`, limit: '1' }).catch(() => []);
+      const u = rows?.[0] || null;
+      if (!u?.id || !u?.email) return okResponse();
+
+      // eslint-disable-next-line global-require
+      const crypto = require('crypto');
+      const token = crypto.randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
+      const expiresIso = expiresAt.toISOString();
+
+      // Try DB columns first (if present), else fallback to users.metadata.
+      let stored = false;
+      try {
+        await supabaseRestPatch(
+          'users',
+          { id: `eq.${u.id}` },
+          { password_reset_token: token, password_reset_expires: expiresIso }
+        );
+        stored = true;
+      } catch (e) {
+        const msg = String(e?.message || '');
+        // Fallback to metadata if columns don't exist.
+        if (msg.toLowerCase().includes('password_reset')) {
+          const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+          const nextMeta = {
+            ...meta,
+            password_reset_token_hash: sha256Hex(token),
+            password_reset_expires_at: expiresIso,
+          };
+          await safeUserPatch(u.id, { metadata: nextMeta }).catch(() => null);
+          stored = true;
+        }
+      }
+
+      if (stored) {
+        const appUrl = getPublicAppUrl(req);
+        const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
+        const subject = 'Polithane – Şifre sıfırlama';
+        const text =
+          `Merhaba,\n\n` +
+          `Polithane hesabınız için şifre sıfırlama talebi aldık.\n\n` +
+          `Şifrenizi sıfırlamak için 1 saat içinde şu bağlantıya tıklayın:\n${resetUrl}\n\n` +
+          `Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n`;
+        const html = `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+            <h2>Şifre sıfırlama</h2>
+            <p>Polithane hesabınız için <strong>şifre sıfırlama</strong> talebi aldık.</p>
+            <p>Şifrenizi sıfırlamak için <strong>1 saat</strong> içinde aşağıdaki butona tıklayın:</p>
+            <p>
+              <a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#009fd6;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
+                Şifremi sıfırla
+              </a>
+            </p>
+            <p style="font-size:12px;color:#6b7280;">Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>
+          </div>
+        `;
+        await sendEmail({ to: u.email, subject, html, text }).catch(() => null);
+      }
+    } catch {
+      // best-effort only
+    }
+
+    return okResponse();
+}
+
+async function authResetPassword(req, res) {
+  const body = await readJsonBody(req);
+  const token = String(body?.token || '').trim();
+  const newPassword = String(body?.newPassword || '').trim();
+  if (!token || !newPassword) return res.status(400).json({ success: false, error: 'Eksik bilgi.' });
+
+  // Password rules aligned with other flows
+  if (newPassword.length < 8) return res.status(400).json({ success: false, error: 'Yeni şifre en az 8 karakter olmalı.' });
+  if (newPassword.length > 50) return res.status(400).json({ success: false, error: 'Yeni şifre en fazla 50 karakter olabilir.' });
+  if (!/[a-zA-Z]/.test(newPassword)) return res.status(400).json({ success: false, error: 'Yeni şifre en az 1 harf içermeli.' });
+  if (!/[0-9]/.test(newPassword)) return res.status(400).json({ success: false, error: 'Yeni şifre en az 1 rakam içermeli.' });
+
+  const password_hash = await bcrypt.hash(newPassword, 10);
+
+  // Try schema with password_reset_token/password_reset_expires columns.
+  try {
+    const rows = await supabaseRestGet('users', {
+      select: 'id,password_reset_expires',
+      password_reset_token: `eq.${token}`,
+      limit: '1',
+    });
+    const u = rows?.[0] || null;
+    if (u?.id) {
+      const exp = u.password_reset_expires ? new Date(u.password_reset_expires) : null;
+      if (exp && Number.isFinite(exp.getTime()) && exp.getTime() < Date.now()) {
+        return res.status(400).json({ success: false, error: 'Geçersiz veya süresi dolmuş link.' });
+      }
+      await supabaseRestPatch(
+        'users',
+        { id: `eq.${u.id}` },
+        { password_hash, password_reset_token: null, password_reset_expires: null }
+      );
+      return res.json({ success: true, message: 'Şifreniz sıfırlandı.' });
+    }
+  } catch (e) {
+    // fall through to metadata-based reset
+  }
+
+  // Metadata fallback: users.metadata.password_reset_token_hash + password_reset_expires_at
+  const tokenHash = sha256Hex(token);
+  const rows = await supabaseRestGet('users', {
+    select: 'id,metadata',
+    'metadata->>password_reset_token_hash': `eq.${tokenHash}`,
+    limit: '1',
+  }).catch(() => []);
+  const u = rows?.[0] || null;
+  if (!u?.id) return res.status(400).json({ success: false, error: 'Geçersiz veya süresi dolmuş link.' });
+
+  const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+  const exp = meta.password_reset_expires_at ? new Date(meta.password_reset_expires_at) : null;
+  if (!exp || !Number.isFinite(exp.getTime()) || exp.getTime() < Date.now()) {
+    return res.status(400).json({ success: false, error: 'Geçersiz veya süresi dolmuş link.' });
+  }
+  const nextMeta = { ...meta, password_reset_token_hash: null, password_reset_expires_at: null };
+  const updated = await safeUserPatch(u.id, { password_hash, metadata: nextMeta }).catch(() => []);
+  if (!updated || updated.length === 0) {
+    return res.status(500).json({ success: false, error: 'Şifre sıfırlanamadı (veritabanı şeması uyumsuz olabilir).' });
+  }
+  return res.json({ success: true, message: 'Şifreniz sıfırlandı.' });
 }
 
 async function authRegister(req, res) {
@@ -3390,6 +3535,7 @@ export default async function handler(req, res) {
       if (url === '/api/auth/login' && req.method === 'POST') return await authLogin(req, res);
       if (url === '/api/auth/register' && req.method === 'POST') return await authRegister(req, res);
       if (url === '/api/auth/forgot-password' && req.method === 'POST') return await authForgotPassword(req, res);
+      if (url === '/api/auth/reset-password' && req.method === 'POST') return await authResetPassword(req, res);
       if (url === '/api/auth/me' && req.method === 'GET') return await authMe(req, res);
       if (url === '/api/auth/change-password' && req.method === 'POST') return await authChangePassword(req, res);
       if (url === '/api/auth/logout') return res.json({ success: true });

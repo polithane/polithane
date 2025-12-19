@@ -140,7 +140,7 @@ Admin panel Polithane’nin üretim gücüdür. Minimum modüller:
 - **Mesajlaşma yönetimi**: abuse raporları, içerik inceleme (gerekli yasal sınırlar içinde)
 - **İstatistik/Analitik**: DAU/MAU, içerik üretimi, etkileşim, trend gündemler
 - **Reklam alanları**: yerleşimler, kampanyalar, sponsorlu içerik yönetimi
-- **Pazarlama**: duyurular, e-posta kampanyaları (şimdilik SendGrid)
+- **Pazarlama**: duyurular, e-posta kampanyaları (SMTP)
 - **Sistem sağlığı**: hata oranı, performans, log/audit, storage tüketimi
 
 ---
@@ -150,7 +150,7 @@ Admin panel Polithane’nin üretim gücüdür. Minimum modüller:
 ### 7.1 Bugünkü kesin karar (SCOPE-INFRA-01)
 - **DB/Auth/Storage/Realtime**: Supabase
 - **Web hosting**: Vercel
-- **Harici e-posta**: SendGrid (şimdilik)
+- **Harici e-posta**: SMTP (mail.polithane.com)
 - Başka bir veritabanı/hosting sağlayıcısı **kullanılmıyor** ve bu karar **sabit** (migrasyon önerme/ekleme).
 
 ### 7.2 Repodaki bazı dokümanlar

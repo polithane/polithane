@@ -1,27 +1,27 @@
 import nodemailer from 'nodemailer';
-import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 import { verificationEmailTemplate, welcomeEmailTemplate, passwordResetEmailTemplate } from './emailTemplates.js';
 
-// Initialize SendGrid
-if (process.env.EMAIL_SERVICE === 'sendgrid' && process.env.EMAIL_PASSWORD) {
-  sgMail.setApiKey(process.env.EMAIL_PASSWORD);
-}
-
-// Create email transporter (SMTP fallback)
+// Create SMTP transporter (Polithane mail server)
 const createTransporter = () => {
-  // Gmail SMTP (bazı hosting sağlayıcılarında SMTP portları bloklanabilir)
+  const host = process.env.SMTP_HOST || 'mail.polithane.com';
+  const port = parseInt(process.env.SMTP_PORT || '587', 10) || 587;
+  const secure = port === 465;
+  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASSWORD;
+  if (!user || !pass) {
+    throw new Error('SMTP_USER/SMTP_PASS eksik. Lütfen .env dosyanızı kontrol edin.');
+  }
   return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465, // SSL port
-    secure: true, // SSL kullan
-    auth: {
-      user: process.env.EMAIL_USER || 'polithanecom@gmail.com',
-      pass: process.env.EMAIL_PASSWORD
-    },
-    connectionTimeout: 10000, // 10 saniye timeout
+    host,
+    port,
+    secure,
+    requireTLS: !secure,
+    auth: { user, pass },
+    connectionTimeout: 10000,
     greetingTimeout: 5000,
-    socketTimeout: 10000
+    socketTimeout: 10000,
+    tls: { servername: host },
   });
 };
 
@@ -33,30 +33,10 @@ export const generateVerificationToken = () => {
 // Send verification email
 export const sendVerificationEmail = async (email, token) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
-  
-  // SendGrid Web API
-  if (process.env.EMAIL_SERVICE === 'sendgrid') {
-    try {
-      await sgMail.send({
-        to: email,
-        from: {
-          email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
-          name: 'Polithane. Özgür, açık, şeffaf siyaset, bağımsız medya!'
-        },
-        subject: '✅ Email Doğrulama - Polithane.',
-        html: verificationEmailTemplate(email, token, frontendUrl)
-      });
-      return { success: true };
-    } catch (error) {
-      console.error('SendGrid email hatası:', error);
-      return { success: false, error: error.message };
-    }
-  }
-  
-  // Gmail SMTP (fallback)
+
   const transporter = createTransporter();
   const mailOptions = {
-    from: process.env.EMAIL_FROM || 'Polithane <polithanecom@gmail.com>',
+    from: process.env.EMAIL_FROM || `Polithane <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
     to: email,
     subject: '✅ Email Doğrulama - Polithane',
     html: verificationEmailTemplate(email, token, frontendUrl)
@@ -74,30 +54,10 @@ export const sendVerificationEmail = async (email, token) => {
 // Send welcome email
 export const sendWelcomeEmail = async (email, fullName) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
-  
-  // SendGrid Web API
-  if (process.env.EMAIL_SERVICE === 'sendgrid') {
-    try {
-      await sgMail.send({
-        to: email,
-        from: {
-          email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
-          name: 'Polithane. Özgür, açık, şeffaf siyaset, bağımsız medya!'
-        },
-        subject: '🎉 Hoş Geldiniz - Polithane.',
-        html: welcomeEmailTemplate(fullName, email, frontendUrl)
-      });
-      return { success: true };
-    } catch (error) {
-      console.error('SendGrid email hatası:', error);
-      return { success: false, error: error.message };
-    }
-  }
-  
-  // Gmail SMTP (fallback)
+
   const transporter = createTransporter();
   const mailOptions = {
-    from: process.env.EMAIL_FROM || 'Polithane <polithanecom@gmail.com>',
+    from: process.env.EMAIL_FROM || `Polithane <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
     to: email,
     subject: '🎉 Hoş Geldiniz - Polithane',
     html: welcomeEmailTemplate(fullName, email, frontendUrl)
@@ -115,30 +75,10 @@ export const sendWelcomeEmail = async (email, fullName) => {
 // Send password reset email
 export const sendPasswordResetEmail = async (email, resetToken) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
-  
-  // SendGrid Web API (SMTP portları bloklu ortamlarda Web API kullanılır)
-  if (process.env.EMAIL_SERVICE === 'sendgrid') {
-    try {
-      await sgMail.send({
-        to: email,
-        from: {
-          email: process.env.EMAIL_FROM || 'polithanecom@gmail.com',
-          name: 'Polithane. Özgür, açık, şeffaf siyaset, bağımsız medya!'
-        },
-        subject: '🔐 Şifre Sıfırlama - Polithane.',
-        html: passwordResetEmailTemplate(email, resetToken, frontendUrl)
-      });
-      return { success: true };
-    } catch (error) {
-      console.error('SendGrid email hatası:', error.response?.body || error);
-      return { success: false, error: error.message };
-    }
-  }
-  
-  // Gmail SMTP (fallback)
+
   const transporter = createTransporter();
   const mailOptions = {
-    from: process.env.EMAIL_FROM || 'Polithane <polithanecom@gmail.com>',
+    from: process.env.EMAIL_FROM || `Polithane <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
     to: email,
     subject: '🔐 Şifre Sıfırlama - Polithane',
     html: passwordResetEmailTemplate(email, resetToken, frontendUrl)
