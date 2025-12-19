@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { HeroSlider } from '../components/home/HeroSlider';
 import { ParliamentBar } from '../components/home/ParliamentBar';
 import { StoriesBar } from '../components/home/StoriesBar';
@@ -322,9 +323,9 @@ export const HomePage = () => {
                     <h2 className="text-xl font-bold text-gray-900">HİT PAYLAŞIMLAR</h2>
                     <span className="text-sm text-gray-500 font-medium">Tüm Kategorilerden</span>
                   </div>
-                  <a href="/category/all" className="text-primary-blue hover:underline text-sm">
+                  <Link to="/category/all" className="text-primary-blue hover:underline text-sm">
                     Tümünü Gör
-                  </a>
+                  </Link>
                 </div>
                 <HorizontalScroll 
                   autoScroll={true} 
@@ -346,9 +347,9 @@ export const HomePage = () => {
               <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(0, 159, 214, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">VEKİLLER GÜNDEMİ</h2>
-                <a href="/category/mps" className="text-primary-blue hover:underline text-sm">
+                <Link to="/category/mps" className="text-primary-blue hover:underline text-sm">
                   Tümünü Gör
-                </a>
+                </Link>
               </div>
               <HorizontalScroll 
                 autoScroll={true} 
@@ -370,9 +371,9 @@ export const HomePage = () => {
             <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(135, 180, 51, 0.08)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">TEŞKİLAT GÜNDEMİ</h2>
-                <a href="/category/organization" className="text-primary-blue hover:underline text-sm">
+                <Link to="/category/organization" className="text-primary-blue hover:underline text-sm">
                   Tümünü Gör
-                </a>
+                </Link>
               </div>
               <HorizontalScroll 
                 autoScroll={true} 
@@ -393,9 +394,9 @@ export const HomePage = () => {
             <section className="min-w-0 rounded-lg p-4" style={{ backgroundColor: 'rgba(229, 229, 229, 0.5)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">VATANDAŞ GÜNDEMİ</h2>
-                <a href="/category/citizens" className="text-primary-blue hover:underline text-sm">
+                <Link to="/category/citizens" className="text-primary-blue hover:underline text-sm">
                   Tümünü Gör
-                </a>
+                </Link>
               </div>
               <HorizontalScroll 
                 autoScroll={true} 
