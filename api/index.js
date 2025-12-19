@@ -264,7 +264,14 @@ async function getPostById(req, res, id) {
     try {
       const cur = Number(post?.view_count || 0);
       const next = cur + 1;
-      supabaseRestPatch('posts', { id: `eq.${id}` }, { view_count: next }).catch(() => null);
+      // If update succeeds, prefer returning the updated value so UI reflects it immediately.
+      const updated = await supabaseRestPatch('posts', { id: `eq.${id}` }, { view_count: next }).catch(() => null);
+      if (Array.isArray(updated) && updated[0] && updated[0].view_count !== undefined) {
+        post.view_count = updated[0].view_count;
+      } else {
+        // If Supabase doesn't return representation (or schema differs), at least reflect the expected next count.
+        post.view_count = next;
+      }
     } catch {
       // ignore
     }
