@@ -180,6 +180,27 @@ async function supabaseRestDelete(path, params) {
   return await supabaseRestRequest('DELETE', path, params, undefined);
 }
 
+// Notifications table schema differs between environments (some don't have title/message).
+// This helper tries inserting as-is, then falls back to minimal columns if needed.
+async function supabaseInsertNotifications(rows) {
+  try {
+    return await supabaseRestInsert('notifications', rows);
+  } catch (e) {
+    const msg = String(e?.message || '');
+    const lower = msg.toLowerCase();
+    if (lower.includes('title') || lower.includes('message')) {
+      const stripped = (rows || []).map((r) => {
+        if (!r || typeof r !== 'object') return r;
+        // eslint-disable-next-line no-unused-vars
+        const { title, message, ...rest } = r;
+        return rest;
+      });
+      return await supabaseRestInsert('notifications', stripped);
+    }
+    throw e;
+  }
+}
+
 // --- CONTROLLERS ---
 
 async function getPosts(req, res) {
@@ -1058,7 +1079,7 @@ async function toggleFollow(req, res, targetId) {
   await supabaseRestInsert('follows', [{ follower_id: auth.id, following_id: tid }]);
 
   // Notify target user
-  await supabaseRestInsert('notifications', [
+  await supabaseInsertNotifications([
     {
       user_id: tid,
       actor_id: auth.id,
@@ -3187,7 +3208,7 @@ async function adminSendNotification(req, res) {
   const chunkSize = 500;
   for (let i = 0; i < rows.length; i += chunkSize) {
     // eslint-disable-next-line no-await-in-loop
-    await supabaseRestInsert('notifications', rows.slice(i, i + chunkSize));
+    await supabaseInsertNotifications(rows.slice(i, i + chunkSize));
   }
   res.json({ success: true, sent: targets.length });
 }
