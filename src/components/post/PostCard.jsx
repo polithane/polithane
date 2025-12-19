@@ -305,7 +305,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
         <div className="flex items-center gap-6">
           <button
             type="button"
-            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue"
+            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-sm"
             onClick={(e) => {
               e.stopPropagation();
               if (!postId) return;
@@ -313,21 +313,21 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             }}
             title="Detayı aç"
           >
-            <Eye className="w-4 h-4" />
+            <Eye className="w-5 h-5 sm:w-4 sm:h-4" />
             <span className="text-sm">{formatNumber(post.view_count)}</span>
           </button>
           <button
             type="button"
-            className={`flex items-center gap-1 ${isLiked ? 'text-red-600' : 'text-gray-600 hover:text-red-500'}`}
+            className={`flex items-center gap-1 text-sm ${isLiked ? 'text-red-600' : 'text-gray-600 hover:text-red-500'}`}
             onClick={handleToggleLike}
             title={isLiked ? 'Beğeniyi geri al' : 'Beğen'}
           >
-            <Heart className="w-4 h-4" fill={isLiked ? 'currentColor' : 'none'} />
+            <Heart className="w-5 h-5 sm:w-4 sm:h-4" fill={isLiked ? 'currentColor' : 'none'} />
             <span className="text-sm">{formatNumber(likeCount)}</span>
           </button>
           <button
             type="button"
-            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue"
+            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-sm"
             onClick={(e) => {
               e.stopPropagation();
               if (!postId) return;
@@ -335,7 +335,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             }}
             title="Yorum yap"
           >
-            <MessageCircle className="w-4 h-4" />
+            <MessageCircle className="w-5 h-5 sm:w-4 sm:h-4" />
             <span className="text-sm">{formatNumber(post.comment_count)}</span>
           </button>
         </div>
@@ -358,7 +358,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           }}
           title="Paylaş"
         >
-          <Share2 className="w-4 h-4" />
+          <Share2 className="w-5 h-5 sm:w-4 sm:h-4" />
         </button>
       </div>
 

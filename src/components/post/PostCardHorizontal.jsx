@@ -504,7 +504,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-xs"
+            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-sm sm:text-xs"
             onClick={(e) => {
               e.stopPropagation();
               if (!postId) return;
@@ -513,21 +513,21 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             }}
             title="Detayı aç"
           >
-            <Eye className="w-3 h-3" />
+            <Eye className="w-5 h-5 sm:w-4 sm:h-4" />
             <span>{formatNumber(post.view_count)}</span>
           </button>
           <button
             type="button"
-            className={`flex items-center gap-1 text-xs ${isLiked ? 'text-red-600' : 'text-gray-600 hover:text-red-500'}`}
+            className={`flex items-center gap-1 text-sm sm:text-xs ${isLiked ? 'text-red-600' : 'text-gray-600 hover:text-red-500'}`}
             onClick={handleToggleLike}
             title={isLiked ? 'Beğeniyi geri al' : 'Beğen'}
           >
-            <Heart className="w-3 h-3" fill={isLiked ? 'currentColor' : 'none'} />
+            <Heart className="w-5 h-5 sm:w-4 sm:h-4" fill={isLiked ? 'currentColor' : 'none'} />
             <span>{formatNumber(likeCount)}</span>
           </button>
           <button
             type="button"
-            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-xs"
+            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-sm sm:text-xs"
             onClick={(e) => {
               e.stopPropagation();
               if (!postId) return;
@@ -535,7 +535,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             }}
             title="Yorum yap"
           >
-            <MessageCircle className="w-3 h-3" />
+            <MessageCircle className="w-5 h-5 sm:w-4 sm:h-4" />
             <span>{formatNumber(post.comment_count)}</span>
           </button>
         </div>
@@ -558,7 +558,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
           }}
           title="Paylaş"
         >
-          <Share2 className="w-3 h-3" />
+          <Share2 className="w-5 h-5 sm:w-4 sm:h-4" />
         </button>
       </div>
 
