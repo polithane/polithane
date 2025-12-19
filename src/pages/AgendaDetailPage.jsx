@@ -139,7 +139,7 @@ export const AgendaDetailPage = () => {
 
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/gundem-disi')}
               className="md:col-span-1 w-full h-full min-h-[52px] rounded-2xl bg-gray-900 hover:bg-black text-white font-black px-4 py-3 transition-colors"
               title="Gündem dışı tüm politlere git"
             >

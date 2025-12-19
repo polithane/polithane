@@ -204,7 +204,7 @@ async function supabaseInsertNotifications(rows) {
 // --- CONTROLLERS ---
 
 async function getPosts(req, res) {
-    const { limit = '50', offset = '0', party_id, user_id, user_ids, category, order = 'created_at.desc' } = req.query;
+    const { limit = '50', offset = '0', party_id, user_id, user_ids, category, agenda_tag, order = 'created_at.desc' } = req.query;
     const auth = verifyJwtFromRequest(req);
     const params = {
         // Keep selects schema-agnostic: embed with *
@@ -217,6 +217,19 @@ async function getPosts(req, res) {
     if (party_id) params.party_id = `eq.${party_id}`;
     if (user_id) params.user_id = `eq.${user_id}`;
     if (category) params.category = `eq.${category}`;
+    if (agenda_tag !== undefined) {
+      const raw = String(agenda_tag || '').trim();
+      // Support special values for agenda filtering:
+      // - "__null__" / "null" / "none": agenda_tag IS NULL (gündem dışı)
+      // - otherwise: exact match
+      if (!raw || raw === '__null__' || raw === 'null' || raw === 'none') {
+        params.agenda_tag = 'is.null';
+      } else if (raw === '__notnull__') {
+        params.agenda_tag = 'not.is.null';
+      } else {
+        params.agenda_tag = `eq.${raw}`;
+      }
+    }
     if (user_ids) {
         const raw = String(user_ids);
         const list = raw

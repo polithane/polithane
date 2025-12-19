@@ -18,6 +18,8 @@ import { CreatePolitPage } from './pages/CreatePolitPage';
 import { TestPage } from './pages/TestPage';
 import { PoliFestPage } from './pages/PoliFestPage';
 import { PoliFestViewerPage } from './pages/PoliFestViewerPage';
+import { CategoryFeedPage } from './pages/CategoryFeedPage';
+import { NoAgendaFeedPage } from './pages/NoAgendaFeedPage';
 
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
@@ -80,6 +82,8 @@ function App() {
         <Route path="/:username" element={<><Header /><ProfilePage /><Footer /><FloatingChat /></>} />
         <Route path="/party/:partyId" element={<><Header /><PartyDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/agenda/:agendaSlug" element={<><Header /><AgendaDetailPage /><Footer /><FloatingChat /></>} />
+        <Route path="/category/:categoryId" element={<><Header /><CategoryFeedPage /><Footer /><FloatingChat /></>} />
+        <Route path="/gundem-disi" element={<><Header /><NoAgendaFeedPage /><Footer /><FloatingChat /></>} />
         <Route path="/agendas" element={<><Header /><AgendasPage /><Footer /><FloatingChat /></>} />
         <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/messages" element={<><Header /><MessagesPage /><Footer /><FloatingChat /></>} />
