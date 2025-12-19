@@ -25,6 +25,8 @@ export const MessagesPage = () => {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   const fileRef = useRef(null);
+  const messageInputRef = useRef(null);
+  const focusOnSelectRef = useRef(false);
   
   const [conversations, setConversations] = useState([]);
 
@@ -91,10 +93,13 @@ export const MessagesPage = () => {
 
   // Deep-link: /messages?to=<id> should open conversation (or start one)
   useEffect(() => {
-    const to = new URLSearchParams(location.search || '').get('to');
+    const qs = new URLSearchParams(location.search || '');
+    const to = qs.get('to');
     if (!to) return;
     const targetId = String(to || '').trim();
     if (!targetId) return;
+    // Optional: focus input when coming from profile/message shortcut
+    focusOnSelectRef.current = qs.get('focus') === '1';
 
     const existing = (conversations || []).find((c) => String(c?.participant_id) === targetId);
     if (existing) {
@@ -126,6 +131,14 @@ export const MessagesPage = () => {
       }
     })();
   }, [location.search, conversations, user?.id]);
+
+  // If requested via URL, focus message input after selecting the conversation.
+  useEffect(() => {
+    if (!selectedConv?.participant_id) return;
+    if (!focusOnSelectRef.current) return;
+    focusOnSelectRef.current = false;
+    setTimeout(() => messageInputRef.current?.focus?.(), 50);
+  }, [selectedConv?.participant_id]);
 
   const openCompose = async () => {
     setShowCompose(true);
@@ -536,6 +549,7 @@ export const MessagesPage = () => {
                   />
                   <div className="flex items-center gap-2">
                     <input
+                      ref={messageInputRef}
                       type="text"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}

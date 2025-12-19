@@ -486,9 +486,14 @@ export const ProfilePage = () => {
                       className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg p-2 transition-colors"
                       title="Mesaj Gönder"
                       onClick={() => {
+                        // If not logged in, redirect to login first.
+                        if (!currentUser?.id) {
+                          navigate('/login-new');
+                          return;
+                        }
                         const tid = user?.user_id || user?.id || userId;
                         if (!tid) return;
-                        navigate(`/messages?to=${encodeURIComponent(tid)}`);
+                        navigate(`/messages?to=${encodeURIComponent(tid)}&focus=1`);
                       }}
                     >
                       <MessageCircle className="w-5 h-5" />
