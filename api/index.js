@@ -672,12 +672,16 @@ async function createPost(req, res) {
 
     // Get party_id from user (if exists)
     const userRows = await supabaseRestGet('users', {
-      select: 'id,party_id,user_type,is_verified,is_admin',
+      select: 'id,party_id,user_type,is_verified,is_admin,is_active',
       id: `eq.${auth.id}`,
       limit: '1',
     }).catch(() => []);
     const u = userRows?.[0] || null;
     const party_id = u?.party_id ?? null;
+
+    if (u?.is_active === false) {
+      return res.status(403).json({ success: false, error: 'Bu hesap aktif değil.' });
+    }
 
     // Approval gate: pending accounts can login but cannot post yet.
     const ut = String(u?.user_type || 'citizen');
@@ -2655,6 +2659,27 @@ async function authLogin(req, res) {
     if (!user.password_hash) return res.status(401).json({ success: false, error: 'Şifre hatalı.' });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ success: false, error: 'Şifre hatalı.' });
+
+    // Block login for inactive accounts (deactivated, claim-pending, etc.)
+    if (user?.is_active === false) {
+      return res.status(403).json({ success: false, error: 'Bu hesap aktif değil.' });
+    }
+
+    // Claim flow safety: block login until admin approval.
+    try {
+      const meta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : {};
+      const cr = meta?.claim_request && typeof meta.claim_request === 'object' ? meta.claim_request : null;
+      const status = cr ? String(cr.status || '') : '';
+      if (status === 'pending') {
+        return res.status(403).json({
+          success: false,
+          error: 'Profil sahiplenme başvurunuz inceleniyor. Admin onayı sonrası giriş yapabilirsiniz.',
+          code: 'CLAIM_PENDING',
+        });
+      }
+    } catch {
+      // ignore
+    }
     
     // Approval pending: allow login, but ensure user sees a notification.
     try {
@@ -2877,8 +2902,16 @@ async function authRegister(req, res) {
         } catch (e) { console.error('Upload error', e); }
     }
 
-    if (is_claim === 'true' && claim_user_id) {
-        metadata.claim_request = { target_user_id: claim_user_id, status: 'pending' };
+    const isClaim = String(is_claim || '') === 'true' && !!claim_user_id;
+    const claimTargetId = isClaim ? String(claim_user_id || '').trim() : '';
+    if (isClaim) {
+      const isValidId = /^\d+$/.test(claimTargetId) || /^[0-9a-fA-F-]{36}$/.test(claimTargetId);
+      if (!isValidId) return res.status(400).json({ success: false, error: 'Geçersiz claim_user_id.' });
+      metadata.claim_request = {
+        target_user_id: claimTargetId,
+        status: 'pending',
+        requested_at: new Date().toISOString(),
+      };
     }
 
     const password_hash = await bcrypt.hash(password, 10);
@@ -2896,7 +2929,8 @@ async function authRegister(req, res) {
         // Verified is reserved for admin approval (non-citizen account types).
         // Citizens don't display a verified badge in UI anyway, but keep this false to avoid confusion.
         is_verified: false,
-        is_active: true,
+        // Claim registrations must never create an immediately-usable account.
+        is_active: isClaim ? false : true,
         email_verified: true,
         is_admin: false
     };
@@ -2984,9 +3018,18 @@ async function authRegister(req, res) {
       });
     }
 
+    // Claim registrations always require manual admin review.
+    const requiresApproval = user_type !== 'citizen' || isClaim;
+    if (isClaim) {
+      return res.status(201).json({
+        success: true,
+        message: 'Profil sahiplenme başvurunuz alındı. Admin incelemesi sonrası bilgilendirileceksiniz.',
+        data: { requiresApproval: true },
+      });
+    }
+
     const token = signJwt({ id: user.id, username: user.username, email: user.email, user_type: user.user_type, is_admin: !!user.is_admin });
-    
-    res.status(201).json({ success: true, message: 'Kayıt başarılı.', data: { user, token, requiresApproval: user_type !== 'citizen' } });
+    res.status(201).json({ success: true, message: 'Kayıt başarılı.', data: { user, token, requiresApproval } });
 }
 
 async function authMe(req, res) {
@@ -3206,6 +3249,22 @@ async function sendMessage(req, res) {
   const text = typeof rawContent === 'string' ? String(rawContent).trim() : '';
   if (!receiver_id || !/^\d+$/.test(String(receiver_id))) return res.status(400).json({ success: false, error: 'Geçersiz alıcı.' });
   if (String(receiver_id) === String(auth.id)) return res.status(400).json({ success: false, error: 'Kendinize mesaj gönderemezsiniz.' });
+
+  // Sender must be active (deactivated / claim-pending accounts cannot message)
+  try {
+    const meRows = await supabaseRestGet('users', { select: 'id,is_active,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+    const me = meRows?.[0] || null;
+    if (!me || me.is_active === false) {
+      return res.status(403).json({ success: false, error: 'Bu hesap aktif değil.' });
+    }
+    const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
+    const cr = meta?.claim_request && typeof meta.claim_request === 'object' ? meta.claim_request : null;
+    if (cr && String(cr.status || '') === 'pending') {
+      return res.status(403).json({ success: false, error: 'Profil sahiplenme başvurunuz inceleniyor.' });
+    }
+  } catch {
+    // best-effort
+  }
 
   // Block checks (either direction)
   const blocked = await isBlockedBetween(auth.id, receiver_id);
