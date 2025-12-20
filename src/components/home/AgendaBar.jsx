@@ -102,7 +102,7 @@ export const AgendaBar = ({ agendas = [] }) => {
             <button
               key={getAgendaId(agenda)}
               onClick={() => navigate(`/agenda/${getAgendaSlug(agenda)}`)}
-              className="flex-shrink-0 px-3 py-1.5 bg-white border-2 border-primary-blue text-primary-blue rounded-full text-xs font-semibold shadow-sm whitespace-nowrap flex items-center gap-1"
+              className="group flex-shrink-0 px-3 py-1.5 bg-white border-2 border-primary-blue text-primary-blue rounded-full text-xs font-semibold shadow-sm whitespace-nowrap flex items-center gap-1 transition-colors hover:bg-primary-blue hover:text-white"
             >
               <Flame 
                 className={
@@ -116,7 +116,7 @@ export const AgendaBar = ({ agendas = [] }) => {
                 }}
               />
               <span className="truncate max-w-[140px]">{getAgendaTitle(agenda)}</span>
-              <span className="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded-full font-black">
+              <span className="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded-full font-black transition-colors group-hover:bg-white group-hover:text-primary-blue hover:bg-black hover:text-white">
                 {formatPolitScore(getAgendaScore(agenda))}
               </span>
             </button>
@@ -138,7 +138,7 @@ export const AgendaBar = ({ agendas = [] }) => {
               <button
                 key={getAgendaId(agenda)}
                 onClick={() => navigate(`/agenda/${getAgendaSlug(agenda)}`)}
-                className="w-full flex items-center justify-between px-3 py-2.5 bg-white border border-gray-200 rounded-lg hover:border-primary-blue hover:bg-blue-50 transition-all"
+                className="group w-full flex items-center justify-between px-3 py-2.5 bg-white border border-gray-200 rounded-lg hover:border-primary-blue hover:bg-blue-50 transition-all"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   {index + 4 < 3 && (
@@ -151,7 +151,7 @@ export const AgendaBar = ({ agendas = [] }) => {
                     {getAgendaTitle(agenda)}
                   </span>
                 </div>
-                <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded-full font-black flex-shrink-0 ml-2">
+                <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded-full font-black flex-shrink-0 ml-2 transition-colors group-hover:bg-white group-hover:text-primary-blue hover:bg-black hover:text-white">
                   {formatPolitScore(getAgendaScore(agenda))}
                 </span>
               </button>
