@@ -48,7 +48,7 @@ export const ActionBar = () => {
     {
       key: 'explore',
       label: 'Keşfet',
-      onClick: () => navigate('/category/all'),
+      onClick: () => navigate('/hit'),
       icon: Compass,
       iconClass: 'text-white',
       bgClass: 'bg-gradient-to-br from-amber-400 to-orange-500',

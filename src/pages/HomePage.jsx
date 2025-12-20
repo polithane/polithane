@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { HeroSlider } from '../components/home/HeroSlider';
 import { ParliamentBar } from '../components/home/ParliamentBar';
@@ -8,6 +8,7 @@ import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { HorizontalScroll } from '../components/common/HorizontalScroll';
 import { MediaSidebar } from '../components/media/MediaSidebar';
 import { Avatar } from '../components/common/Avatar';
+import { FollowSuggestionsSidebar } from '../components/home/FollowSuggestionsSidebar';
 import { mockParties } from '../mock/parties';
 import { mockAgendas } from '../mock/agendas';
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
@@ -25,27 +26,85 @@ export const HomePage = () => {
   const [polifest, setPolifest] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
   const [loading, setLoading] = useState(true);
+  const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [postsOffset, setPostsOffset] = useState(0);
+  const postsSentinelRef = useRef(null);
+  const postsObserverRef = useRef(null);
+
+  const POSTS_PAGE_SIZE = 120;
+
+  const computeHitPosts = (input = [], limit = 30) => {
+    const now = Date.now();
+    const candidates = (Array.isArray(input) ? input : [])
+      .filter((p) => p && (p.post_id ?? p.id))
+      .map((p) => {
+        const createdAt = new Date(p.created_at || 0).getTime();
+        const hours = Math.max(0, (now - (Number.isFinite(createdAt) ? createdAt : now)) / 36e5);
+        const recency = 1 / (1 + hours / 12); // 12h half-ish decay
+        const engagement =
+          (Number(p.like_count || 0) || 0) +
+          (Number(p.comment_count || 0) || 0) * 2 +
+          (Number(p.share_count || 0) || 0) * 5 +
+          (Number(p.view_count || 0) || 0) * 0.05;
+        const engagementBoost = Math.log1p(Math.max(0, engagement));
+        const base = Number(p.polit_score || 0) || 0;
+        const score = base * (0.75 + 0.25 * recency) + engagementBoost * 12;
+        return { p, score, recency };
+      })
+      .sort((a, b) => (b.score - a.score) || (b.recency - a.recency));
+
+    const out = [];
+    const perUser = new Map();
+    const perUserType = new Map();
+    let lastType = '';
+    const maxPerUser = 2;
+
+    for (const c of candidates) {
+      if (out.length >= limit) break;
+      const p = c.p;
+      const postType = String(p.content_type || 'text');
+      const userType = String(p?.user?.user_type || '');
+      const uid = String(p.user_id ?? p?.user?.user_id ?? p?.user?.id ?? '');
+
+      if (uid) {
+        const n = perUser.get(uid) || 0;
+        if (n >= maxPerUser) continue;
+      }
+      if (userType) {
+        const n = perUserType.get(userType) || 0;
+        // keep a mix: avoid overfilling by a single role in hit
+        if (n >= Math.ceil(limit * 0.45)) continue;
+      }
+      // Avoid consecutive text/audio in hit itself (extra safety)
+      if ((postType === 'text' || postType === 'audio') && postType === lastType) continue;
+
+      out.push(p);
+      lastType = postType;
+      if (uid) perUser.set(uid, (perUser.get(uid) || 0) + 1);
+      if (userType) perUserType.set(userType, (perUserType.get(userType) || 0) + 1);
+    }
+
+    return filterConsecutiveTextAudio(out, true).slice(0, limit);
+  };
+
+  const hitPosts = useMemo(() => computeHitPosts(posts, 30), [posts]);
   
   useEffect(() => {
     // Load data from Supabase
     const loadData = async () => {
       setLoading(true);
       try {
-        // Partiler + postlar (tamamı DB - Vercel /api üzerinden)
+        // Partiler + postlar (paged) (tamamı DB - Vercel /api üzerinden)
         const [partiesData, postsData] = await Promise.all([
-          api.parties.getAll().catch((err) => { console.error('Parties error:', err); return []; }),
-          api.posts.getAll({ limit: 500, order: 'created_at.desc' }).catch((err) => { console.error('Posts error:', err); return []; }),
+          api.parties.getAll().catch(() => []),
+          api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: 0, order: 'created_at.desc' }).catch(() => []),
         ]);
-        
-        console.log('=== SUPABASE DATA LOADED ===');
-        console.log('Parties:', partiesData?.length || 0);
-        console.log('Posts from Supabase:', postsData?.length || 0);
 
         // Partileri ayarla
         if (partiesData && partiesData.length > 0) {
           setParties(partiesData);
         } else {
-          console.log('Using mock parties as fallback');
           setParties(mockParties);
         }
 
@@ -104,7 +163,10 @@ export const HomePage = () => {
             : null,
         });
 
-        setPosts((postsData || []).map(mapDbPostToUi));
+        const initialPosts = (postsData || []).map(mapDbPostToUi);
+        setPosts(initialPosts);
+        setPostsOffset(initialPosts.length);
+        setHasMorePosts(initialPosts.length >= POSTS_PAGE_SIZE);
 
         // Agendas: load from admin-managed list (no mock fallback in production)
         try {
@@ -138,13 +200,108 @@ export const HomePage = () => {
         setParties(mockParties);
         setAgendas(mockAgendas);
         setPolifest([]);
+        setPostsOffset(0);
+        setHasMorePosts(false);
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchMorePosts = async () => {
+    if (loadingMorePosts || !hasMorePosts) return;
+    setLoadingMorePosts(true);
+    try {
+      const partyMap = new Map((parties || []).map((p) => [p.id, p]));
+      const normalizeMediaUrls = (value) => {
+        const raw = Array.isArray(value) ? value : value ? [value] : [];
+        const isPlaceholderPostAsset = (s) =>
+          s.startsWith('/assets/posts/') || s === '/assets/default/post_image.jpg' || s === '/assets/default/post.jpg';
+        return raw
+          .map((v) => String(v || '').trim())
+          .filter((s) => s && !isPlaceholderPostAsset(s));
+      };
+      const mapDbPostToUi = (p) => ({
+        post_id: p.id,
+        user_id: p.user_id,
+        content_type: p.content_type || 'text',
+        content_text: p.content_text ?? p.content ?? '',
+        media_url: normalizeMediaUrls(p.media_urls),
+        thumbnail_url: p.thumbnail_url ?? null,
+        media_duration: p.media_duration ?? null,
+        agenda_tag: p.agenda_tag ?? null,
+        polit_score: p.polit_score ?? 0,
+        view_count: p.view_count ?? 0,
+        like_count: p.like_count ?? 0,
+        dislike_count: p.dislike_count ?? 0,
+        comment_count: p.comment_count ?? 0,
+        share_count: p.share_count ?? 0,
+        is_featured: p.is_featured ?? false,
+        created_at: p.created_at,
+        source_url: p.source_url,
+        category: p.category,
+        user: p.user
+          ? {
+              ...p.user,
+              user_id: p.user.id,
+              profile_image: p.user.avatar_url,
+              verification_badge: false,
+              party_id: p.user.party_id,
+              party: p.user.party_id && partyMap.get(p.user.party_id)
+                ? {
+                    party_id: partyMap.get(p.user.party_id).id,
+                    party_slug: partyMap.get(p.user.party_id).slug,
+                    party_short_name: partyMap.get(p.user.party_id).short_name,
+                    party_logo: partyMap.get(p.user.party_id).logo_url,
+                    party_color: partyMap.get(p.user.party_id).color,
+                  }
+                : null,
+            }
+          : null,
+      });
+
+      const postsData = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: postsOffset, order: 'created_at.desc' }).catch(() => []);
+      const nextBatch = (postsData || []).map(mapDbPostToUi);
+      setPosts((prev) => {
+        const seen = new Set((prev || []).map((p) => String(p?.post_id ?? p?.id ?? '')));
+        const merged = prev ? prev.slice() : [];
+        for (const p of nextBatch) {
+          const id = String(p?.post_id ?? p?.id ?? '');
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          merged.push(p);
+        }
+        return merged;
+      });
+      setPostsOffset((prev) => prev + nextBatch.length);
+      if (nextBatch.length < POSTS_PAGE_SIZE) setHasMorePosts(false);
+    } catch {
+      setHasMorePosts(false);
+    } finally {
+      setLoadingMorePosts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (loading) return;
+    if (!postsSentinelRef.current) return;
+    if (postsObserverRef.current) postsObserverRef.current.disconnect();
+    postsObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        if (e?.isIntersecting) fetchMorePosts();
+      },
+      { root: null, rootMargin: '600px', threshold: 0.01 }
+    );
+    postsObserverRef.current.observe(postsSentinelRef.current);
+    return () => {
+      postsObserverRef.current?.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, hasMorePosts, postsOffset, parties]);
   
   // Kategorilere göre post filtreleme (DB user_type ile)
   const pickFixedMix = (list = []) => {
@@ -329,7 +486,7 @@ export const HomePage = () => {
                     <h2 className="text-xl font-bold text-gray-900">HİT PAYLAŞIMLAR</h2>
                     <span className="text-sm text-gray-500 font-medium">Tüm Kategorilerden</span>
                   </div>
-                  <Link to="/category/all" className="text-primary-blue hover:underline text-sm">
+                  <Link to="/hit" className="text-primary-blue hover:underline text-sm">
                     Tümünü Gör
                   </Link>
                 </div>
@@ -338,7 +495,7 @@ export const HomePage = () => {
                   scrollInterval={4000}
                   itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
                 >
-                  {filterConsecutiveTextAudio(allPosts.slice(0, 30), true).map(post => (
+                  {hitPosts.map(post => (
                     <PostCardHorizontal 
                       key={post.post_id ?? post.id} 
                       post={post}
@@ -423,14 +580,22 @@ export const HomePage = () => {
           
           {/* Sağ Medya Sidebar */}
           <aside className="hidden lg:block lg:mr-0 min-w-0">
-            <div className="sticky top-20 bg-slate-800/80 backdrop-blur-sm rounded-lg p-4 shadow-lg">
-              <h2 className="text-sm font-bold text-white mb-4 whitespace-nowrap">MEDYA GÜNDEMİ</h2>
-              <div className="-mx-4 -mb-4 px-4 pb-4">
-                <MediaSidebar posts={posts} />
+            <div className="sticky top-20 space-y-3">
+              <FollowSuggestionsSidebar limit={8} />
+              <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg p-4 shadow-lg">
+                <h2 className="text-sm font-bold text-white mb-4 whitespace-nowrap">MEDYA GÜNDEMİ</h2>
+                <div className="-mx-4 -mb-4 px-4 pb-4">
+                  <MediaSidebar posts={posts} />
+                </div>
               </div>
             </div>
           </aside>
         </div>
+        {/* Infinite feed loader (best-effort) */}
+        <div ref={postsSentinelRef} className="h-10" />
+        {loadingMorePosts && (
+          <div className="text-center text-sm text-gray-600 py-4">Daha fazla içerik yükleniyor…</div>
+        )}
       </div>
     </div>
   );

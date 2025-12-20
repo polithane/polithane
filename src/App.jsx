@@ -21,6 +21,7 @@ import { PoliFestPage } from './pages/PoliFestPage';
 import { PoliFestViewerPage } from './pages/PoliFestViewerPage';
 import { CategoryFeedPage } from './pages/CategoryFeedPage';
 import { NoAgendaFeedPage } from './pages/NoAgendaFeedPage';
+import { HitFeedPage } from './pages/HitFeedPage';
 
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
@@ -86,6 +87,7 @@ function App() {
         <Route path="/party/:partyId" element={<><Header /><ActionBar /><PartyDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/agenda/:agendaSlug" element={<><Header /><ActionBar /><AgendaDetailPage /><Footer /><FloatingChat /></>} />
         <Route path="/category/:categoryId" element={<><Header /><ActionBar /><CategoryFeedPage /><Footer /><FloatingChat /></>} />
+        <Route path="/hit" element={<><Header /><ActionBar /><HitFeedPage /><Footer /><FloatingChat /></>} />
         <Route path="/gundem-disi" element={<><Header /><ActionBar /><NoAgendaFeedPage /><Footer /><FloatingChat /></>} />
         <Route path="/agendas" element={<><Header /><ActionBar /><AgendasPage /><Footer /><FloatingChat /></>} />
         <Route path="/city/:cityCode" element={<><Header /><ActionBar /><CityDetailPage /><Footer /><FloatingChat /></>} />
