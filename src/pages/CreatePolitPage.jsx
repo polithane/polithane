@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Camera,
   Trash2,
@@ -21,7 +21,10 @@ import { isUiVerifiedUser } from '../utils/titleHelpers';
 
 export const CreatePolitPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useAuth();
+
+  const isFastMode = useMemo(() => String(location?.pathname || '') === '/fast-at', [location?.pathname]);
 
   const approvalPending = useMemo(() => {
     if (!isAuthenticated) return false;
@@ -89,6 +92,7 @@ export const CreatePolitPage = () => {
   const [iconTryIndex, setIconTryIndex] = useState({});
   const [dragImageIdx, setDragImageIdx] = useState(null);
   const [dragOverImageIdx, setDragOverImageIdx] = useState(null);
+  const [alsoPublishOther, setAlsoPublishOther] = useState(false);
 
   // Text constraints
   const TEXT_LIMIT = 350;
@@ -361,23 +365,39 @@ export const CreatePolitPage = () => {
         media_urls = await Promise.all(files.slice(0, maxFiles || 1).map(uploadOne));
       }
 
-      const result = await postsApi.create({
+      const primaryPayload = {
         content: content,
         content_type: contentType,
         content_text: content,
-        // Category selection removed from UI; keep a safe default for backend compatibility.
         category: 'general',
         agenda_tag: agendaTag || null,
         media_urls,
-      });
-      if (result?.success && result?.data?.id) {
-        toast.success('Polit başarıyla oluşturuldu.');
-        navigate(`/post/${result.data.id}`);
+        ...(isFastMode ? { is_trending: true } : {}),
+      };
+
+      const primary = await postsApi.create(primaryPayload);
+      const primaryId = primary?.data?.id;
+      const primaryOk = !!(primary?.success && primaryId);
+
+      // Optional cross-post
+      if (alsoPublishOther) {
+        const secondaryPayload = {
+          ...primaryPayload,
+          ...(isFastMode ? { is_trending: false } : { is_trending: true }),
+        };
+        // Best-effort (don't block primary success)
+        await postsApi.create(secondaryPayload).catch(() => null);
+      }
+
+      if (primaryOk) {
+        toast.success(isFastMode ? 'Fast başarıyla oluşturuldu.' : 'Polit başarıyla oluşturuldu.');
+        if (isFastMode) navigate('/fast');
+        else navigate(`/post/${primaryId}`);
         return;
       }
 
-      toast.success('Polit oluşturuldu.');
-      navigate('/');
+      toast.success(isFastMode ? 'Fast oluşturuldu.' : 'Polit oluşturuldu.');
+      navigate(isFastMode ? '/fast' : '/');
     } catch (err) {
       const msg = String(err?.message || '');
       if (msg.toLowerCase().includes('row-level security')) {
@@ -391,10 +411,22 @@ export const CreatePolitPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
+    <div
+      className={[
+        'min-h-screen bg-gradient-to-br',
+        isFastMode ? 'from-rose-50 via-white to-red-50' : 'from-blue-50 via-white to-emerald-50',
+      ].join(' ')}
+    >
       <div className="container-main py-6">
         <div className="max-w-2xl mx-auto">
-          <div className="relative rounded-[28px] p-[2px] bg-gradient-to-br from-primary-blue/70 via-indigo-400/70 to-emerald-400/70 shadow-2xl">
+          <div
+            className={[
+              'relative rounded-[28px] p-[2px] shadow-2xl',
+              isFastMode
+                ? 'bg-gradient-to-br from-red-500/70 via-rose-500/70 to-orange-400/70'
+                : 'bg-gradient-to-br from-primary-blue/70 via-indigo-400/70 to-emerald-400/70',
+            ].join(' ')}
+          >
             <div className="bg-white/90 backdrop-blur rounded-[26px] overflow-hidden">
             {/* Top bar */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -407,8 +439,10 @@ export const CreatePolitPage = () => {
                 <X className="w-6 h-6 text-gray-700" />
               </button>
               <div className="text-center">
-                <div className="text-lg font-black text-gray-900">Polit At</div>
-                <div className="text-[11px] text-gray-500">Sosyal medya gibi hızlı paylaş</div>
+                <div className="text-lg font-black text-gray-900">{isFastMode ? 'Fast At' : 'Polit At'}</div>
+                <div className="text-[11px] text-gray-500">
+                  {isFastMode ? '24 saatlik hızlı paylaş' : 'Sosyal medya gibi hızlı paylaş'}
+                </div>
               </div>
               <div className="w-10" />
             </div>
@@ -442,6 +476,33 @@ export const CreatePolitPage = () => {
                 </div>
               )}
 
+              {/* Cross-post option */}
+              <div
+                className={[
+                  'mb-4 rounded-2xl border px-4 py-3',
+                  isFastMode ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-rose-200 bg-rose-50 text-rose-900',
+                ].join(' ')}
+              >
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="mt-1 w-5 h-5 accent-red-600"
+                    checked={alsoPublishOther}
+                    onChange={(e) => setAlsoPublishOther(e.target.checked)}
+                  />
+                  <div className="min-w-0">
+                    <div className={['text-sm font-black', isFastMode ? 'text-blue-900' : 'text-rose-900'].join(' ')}>
+                      {isFastMode ? 'Bu Fast’i Polit olarak da yayınla' : 'Bu Polit’i Fast olarak da yayınla'}
+                    </div>
+                    <div className="text-xs mt-0.5 opacity-90">
+                      {isFastMode
+                        ? 'Fast paylaşımın ayrıca normal akışta da görünsün.'
+                        : 'Polit paylaşımın ayrıca Fast alanında da 24 saat görünsün.'}
+                    </div>
+                  </div>
+                </label>
+              </div>
+
             {/* Content type tabs */}
             <div className="flex items-center justify-center gap-4 sm:gap-6 mb-5">
               {contentTabs.map((t) => {
@@ -465,7 +526,11 @@ export const CreatePolitPage = () => {
                     <div
                       className={[
                         'relative rounded-3xl p-[2px] transition-all',
-                        active ? 'bg-gradient-to-br from-primary-blue via-indigo-400 to-emerald-400 shadow-lg' : 'bg-transparent',
+                        active
+                          ? isFastMode
+                            ? 'bg-gradient-to-br from-red-500 via-rose-500 to-orange-400 shadow-lg'
+                            : 'bg-gradient-to-br from-primary-blue via-indigo-400 to-emerald-400 shadow-lg'
+                          : 'bg-transparent',
                       ].join(' ')}
                     >
                       <div
@@ -504,13 +569,17 @@ export const CreatePolitPage = () => {
                             className={[
                               'transition-transform duration-200',
                               'w-10 h-10 sm:w-14 sm:h-14 md:w-[86px] md:h-[86px]',
-                              active ? 'text-primary-blue scale-[1.06]' : 'text-gray-700 group-hover:text-gray-900',
+                              active
+                                ? isFastMode
+                                  ? 'text-rose-600 scale-[1.06]'
+                                  : 'text-primary-blue scale-[1.06]'
+                                : 'text-gray-700 group-hover:text-gray-900',
                             ].join(' ')}
                           />
                         )}
                       </div>
                       <div className="mt-2 text-center text-[11px] sm:text-xs font-black tracking-tight">
-                        <span className={active ? 'text-primary-blue' : 'text-gray-600 group-hover:text-gray-800'}>
+                        <span className={active ? (isFastMode ? 'text-rose-700' : 'text-primary-blue') : 'text-gray-600 group-hover:text-gray-800'}>
                           {t.alt}
                         </span>
                       </div>
@@ -588,7 +657,11 @@ export const CreatePolitPage = () => {
                               setDragOverImageIdx(null);
                             }}
                             className={`w-24 h-24 rounded-xl flex-shrink-0 border ${
-                              dragOverImageIdx === idx ? 'border-primary-blue ring-2 ring-primary-blue/30' : 'border-gray-200'
+                              dragOverImageIdx === idx
+                                ? isFastMode
+                                  ? 'border-rose-500 ring-2 ring-rose-500/30'
+                                  : 'border-primary-blue ring-2 ring-primary-blue/30'
+                                : 'border-gray-200'
                             }`}
                             title="Sürükle-bırak ile sırala"
                           >
@@ -611,11 +684,23 @@ export const CreatePolitPage = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Gündem</label>
-                <div className="relative rounded-xl p-[2px] bg-gradient-to-r from-primary-blue/70 via-indigo-400/70 to-emerald-400/70">
+                <div
+                  className={[
+                    'relative rounded-xl p-[2px]',
+                    isFastMode
+                      ? 'bg-gradient-to-r from-red-500/70 via-rose-500/70 to-orange-400/70'
+                      : 'bg-gradient-to-r from-primary-blue/70 via-indigo-400/70 to-emerald-400/70',
+                  ].join(' ')}
+                >
                   <select
                     value={agendaTag}
                     onChange={(e) => setAgendaTag(e.target.value)}
-                    className="w-full px-4 py-3 pr-11 bg-white/95 border border-transparent rounded-[10px] focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue outline-none"
+                    className={[
+                      'w-full px-4 py-3 pr-11 bg-white/95 border border-transparent rounded-[10px] outline-none',
+                      isFastMode
+                        ? 'focus:ring-2 focus:ring-rose-500/35 focus:border-rose-500'
+                        : 'focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue',
+                    ].join(' ')}
                   >
                     <option value="">Gündem dışı</option>
                     {agendas
@@ -626,7 +711,12 @@ export const CreatePolitPage = () => {
                         </option>
                       ))}
                   </select>
-                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-primary-blue">
+                  <div
+                    className={[
+                      'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2',
+                      isFastMode ? 'text-rose-600' : 'text-primary-blue',
+                    ].join(' ')}
+                  >
                     <Flame className="w-5 h-5" />
                   </div>
                 </div>
@@ -644,7 +734,10 @@ export const CreatePolitPage = () => {
                       <button
                         type="button"
                         onClick={startRecording}
-                        className="flex-1 py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black"
+                        className={[
+                          'flex-1 py-3 rounded-xl text-white font-black',
+                          isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
+                        ].join(' ')}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Video className="w-5 h-5" />
@@ -686,7 +779,10 @@ export const CreatePolitPage = () => {
                     <button
                       type="button"
                       onClick={() => imageUploadRef.current?.click()}
-                      className="py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black"
+                      className={[
+                        'py-3 rounded-xl text-white font-black',
+                        isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
+                      ].join(' ')}
                     >
                       <div className="flex items-center justify-center gap-2">
                         <UploadCloud className="w-5 h-5" />
@@ -739,7 +835,10 @@ export const CreatePolitPage = () => {
                       <button
                         type="button"
                         onClick={startRecording}
-                        className="flex-1 py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black"
+                        className={[
+                          'flex-1 py-3 rounded-xl text-white font-black',
+                          isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
+                        ].join(' ')}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Mic className="w-5 h-5" />
@@ -794,7 +893,12 @@ export const CreatePolitPage = () => {
                         : 'Önce bir içerik türü seçin, sonra yazın…'
                   }
                   maxLength={contentType === 'text' ? TEXT_LIMIT : undefined}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue outline-none resize-none bg-white/95"
+                  className={[
+                    'w-full px-4 py-3 border border-gray-300 rounded-xl outline-none resize-none bg-white/95',
+                    isFastMode
+                      ? 'focus:ring-2 focus:ring-rose-500/35 focus:border-rose-500'
+                      : 'focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue',
+                  ].join(' ')}
                 />
                 {contentType === 'text' && (
                   <div className="mt-2 text-[11px] text-gray-500">
@@ -806,9 +910,20 @@ export const CreatePolitPage = () => {
               <button
                 type="submit"
                 disabled={loading || approvalPending || !contentType}
-                className="w-full py-3 rounded-xl bg-primary-blue hover:bg-blue-600 text-white font-black disabled:opacity-60"
+                className={[
+                  'w-full py-3 rounded-xl text-white font-black disabled:opacity-60',
+                  isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
+                ].join(' ')}
               >
-                {!contentType ? 'Önce tür seç' : approvalPending ? 'Onay bekleniyor' : loading ? 'Paylaşılıyor…' : 'Polit At!'}
+                {!contentType
+                  ? 'Önce tür seç'
+                  : approvalPending
+                    ? 'Onay bekleniyor'
+                    : loading
+                      ? 'Paylaşılıyor…'
+                      : isFastMode
+                        ? 'Fast At!'
+                        : 'Polit At!'}
               </button>
 
             </form>

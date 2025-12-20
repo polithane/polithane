@@ -29,6 +29,8 @@ export const MessagesPage = () => {
   const focusOnSelectRef = useRef(false);
   
   const [conversations, setConversations] = useState([]);
+  const convPollRef = useRef(null);
+  const msgPollRef = useRef(null);
 
   // Compose modal
   const [showCompose, setShowCompose] = useState(false);
@@ -77,6 +79,56 @@ export const MessagesPage = () => {
     }
   }, [selectedConv]);
 
+  // Optimistically clear unread badge when opening a conversation.
+  useEffect(() => {
+    if (!selectedConv?.participant_id) return;
+    setConversations((prev) =>
+      (prev || []).map((c) =>
+        String(c?.participant_id) === String(selectedConv.participant_id) ? { ...c, unread_count: 0 } : c
+      )
+    );
+  }, [selectedConv?.participant_id]);
+
+  // Poll messages for the active conversation (new message + read status).
+  useEffect(() => {
+    if (!selectedConv?.participant_id) return;
+    if (msgPollRef.current) clearInterval(msgPollRef.current);
+    const otherId = String(selectedConv.participant_id);
+    const tick = async () => {
+      try {
+        const r = await messagesApi.getMessages(otherId);
+        if (!r?.success) return;
+        const next = Array.isArray(r.data) ? r.data : [];
+        setMessages((prev) => {
+          const base = Array.isArray(prev) ? prev : [];
+          const merged = base.slice();
+          const indexById = new Map(merged.map((m, i) => [String(m?.id || ''), i]));
+          for (const m of next) {
+            const id = String(m?.id || '');
+            if (!id) continue;
+            const at = indexById.get(id);
+            if (at !== undefined) {
+              merged[at] = { ...merged[at], ...m };
+            } else {
+              indexById.set(id, merged.length);
+              merged.push(m);
+            }
+          }
+          merged.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+          return merged;
+        });
+      } catch {
+        // ignore
+      }
+    };
+    msgPollRef.current = setInterval(tick, 4000);
+    return () => {
+      if (msgPollRef.current) clearInterval(msgPollRef.current);
+      msgPollRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConv?.participant_id]);
+
   // Load conversations
   useEffect(() => {
     const load = async () => {
@@ -89,6 +141,25 @@ export const MessagesPage = () => {
       }
     };
     load();
+  }, [user?.id]);
+
+  // Poll conversations (unread count + latest message)
+  useEffect(() => {
+    if (!user?.id) return;
+    if (convPollRef.current) clearInterval(convPollRef.current);
+    const tick = async () => {
+      try {
+        const r = await messagesApi.getConversations();
+        if (r?.success) setConversations(r.data || []);
+      } catch {
+        // ignore
+      }
+    };
+    convPollRef.current = setInterval(tick, 8000);
+    return () => {
+      if (convPollRef.current) clearInterval(convPollRef.current);
+      convPollRef.current = null;
+    };
   }, [user?.id]);
 
   // Deep-link: /messages?to=<id> should open conversation (or start one)
@@ -193,6 +264,19 @@ export const MessagesPage = () => {
       const sent = await messagesApi.send(selectedConv.participant_id, newMessage.trim());
       if (sent?.success) {
         setMessages((prev) => [...prev, sent.data]);
+        setConversations((prev) => {
+          const list = Array.isArray(prev) ? prev.slice() : [];
+          const pid = String(selectedConv.participant_id);
+          const i = list.findIndex((c) => String(c?.participant_id) === pid);
+          const updated = {
+            ...(i >= 0 ? list[i] : selectedConv),
+            last_message: sent.data?.content || newMessage.trim(),
+            last_message_time: sent.data?.created_at || new Date().toISOString(),
+            unread_count: 0,
+          };
+          if (i >= 0) list.splice(i, 1);
+          return [updated, ...list];
+        });
       }
       setNewMessage('');
       
@@ -245,7 +329,22 @@ export const MessagesPage = () => {
       if (!url) throw new Error('Resim yüklenemedi.');
 
       const sent = await messagesApi.send(selectedConv.participant_id, '', { kind: 'image', url });
-      if (sent?.success) setMessages((prev) => [...prev, sent.data]);
+      if (sent?.success) {
+        setMessages((prev) => [...prev, sent.data]);
+        setConversations((prev) => {
+          const list = Array.isArray(prev) ? prev.slice() : [];
+          const pid = String(selectedConv.participant_id);
+          const i = list.findIndex((c) => String(c?.participant_id) === pid);
+          const updated = {
+            ...(i >= 0 ? list[i] : selectedConv),
+            last_message: '📷 Fotoğraf',
+            last_message_time: sent.data?.created_at || new Date().toISOString(),
+            unread_count: 0,
+          };
+          if (i >= 0) list.splice(i, 1);
+          return [updated, ...list];
+        });
+      }
       setTimeout(scrollToBottom, 100);
     } catch (e) {
       setError(e?.message || 'Resim gönderilemedi');

@@ -180,19 +180,18 @@ export const HomePage = () => {
           setAgendas(import.meta.env.PROD ? [] : mockAgendas);
         }
 
-        // PoliFest: real profiles from DB (no mock)
-        const polifestUsers = await apiCall(
-          `/api/users?user_type=mp,party_official,media&limit=24&order=polit_score.desc`
-        ).catch(() => []);
-        setPolifest(
-          (polifestUsers || []).map((u) => ({
-            user_id: u.id,
-            username: u.username,
-            full_name: u.full_name,
-            profile_image: u.avatar_url,
-            story_count: Math.max(1, Math.min(6, Math.floor((u.post_count || 1) / 3) || 1)),
-          }))
-        );
+        // Fast: only followings (plus self), last 24h (server-filtered)
+        try {
+          if (isAuthenticated) {
+            const r = await apiCall('/api/fast?limit=24').catch(() => null);
+            const list = r?.data || [];
+            setPolifest(Array.isArray(list) ? list : []);
+          } else {
+            setPolifest([]);
+          }
+        } catch {
+          setPolifest([]);
+        }
 
       } catch (error) {
         console.error('Error loading data:', error);
@@ -210,6 +209,27 @@ export const HomePage = () => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Refresh Fast list when auth state changes (without reloading whole HomePage)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!isAuthenticated) {
+          if (!cancelled) setPolifest([]);
+          return;
+        }
+        const r = await apiCall('/api/fast?limit=24').catch(() => null);
+        const list = r?.data || [];
+        if (!cancelled) setPolifest(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setPolifest([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const fetchMorePosts = async () => {
     if (loadingMorePosts || !hasMorePosts) return;
@@ -422,7 +442,7 @@ export const HomePage = () => {
         <ParliamentBar parliamentData={currentParliamentDistribution} totalSeats={totalSeats} />
         
         {/* Stories/Reels Bar */}
-        <StoriesBar stories={polifest} />
+        <StoriesBar stories={polifest} mode="fast" />
         
         {/* Gündem Bar */}
         {agendas.length > 0 && <AgendaBar agendas={agendas} />}

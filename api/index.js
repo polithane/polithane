@@ -720,6 +720,7 @@ async function createPost(req, res) {
     const agenda_tag = String(body.agenda_tag || '').trim() || null;
     const media_urls = Array.isArray(body.media_urls) ? body.media_urls : [];
     const content_type = String(body.content_type || (media_urls.length > 0 ? 'image' : 'text')).trim();
+    const is_trending = typeof body?.is_trending === 'boolean' ? body.is_trending : undefined;
 
     if (!content) return res.status(400).json({ success: false, error: 'İçerik boş olamaz.' });
     if (content.length > 5000) return res.status(400).json({ success: false, error: 'İçerik çok uzun.' });
@@ -748,10 +749,10 @@ async function createPost(req, res) {
       });
     }
 
-    // Try schema variants (content/content_text)
+    // Try schema variants (content/content_text) and optional flags (is_trending)
     let inserted;
     try {
-      inserted = await supabaseRestInsert('posts', [{
+      const payload = {
         user_id: auth.id,
         party_id,
         content_type,
@@ -759,26 +760,175 @@ async function createPost(req, res) {
         category,
         agenda_tag,
         media_urls,
-        is_deleted: false
-      }]);
+        is_deleted: false,
+        ...(typeof is_trending === 'boolean' ? { is_trending } : {}),
+      };
+      inserted = await supabaseRestInsert('posts', [payload]);
     } catch (e) {
       const msg = String(e?.message || '');
-      if (msg.includes('content_text') || msg.includes('content_type')) {
-        inserted = await supabaseRestInsert('posts', [{
-          user_id: auth.id,
-          party_id,
-          content,
-          category,
-          agenda_tag,
-          media_urls,
-          is_deleted: false
-        }]);
-      } else {
-        throw e;
+      // Retry without unsupported fields (schema-agnostic)
+      if (msg.includes('is_trending')) {
+        try {
+          inserted = await supabaseRestInsert('posts', [{
+            user_id: auth.id,
+            party_id,
+            content_type,
+            content_text: content,
+            category,
+            agenda_tag,
+            media_urls,
+            is_deleted: false,
+          }]);
+          // eslint-disable-next-line no-empty
+        } catch {}
+      }
+      if (!inserted) {
+        if (msg.includes('content_text') || msg.includes('content_type')) {
+          // content/content_text schema fallback
+          try {
+            inserted = await supabaseRestInsert('posts', [{
+              user_id: auth.id,
+              party_id,
+              content,
+              category,
+              agenda_tag,
+              media_urls,
+              is_deleted: false,
+              ...(typeof is_trending === 'boolean' ? { is_trending } : {}),
+            }]);
+          } catch (e2) {
+            const msg2 = String(e2?.message || '');
+            if (msg2.includes('is_trending')) {
+              inserted = await supabaseRestInsert('posts', [{
+                user_id: auth.id,
+                party_id,
+                content,
+                category,
+                agenda_tag,
+                media_urls,
+                is_deleted: false,
+              }]);
+            } else {
+              throw e2;
+            }
+          }
+        } else {
+          throw e;
+        }
       }
     }
     const post = inserted?.[0] || null;
     res.status(201).json({ success: true, data: post });
+}
+
+function fastSinceIso(hours = 24) {
+  const h = Math.max(1, Number(hours) || 24);
+  return new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
+}
+
+async function getFastUsers(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const since = fastSinceIso(24);
+  const { limit = 80 } = req.query || {};
+  const lim = Math.min(200, Math.max(1, parseInt(limit, 10) || 80));
+
+  // Only show followings (+ self)
+  const followingRows = await supabaseRestGet('follows', {
+    select: 'following_id',
+    follower_id: `eq.${auth.id}`,
+    limit: '500',
+  }).catch(() => []);
+  const ids = Array.from(
+    new Set([String(auth.id), ...(followingRows || []).map((r) => String(r.following_id)).filter(Boolean)])
+  );
+  if (ids.length === 0) return res.json({ success: true, data: [] });
+
+  // Fast posts = is_trending=true within last 24h
+  const posts = await supabaseRestGet('posts', {
+    select: 'id,user_id,created_at',
+    user_id: `in.(${ids.join(',')})`,
+    is_deleted: 'eq.false',
+    is_trending: 'eq.true',
+    created_at: `gte.${since}`,
+    order: 'created_at.desc',
+    limit: '1000',
+  }).catch(() => []);
+
+  const list = Array.isArray(posts) ? posts : [];
+  const byUser = new Map();
+  for (const p of list) {
+    const uid = p?.user_id != null ? String(p.user_id) : '';
+    if (!uid) continue;
+    const cur = byUser.get(uid) || { user_id: uid, story_count: 0, latest: 0 };
+    cur.story_count += 1;
+    const t = new Date(p.created_at || 0).getTime();
+    if (t > cur.latest) cur.latest = t;
+    byUser.set(uid, cur);
+  }
+
+  const activeIds = Array.from(byUser.keys());
+  if (activeIds.length === 0) return res.json({ success: true, data: [] });
+
+  const users = await supabaseRestGet('users', {
+    select: 'id,username,full_name,avatar_url,is_active',
+    id: `in.(${activeIds.join(',')})`,
+    is_active: 'eq.true',
+    limit: String(Math.min(200, activeIds.length)),
+  }).catch(() => []);
+
+  const userMap = new Map((users || []).map((u) => [String(u.id), u]));
+  const out = activeIds
+    .map((id) => {
+      const u = userMap.get(String(id));
+      const info = byUser.get(String(id));
+      if (!u || !info) return null;
+      return {
+        user_id: u.id,
+        username: u.username,
+        full_name: u.full_name,
+        avatar_url: u.avatar_url,
+        profile_image: u.avatar_url,
+        story_count: info.story_count,
+        latest_created_at: info.latest ? new Date(info.latest).toISOString() : null,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.latest_created_at || 0).getTime() - new Date(a.latest_created_at || 0).getTime())
+    .slice(0, lim);
+
+  return res.json({ success: true, data: out });
+}
+
+async function getFastForUser(req, res, userKey) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const uid = await resolveUserId(userKey);
+  if (!uid) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+
+  // Only allow if viewer follows target (or self)
+  if (String(uid) !== String(auth.id)) {
+    const existing = await supabaseRestGet('follows', {
+      select: 'id',
+      follower_id: `eq.${auth.id}`,
+      following_id: `eq.${uid}`,
+      limit: '1',
+    }).catch(() => []);
+    const ok = Array.isArray(existing) && existing.length > 0;
+    if (!ok) return res.status(403).json({ success: false, error: 'Bu Fast içeriğini görüntülemek için takip etmelisiniz.' });
+  }
+
+  const since = fastSinceIso(24);
+  const rows = await supabaseRestGet('posts', {
+    select: '*,user:users(*),party:parties(*)',
+    user_id: `eq.${uid}`,
+    is_deleted: 'eq.false',
+    is_trending: 'eq.true',
+    created_at: `gte.${since}`,
+    order: 'created_at.asc',
+    limit: '50',
+  }).catch(() => []);
+  return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
 }
 
 async function updatePost(req, res, postId) {
@@ -3979,6 +4129,11 @@ export default async function handler(req, res) {
       if ((url === '/api/posts' || url === '/api/posts/') && req.method === 'GET') return await getPosts(req, res);
       if ((url === '/api/agendas' || url === '/api/agendas/') && req.method === 'GET') return await getAgendas(req, res);
       if (url === '/api/parties' || url === '/api/parties/') return await getParties(req, res);
+      if ((url === '/api/fast' || url === '/api/fast/') && req.method === 'GET') return await getFastUsers(req, res);
+      if (url.startsWith('/api/fast/') && req.method === 'GET') {
+        const key = url.split('/api/fast/')[1];
+        if (key) return await getFastForUser(req, res, key);
+      }
 
       // Posts (detail + interactions)
       if (url.startsWith('/api/posts/') && !url.endsWith('/')) {

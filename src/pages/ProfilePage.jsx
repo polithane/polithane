@@ -12,7 +12,7 @@ import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { formatNumber, formatPolitScore } from '../utils/formatters';
 import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 import { useAuth } from '../contexts/AuthContext';
-import { users, posts } from '../utils/api';
+import { apiCall, users, posts } from '../utils/api';
 import { CITY_CODES, FEATURE_FLAGS } from '../utils/constants';
 import { normalizeUsername } from '../utils/validators';
 import { getProfilePath } from '../utils/paths';
@@ -60,6 +60,7 @@ export const ProfilePage = () => {
   const [userComments, setUserComments] = useState([]);
   const [likedPosts, setLikedPosts] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [hasFast, setHasFast] = useState(false);
   
   const isOwnProfile = currentUser && (
     userId === 'me' || 
@@ -178,6 +179,7 @@ export const ProfilePage = () => {
         const resolvedProfileData = profileData?.data ? profileData.data : profileData;
         const normalizedProfile = normalizeUser(resolvedProfileData);
         setUser(normalizedProfile);
+        setHasFast(false);
 
         // Load my blocked user ids (for UI state)
         try {
@@ -243,6 +245,18 @@ export const ProfilePage = () => {
           }
         } catch {
           // noop
+        }
+
+        // Fast ring: only if there are active fasts (requires auth+follow when not self)
+        try {
+          const profileDbId = resolvedProfileData?.id ?? resolvedProfileData?.user_id ?? userId;
+          if (profileDbId) {
+            const r = await apiCall(`/api/fast/${encodeURIComponent(profileDbId)}`).catch(() => null);
+            const list = r?.data || [];
+            setHasFast(Array.isArray(list) && list.length > 0);
+          }
+        } catch {
+          setHasFast(false);
         }
       } catch (err) {
         console.error('Profile load error:', err);
@@ -350,7 +364,15 @@ export const ProfilePage = () => {
               src={user.avatar_url || user.profile_image} 
               size="120px" 
               verified={isUiVerifiedUser(user)}
-              onClick={() => setShowAvatarModal(true)}
+              ring={hasFast ? 'fast' : null}
+              onClick={() => {
+                if (hasFast) {
+                  const key = user?.username || user?.user_id || user?.id;
+                  if (key) navigate(`/fast/${encodeURIComponent(String(key))}`);
+                  return;
+                }
+                setShowAvatarModal(true);
+              }}
             />
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2 flex-wrap">

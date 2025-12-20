@@ -22,6 +22,8 @@ import { PoliFestViewerPage } from './pages/PoliFestViewerPage';
 import { CategoryFeedPage } from './pages/CategoryFeedPage';
 import { NoAgendaFeedPage } from './pages/NoAgendaFeedPage';
 import { HitFeedPage } from './pages/HitFeedPage';
+import { FastPage } from './pages/FastPage';
+import { FastViewerPage } from './pages/FastViewerPage';
 
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
@@ -96,7 +98,9 @@ function App() {
         <Route path="/polit-at" element={<><Header /><ActionBar /><CreatePolitPage /><Footer /><FloatingChat /></>} />
         <Route path="/test" element={<><Header /><ActionBar /><TestPage /><Footer /><FloatingChat /></>} />
         <Route path="/polifest" element={<><Header /><ActionBar /><PoliFestPage /><Footer /><FloatingChat /></>} />
-        <Route path="/fast" element={<><Header /><ActionBar /><PoliFestPage /><Footer /><FloatingChat /></>} />
+        <Route path="/fast" element={<><Header /><ActionBar /><FastPage /><Footer /><FloatingChat /></>} />
+        <Route path="/fast-at" element={<><Header /><ActionBar /><CreatePolitPage /><Footer /><FloatingChat /></>} />
+        <Route path="/fast/:usernameOrId" element={<FastViewerPage />} />
         <Route path="/polifest/:usernameOrId" element={<PoliFestViewerPage />} />
         <Route path="/delete-confirm" element={<DeleteConfirmPage />} />
         <Route path="/about" element={<><Header /><ActionBar /><AboutPage /><Footer /><FloatingChat /></>} />

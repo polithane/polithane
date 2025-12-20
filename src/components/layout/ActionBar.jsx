@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PenTool, Wind, Search, Compass, MessageCircle } from 'lucide-react';
+import { PenTool, Wind, ArrowRight, Search, Compass, MessageCircle } from 'lucide-react';
+
+const FastWindIcon = (props) => {
+  // "Wind" + small arrow tip to mimic the requested icon
+  // (keeps Lucide style + clear arrow head on the front)
+  return (
+    <span className="relative inline-flex">
+      <Wind {...props} />
+      <ArrowRight
+        className="absolute -right-1 -top-1 w-3.5 h-3.5"
+        style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}
+      />
+    </span>
+  );
+};
 
 export const ActionBar = () => {
   const navigate = useNavigate();
@@ -25,8 +39,8 @@ export const ActionBar = () => {
     {
       key: 'fast',
       label: 'Fast At',
-      onClick: () => navigate('/fast'),
-      icon: Wind,
+      onClick: () => navigate('/fast-at'),
+      icon: FastWindIcon,
       iconClass: 'text-white',
       bgClass: 'bg-gradient-to-br from-red-500 to-rose-600',
       pulse: true,

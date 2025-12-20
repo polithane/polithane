@@ -10,6 +10,7 @@ export const Avatar = ({
   size = '40px', 
   verified = false,
   partyLogo = null,
+  ring = null,
   onClick,
   className = ''
 }) => {
@@ -36,10 +37,16 @@ export const Avatar = ({
       style={{ width: size, height: size }}
       onClick={onClick}
     >
+      {ring === 'fast' ? (
+        <div className="absolute inset-0 rounded-full border-2 border-dashed border-primary-blue pointer-events-none" />
+      ) : null}
       <img
         src={getAvatarUrl(src)}
         alt={alt}
-        className="w-full h-full rounded-full object-cover border-2 border-gray-200 bg-white"
+        className={clsx(
+          'w-full h-full rounded-full object-cover bg-white',
+          ring === 'fast' ? 'border-0' : 'border-2 border-gray-200'
+        )}
         crossOrigin="anonymous"
         onError={(e) => {
           // Hata durumunda default logo göster
