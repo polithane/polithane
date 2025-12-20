@@ -33,6 +33,7 @@ export const Header = () => {
   const [results, setResults] = useState({ users: [], posts: [], parties: [] });
   const [showResults, setShowResults] = useState(false);
   const searchTimerRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -69,6 +70,20 @@ export const Header = () => {
       }
     }, 250);
     return () => clearTimeout(searchTimerRef.current);
+  }, [q]);
+
+  // Allow ActionBar to focus the header search input.
+  useEffect(() => {
+    const handler = () => {
+      try {
+        searchInputRef.current?.focus?.();
+        if (q.trim().length >= 3) setShowResults(true);
+      } catch {
+        // noop
+      }
+    };
+    window.addEventListener('polithane:focus-search', handler);
+    return () => window.removeEventListener('polithane:focus-search', handler);
   }, [q]);
 
   // Poll message unread count (header badge)
@@ -186,6 +201,7 @@ export const Header = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
+              ref={searchInputRef}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onFocus={() => q.trim().length >= 3 && setShowResults(true)}

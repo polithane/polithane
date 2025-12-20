@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { FloatingChat } from './components/common/FloatingChat';
+import { ActionBar } from './components/layout/ActionBar';
 import { HomePage } from './pages/HomePage';
 import { PostDetailPage } from './pages/PostDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -75,32 +76,33 @@ function App() {
     <div className="min-h-screen flex flex-col">
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<><Header /><HomePage /><Footer /><FloatingChat /></>} />
-        <Route path="/post/:postId" element={<><Header /><PostDetailPage /><Footer /><FloatingChat /></>} />
-        <Route path="/profile/:userId" element={<><Header /><ProfilePage /><Footer /><FloatingChat /></>} />
-        <Route path="/@:username" element={<><Header /><ProfilePage /><Footer /><FloatingChat /></>} />
-        <Route path="/:username" element={<><Header /><ProfilePage /><Footer /><FloatingChat /></>} />
-        <Route path="/party/:partyId" element={<><Header /><PartyDetailPage /><Footer /><FloatingChat /></>} />
-        <Route path="/agenda/:agendaSlug" element={<><Header /><AgendaDetailPage /><Footer /><FloatingChat /></>} />
-        <Route path="/category/:categoryId" element={<><Header /><CategoryFeedPage /><Footer /><FloatingChat /></>} />
-        <Route path="/gundem-disi" element={<><Header /><NoAgendaFeedPage /><Footer /><FloatingChat /></>} />
-        <Route path="/agendas" element={<><Header /><AgendasPage /><Footer /><FloatingChat /></>} />
-        <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><FloatingChat /></>} />
-        <Route path="/messages" element={<><Header /><MessagesPage /><Footer /><FloatingChat /></>} />
-        <Route path="/search" element={<><Header /><SearchPage /><Footer /><FloatingChat /></>} />
-        <Route path="/polit-at" element={<><Header /><CreatePolitPage /><Footer /><FloatingChat /></>} />
-        <Route path="/test" element={<><Header /><TestPage /><Footer /><FloatingChat /></>} />
-        <Route path="/polifest" element={<><Header /><PoliFestPage /><Footer /><FloatingChat /></>} />
+        <Route path="/" element={<><Header /><ActionBar /><HomePage /><Footer /><FloatingChat /></>} />
+        <Route path="/post/:postId" element={<><Header /><ActionBar /><PostDetailPage /><Footer /><FloatingChat /></>} />
+        <Route path="/profile/:userId" element={<><Header /><ActionBar /><ProfilePage /><Footer /><FloatingChat /></>} />
+        <Route path="/@:username" element={<><Header /><ActionBar /><ProfilePage /><Footer /><FloatingChat /></>} />
+        <Route path="/:username" element={<><Header /><ActionBar /><ProfilePage /><Footer /><FloatingChat /></>} />
+        <Route path="/party/:partyId" element={<><Header /><ActionBar /><PartyDetailPage /><Footer /><FloatingChat /></>} />
+        <Route path="/agenda/:agendaSlug" element={<><Header /><ActionBar /><AgendaDetailPage /><Footer /><FloatingChat /></>} />
+        <Route path="/category/:categoryId" element={<><Header /><ActionBar /><CategoryFeedPage /><Footer /><FloatingChat /></>} />
+        <Route path="/gundem-disi" element={<><Header /><ActionBar /><NoAgendaFeedPage /><Footer /><FloatingChat /></>} />
+        <Route path="/agendas" element={<><Header /><ActionBar /><AgendasPage /><Footer /><FloatingChat /></>} />
+        <Route path="/city/:cityCode" element={<><Header /><ActionBar /><CityDetailPage /><Footer /><FloatingChat /></>} />
+        <Route path="/messages" element={<><Header /><ActionBar /><MessagesPage /><Footer /><FloatingChat /></>} />
+        <Route path="/search" element={<><Header /><ActionBar /><SearchPage /><Footer /><FloatingChat /></>} />
+        <Route path="/polit-at" element={<><Header /><ActionBar /><CreatePolitPage /><Footer /><FloatingChat /></>} />
+        <Route path="/test" element={<><Header /><ActionBar /><TestPage /><Footer /><FloatingChat /></>} />
+        <Route path="/polifest" element={<><Header /><ActionBar /><PoliFestPage /><Footer /><FloatingChat /></>} />
+        <Route path="/fast" element={<><Header /><ActionBar /><PoliFestPage /><Footer /><FloatingChat /></>} />
         <Route path="/polifest/:usernameOrId" element={<PoliFestViewerPage />} />
         <Route path="/delete-confirm" element={<DeleteConfirmPage />} />
-        <Route path="/about" element={<><Header /><AboutPage /><Footer /><FloatingChat /></>} />
-        <Route path="/mission" element={<><Header /><MissionPage /><Footer /><FloatingChat /></>} />
-        <Route path="/contact" element={<><Header /><ContactPage /><Footer /><FloatingChat /></>} />
-        <Route path="/terms" element={<><Header /><TermsPage /><Footer /><FloatingChat /></>} />
-        <Route path="/privacy-policy" element={<><Header /><PrivacyPolicyPage /><Footer /><FloatingChat /></>} />
-        <Route path="/cookie-policy" element={<><Header /><CookiePolicyPage /><Footer /><FloatingChat /></>} />
+        <Route path="/about" element={<><Header /><ActionBar /><AboutPage /><Footer /><FloatingChat /></>} />
+        <Route path="/mission" element={<><Header /><ActionBar /><MissionPage /><Footer /><FloatingChat /></>} />
+        <Route path="/contact" element={<><Header /><ActionBar /><ContactPage /><Footer /><FloatingChat /></>} />
+        <Route path="/terms" element={<><Header /><ActionBar /><TermsPage /><Footer /><FloatingChat /></>} />
+        <Route path="/privacy-policy" element={<><Header /><ActionBar /><PrivacyPolicyPage /><Footer /><FloatingChat /></>} />
+        <Route path="/cookie-policy" element={<><Header /><ActionBar /><CookiePolicyPage /><Footer /><FloatingChat /></>} />
         {/* Backward-compatible legacy routes */}
-        <Route path="/stories" element={<><Header /><PoliFestPage /><Footer /><FloatingChat /></>} />
+        <Route path="/stories" element={<><Header /><ActionBar /><PoliFestPage /><Footer /><FloatingChat /></>} />
         <Route path="/stories/:usernameOrId" element={<PoliFestViewerPage />} />
         
         {/* Auth Routes (No Header/Footer) */}

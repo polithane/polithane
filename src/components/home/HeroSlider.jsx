@@ -76,26 +76,10 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
   };
   
   const bgColor = getBackgroundColor();
-  const sliderIsLight = isLightColor(bgColor);
-  const ctaBgClass = sliderIsLight ? 'bg-gray-900 hover:bg-black' : 'bg-white hover:bg-gray-50';
-  const ctaBorderClass = sliderIsLight ? 'border border-white/10' : 'border border-black/10';
+  // CTA moved to global ActionBar (keep slider clean)
   
   return (
     <div className="mb-4">
-      {/* Mobile: big CTA above slider */}
-      <div className="md:hidden mb-2">
-        <button
-          type="button"
-          onClick={() => navigate('/polit-at')}
-          className={`w-full h-[100px] rounded-2xl ${ctaBgClass} ${ctaBorderClass} font-black tracking-wide shadow-xl transition-colors flex items-center justify-center gap-3`}
-          style={{ color: bgColor }}
-          title="Polit At"
-        >
-          <PenTool className="w-7 h-7 text-current" />
-          <span className="text-2xl leading-none">Polit At</span>
-        </button>
-      </div>
-
       <div 
         className="relative h-[100px] md:h-[120px] rounded-xl overflow-hidden cursor-pointer shadow-lg"
         style={{ backgroundColor: bgColor }}
@@ -150,22 +134,7 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
           </div>
         </div>
         
-        {/* Desktop: huge CTA on the far right */}
-        <div className="hidden md:flex flex-shrink-0">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate('/polit-at');
-            }}
-            className={`h-full px-10 rounded-2xl ${ctaBgClass} ${ctaBorderClass} font-black tracking-wide shadow-2xl transition-colors flex items-center gap-4`}
-            style={{ color: bgColor }}
-            title="Polit At"
-          >
-            <PenTool className="w-9 h-9 text-current" />
-            <span className="text-3xl leading-none">Polit At</span>
-          </button>
-        </div>
+        {/* Polit At CTA moved to the global ActionBar */}
       </div>
       
       {/* Slider Dots */}
