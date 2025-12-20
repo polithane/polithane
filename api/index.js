@@ -1351,9 +1351,10 @@ async function adminBootstrap(req, res) {
     return res.status(400).json({ success: false, error: 'Geçerli bir şifre gönderin (en az 8 karakter).' });
   }
 
-  const username = 'admin';
-  const email = 'admin@polithane.com';
-  const full_name = 'Admin';
+  // Allow operator to override defaults (kept safe by bootstrap token)
+  const username = String(body?.username || 'admin').trim().toLowerCase();
+  const email = String(body?.email || 'admin@polithane.com').trim().toLowerCase();
+  const full_name = String(body?.full_name || 'Admin').trim() || 'Admin';
 
   const password_hash = await bcrypt.hash(password, 10);
 
@@ -2891,13 +2892,23 @@ async function authLogin(req, res) {
     const rl = rateLimit(`login:${ip}:${String(loginValue).toLowerCase()}`, { windowMs: 60_000, max: 10 });
     if (!rl.ok) return res.status(429).json({ success: false, error: 'Çok fazla giriş denemesi. Lütfen 1 dakika sonra tekrar deneyin.' });
 
-    const users = await supabaseRestGet('users', { 
+    let users = await supabaseRestGet('users', { 
+      select: '*',
+      or: `(email.eq.${loginValue},username.eq.${loginValue})`,
+      limit: '1'
+    }).catch(() => []);
+
+    // Retry with normalized value to support case-insensitive login for usernames/emails
+    if (!Array.isArray(users) || !users[0]) {
+      const lowered = String(loginValue).toLowerCase();
+      users = await supabaseRestGet('users', {
         select: '*',
-        or: `(email.eq.${loginValue},username.eq.${loginValue})`,
-        limit: '1'
-    });
-    
-    const user = users[0];
+        or: `(email.eq.${lowered},username.eq.${lowered})`,
+        limit: '1',
+      }).catch(() => []);
+    }
+
+    const user = (Array.isArray(users) && users[0]) ? users[0] : null;
     if (!user) return res.status(401).json({ success: false, error: 'Kullanıcı bulunamadı.' });
     
     if (!user.password_hash) return res.status(401).json({ success: false, error: 'Şifre hatalı.' });
