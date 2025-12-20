@@ -332,7 +332,7 @@ function analyzeCommentContent(input) {
   return { ok: true, text, flagged, reasons };
 }
 
-async function notifyAdminsAboutComment({ type, commentId, postId, actorId, title, message }) {
+async function notifyAdminsAboutComment(req, { type, commentId, postId, actorId, title, message }) {
   const admins = await supabaseRestGet('users', { select: 'id', is_admin: 'eq.true', limit: '50' }).catch(() => []);
   const targets = (admins || []).map((a) => a.id).filter(Boolean);
   if (!targets.length) return;
@@ -345,6 +345,12 @@ async function notifyAdminsAboutComment({ type, commentId, postId, actorId, titl
     is_read: false,
   }));
   await supabaseInsertNotifications(rows).catch(() => null);
+  // Email admins (best-effort)
+  try {
+    await Promise.all(targets.map((uid) => sendNotificationEmail(req, { userId: uid, type: 'system', actorId, postId }).catch(() => null)));
+  } catch {
+    // ignore
+  }
 }
 
 async function addPostComment(req, res, postId) {
@@ -399,13 +405,14 @@ async function addPostComment(req, res, postId) {
             is_read: false,
           },
         ]).catch(() => null);
+        sendNotificationEmail(req, { userId: ownerId, type: 'comment', actorId: auth.id, postId }).catch(() => null);
       }
     } catch {
       // best-effort
     }
 
     if (pending && row?.id) {
-      await notifyAdminsAboutComment({
+      await notifyAdminsAboutComment(req, {
         type: 'comment_review',
         commentId: row.id,
         postId,
@@ -452,7 +459,7 @@ async function updateComment(req, res, commentId) {
   ).catch(() => []);
   const row = updated?.[0] || null;
   if (pending && row?.id) {
-    await notifyAdminsAboutComment({
+    await notifyAdminsAboutComment(req, {
       type: 'comment_review',
       commentId: row.id,
       postId: row.post_id,
@@ -546,6 +553,7 @@ async function trackPostShare(req, res, postId) {
             is_read: false,
           },
         ]).catch(() => null);
+        sendNotificationEmail(req, { userId: ownerId, type: 'share', actorId: auth.id, postId }).catch(() => null);
       }
     }
   } catch {
@@ -644,6 +652,7 @@ async function togglePostLike(req, res, postId) {
             is_read: false,
           },
         ]).catch(() => null);
+        sendNotificationEmail(req, { userId: ownerId, type: 'like', actorId: userId, postId }).catch(() => null);
       }
     } catch {
       // best-effort
@@ -1117,6 +1126,8 @@ async function toggleFollow(req, res, targetId) {
       is_read: false,
     },
   ]).catch(() => null);
+  // Email (best-effort)
+  sendNotificationEmail(req, { userId: tid, type: 'follow', actorId: auth.id }).catch(() => null);
 
   return res.json({ success: true, action: 'followed' });
 }
@@ -1480,6 +1491,194 @@ async function sendEmail({ to, subject, html, text }) {
     html: html ? String(html) : undefined,
   };
   await transporter.sendMail(mail);
+}
+
+function isSmtpConfigured() {
+  const host = String(process.env.SMTP_HOST || '').trim();
+  const user = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '').trim();
+  const from = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '').trim();
+  return !!(host && user && pass && (from || user));
+}
+
+function emailLayout({ title, bodyHtml }) {
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; background:#f3f4f6; padding:18px;">
+      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#009fd6,#0077b6);padding:18px 20px;color:#fff;">
+          <div style="font-weight:900;font-size:18px;">Polithane.</div>
+          <div style="font-size:12px;opacity:.9;">Özgür, açık, şeffaf siyaset, bağımsız medya!</div>
+        </div>
+        <div style="padding:20px;">
+          <h2 style="margin:0 0 10px 0;font-size:18px;">${title}</h2>
+          ${bodyHtml}
+          <div style="margin-top:18px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:12px;">
+            Bu otomatik bir e-postadır, lütfen yanıtlamayın.
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function safeSendEmail(payload) {
+  try {
+    if (!isSmtpConfigured()) return false;
+    await sendEmail(payload);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function shouldEmailFromMeta(meta, type) {
+  const settings = meta?.notification_settings && typeof meta.notification_settings === 'object' ? meta.notification_settings : {};
+  // Global switch (default: on)
+  if (settings.emailNotifications === false) return false;
+  // Per-type switches (default: on)
+  if (type === 'message' && settings.messagesEmail === false) return false;
+  if (type === 'like' && settings.likesEmail === false) return false;
+  if (type === 'comment' && settings.commentsEmail === false) return false;
+  if (type === 'share' && settings.sharesEmail === false) return false;
+  if (type === 'follow' && settings.followsEmail === false) return false;
+  if (type === 'approval' && settings.approvalEmail === false) return false;
+  if (type === 'system' && settings.systemEmail === false) return false;
+  return true;
+}
+
+async function sendVerificationEmailForUser(req, { toEmail, token }) {
+  const appUrl = getPublicAppUrl(req);
+  const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(token)}`;
+  const subject = 'Polithane – E-posta doğrulama';
+  const text =
+    `Merhaba,\n\n` +
+    `Polithane hesabınızı aktifleştirmek için e-posta adresinizi doğrulayın:\n${verifyUrl}\n\n` +
+    `Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n`;
+  const html = emailLayout({
+    title: 'E-posta adresinizi doğrulayın',
+    bodyHtml: `
+      <p>Hesabınızı aktifleştirmek için lütfen aşağıdaki butona tıklayın:</p>
+      <p>
+        <a href="${verifyUrl}" style="display:inline-block;padding:12px 18px;background:#009fd6;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
+          E-postamı doğrula
+        </a>
+      </p>
+      <p style="font-size:12px;color:#6b7280;">Link çalışmazsa: <span style="color:#009fd6;word-break:break-all;">${verifyUrl}</span></p>
+    `,
+  });
+  await safeSendEmail({ to: toEmail, subject, html, text });
+}
+
+async function sendWelcomeEmailToUser(req, { toEmail, fullName }) {
+  const appUrl = getPublicAppUrl(req);
+  const subject = 'Polithane – Hoş geldiniz';
+  const html = emailLayout({
+    title: 'Hoş geldiniz!',
+    bodyHtml: `
+      <p>Merhaba <strong>${String(fullName || '').trim() || 'kullanıcı'}</strong>,</p>
+      <p>Polithane ailesine katıldığınız için teşekkür ederiz.</p>
+      <p><a href="${appUrl}" style="color:#009fd6;font-weight:700;">Polithane’ye git</a></p>
+    `,
+  });
+  const text = `Merhaba ${String(fullName || '').trim() || 'kullanıcı'},\n\nPolithane ailesine hoş geldiniz.\n${appUrl}\n`;
+  await safeSendEmail({ to: toEmail, subject, html, text });
+}
+
+async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
+  try {
+    const rows = await supabaseRestGet('users', { select: 'id,email,full_name,metadata,is_active,email_verified', id: `eq.${userId}`, limit: '1' }).catch(() => []);
+    const u = rows?.[0] || null;
+    if (!u?.email) return;
+    if (u?.is_active === false) return;
+    const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+    if (!shouldEmailFromMeta(meta, type)) return;
+
+    const appUrl = getPublicAppUrl(req);
+    const link = postId ? `${appUrl}/post/${encodeURIComponent(postId)}` : actorId ? `${appUrl}/profile/${encodeURIComponent(actorId)}` : appUrl;
+
+    let actorName = '';
+    if (actorId) {
+      const aRows = await supabaseRestGet('users', { select: 'id,full_name,username', id: `eq.${actorId}`, limit: '1' }).catch(() => []);
+      const a = aRows?.[0] || null;
+      actorName = a?.full_name || a?.username || '';
+    }
+
+    const titleMap = {
+      like: 'Beğeni',
+      comment: 'Yorum',
+      share: 'Paylaşım',
+      follow: 'Yeni takip',
+      message: 'Yeni mesaj',
+      approval: 'Üyelik durumu',
+      system: 'Bildirim',
+    };
+    const ttl = titleMap[String(type || 'system')] || 'Bildirim';
+    const subject = `Polithane – ${ttl}`;
+    const detail =
+      type === 'like'
+        ? `${actorName ? `<strong>${actorName}</strong> ` : ''}paylaşımınızı beğendi.`
+        : type === 'comment'
+          ? `${actorName ? `<strong>${actorName}</strong> ` : ''}paylaşımınıza yorum yaptı.`
+          : type === 'share'
+            ? `${actorName ? `<strong>${actorName}</strong> ` : ''}paylaşımınızı paylaştı.`
+            : type === 'follow'
+              ? `${actorName ? `<strong>${actorName}</strong> ` : ''}sizi takip etmeye başladı.`
+              : type === 'approval'
+                ? `Üyeliğiniz ile ilgili bir güncelleme var.`
+                : `Yeni bir bildiriminiz var.`;
+
+    const html = emailLayout({
+      title: ttl,
+      bodyHtml: `
+        <p>${detail}</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+            Görüntüle
+          </a>
+        </p>
+      `,
+    });
+    const text = `${ttl}\n\n${actorName ? actorName + ' ' : ''}${detail.replace(/<[^>]+>/g, '')}\n${link}\n`;
+    await safeSendEmail({ to: u.email, subject, html, text });
+  } catch {
+    // best-effort
+  }
+}
+
+async function sendMessageEmail(req, { receiverId, senderId, messagePreview }) {
+  try {
+    const recvRows = await supabaseRestGet('users', { select: 'id,email,metadata,is_active', id: `eq.${receiverId}`, limit: '1' }).catch(() => []);
+    const recv = recvRows?.[0] || null;
+    if (!recv?.email) return;
+    if (recv.is_active === false) return;
+    const meta = recv?.metadata && typeof recv.metadata === 'object' ? recv.metadata : {};
+    if (!shouldEmailFromMeta(meta, 'message')) return;
+
+    const senderRows = await supabaseRestGet('users', { select: 'id,full_name,username', id: `eq.${senderId}`, limit: '1' }).catch(() => []);
+    const sender = senderRows?.[0] || null;
+    const senderName = sender?.full_name || sender?.username || 'Bir kullanıcı';
+
+    const appUrl = getPublicAppUrl(req);
+    const link = `${appUrl}/messages?to=${encodeURIComponent(senderId)}`;
+    const subject = `Polithane – Yeni mesaj (${senderName})`;
+    const safePreview = String(messagePreview || '').slice(0, 220);
+    const html = emailLayout({
+      title: 'Yeni mesajınız var',
+      bodyHtml: `
+        <p><strong>${senderName}</strong> size bir mesaj gönderdi.</p>
+        ${safePreview ? `<div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin:12px 0;white-space:pre-wrap;">${safePreview}</div>` : ''}
+        <p>
+          <a href="${link}" style="display:inline-block;padding:10px 14px;background:#009fd6;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+            Mesajı aç
+          </a>
+        </p>
+      `,
+    });
+    const text = `Yeni mesajınız var.\nGönderen: ${senderName}\n\n${safePreview}\n\n${link}\n`;
+    await safeSendEmail({ to: recv.email, subject, html, text });
+  } catch {
+    // best-effort
+  }
 }
 
 async function safeUserPatch(userId, patch) {
@@ -2681,6 +2880,16 @@ async function authLogin(req, res) {
       // ignore
     }
     
+    // Email verification gate (optional)
+    const emailVerificationRequired = String(process.env.EMAIL_VERIFICATION_ENABLED || '').trim() === 'true';
+    if (emailVerificationRequired) {
+      const meta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : {};
+      const verified = user?.email_verified === true || meta?.email_verified === true;
+      if (!verified) {
+        return res.status(403).json({ success: false, error: 'E-posta adresinizi doğrulamanız gerekiyor.', code: 'EMAIL_NOT_VERIFIED' });
+      }
+    }
+
     // Approval pending: allow login, but ensure user sees a notification.
     try {
       const ut = String(user?.user_type || 'citizen');
@@ -2707,6 +2916,7 @@ async function authLogin(req, res) {
               await supabaseRestInsert('notifications', [{ user_id: user.id, type: 'approval', is_read: false }]).catch(() => {});
             }
           });
+          sendNotificationEmail(req, { userId: user.id, type: 'approval' }).catch(() => null);
         }
       }
     } catch {
@@ -2859,6 +3069,63 @@ async function authResetPassword(req, res) {
   return res.json({ success: true, message: 'Şifreniz sıfırlandı.' });
 }
 
+async function authVerifyEmail(req, res) {
+  const token = String(req.query?.token || '').trim();
+  if (!token) return res.status(400).json({ success: false, error: 'Token eksik.' });
+  const tokenHash = sha256Hex(token);
+
+  // Try metadata-based storage
+  const rows = await supabaseRestGet('users', {
+    select: 'id,email,full_name,metadata,email_verified',
+    'metadata->>email_verification_token_hash': `eq.${tokenHash}`,
+    limit: '1',
+  }).catch(() => []);
+  const u = rows?.[0] || null;
+  if (!u?.id) return res.status(400).json({ success: false, error: 'Geçersiz veya süresi dolmuş link.' });
+  const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+  const exp = meta.email_verification_expires_at ? new Date(meta.email_verification_expires_at) : null;
+  if (!exp || !Number.isFinite(exp.getTime()) || exp.getTime() < Date.now()) {
+    return res.status(400).json({ success: false, error: 'Doğrulama linkinin süresi dolmuş.' });
+  }
+  const nextMeta = {
+    ...meta,
+    email_verified: true,
+    email_verification_token_hash: null,
+    email_verification_expires_at: null,
+    email_verified_at: new Date().toISOString(),
+  };
+  await safeUserPatch(u.id, { metadata: nextMeta, email_verified: true }).catch(() => null);
+  await sendWelcomeEmailToUser(req, { toEmail: u.email, fullName: u.full_name }).catch(() => null);
+  return res.json({ success: true, message: 'E-posta doğrulandı.' });
+}
+
+async function authResendVerification(req, res) {
+  const body = await readJsonBody(req);
+  const email = String(body?.email || '').trim().toLowerCase();
+  if (!email) return res.status(400).json({ success: false, error: 'Email gerekli.' });
+  const rows = await supabaseRestGet('users', { select: 'id,email,metadata,email_verified,is_active', email: `eq.${email}`, limit: '1' }).catch(() => []);
+  const u = rows?.[0] || null;
+  if (!u?.id) return res.json({ success: true, message: 'Eğer bu e-posta kayıtlıysa, doğrulama bağlantısı gönderilecektir.' });
+  if (u?.is_active === false) return res.json({ success: true, message: 'Eğer bu e-posta kayıtlıysa, doğrulama bağlantısı gönderilecektir.' });
+  const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+  const verified = u?.email_verified === true || meta?.email_verified === true;
+  if (verified) return res.json({ success: true, message: 'E-posta zaten doğrulanmış.' });
+
+  // eslint-disable-next-line global-require
+  const crypto = require('crypto');
+  const tokenRaw = crypto.randomBytes(32).toString('base64url');
+  const expiresIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const nextMeta = {
+    ...meta,
+    email_verification_token_hash: sha256Hex(tokenRaw),
+    email_verification_expires_at: expiresIso,
+    email_verified: false,
+  };
+  await safeUserPatch(u.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
+  await sendVerificationEmailForUser(req, { toEmail: u.email, token: tokenRaw });
+  return res.json({ success: true, message: 'Doğrulama e-postası gönderildi.' });
+}
+
 async function authRegister(req, res) {
     const body = await readJsonBody(req);
     const { email, password, full_name, user_type = 'citizen', province, district, party_id, politician_type, metadata = {}, document, is_claim, claim_user_id } = body;
@@ -2915,6 +3182,7 @@ async function authRegister(req, res) {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
+    const emailVerificationRequired = String(process.env.EMAIL_VERIFICATION_ENABLED || '').trim() === 'true';
     const cleanEmpty = (v) => (v === '' ? null : v);
     const userData = {
         username,
@@ -2931,7 +3199,7 @@ async function authRegister(req, res) {
         is_verified: false,
         // Claim registrations must never create an immediately-usable account.
         is_active: isClaim ? false : true,
-        email_verified: true,
+        email_verified: emailVerificationRequired ? false : true,
         is_admin: false
     };
 
@@ -3028,6 +3296,31 @@ async function authRegister(req, res) {
       });
     }
 
+    // Email verification (best-effort). If enabled, user can register but must verify before login.
+    if (emailVerificationRequired) {
+      // eslint-disable-next-line global-require
+      const crypto = require('crypto');
+      const tokenRaw = crypto.randomBytes(32).toString('base64url');
+      const expiresIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
+      // Store in metadata so we don't depend on optional columns.
+      const baseMeta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : (metadata && typeof metadata === 'object' ? metadata : {});
+      const nextMeta = {
+        ...baseMeta,
+        email_verification_token_hash: sha256Hex(tokenRaw),
+        email_verification_expires_at: expiresIso,
+        email_verified: false,
+      };
+      await safeUserPatch(user.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
+      await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw });
+      return res.status(201).json({
+        success: true,
+        message: 'Kayıt başarılı. Lütfen e-posta adresinizi doğrulayın.',
+        data: { requiresApproval },
+      });
+    }
+
+    // Welcome email (best-effort)
+    sendWelcomeEmailToUser(req, { toEmail: user.email, fullName: user.full_name }).catch(() => null);
     const token = signJwt({ id: user.id, username: user.username, email: user.email, user_type: user.user_type, is_admin: !!user.is_admin });
     res.status(201).json({ success: true, message: 'Kayıt başarılı.', data: { user, token, requiresApproval } });
 }
@@ -3338,6 +3631,22 @@ async function sendMessage(req, res) {
     is_deleted_by_sender: false,
     is_deleted_by_receiver: false,
   }]);
+  // Email receiver (best-effort)
+  try {
+    const preview = (() => {
+      // If attachment message, show a generic preview
+      try {
+        const obj = JSON.parse(String(content || ''));
+        if (obj && typeof obj === 'object' && obj.type === 'image') return (obj.text ? String(obj.text).slice(0, 200) : '📷 Resim mesajı');
+      } catch {
+        // ignore
+      }
+      return String(text || content || '').slice(0, 220);
+    })();
+    sendMessageEmail(req, { receiverId: Number(receiver_id), senderId: auth.id, messagePreview: preview }).catch(() => null);
+  } catch {
+    // ignore
+  }
   res.status(201).json({ success: true, data: inserted?.[0] || null });
 }
 
@@ -3594,6 +3903,8 @@ export default async function handler(req, res) {
       if (url === '/api/auth/login' && req.method === 'POST') return await authLogin(req, res);
       if (url === '/api/auth/register' && req.method === 'POST') return await authRegister(req, res);
       if (url === '/api/auth/forgot-password' && req.method === 'POST') return await authForgotPassword(req, res);
+      if (url === '/api/auth/resend-verification' && req.method === 'POST') return await authResendVerification(req, res);
+      if (url === '/api/auth/verify-email' && req.method === 'GET') return await authVerifyEmail(req, res);
       if (url === '/api/auth/reset-password' && req.method === 'POST') return await authResetPassword(req, res);
       if (url === '/api/auth/me' && req.method === 'GET') return await authMe(req, res);
       if (url === '/api/auth/change-password' && req.method === 'POST') return await authChangePassword(req, res);
