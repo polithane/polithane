@@ -6,6 +6,7 @@ import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
 export const LoginPageNew = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [logoFailed, setLogoFailed] = useState(false);
   
   const [formData, setFormData] = useState({
     identifier: '',
@@ -60,17 +61,15 @@ export const LoginPageNew = () => {
             className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform"
             onClick={() => navigate('/')}
           >
-            <img 
-              src="/ikon.png" 
+            {!logoFailed && (
+              <img 
+                src="/favicon.ico" 
               alt="Polithane" 
               className="w-20 h-20 object-contain drop-shadow-lg"
-              onError={(e) => {
-                // Fallback to default icon if not found
-                e.target.style.display = 'none';
-                e.target.nextSibling.style.display = 'flex';
-              }}
-            />
-            <div className="hidden items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg">
+                onError={() => setLogoFailed(true)}
+              />
+            )}
+            <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg`}>
               <span className="text-4xl font-black text-white">P</span>
             </div>
           </div>

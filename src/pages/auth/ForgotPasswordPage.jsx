@@ -5,6 +5,7 @@ import { apiCall } from '../../utils/api';
 
 export const ForgotPasswordPage = () => {
   const navigate = useNavigate();
+  const [logoFailed, setLogoFailed] = useState(false);
   
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,31 +17,19 @@ export const ForgotPasswordPage = () => {
     setError('');
     setLoading(true);
 
-    console.log('🔄 Forgot Password - Starting...');
-    console.log('Email:', email);
-
     try {
-      console.log('📤 Sending request to /api/auth/forgot-password');
-      
       const response = await apiCall('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
 
-      console.log('📥 Response received:', response);
-
       if (response.success) {
-        console.log('✅ Success! Showing success page...');
         setSuccess(true);
       } else {
-        console.error('❌ Error response:', response.error);
         setError(response.error || 'Bir hata oluştu');
         setLoading(false);
       }
     } catch (err) {
-      console.error('💥 Exception caught:', err);
-      console.error('Error message:', err.message);
-      console.error('Error stack:', err.stack);
       setError(err.message || 'Bir hata oluştu. Lütfen tekrar deneyin.');
       setLoading(false);
     }
@@ -55,16 +44,15 @@ export const ForgotPasswordPage = () => {
               className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform"
               onClick={() => navigate('/')}
             >
-              <img 
-                src="/ikon.png" 
+              {!logoFailed && (
+                <img 
+                  src="/favicon.ico" 
                 alt="Polithane" 
                 className="w-20 h-20 object-contain drop-shadow-lg"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-              <div className="hidden items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg">
+                  onError={() => setLogoFailed(true)}
+                />
+              )}
+              <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg`}>
                 <span className="text-4xl font-black text-white">P</span>
               </div>
             </div>
@@ -118,16 +106,15 @@ export const ForgotPasswordPage = () => {
             className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform"
             onClick={() => navigate('/')}
           >
-            <img 
-              src="/ikon.png" 
+            {!logoFailed && (
+              <img 
+                src="/favicon.ico" 
               alt="Polithane" 
               className="w-20 h-20 object-contain drop-shadow-lg"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                e.target.nextSibling.style.display = 'flex';
-              }}
-            />
-            <div className="hidden items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg">
+                onError={() => setLogoFailed(true)}
+              />
+            )}
+            <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg`}>
               <span className="text-4xl font-black text-white">P</span>
             </div>
           </div>

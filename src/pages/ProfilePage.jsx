@@ -561,7 +561,7 @@ export const ProfilePage = () => {
       >
         <div className="flex items-center justify-center">
           <img
-            src={user?.avatar_url || user?.profile_image || '/ikon.png'}
+            src={user?.avatar_url || user?.profile_image || '/favicon.ico'}
             alt={user?.full_name || 'Profil'}
             className="max-w-full max-h-[70vh] rounded-2xl object-contain bg-gray-50 border border-gray-200"
           />

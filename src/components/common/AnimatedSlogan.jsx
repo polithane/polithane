@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 export const AnimatedSlogan = () => {
   const navigate = useNavigate();
+  const [logoFailed, setLogoFailed] = useState(false);
   // NOTE (per product request):
   // - No full sentence mode
   // - Words should keep rotating forever
@@ -35,19 +36,17 @@ export const AnimatedSlogan = () => {
   return (
     <div className="flex items-center gap-3 min-w-0">
       {/* Logo - Tıklanabilir */}
-      <img 
-        src="/logo.png" 
-        alt="Polithane Logo" 
-        className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
-        onClick={() => navigate('/')}
-        onError={(e) => {
-          // Fallback to text if logo not found
-          e.target.style.display = 'none';
-          e.target.nextSibling.style.display = 'inline';
-        }}
-      />
+      {!logoFailed && (
+        <img
+          src="/favicon.ico"
+          alt="Polithane"
+          className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => navigate('/')}
+          onError={() => setLogoFailed(true)}
+        />
+      )}
       <span 
-        className="text-primary-blue font-bold text-xl whitespace-nowrap hidden cursor-pointer hover:opacity-80 transition-opacity"
+        className={`text-primary-blue font-bold text-xl whitespace-nowrap cursor-pointer hover:opacity-80 transition-opacity ${logoFailed ? '' : 'hidden'}`}
         onClick={() => navigate('/')}
       >
         Polithane

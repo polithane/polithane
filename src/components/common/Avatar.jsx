@@ -1,8 +1,8 @@
 import { Check } from 'lucide-react';
 import { clsx } from 'clsx';
 
-// Default avatar - Polithane logosu
-const DEFAULT_AVATAR = '/ikon.png';
+// Default avatar
+const DEFAULT_AVATAR = '/favicon.ico';
 
 export const Avatar = ({ 
   src, 
@@ -43,8 +43,13 @@ export const Avatar = ({
         crossOrigin="anonymous"
         onError={(e) => {
           // Hata durumunda default logo göster
-          console.log('Avatar load error:', src);
-          e.target.src = DEFAULT_AVATAR;
+          try {
+            // Avoid infinite loop
+            if (e.currentTarget?.src && e.currentTarget.src.endsWith(DEFAULT_AVATAR)) return;
+            e.currentTarget.src = DEFAULT_AVATAR;
+          } catch {
+            // ignore
+          }
         }}
       />
       {/* Parti Logosu - Sol alt köşe */}

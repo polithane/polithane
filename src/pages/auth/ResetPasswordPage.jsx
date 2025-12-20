@@ -7,6 +7,7 @@ export const ResetPasswordPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
+  const [logoFailed, setLogoFailed] = useState(false);
   
   const [formData, setFormData] = useState({
     password: '',
@@ -86,18 +87,18 @@ export const ResetPasswordPage = () => {
               className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform"
               onClick={() => navigate('/')}
             >
-              <img 
-                src="/ikon.png" 
-                alt="Polithane" 
-                className="w-20 h-20 object-contain drop-shadow-lg"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-              <div className="hidden items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg">
-                <span className="text-4xl font-black text-white">P</span>
-              </div>
+              {!logoFailed ? (
+                <img
+                  src="/favicon.ico"
+                  alt="Polithane"
+                  className="w-20 h-20 object-contain drop-shadow-lg"
+                  onError={() => setLogoFailed(true)}
+                />
+              ) : (
+                <div className="flex items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg">
+                  <span className="text-4xl font-black text-white">P</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -141,18 +142,18 @@ export const ResetPasswordPage = () => {
             className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform"
             onClick={() => navigate('/')}
           >
-            <img 
-              src="/ikon.png" 
-              alt="Polithane" 
-              className="w-20 h-20 object-contain drop-shadow-lg"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                e.target.nextSibling.style.display = 'flex';
-              }}
-            />
-            <div className="hidden items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg">
-              <span className="text-4xl font-black text-white">P</span>
-            </div>
+            {!logoFailed ? (
+              <img
+                src="/favicon.ico"
+                alt="Polithane"
+                className="w-20 h-20 object-contain drop-shadow-lg"
+                onError={() => setLogoFailed(true)}
+              />
+            ) : (
+              <div className="flex items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg">
+                <span className="text-4xl font-black text-white">P</span>
+              </div>
+            )}
           </div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Yeni Şifre</h1>
           <p className="text-gray-600">Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
