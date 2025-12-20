@@ -55,19 +55,43 @@ export const apiCall = async (endpoint, options = {}) => {
     debugLog('📤 Fetching...');
     
     // Timeout kontrolü (30 saniye)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      debugError('⏰ Request timeout! (30s)');
-      controller.abort();
-    }, 30000);
-    
-    const response = await fetch(url, {
+    // NOTE: Some mobile/older browsers don't support AbortController.
+    const supportsAbort = typeof AbortController !== 'undefined';
+    const timeoutMs = 30000;
+    let timeoutId = null;
+    let controller = null;
+
+    if (supportsAbort) {
+      controller = new AbortController();
+      timeoutId = setTimeout(() => {
+        debugError('⏰ Request timeout! (30s)');
+        try {
+          controller.abort();
+        } catch {
+          // ignore
+        }
+      }, timeoutMs);
+    }
+
+    const fetchPromise = fetch(url, {
       ...options,
       headers,
-      signal: controller.signal
+      ...(supportsAbort ? { signal: controller.signal } : {}),
     });
-    
-    clearTimeout(timeoutId);
+
+    const response = supportsAbort
+      ? await fetchPromise
+      : await Promise.race([
+          fetchPromise,
+          new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+              debugError('⏰ Request timeout! (30s)');
+              reject(new Error('REQUEST_TIMEOUT'));
+            }, timeoutMs);
+          }),
+        ]);
+
+    if (timeoutId) clearTimeout(timeoutId);
     debugLog('📥 Response received:', response.status, response.statusText);
 
     // Network error
@@ -110,7 +134,7 @@ export const apiCall = async (endpoint, options = {}) => {
     debugError('Error message:', error.message);
     
     // Timeout hatası
-    if (error.name === 'AbortError') {
+    if (error.name === 'AbortError' || error.message === 'REQUEST_TIMEOUT') {
       throw new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.');
     }
     
