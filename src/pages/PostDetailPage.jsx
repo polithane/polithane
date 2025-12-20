@@ -445,12 +445,12 @@ export const PostDetailPage = () => {
               </div>
             )}
             
-            {/* Etkileşim Butonları - Kompakt */}
+            {/* Etkileşim Butonları - Büyük ikonlar (mobil öncelikli) */}
             <div className="grid grid-cols-3 gap-2 pt-4 border-t">
               {/* BEĞEN - Özel Vurgulu */}
               <button onClick={handleToggleLike} className="flex items-center justify-center gap-2 bg-gradient-to-br from-red-500 via-pink-500 to-red-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                <Heart className="w-6 h-6" fill="currentColor" />
-                <span className="text-sm font-bold">BEĞEN ({formatNumber(uiPost.like_count)})</span>
+                <Heart className="w-7 h-7 md:w-6 md:h-6" fill="currentColor" />
+                <span className="text-base md:text-sm font-black tracking-tight">BEĞEN ({formatNumber(uiPost.like_count)})</span>
               </button>
               
               {/* YORUM */}
@@ -461,8 +461,8 @@ export const PostDetailPage = () => {
                 }}
                 className="flex items-center justify-center gap-2 bg-gradient-to-br from-primary-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                <MessageCircle className="w-6 h-6" />
-                <span className="text-sm font-bold">YORUM ({formatNumber(uiPost.comment_count)})</span>
+                <MessageCircle className="w-7 h-7 md:w-6 md:h-6" />
+                <span className="text-base md:text-sm font-black tracking-tight">YORUM ({formatNumber(uiPost.comment_count)})</span>
               </button>
               
               {/* PAYLAŞ */}
@@ -490,8 +490,8 @@ export const PostDetailPage = () => {
                 }}
                 className="flex items-center justify-center gap-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                <Share2 className="w-6 h-6" />
-                <span className="text-sm font-bold">PAYLAŞ ({formatNumber(uiPost.share_count || 0)})</span>
+                <Share2 className="w-7 h-7 md:w-6 md:h-6" />
+                <span className="text-base md:text-sm font-black tracking-tight">PAYLAŞ ({formatNumber(uiPost.share_count || 0)})</span>
               </button>
             </div>
             
@@ -507,7 +507,7 @@ export const PostDetailPage = () => {
                 }}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-red-600 hover:bg-red-50 text-sm font-black transition-colors"
               >
-                <Flag className="w-6 h-6" />
+                <Flag className="w-7 h-7 md:w-6 md:h-6" />
                 <span className="tracking-tight">Şikayet Et</span>
               </button>
             </div>
@@ -603,7 +603,7 @@ export const PostDetailPage = () => {
                         }}
                         title="Bildir"
                       >
-                        <Flag className="w-6 h-6" />
+                        <Flag className="w-7 h-7" />
                       </button>
                     </div>
                     {editingId === (comment.id || comment.comment_id) ? (
@@ -707,8 +707,8 @@ export const PostDetailPage = () => {
                         }}
                         title={isPendingComment(comment) ? 'Bu yorum incelemede' : 'Beğen'}
                       >
-                        <Heart className="w-6 h-6" fill="currentColor" />
-                        <span className="text-base font-black text-gray-800">{formatNumber(comment.like_count)}</span>
+                        <Heart className="w-7 h-7" fill="currentColor" />
+                        <span className="text-lg font-black text-gray-800">{formatNumber(comment.like_count)}</span>
                       </button>
                     </div>
                   </div>
