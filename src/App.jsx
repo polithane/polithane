@@ -64,6 +64,7 @@ import { SecuritySettings } from './pages/admin/SecuritySettings';
 import { DatabaseManagement } from './pages/admin/DatabaseManagement';
 import { APISettings } from './pages/admin/APISettings';
 import { PartyManagement } from './pages/admin/PartyManagement';
+import { AgendaManagement } from './pages/admin/AgendaManagement';
 import { DeleteConfirmPage } from './pages/DeleteConfirmPage';
 import { AboutPage } from './pages/AboutPage';
 import { MissionPage } from './pages/MissionPage';
@@ -133,6 +134,7 @@ function App() {
           <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="parties" element={<PartyManagement />} />
+          <Route path="agendas" element={<AgendaManagement />} />
           <Route path="posts" element={<PostModeration />} />
           <Route path="comments" element={<CommentModeration />} />
           <Route path="media" element={<MediaManagement />} />

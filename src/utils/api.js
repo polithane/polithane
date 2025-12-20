@@ -388,6 +388,26 @@ export const admin = {
       method: 'DELETE',
     }),
 
+  // Agendas
+  getAgendas: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/agendas${query ? `?${query}` : ''}`);
+  },
+  createAgenda: (data) =>
+    apiCall('/api/admin/agendas', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  updateAgenda: (agendaId, data) =>
+    apiCall(`/api/admin/agendas/${agendaId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data || {}),
+    }),
+  deleteAgenda: (agendaId) =>
+    apiCall(`/api/admin/agendas/${agendaId}`, {
+      method: 'DELETE',
+    }),
+
   // Settings
   getSettings: () => apiCall('/api/admin/settings'),
 

@@ -106,16 +106,16 @@ export const HomePage = () => {
 
         setPosts((postsData || []).map(mapDbPostToUi));
 
-        // Agendas: load from admin-managed list (fallback to mock)
+        // Agendas: load from admin-managed list (no mock fallback in production)
         try {
           const agendaRes = await apiCall('/api/agendas?limit=80').catch(() => null);
           const list = agendaRes?.data || [];
           const normalized = (Array.isArray(list) ? list : [])
             .filter((a) => a?.is_active !== false)
             .slice(0, 80);
-          setAgendas(normalized.length > 0 ? normalized : mockAgendas);
+          setAgendas(normalized);
         } catch {
-          setAgendas(mockAgendas);
+          setAgendas(import.meta.env.PROD ? [] : mockAgendas);
         }
 
         // PoliFest: real profiles from DB (no mock)

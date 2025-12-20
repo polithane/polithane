@@ -2547,6 +2547,99 @@ async function adminDeletePost(req, res, postId) {
   res.json({ success: true, data: updated?.[0] || null });
 }
 
+async function adminGetAgendas(req, res) {
+  requireAdmin(req, res);
+  const { page = 1, limit = 50, search, is_active, is_trending } = req.query || {};
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+  const offset = (pageNum - 1) * limitNum;
+
+  const params = {
+    select: '*',
+    order: 'trending_score.desc',
+    limit: String(limitNum),
+    offset: String(offset),
+  };
+  if (is_active === 'true' || is_active === 'false') params.is_active = `eq.${is_active}`;
+  if (is_trending === 'true' || is_trending === 'false') params.is_trending = `eq.${is_trending}`;
+  if (search && String(search).trim()) {
+    const q = String(search).trim();
+    params.or = `(title.ilike.*${q}*,slug.ilike.*${q}*)`;
+  }
+
+  const countParams = { select: 'id' };
+  if (params.is_active) countParams.is_active = params.is_active;
+  if (params.is_trending) countParams.is_trending = params.is_trending;
+  if (params.or) countParams.or = params.or;
+
+  const [total, rows] = await Promise.all([
+    supabaseCount('agendas', countParams).catch(() => 0),
+    supabaseRestGet('agendas', params).catch(() => []),
+  ]);
+
+  return res.json({
+    success: true,
+    data: Array.isArray(rows) ? rows : [],
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.max(1, Math.ceil((total || 0) / limitNum)),
+    },
+  });
+}
+
+async function adminCreateAgenda(req, res) {
+  requireAdmin(req, res);
+  const body = await readJsonBody(req);
+  const title = String(body?.title || '').trim();
+  if (!title) return res.status(400).json({ success: false, error: 'title zorunludur.' });
+
+  const slugify = (input) => String(input || '').trim().toLowerCase()
+    .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
+    .replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 200);
+
+  const nowIso = new Date().toISOString();
+  const payload = {
+    title,
+    slug: String(body?.slug || '').trim() || slugify(title),
+    description: body?.description ?? null,
+    is_active: typeof body?.is_active === 'boolean' ? body.is_active : true,
+    is_trending: typeof body?.is_trending === 'boolean' ? body.is_trending : true,
+    trending_score: Number.isFinite(Number(body?.trending_score)) ? Number(body.trending_score) : 0,
+    post_count: Number.isFinite(Number(body?.post_count)) ? Number(body.post_count) : 0,
+    total_polit_score: Number.isFinite(Number(body?.total_polit_score)) ? Number(body.total_polit_score) : 0,
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  const inserted = await supabaseRestInsert('agendas', [payload]).catch(() => []);
+  return res.status(201).json({ success: true, data: inserted?.[0] || null });
+}
+
+async function adminUpdateAgenda(req, res, agendaId) {
+  requireAdmin(req, res);
+  const body = await readJsonBody(req);
+  const allowed = {};
+  const fields = ['title', 'slug', 'description', 'trending_score', 'post_count', 'total_polit_score'];
+  for (const f of fields) {
+    if (Object.prototype.hasOwnProperty.call(body, f)) allowed[f] = body[f];
+  }
+  if (typeof body?.is_active === 'boolean') allowed.is_active = body.is_active;
+  if (typeof body?.is_trending === 'boolean') allowed.is_trending = body.is_trending;
+  allowed.updated_at = new Date().toISOString();
+  if (Object.keys(allowed).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
+
+  const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, allowed).catch(() => []);
+  return res.json({ success: true, data: updated?.[0] || null });
+}
+
+async function adminDeleteAgenda(req, res, agendaId) {
+  requireAdmin(req, res);
+  const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, { is_active: false, updated_at: new Date().toISOString() }).catch(() => []);
+  return res.json({ success: true, data: updated?.[0] || null });
+}
+
 function slugifyParty(input) {
   const s = String(input || '').trim().toLowerCase();
   const map = { ç: 'c', ğ: 'g', ı: 'i', i: 'i', ö: 'o', ş: 's', ü: 'u' };
@@ -4003,6 +4096,8 @@ export default async function handler(req, res) {
       if (url === '/api/admin/users/duplicates' && req.method === 'GET') return await adminFindDuplicateUsers(req, res);
       if (url === '/api/admin/users/dedupe' && req.method === 'POST') return await adminDedupeUsers(req, res);
       if (url === '/api/admin/posts' && req.method === 'GET') return await adminGetPosts(req, res);
+      if (url === '/api/admin/agendas' && req.method === 'GET') return await adminGetAgendas(req, res);
+      if (url === '/api/admin/agendas' && req.method === 'POST') return await adminCreateAgenda(req, res);
       if (url === '/api/admin/parties' && req.method === 'GET') return await adminGetParties(req, res);
       if (url === '/api/admin/parties' && req.method === 'POST') return await adminCreateParty(req, res);
       if (url === '/api/admin/notifications' && req.method === 'POST') return await adminSendNotification(req, res);
@@ -4033,6 +4128,14 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/admin/posts/') && req.method === 'DELETE') {
         const postId = url.split('/api/admin/posts/')[1];
         return await adminDeletePost(req, res, postId);
+      }
+      if (url.startsWith('/api/admin/agendas/') && req.method === 'PUT') {
+        const agendaId = url.split('/api/admin/agendas/')[1];
+        return await adminUpdateAgenda(req, res, agendaId);
+      }
+      if (url.startsWith('/api/admin/agendas/') && req.method === 'DELETE') {
+        const agendaId = url.split('/api/admin/agendas/')[1];
+        return await adminDeleteAgenda(req, res, agendaId);
       }
       if (url.startsWith('/api/admin/parties/') && req.method === 'PUT') {
         const partyId = url.split('/api/admin/parties/')[1];

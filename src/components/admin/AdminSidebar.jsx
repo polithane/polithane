@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, FileText, TrendingUp, Settings, Palette, 
   Shield, Search, DollarSign, Megaphone, Bot, BarChart3, Mail, 
-  Globe, Image, Bell, Database, Code, Zap, Flag
+  Globe, Image, Bell, Database, Code, Zap, Flag, Flame
 } from 'lucide-react';
 
 export const AdminSidebar = () => {
@@ -21,6 +21,7 @@ export const AdminSidebar = () => {
       items: [
         { path: '/admin/users', icon: Users, label: 'Kullanıcı Yönetimi' },
         { path: '/admin/parties', icon: Flag, label: 'Parti Yönetimi' },
+        { path: '/admin/agendas', icon: Flame, label: 'Gündem Yönetimi' },
         { path: '/admin/posts', icon: FileText, label: 'Post Moderasyonu' },
         { path: '/admin/comments', icon: FileText, label: 'Yorum Moderasyonu' },
         { path: '/admin/media', icon: Image, label: 'Medya Yönetimi' },
