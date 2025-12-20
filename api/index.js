@@ -1481,6 +1481,166 @@ function requireAdmin(req, res) {
   return auth;
 }
 
+function requireAdminOrBootstrapToken(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (auth?.id && auth.is_admin) return { mode: 'admin', auth };
+
+  const expected = String(process.env.ADMIN_BOOTSTRAP_TOKEN || '').trim();
+  const provided = String(req.headers['x-admin-bootstrap-token'] || '').trim();
+  if (expected && provided && provided === expected) return { mode: 'bootstrap', auth: null };
+
+  res.status(401).json({ success: false, error: 'Unauthorized' });
+  return null;
+}
+
+async function adminEnvCheck(req, res) {
+  const gate = requireAdminOrBootstrapToken(req, res);
+  if (!gate) return;
+
+  // Return booleans only (never leak secrets)
+  const keys = [
+    'JWT_SECRET',
+    'SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_ANON_KEY',
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_FROM',
+    'ADMIN_BOOTSTRAP_TOKEN',
+    'PUBLIC_APP_URL',
+    'APP_URL',
+    'EMAIL_VERIFICATION_ENABLED',
+  ];
+
+  const present = {};
+  for (const k of keys) present[k] = !!String(process.env[k] || '').trim();
+
+  // Convenience flags
+  present.SUPABASE_KEY_OK = present.SUPABASE_SERVICE_ROLE_KEY || present.SUPABASE_ANON_KEY;
+  present.SMTP_OK = present.SMTP_HOST && present.SMTP_USER && present.SMTP_PASS && present.SMTP_FROM;
+
+  return res.json({ success: true, data: { present } });
+}
+
+async function adminSchemaCheck(req, res) {
+  const gate = requireAdminOrBootstrapToken(req, res);
+  if (!gate) return;
+
+  const env = {
+    SUPABASE_URL: !!String(process.env.SUPABASE_URL || '').trim(),
+    SUPABASE_SERVICE_ROLE_KEY: !!String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(),
+    SUPABASE_ANON_KEY: !!String(process.env.SUPABASE_ANON_KEY || '').trim(),
+  };
+  if (!env.SUPABASE_URL || (!env.SUPABASE_SERVICE_ROLE_KEY && !env.SUPABASE_ANON_KEY)) {
+    return res.json({
+      success: true,
+      data: {
+        ok: false,
+        env,
+        missingTables: [],
+        missingColumns: {},
+        note: 'Supabase env eksik olduğu için schema kontrolü yapılamadı.',
+      },
+    });
+  }
+
+  const missingTables = [];
+  const missingColumns = {};
+
+  const tableExists = async (table) => {
+    try {
+      await supabaseRestGet(table, { select: 'id', limit: '1' });
+      return true;
+    } catch (e) {
+      const msg = String(e?.message || '');
+      // Common PostgREST errors for missing relation/table
+      if (msg.toLowerCase().includes('does not exist') || msg.toLowerCase().includes('relation')) return false;
+      // If RLS blocks, table still exists; treat as exists to avoid false negatives.
+      if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('rls')) return true;
+      return false;
+    }
+  };
+
+  const columnExists = async (table, column) => {
+    try {
+      await supabaseRestGet(table, { select: `id,${column}`, limit: '1' });
+      return true;
+    } catch (e) {
+      const msg = String(e?.message || '');
+      const lower = msg.toLowerCase();
+      // PostgREST: "Could not find the '<col>' column"
+      if (lower.includes('could not find') && lower.includes('column')) return false;
+      // Postgres: column "<col>" does not exist
+      if (lower.includes(`column \"${String(column).toLowerCase()}\" does not exist`)) return false;
+      // If RLS blocks, column exists (avoid false negatives)
+      if (lower.includes('permission') || lower.includes('rls')) return true;
+      return false;
+    }
+  };
+
+  const check = async (table, columns) => {
+    const exists = await tableExists(table);
+    if (!exists) {
+      missingTables.push(table);
+      return;
+    }
+    for (const c of columns) {
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await columnExists(table, c);
+      if (!ok) {
+        if (!missingColumns[table]) missingColumns[table] = [];
+        missingColumns[table].push(c);
+      }
+    }
+  };
+
+  // Tables/columns our current app relies on (minimum set)
+  await check('users', ['id', 'username', 'email', 'password_hash', 'full_name', 'avatar_url', 'user_type', 'is_active', 'is_verified', 'is_admin', 'metadata', 'email_verified']);
+  await check('posts', [
+    'id',
+    'user_id',
+    'content_type',
+    'content_text',
+    'content',
+    'media_urls',
+    'thumbnail_url',
+    'media_duration',
+    'category',
+    'agenda_tag',
+    'polit_score',
+    'view_count',
+    'like_count',
+    'dislike_count',
+    'comment_count',
+    'share_count',
+    'is_featured',
+    'is_trending',
+    'is_deleted',
+    'created_at',
+  ]);
+  await check('follows', ['id', 'follower_id', 'following_id', 'created_at']);
+  await check('messages', ['id', 'sender_id', 'receiver_id', 'content', 'is_read', 'is_deleted_by_sender', 'is_deleted_by_receiver', 'created_at']);
+  await check('notifications', ['id', 'user_id', 'actor_id', 'type', 'post_id', 'comment_id', 'is_read', 'created_at']);
+  await check('agendas', ['id', 'title', 'slug', 'is_active', 'is_trending', 'trending_score', 'total_polit_score', 'post_count']);
+  await check('comments', ['id', 'post_id', 'user_id', 'content', 'is_deleted', 'created_at']);
+  await check('likes', ['id', 'post_id', 'comment_id', 'user_id', 'created_at']);
+  await check('parties', ['id', 'name', 'short_name', 'slug', 'logo_url', 'color', 'is_active']);
+
+  const ok = missingTables.length === 0 && Object.keys(missingColumns).length === 0;
+  return res.json({
+    success: true,
+    data: {
+      ok,
+      missingTables,
+      missingColumns,
+      note:
+        'Bu kontrol, PostgREST üzerinden column/table varlığını test eder. RLS engelleri varsa bazı alanlar "var" kabul edilir.',
+    },
+  });
+}
+
 async function adminBootstrap(req, res) {
   // One-time recovery endpoint for initial admin access.
   // Protected by an env token; do NOT leave this enabled without a strong token.
@@ -4248,6 +4408,8 @@ export default async function handler(req, res) {
 
       // Admin
       if (url === '/api/admin/bootstrap' && req.method === 'POST') return await adminBootstrap(req, res);
+      if (url === '/api/admin/env-check' && req.method === 'GET') return await adminEnvCheck(req, res);
+      if (url === '/api/admin/schema-check' && req.method === 'GET') return await adminSchemaCheck(req, res);
       if (url === '/api/admin/stats' && req.method === 'GET') return await adminGetStats(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
       if (url === '/api/admin/users/duplicates' && req.method === 'GET') return await adminFindDuplicateUsers(req, res);

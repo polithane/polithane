@@ -83,6 +83,59 @@ Proje şu anda mock data ile çalışmaktadır. Backend entegrasyonu için `src/
 
 ## 🌐 Deployment
 
+### Vercel Environment Variables (Önemli)
+
+Bu proje Vercel’de **Frontend (Vite)** + **Serverless API (`/api`)** olarak çalışır. Aşağıdaki değişkenler Vercel Project → Settings → Environment Variables kısmına girilmelidir.
+
+#### Frontend (Vite) – Required
+- **VITE_SUPABASE_URL**: Supabase project URL (public)
+- **VITE_SUPABASE_ANON_KEY**: Supabase anon key (public)
+
+#### Backend (`api/index.js`) – Required
+- **SUPABASE_URL**: Supabase project URL
+- **SUPABASE_SERVICE_ROLE_KEY**: Supabase service role key (**gizli**, server-only)
+- **JWT_SECRET**: JWT imzalama anahtarı (**gizli**)
+- **SMTP_HOST**: `mail.polithane.com`
+- **SMTP_PORT**: `587`
+- **SMTP_USER**: SMTP kullanıcı adı (örn. `bilgi@polithane.com` / `noreply@polithane.com`)
+- **SMTP_PASS**: SMTP şifresi (**gizli**)
+- **SMTP_FROM**: Gönderici adresi (örn. `bilgi@polithane.com`)
+
+#### Backend – Opsiyonel (ama önerilir)
+- **ADMIN_BOOTSTRAP_TOKEN**: ilk admin erişimi + üretimde debug kontrol endpoint’leri için token (**gizli**)
+- **PUBLIC_APP_URL**: örn `https://polithane.com` (email linklerinde kullanılır)
+- **EMAIL_VERIFICATION_ENABLED**: `true` / `false`
+
+> Not: `SUPABASE_ANON_KEY` backend tarafında da fallback olarak okunabiliyor ama **production’da service role** kullanmalısınız.
+
+### Production “self-check” (Vercel + Supabase kontrolü)
+
+Bu agent Vercel dashboard’una doğrudan erişemediği için, production’dan hızlı kontrol yapmanız için 2 endpoint eklendi (token ile korunur).
+
+#### 1) Vercel env var kontrolü (boolean)
+`GET /api/admin/env-check`
+
+#### 2) Supabase tablo/kolon kontrolü
+`GET /api/admin/schema-check`
+
+İsteklerde header ekleyin:
+- `x-admin-bootstrap-token: <ADMIN_BOOTSTRAP_TOKEN>`
+
+Örnek (terminalde):
+
+```bash
+curl -s "https://<SİTENİZ>/api/admin/env-check" -H "x-admin-bootstrap-token: <TOKEN>"
+curl -s "https://<SİTENİZ>/api/admin/schema-check" -H "x-admin-bootstrap-token: <TOKEN>"
+```
+
+### Supabase Migration (Fast için kritik)
+
+Fast sistemi `posts.is_trending` alanını kullanır. Eski schema kullanıyorsanız eksik olabilir.
+Supabase SQL Editor’da şu migration’ı çalıştırın:
+- `server/migrations/007_fast_posts_compat.sql`
+
+---
+
 Vercel'e deploy için:
 
 ```bash
