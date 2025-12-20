@@ -84,7 +84,7 @@ export const CommentModeration = () => {
     const Icon = badge.icon;
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
-        <Icon className="w-3 h-3" />
+        <Icon className="w-5 h-5 sm:w-4 sm:h-4" />
         {badge.text}
       </span>
     );
@@ -218,10 +218,10 @@ export const CommentModeration = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Görüntüle">
-                        <Eye className="w-4 h-4 text-gray-600" />
+                        <Eye className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" />
                       </button>
                       <button className="p-2 hover:bg-red-50 rounded-lg transition-colors" title="Sil">
-                        <Trash2 className="w-4 h-4 text-red-600" />
+                        <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
                       </button>
                     </div>
                   </td>

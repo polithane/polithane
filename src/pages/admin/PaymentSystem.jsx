@@ -51,7 +51,7 @@ export const PaymentSystem = () => {
     const Icon = badge.icon;
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
-        <Icon className="w-3 h-3" />
+        <Icon className="w-5 h-5 sm:w-4 sm:h-4" />
         {badge.text}
       </span>
     );

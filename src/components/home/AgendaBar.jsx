@@ -30,13 +30,13 @@ export const AgendaBar = ({ agendas = [] }) => {
     let fireIcon = null;
     if (index === 0) {
       // 1. en sıcak - büyük ateş - ÇOK HIZLI yanıp sönme (0.3s - çok hızlı flash)
-      fireIcon = <Flame className="w-5 h-5 text-red-600" fill="currentColor" style={{animation: 'pulse 0.3s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
+      fireIcon = <Flame className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" fill="currentColor" style={{animation: 'pulse 0.3s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     } else if (index === 1) {
       // 2. orta sıcak - orta ateş - ORTA HIZLI (0.6s - orta hız flash)
-      fireIcon = <Flame className="w-[17px] h-[17px] text-orange-500" fill="currentColor" style={{animation: 'pulse 0.6s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
+      fireIcon = <Flame className="w-5 h-5 sm:w-4 sm:h-4 text-orange-500" fill="currentColor" style={{animation: 'pulse 0.6s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     } else if (index === 2) {
       // 3. hafif sıcak - küçük ateş - YAVAŞ (1s - yavaş flash)
-      fireIcon = <Flame className="w-3.5 h-3.5 text-yellow-500" fill="currentColor" style={{animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
+      fireIcon = <Flame className="w-5 h-5 sm:w-4 sm:h-4 text-yellow-500" fill="currentColor" style={{animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     }
     
     return (
@@ -106,9 +106,9 @@ export const AgendaBar = ({ agendas = [] }) => {
             >
               <Flame 
                 className={
-                  index === 0 ? "w-3 h-3 text-red-600" : 
-                  index === 1 ? "w-2.5 h-2.5 text-orange-500" : 
-                  "w-2 h-2 text-yellow-500"
+                  index === 0 ? "w-5 h-5 sm:w-4 sm:h-4 text-red-600" : 
+                  index === 1 ? "w-5 h-5 sm:w-4 sm:h-4 text-orange-500" : 
+                  "w-5 h-5 sm:w-4 sm:h-4 text-yellow-500"
                 } 
                 fill="currentColor"
                 style={{
@@ -143,7 +143,7 @@ export const AgendaBar = ({ agendas = [] }) => {
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   {index + 4 < 3 && (
                     <Flame 
-                      className="w-3 h-3 flex-shrink-0 text-yellow-500" 
+                      className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0 text-yellow-500" 
                       fill="currentColor"
                     />
                   )}

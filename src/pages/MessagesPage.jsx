@@ -306,7 +306,7 @@ export const MessagesPage = () => {
               </div>
               {/* Search Bar */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-5 sm:h-5 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Mesajlarda ara..."
@@ -504,7 +504,7 @@ export const MessagesPage = () => {
                                   </span>
                                   {isFromMe && (
                                     <span className="inline-flex items-center gap-1 text-gray-400" title={message.is_read ? 'Görüldü' : 'Gönderildi'}>
-                                      {message.is_read ? <CheckCheck className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+                                      {message.is_read ? <CheckCheck className="w-6 h-6 sm:w-5 sm:h-5" /> : <Check className="w-6 h-6 sm:w-5 sm:h-5" />}
                                     </span>
                                   )}
                                   {isFromMe && (
@@ -521,7 +521,7 @@ export const MessagesPage = () => {
                                         }
                                       }}
                                     >
-                                      <Trash2 className="w-4 h-4" />
+                                      <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
                                     </button>
                                   )}
                                 </div>
@@ -594,7 +594,7 @@ export const MessagesPage = () => {
           <div>
             <div className="text-sm font-semibold text-gray-700 mb-2">Kime?</div>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-5 sm:h-5 text-gray-400" />
               <input
                 value={composeQuery}
                 onChange={(e) => setComposeQuery(e.target.value)}

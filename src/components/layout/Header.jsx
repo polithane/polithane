@@ -218,7 +218,7 @@ export const Header = () => {
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
                 title="Temizle"
               >
-                <X className="w-4 h-4" />
+                <X className="w-6 h-6 sm:w-5 sm:h-5" />
               </button>
             )}
           </div>
@@ -342,7 +342,7 @@ export const Header = () => {
                             className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-black"
                             title="Tümünü okundu yap"
                           >
-                            <CheckCheck className="w-4 h-4" />
+                            <CheckCheck className="w-6 h-6 sm:w-5 sm:h-5" />
                             Okundu
                           </button>
                         )}
@@ -406,7 +406,7 @@ export const Header = () => {
                                   if (id) await deleteNotification?.(id);
                                 }}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
                               </button>
                             </button>
                           );
@@ -445,7 +445,7 @@ export const Header = () => {
                   className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <Avatar src={user?.avatar_url || user?.profile_image} size="36px" />
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                  <ChevronDown className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" />
                 </button>
                 
                 {/* Dropdown Menü */}
@@ -536,7 +536,7 @@ export const Header = () => {
                 onClick={() => navigate('/login-new')}
                 className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
               >
-                <LogIn className="w-4 h-4" />
+                <LogIn className="w-6 h-6 sm:w-5 sm:h-5" />
                 <span>Giriş Yap</span>
               </button>
             </div>
@@ -549,7 +549,7 @@ export const Header = () => {
           <div>
             <div className="text-sm font-semibold text-gray-700 mb-2">Kime?</div>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-5 sm:h-5 text-gray-400" />
               <input
                 value={composeQuery}
                 onChange={(e) => setComposeQuery(e.target.value)}

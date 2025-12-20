@@ -124,11 +124,11 @@ export const AlgorithmSettings = () => {
             
             <div className="flex items-center gap-3">
               <button onClick={handleExport} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
-                <Download className="w-4 h-4" />
+                <Download className="w-6 h-6 sm:w-5 sm:h-5" />
                 Dışa Aktar
               </button>
               <button onClick={handleSave} className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 flex items-center gap-2">
-                <Save className="w-4 h-4" />
+                <Save className="w-6 h-6 sm:w-5 sm:h-5" />
                 Kaydet
               </button>
             </div>

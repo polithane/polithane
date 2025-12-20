@@ -38,15 +38,15 @@ export const BlockUserModal = ({ isOpen, onClose, user, onConfirm }) => {
           </h3>
           <ul className="text-sm text-gray-600 space-y-2">
             <li className="flex items-start gap-2">
-              <Ban className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
+              <Ban className="w-6 h-6 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0 text-red-500" />
               <span>Sizi takip edemeyecek ve paylaşımlarınızı göremeyecek</span>
             </li>
             <li className="flex items-start gap-2">
-              <Ban className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
+              <Ban className="w-6 h-6 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0 text-red-500" />
               <span>Size mesaj gönderemeyecek</span>
             </li>
             <li className="flex items-start gap-2">
-              <Ban className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
+              <Ban className="w-6 h-6 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0 text-red-500" />
               <span>Paylaşımlarınıza yorum yapamayacak</span>
             </li>
           </ul>
@@ -67,7 +67,7 @@ export const BlockUserModal = ({ isOpen, onClose, user, onConfirm }) => {
             }}
             className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
           >
-            <Ban className="w-4 h-4" />
+            <Ban className="w-6 h-6 sm:w-5 sm:h-5" />
             Engelle
           </button>
         </div>

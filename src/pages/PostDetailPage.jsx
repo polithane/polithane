@@ -625,7 +625,7 @@ export const PostDetailPage = () => {
                             type="button"
                           >
                             <div className="flex items-center gap-2">
-                              <X className="w-4 h-4" />
+                              <X className="w-6 h-6 sm:w-5 sm:h-5" />
                               Vazgeç
                             </div>
                           </button>
@@ -649,7 +649,7 @@ export const PostDetailPage = () => {
                             type="button"
                           >
                             <div className="flex items-center gap-2">
-                              <Check className="w-4 h-4" />
+                              <Check className="w-6 h-6 sm:w-5 sm:h-5" />
                               Kaydet
                             </div>
                           </button>
@@ -747,7 +747,7 @@ export const PostDetailPage = () => {
 
           <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-start gap-3">
             <div className="bg-primary-blue rounded-full p-2 flex-shrink-0">
-              <Users className="w-4 h-4 text-white" />
+              <Users className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
               <div className="text-sm font-black text-gray-900">Şeffaflık</div>

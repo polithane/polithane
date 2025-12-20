@@ -305,7 +305,7 @@ export const CityDetailPage = () => {
                           </span>
                         </div>
                         <div className="flex items-center gap-1 mt-1">
-                          <TrendingUp className="w-3 h-3 text-green-600" />
+                          <TrendingUp className="w-5 h-5 sm:w-4 sm:h-4 text-green-600" />
                           <span className="text-xs font-semibold text-gray-700">
                             {formatPolitScore(mp.polit_score)}
                           </span>
@@ -581,7 +581,7 @@ export const CityDetailPage = () => {
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-6 h-6 sm:w-5 sm:h-5" />
                   <span className="whitespace-nowrap">{label}</span>
                 </div>
               </button>

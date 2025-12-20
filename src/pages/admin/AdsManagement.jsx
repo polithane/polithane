@@ -23,7 +23,7 @@ export const AdsManagement = () => {
         </div>
         
         <button className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 flex items-center gap-2">
-          <Plus className="w-4 h-4" />
+          <Plus className="w-6 h-6 sm:w-5 sm:h-5" />
           Yeni Reklam
         </button>
       </div>
@@ -82,13 +82,13 @@ export const AdsManagement = () => {
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
                     <button onClick={() => handleToggleStatus(ad.id)} className="p-2 text-blue-600 hover:bg-blue-50 rounded">
-                      {ad.status === 'active' ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {ad.status === 'active' ? <EyeOff className="w-6 h-6 sm:w-5 sm:h-5" /> : <Eye className="w-6 h-6 sm:w-5 sm:h-5" />}
                     </button>
                     <button className="p-2 text-gray-600 hover:bg-gray-50 rounded">
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-6 h-6 sm:w-5 sm:h-5" />
                     </button>
                     <button className="p-2 text-red-600 hover:bg-red-50 rounded">
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </td>

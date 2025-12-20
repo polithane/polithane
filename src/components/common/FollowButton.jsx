@@ -83,9 +83,10 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
   };
   
   const iconSizes = {
-    sm: 'w-3 h-3',
-    md: 'w-4 h-4',
-    lg: 'w-5 h-5'
+    // Mobile-first: keep icons readable (no "dot" icons)
+    sm: 'w-5 h-5 sm:w-4 sm:h-4',
+    md: 'w-6 h-6 sm:w-5 sm:h-5',
+    lg: 'w-7 h-7 sm:w-6 sm:h-6'
   };
   
   // Takipten çık onay popup'ı

@@ -595,7 +595,7 @@ export const RegisterPageNew = () => {
           {/* Media Specific */}
           {isMedia && (
             <div className="col-span-1 md:col-span-2 bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
-              <h4 className="font-bold text-gray-900 flex items-center"><Mic className="w-4 h-4 mr-2"/> Medya Bilgileri</h4>
+              <h4 className="font-bold text-gray-900 flex items-center"><Mic className="w-6 h-6 sm:w-5 sm:h-5 mr-2"/> Medya Bilgileri</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kurum Adı</label>
@@ -621,7 +621,7 @@ export const RegisterPageNew = () => {
           {(isPartyMember || isTeşkilat || isPolitician) && (
             <div className="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
               <label className="block text-sm font-bold text-blue-900 mb-2 flex items-center">
-                <FileText className="w-4 h-4 mr-2"/> 
+                <FileText className="w-6 h-6 sm:w-5 sm:h-5 mr-2"/> 
                 Resmi Belge Yükleme (Zorunlu)
               </label>
               <p className="text-xs text-blue-700 mb-3">

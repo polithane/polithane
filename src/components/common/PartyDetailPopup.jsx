@@ -61,7 +61,7 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
           >
             <div className="flex items-center gap-3">
               <div className="bg-primary-blue rounded-full p-2">
-                <Users className="w-4 h-4 text-white" />
+                <Users className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
               </div>
               <span className="text-sm font-semibold text-gray-700">Milletvekili Sayısı</span>
             </div>
@@ -76,7 +76,7 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
           >
             <div className="flex items-center gap-3">
               <div className="bg-primary-green rounded-full p-2">
-                <Building2 className="w-4 h-4 text-white" />
+                <Building2 className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
               </div>
               <span className="text-sm font-semibold text-gray-700">Büyükşehir Belediye</span>
             </div>
@@ -91,7 +91,7 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
           >
             <div className="flex items-center gap-3">
               <div className="bg-accent-mustard rounded-full p-2">
-                <MapPin className="w-4 h-4 text-white" />
+                <MapPin className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
               </div>
               <span className="text-sm font-semibold text-gray-700">İlçe Belediye</span>
             </div>
@@ -106,7 +106,7 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
           >
             <div className="flex items-center gap-3">
               <div className="bg-purple-600 rounded-full p-2">
-                <TrendingUp className="w-4 h-4 text-white" />
+                <TrendingUp className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
               </div>
               <span className="text-sm font-semibold text-gray-700">Gündeme Katkı</span>
             </div>

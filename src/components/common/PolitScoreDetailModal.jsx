@@ -153,7 +153,7 @@ export const PolitScoreDetailModal = ({ post, onClose }) => {
           <div className="bg-gray-50 p-4 border-t border-gray-200">
             <div className="flex items-start gap-3">
               <div className="bg-primary-blue rounded-full p-2 flex-shrink-0">
-                <Users className="w-4 h-4 text-white" />
+                <Users className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
               </div>
               <div>
                 <h4 className="font-semibold text-gray-900 text-sm mb-1">

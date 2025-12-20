@@ -169,7 +169,7 @@ export const SourceManagement = () => {
                 <td className="px-6 py-4">{getTypeBadge(source.type)}</td>
                 <td className="px-6 py-4">
                   <a href={source.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-primary-blue hover:underline">
-                    <LinkIcon className="w-3 h-3" />
+                    <LinkIcon className="w-5 h-5 sm:w-4 sm:h-4" />
                     <span className="max-w-xs truncate">{source.url}</span>
                   </a>
                 </td>
@@ -188,10 +188,10 @@ export const SourceManagement = () => {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <button className="p-2 hover:bg-blue-50 rounded-lg transition-colors">
-                      <Edit className="w-4 h-4 text-primary-blue" />
+                      <Edit className="w-6 h-6 sm:w-5 sm:h-5 text-primary-blue" />
                     </button>
                     <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
                     </button>
                   </div>
                 </td>

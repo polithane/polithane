@@ -464,13 +464,13 @@ export const ProfilePage = () => {
                 <>
                   <Link to="/settings/profile">
                     <Button variant="outline">
-                      <Edit className="w-4 h-4 mr-2" />
+                      <Edit className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
                       Profili Düzenle
                     </Button>
                   </Link>
                   <Link to="/settings">
                     <Button variant="outline">
-                      <Settings className="w-4 h-4 mr-2" />
+                      <Settings className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
                       Ayarlar
                     </Button>
                   </Link>
@@ -518,14 +518,14 @@ export const ProfilePage = () => {
                           }}
                           className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600 font-medium flex items-center gap-2"
                         >
-                          <Ban className="w-4 h-4" />
+                          <Ban className="w-6 h-6 sm:w-5 sm:h-5" />
                           Engelle
                         </button>
                         <button
                           onClick={handleReport}
                           className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 font-medium flex items-center gap-2"
                         >
-                          <AlertCircle className="w-4 h-4" />
+                          <AlertCircle className="w-6 h-6 sm:w-5 sm:h-5" />
                           Şikayet Et
                         </button>
                       </div>

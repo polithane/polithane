@@ -133,16 +133,16 @@ export const EmailTemplates = () => {
                       onClick={() => setSelectedTemplate(template)}
                       title="Görüntüle"
                     >
-                      <Eye className="w-4 h-4 text-gray-600" />
+                      <Eye className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" />
                     </button>
                     <button className="p-2 hover:bg-blue-50 rounded-lg transition-colors" title="Düzenle">
-                      <Edit className="w-4 h-4 text-primary-blue" />
+                      <Edit className="w-6 h-6 sm:w-5 sm:h-5 text-primary-blue" />
                     </button>
                     <button className="p-2 hover:bg-green-50 rounded-lg transition-colors" title="Test Gönder">
-                      <Send className="w-4 h-4 text-green-600" />
+                      <Send className="w-6 h-6 sm:w-5 sm:h-5 text-green-600" />
                     </button>
                     <button className="p-2 hover:bg-red-50 rounded-lg transition-colors" title="Sil">
-                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
                     </button>
                   </div>
                 </td>

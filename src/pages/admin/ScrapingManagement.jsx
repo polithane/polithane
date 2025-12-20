@@ -59,7 +59,7 @@ export const ScrapingManagement = () => {
     const Icon = badge.icon;
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
-        <Icon className="w-3 h-3" />
+        <Icon className="w-5 h-5 sm:w-4 sm:h-4" />
         {badge.text}
       </span>
     );
@@ -141,21 +141,21 @@ export const ScrapingManagement = () => {
             <div className="flex items-center gap-2">
               {scraper.status === 'active' ? (
                 <button className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm font-semibold">
-                  <Pause className="w-4 h-4" />
+                  <Pause className="w-6 h-6 sm:w-5 sm:h-5" />
                   Duraklat
                 </button>
               ) : (
                 <button className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-semibold">
-                  <Play className="w-4 h-4" />
+                  <Play className="w-6 h-6 sm:w-5 sm:h-5" />
                   Başlat
                 </button>
               )}
               <button className="flex items-center gap-2 px-4 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-semibold">
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-6 h-6 sm:w-5 sm:h-5" />
                 Şimdi Çalıştır
               </button>
               <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold">
-                <TrendingUp className="w-4 h-4" />
+                <TrendingUp className="w-6 h-6 sm:w-5 sm:h-5" />
                 Logları Gör
               </button>
             </div>

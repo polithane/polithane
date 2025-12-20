@@ -256,7 +256,7 @@ export const AccountSettings = () => {
             disabled={usernameStatus.available === false || usernameStatus.checking}
             className="flex items-center gap-2 bg-primary-blue text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
+            <Save className="w-6 h-6 sm:w-5 sm:h-5" />
             Kaydet
           </button>
         </div>

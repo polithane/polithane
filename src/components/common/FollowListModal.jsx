@@ -72,7 +72,7 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
               }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <Users className="w-4 h-4" />
+                <Users className="w-6 h-6 sm:w-5 sm:h-5" />
                 Takipçiler ({followers.length})
               </div>
             </button>
@@ -85,7 +85,7 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
               }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <UserCheck className="w-4 h-4" />
+                <UserCheck className="w-6 h-6 sm:w-5 sm:h-5" />
                 Takip ({following.length})
               </div>
             </button>

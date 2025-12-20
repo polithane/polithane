@@ -162,13 +162,13 @@ export const MediaManagement = () => {
                 <p className="text-xs text-gray-500 mb-3">{media.usage_count} kez kullanıldı</p>
                 <div className="flex items-center gap-2">
                   <button className="flex-1 p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Görüntüle">
-                    <Eye className="w-4 h-4 text-gray-600 mx-auto" />
+                    <Eye className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600 mx-auto" />
                   </button>
                   <button className="flex-1 p-2 hover:bg-blue-50 rounded-lg transition-colors" title="İndir">
-                    <Download className="w-4 h-4 text-primary-blue mx-auto" />
+                    <Download className="w-6 h-6 sm:w-5 sm:h-5 text-primary-blue mx-auto" />
                   </button>
                   <button className="flex-1 p-2 hover:bg-red-50 rounded-lg transition-colors" title="Sil">
-                    <Trash2 className="w-4 h-4 text-red-600 mx-auto" />
+                    <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600 mx-auto" />
                   </button>
                 </div>
               </div>
@@ -216,13 +216,13 @@ export const MediaManagement = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <Eye className="w-4 h-4 text-gray-600" />
+                        <Eye className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" />
                       </button>
                       <button className="p-2 hover:bg-blue-50 rounded-lg transition-colors">
-                        <Download className="w-4 h-4 text-primary-blue" />
+                        <Download className="w-6 h-6 sm:w-5 sm:h-5 text-primary-blue" />
                       </button>
                       <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
-                        <Trash2 className="w-4 h-4 text-red-600" />
+                        <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
                       </button>
                     </div>
                   </td>

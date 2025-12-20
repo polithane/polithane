@@ -151,7 +151,7 @@ export const SecuritySettings = () => {
                       ok ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                     }`}
                   >
-                    {ok ? <CheckCircle className="w-3 h-3 mr-1" /> : <div className="w-2 h-2 rounded-full bg-gray-400 mr-1" />}
+                    {ok ? <CheckCircle className="w-5 h-5 sm:w-4 sm:h-4 mr-1" /> : <div className="w-2 h-2 rounded-full bg-gray-400 mr-1" />}
                     {rule.label}
                   </span>
                 );
@@ -178,7 +178,7 @@ export const SecuritySettings = () => {
             disabled={loading || !passwords.current || !passwords.new || !passwords.confirm || !confirmMatches || !newPassValid}
             className="flex items-center gap-2 bg-primary-blue text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
+            <Save className="w-6 h-6 sm:w-5 sm:h-5" />
             {loading ? 'Değiştiriliyor...' : 'Şifreyi Değiştir'}
           </button>
         </form>

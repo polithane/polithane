@@ -140,7 +140,7 @@ export const BlockedUsersPage = () => {
                   disabled={blockedIds.has(String(u.id))}
                   className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white font-bold px-3 py-2 rounded-lg disabled:opacity-50"
                 >
-                  <UserX className="w-4 h-4" />
+                  <UserX className="w-6 h-6 sm:w-5 sm:h-5" />
                   {blockedIds.has(String(u.id)) ? 'Engelli' : 'Engelle'}
                 </button>
               </div>
@@ -166,7 +166,7 @@ export const BlockedUsersPage = () => {
                 onClick={() => unblockUser(u.id)}
                 className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 rounded-lg"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
                 Kaldır
               </button>
             </div>

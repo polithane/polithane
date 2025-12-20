@@ -91,14 +91,14 @@ export const FollowRequestsModal = ({ isOpen, onClose }) => {
                       onClick={() => handleAccept(user.user_id)}
                       className="bg-primary-blue hover:bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
                     >
-                      <Check className="w-3 h-3" />
+                      <Check className="w-5 h-5 sm:w-4 sm:h-4" />
                       Kabul
                     </button>
                     <button
                       onClick={() => handleReject(user.user_id)}
                       className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
                     >
-                      <XCircle className="w-3 h-3" />
+                      <XCircle className="w-5 h-5 sm:w-4 sm:h-4" />
                       Reddet
                     </button>
                   </div>

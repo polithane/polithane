@@ -206,7 +206,7 @@ export const FloatingChat = () => {
 
           <div className="p-3 border-b border-gray-200">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-5 sm:h-5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Mesajlarda ara..."
@@ -289,7 +289,8 @@ export const FloatingChat = () => {
                       </div>
                       <div className="flex items-center gap-1 mt-1 px-1 text-xs text-gray-400">
                         <span>{m.created_at ? formatTimeAgo(m.created_at) : ''}</span>
-                        {isFromMe && (m.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />)}
+                        {isFromMe &&
+                          (m.is_read ? <CheckCheck className="w-5 h-5 sm:w-4 sm:h-4" /> : <Check className="w-5 h-5 sm:w-4 sm:h-4" />)}
                       </div>
                     </div>
                   </div>

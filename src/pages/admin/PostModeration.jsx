@@ -150,10 +150,10 @@ export const PostModeration = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <button className="p-2 text-blue-600 hover:bg-blue-50 rounded" title="Görüntüle">
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-6 h-6 sm:w-5 sm:h-5" />
                       </button>
                       <button onClick={() => handleDeletePost(post.id || post.post_id)} className="p-2 text-red-600 hover:bg-red-50 rounded" title="Sil">
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
                       </button>
                     </div>
                   </td>

@@ -87,10 +87,10 @@ export const APISettings = () => {
                       onClick={() => setShowKey(!showKey)}
                       className="p-1 hover:bg-gray-200 rounded transition-colors"
                     >
-                      {showKey ? <EyeOff className="w-4 h-4 text-gray-600" /> : <Eye className="w-4 h-4 text-gray-600" />}
+                      {showKey ? <EyeOff className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" /> : <Eye className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" />}
                     </button>
                     <button className="p-1 hover:bg-gray-200 rounded transition-colors">
-                      <Copy className="w-4 h-4 text-gray-600" />
+                      <Copy className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" />
                     </button>
                   </div>
                 </div>
@@ -99,7 +99,7 @@ export const APISettings = () => {
                     {apiKey.status}
                   </span>
                   <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
-                    <Trash2 className="w-4 h-4 text-red-600" />
+                    <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
                   </button>
                 </div>
               </div>

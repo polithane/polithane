@@ -182,7 +182,7 @@ export const ForgotPasswordPage = () => {
               to="/login-new"
               className="flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-6 h-6 sm:w-5 sm:h-5" />
               Giriş Sayfasına Dön
             </Link>
           </div>
