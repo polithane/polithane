@@ -689,7 +689,9 @@ export const PostDetailPage = () => {
 
                       {/* Like button: red heart + count (no square background) */}
                       <button
-                        className="flex items-center gap-1.5 text-red-600 hover:text-red-700 disabled:opacity-50"
+                        className={`flex items-center gap-1.5 disabled:opacity-50 ${
+                          comment.liked_by_me ? 'text-red-600 hover:text-red-700' : 'text-red-600/80 hover:text-red-600'
+                        }`}
                         type="button"
                         disabled={isPendingComment(comment)}
                         onClick={async () => {
@@ -699,7 +701,13 @@ export const PostDetailPage = () => {
                             if (!id) return;
                             const r = await postsApi.likeComment(id);
                             setComments((prev) =>
-                              prev.map((c) => ((c.id || c.comment_id) === id ? { ...c, like_count: r?.like_count ?? c.like_count } : c))
+                              prev.map((c) => {
+                                const cid = c.id || c.comment_id;
+                                if (cid !== id) return c;
+                                const nextLiked =
+                                  r?.action === 'liked' ? true : r?.action === 'unliked' ? false : !Boolean(c.liked_by_me);
+                                return { ...c, like_count: r?.like_count ?? c.like_count, liked_by_me: nextLiked };
+                              })
                             );
                           } catch (e) {
                             setCommentError(e?.message || 'Beğeni işlemi başarısız.');
@@ -707,7 +715,7 @@ export const PostDetailPage = () => {
                         }}
                         title={isPendingComment(comment) ? 'Bu yorum incelemede' : 'Beğen'}
                       >
-                        <Heart className="w-7 h-7" fill="currentColor" />
+                        <Heart className="w-7 h-7" fill={comment.liked_by_me ? 'currentColor' : 'none'} />
                         <span className="text-lg font-black text-gray-800">{formatNumber(comment.like_count)}</span>
                       </button>
                     </div>

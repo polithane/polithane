@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
+    // Improve compatibility on non-Chrome browsers (Safari/Firefox/mobile)
+    // while keeping a reasonable modern baseline.
+    target: 'es2018',
     rollupOptions: {
       output: {
         manualChunks: {

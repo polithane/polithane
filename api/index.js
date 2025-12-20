@@ -309,7 +309,52 @@ async function getPostComments(req, res, postId) {
     } else {
       params.is_deleted = 'eq.false';
     }
-    const rows = await supabaseRestGet('comments', params).catch(() => []);
+    const raw = await supabaseRestGet('comments', params).catch(() => []);
+    let rows = Array.isArray(raw) ? raw : [];
+
+    // Add per-user "liked_by_me" for comment hearts so UI can render empty/full state.
+    if (auth?.id && rows.length > 0) {
+      const ids = rows
+        .map((c) => c?.id ?? c?.comment_id ?? null)
+        .filter(Boolean)
+        .map((x) => String(x));
+
+      if (ids.length > 0) {
+        let supportsCommentId = true;
+        try {
+          // Probe likes.comment_id support
+          await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${ids[0]}`, user_id: `eq.${auth.id}`, limit: '1' });
+        } catch (e) {
+          const msg = String(e?.message || '');
+          if (msg.includes('comment_id')) supportsCommentId = false;
+        }
+
+        let likedSet = new Set();
+        if (supportsCommentId) {
+          const inList = ids.join(',');
+          const likes = await supabaseRestGet('likes', {
+            select: 'comment_id',
+            user_id: `eq.${auth.id}`,
+            comment_id: `in.(${inList})`,
+            limit: String(Math.min(2000, ids.length)),
+          }).catch(() => []);
+          (Array.isArray(likes) ? likes : []).forEach((l) => {
+            if (l?.comment_id != null) likedSet.add(String(l.comment_id));
+          });
+        } else {
+          const meRows = await supabaseRestGet('users', { select: 'metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+          const meta = meRows?.[0]?.metadata && typeof meRows[0].metadata === 'object' ? meRows[0].metadata : {};
+          const liked = Array.isArray(meta.liked_comment_ids) ? meta.liked_comment_ids.map(String) : [];
+          likedSet = new Set(liked);
+        }
+
+        rows = rows.map((c) => {
+          const cid = String(c?.id ?? c?.comment_id ?? '');
+          return { ...c, liked_by_me: likedSet.has(cid) };
+        });
+      }
+    }
+
     res.json({ success: true, data: rows || [] });
 }
 

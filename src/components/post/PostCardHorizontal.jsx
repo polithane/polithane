@@ -82,13 +82,13 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   const getContentIcon = () => {
     switch (post.content_type) {
       case CONTENT_TYPES.VIDEO:
-        return <Video className="w-4 h-4" />;
+        return <Video className="w-5 h-5 sm:w-4 sm:h-4" />;
       case CONTENT_TYPES.IMAGE:
-        return <ImageIcon className="w-4 h-4" />;
+        return <ImageIcon className="w-5 h-5 sm:w-4 sm:h-4" />;
       case CONTENT_TYPES.AUDIO:
-        return <Music className="w-4 h-4" />;
+        return <Music className="w-5 h-5 sm:w-4 sm:h-4" />;
       default:
-        return <FileText className="w-4 h-4" />;
+        return <FileText className="w-5 h-5 sm:w-4 sm:h-4" />;
     }
   };
 

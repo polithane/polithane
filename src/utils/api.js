@@ -2,6 +2,18 @@
 // - In production on Vercel, we must call same-origin /api/* (no localhost).
 // - In local dev, fallback to the local backend if VITE_API_URL is not set.
 const API_URL = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
+const DEBUG_API = !import.meta.env.PROD && String(import.meta.env.VITE_DEBUG_API || '').toLowerCase() === 'true';
+
+const debugLog = (...args) => {
+  if (!DEBUG_API) return;
+  // eslint-disable-next-line no-console
+  console.log(...args);
+};
+const debugError = (...args) => {
+  if (!DEBUG_API) return;
+  // eslint-disable-next-line no-console
+  console.error(...args);
+};
 
 // Helper function to get auth header
 const getAuthHeader = () => {
@@ -22,11 +34,10 @@ const ERROR_MESSAGES = {
 // Helper function for API calls
 export const apiCall = async (endpoint, options = {}) => {
   const url = `${API_URL}${endpoint}`;
-  
-  console.log('🌐 API_URL:', API_URL);
-  console.log('📍 Endpoint:', endpoint);
-  console.log('🔗 Full URL:', url);
-  console.log('⚙️ Options:', options);
+  debugLog('🌐 API_URL:', API_URL);
+  debugLog('📍 Endpoint:', endpoint);
+  debugLog('🔗 Full URL:', url);
+  debugLog('⚙️ Options:', options);
   
   const headers = {
     ...getAuthHeader(),
@@ -38,15 +49,15 @@ export const apiCall = async (endpoint, options = {}) => {
     headers['Content-Type'] = 'application/json';
   }
 
-  console.log('📋 Headers:', headers);
+  debugLog('📋 Headers:', headers);
 
   try {
-    console.log('📤 Fetching...');
+    debugLog('📤 Fetching...');
     
     // Timeout kontrolü (30 saniye)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.error('⏰ Request timeout! (30s)');
+      debugError('⏰ Request timeout! (30s)');
       controller.abort();
     }, 30000);
     
@@ -57,7 +68,7 @@ export const apiCall = async (endpoint, options = {}) => {
     });
     
     clearTimeout(timeoutId);
-    console.log('📥 Response received:', response.status, response.statusText);
+    debugLog('📥 Response received:', response.status, response.statusText);
 
     // Network error
     if (!response.ok && response.status === 0) {
@@ -94,9 +105,9 @@ export const apiCall = async (endpoint, options = {}) => {
 
     return data;
   } catch (error) {
-    console.error('💥 API Hatası:', error);
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
+    debugError('💥 API Hatası:', error);
+    debugError('Error name:', error.name);
+    debugError('Error message:', error.message);
     
     // Timeout hatası
     if (error.name === 'AbortError') {
@@ -151,7 +162,7 @@ export const posts = {
       const query = new URLSearchParams(params).toString();
       return await apiCall(`/api/posts${query ? `?${query}` : ''}`);
     } catch (error) {
-      console.error('Posts API error:', error);
+      debugError('Posts API error:', error);
       return [];
     }
   },
@@ -432,7 +443,7 @@ export const parties = {
     try {
       return await apiCall('/api/parties');
     } catch (error) {
-      console.error('Parties API error:', error);
+      debugError('Parties API error:', error);
       return [];
     }
   },
