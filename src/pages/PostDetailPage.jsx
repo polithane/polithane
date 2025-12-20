@@ -505,10 +505,10 @@ export const PostDetailPage = () => {
                   setPostReportDetails('');
                   setPostReportDone(false);
                 }}
-                className="flex items-center gap-2 text-gray-500 hover:text-red-500 text-sm font-medium transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-red-600 hover:bg-red-50 text-sm font-black transition-colors"
               >
-                <Flag className="w-4 h-4" />
-                Şikayet Et
+                <Flag className="w-6 h-6" />
+                <span className="tracking-tight">Şikayet Et</span>
               </button>
             </div>
 
