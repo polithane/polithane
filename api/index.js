@@ -1057,6 +1057,7 @@ async function getFollowStats(req, res, targetId) {
 
   const followers = await supabaseCount('follows', { following_id: `eq.${tid}` }).catch(() => 0);
   const following = await supabaseCount('follows', { follower_id: `eq.${tid}` }).catch(() => 0);
+  const postsCount = await supabaseCount('posts', { user_id: `eq.${tid}`, is_deleted: 'eq.false' }).catch(() => 0);
 
   let isFollowing = false;
   let isFollowedBy = false;
@@ -1084,6 +1085,7 @@ async function getFollowStats(req, res, targetId) {
     data: {
       followers_count: followers,
       following_count: following,
+      posts_count: postsCount,
       is_following: isFollowing,
       is_followed_by: isFollowedBy,
     },
