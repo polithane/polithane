@@ -124,6 +124,30 @@ function isSafeId(value) {
   return /^(?:\d+|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(s);
 }
 
+function validatePasswordForAuth(password) {
+  const p = String(password || '');
+  if (p.length < 8) return 'Şifre en az 8 karakter olmalı.';
+  if (p.length > 50) return 'Şifre en fazla 50 karakter olabilir.';
+  if (!/[a-zA-Z]/.test(p)) return 'Şifre en az 1 harf içermeli.';
+  if (!/[0-9]/.test(p)) return 'Şifre en az 1 rakam içermeli.';
+  return null;
+}
+
+function normalizeUsernameCandidate(raw) {
+  // allow: a-z 0-9 _
+  const base = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/^_+/, '')
+    .replace(/_+$/, '')
+    .slice(0, 20);
+  if (!base) return '';
+  // Pad to minimum 5 chars with underscores (e.g. ali__ / ay___)
+  if (base.length >= 5) return base;
+  return (base + '_____').slice(0, 5);
+}
+
 async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   const chunks = [];
@@ -3875,15 +3899,31 @@ async function authRegister(req, res) {
     if (!emailRegex.test(emailStr) || hasTurkish) {
       return res.status(400).json({ success: false, error: 'Geçerli bir email adresi giriniz.' });
     }
+
+    // Server-side password validation (must be enforced here, not only on UI)
+    const pwErr = validatePasswordForAuth(password);
+    if (pwErr) return res.status(400).json({ success: false, error: pwErr });
     
-    const emailCheck = await supabaseRestGet('users', { select: 'id', email: `eq.${email}`, limit: '1' });
+    const emailLower = emailStr.toLowerCase();
+    const emailCheck = await supabaseRestGet('users', { select: 'id', email: `eq.${emailLower}`, limit: '1' });
     if (emailCheck.length > 0) return res.status(400).json({ success: false, error: 'Email kayıtlı.' });
 
-    let username = email.split('@')[0].replace(/[^a-z0-9_]/g, '').toLowerCase().slice(0, 20);
-    if (username.length < 3) username = `user_${Date.now()}`;
+    const local = emailLower.split('@')[0] || '';
+    let username = normalizeUsernameCandidate(local);
+    if (!username) username = normalizeUsernameCandidate(`user_${Date.now()}`) || `user_${Date.now()}`;
     const checkUser = async (u) => (await supabaseRestGet('users', { select: 'id', username: `eq.${u}`, limit: '1' })).length > 0;
+    // Ensure uniqueness (keep stable/padded shape where possible)
     if (await checkUser(username)) {
-        username = `${username.slice(0,15)}_${Math.floor(Math.random()*1000)}`;
+      const base = username.slice(0, 15);
+      for (let i = 0; i < 10; i += 1) {
+        const suffix = String(Math.floor(Math.random() * 10000)).padStart(2, '0');
+        const cand = normalizeUsernameCandidate(`${base}_${suffix}`).slice(0, 20);
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await checkUser(cand))) {
+          username = cand;
+          break;
+        }
+      }
     }
 
     if (document && document.content) {
@@ -3917,7 +3957,7 @@ async function authRegister(req, res) {
     const cleanEmpty = (v) => (v === '' ? null : v);
     const userData = {
         username,
-        email,
+        email: emailLower,
         password_hash,
         full_name,
         user_type,

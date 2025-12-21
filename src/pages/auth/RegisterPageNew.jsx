@@ -270,12 +270,18 @@ export const RegisterPageNew = () => {
         return;
     }
     
+    const passwordOk = PASSWORD_RULES.every((r) => r.validator(String(formData.password || '')));
+
     if (emailStatus === 'taken' && !claimUser) {
       setGlobalError('Bu email adresi zaten kullanımda.');
       return;
     }
     if (formData.email && (/[çğıöşüİÇĞÖŞÜ]/.test(formData.email) || !isValidEmail(formData.email))) {
       setGlobalError('Geçerli bir email adresi giriniz (Türkçe karakter olmadan).');
+      return;
+    }
+    if (!passwordOk) {
+      setGlobalError('Şifreniz kurallara uygun değil. Lütfen şifre kurallarını sağlayın.');
       return;
     }
     if (formData.phone && !isValidPhone(formData.phone)) {
@@ -375,6 +381,21 @@ export const RegisterPageNew = () => {
       } else {
         if (result.data?.token) {
             localStorage.setItem('auth_token', result.data.token);
+            if (result.data?.user) {
+              localStorage.setItem('user', JSON.stringify(result.data.user));
+            } else {
+              // Fallback: fetch /me so AuthContext can restore session on refresh.
+              try {
+                const meResp = await fetch(`${apiUrl}/auth/me`, {
+                  headers: { Authorization: `Bearer ${result.data.token}` },
+                });
+                const meJson = await meResp.json().catch(() => ({}));
+                const u = meJson?.data?.user ?? null;
+                if (u) localStorage.setItem('user', JSON.stringify(u));
+              } catch {
+                // ignore
+              }
+            }
             window.location.href = '/'; 
         } else {
             navigate('/login-new');
@@ -741,7 +762,8 @@ export const RegisterPageNew = () => {
                     loading || 
                     emailStatus === 'taken' || 
                     !formData.password || 
-                    formData.password !== formData.password_confirm
+                    formData.password !== formData.password_confirm ||
+                    !PASSWORD_RULES.every((r) => r.validator(String(formData.password || '')))
                 }
                 className="w-full md:w-2/3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-lg"
             >
