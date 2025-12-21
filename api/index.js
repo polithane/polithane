@@ -1548,10 +1548,13 @@ async function adminEnvCheck(req, res) {
     'SUPABASE_ANON_KEY',
     'SMTP_HOST',
     'SMTP_PORT',
+    'SMTP_PORTS',
     'SMTP_USER',
     'SMTP_PASS',
     'SMTP_FROM',
     'SMTP_TLS_REJECT_UNAUTHORIZED',
+    'MAIL_RELAY_URL',
+    'MAIL_RELAY_TOKEN',
     'ADMIN_BOOTSTRAP_TOKEN',
     'ADMIN_BOOTSTRAP_ALLOW_RESET',
     'PUBLIC_APP_URL',
@@ -1565,6 +1568,7 @@ async function adminEnvCheck(req, res) {
   // Convenience flags
   present.SUPABASE_KEY_OK = present.SUPABASE_SERVICE_ROLE_KEY || present.SUPABASE_ANON_KEY;
   present.SMTP_OK = present.SMTP_HOST && present.SMTP_USER && present.SMTP_PASS && present.SMTP_FROM;
+  present.MAIL_RELAY_OK = present.MAIL_RELAY_URL && present.MAIL_RELAY_TOKEN;
 
   return res.json({ success: true, data: { present } });
 }
@@ -1949,6 +1953,46 @@ function withTimeout(promise, ms, label) {
   ]);
 }
 
+function isMailRelayConfigured() {
+  const url = String(process.env.MAIL_RELAY_URL || '').trim();
+  const token = String(process.env.MAIL_RELAY_TOKEN || '').trim();
+  return !!(url && token);
+}
+
+async function sendEmailViaRelay({ to, subject, html, text, fromEmail }) {
+  const relayUrl = String(process.env.MAIL_RELAY_URL || '').trim();
+  const relayToken = String(process.env.MAIL_RELAY_TOKEN || '').trim();
+  if (!relayUrl || !relayToken) throw new Error('MAIL_RELAY is not configured (MAIL_RELAY_URL/MAIL_RELAY_TOKEN missing).');
+
+  const payload = {
+    to: String(to || '').trim(),
+    subject: String(subject || '').trim(),
+    text: text ? String(text) : undefined,
+    html: html ? String(html) : undefined,
+    from: fromEmail ? String(fromEmail) : undefined,
+  };
+
+  const resp = await withTimeout(
+    fetch(relayUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-mail-relay-token': relayToken,
+      },
+      body: JSON.stringify(payload),
+    }),
+    10_000,
+    'MAIL_RELAY fetch'
+  );
+
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || data?.success === false) {
+    const msg = String(data?.error || `MAIL_RELAY error (${resp.status})`).slice(0, 900);
+    throw new Error(msg);
+  }
+  return true;
+}
+
 async function sendEmail({ to, subject, html, text }) {
   const fromEmail = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim();
   if (!fromEmail) throw new Error('SMTP_FROM (or EMAIL_FROM) is missing.');
@@ -1975,6 +2019,12 @@ async function sendEmail({ to, subject, html, text }) {
       // continue trying next port
     }
   }
+  // If SMTP ports are blocked in hosting (common on Vercel), optionally fallback to HTTPS relay.
+  if (isMailRelayConfigured()) {
+    await sendEmailViaRelay({ to, subject, html, text, fromEmail });
+    return;
+  }
+
   throw lastErr || new Error('SMTP send failed');
 }
 
@@ -2008,7 +2058,7 @@ function emailLayout({ title, bodyHtml }) {
 
 async function safeSendEmail(payload) {
   try {
-    if (!isSmtpConfigured()) return false;
+    if (!isSmtpConfigured() && !isMailRelayConfigured()) return false;
     // Keep this bounded so user-facing API endpoints don't stall.
     await withTimeout(sendEmail(payload), 12_000, 'SMTP send');
     return true;
@@ -4357,6 +4407,7 @@ async function adminSendTestEmail(req, res) {
   const secure = port === 465;
   const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').trim().toLowerCase() !== 'false';
   const portCandidates = getSmtpPortCandidates();
+  const relayConfigured = isMailRelayConfigured();
 
   const debug = {
     smtp: {
@@ -4368,6 +4419,11 @@ async function adminSendTestEmail(req, res) {
       hasFrom: !!from,
       tlsRejectUnauthorized: rejectUnauthorized,
       portCandidates,
+    },
+    relay: {
+      configured: relayConfigured,
+      urlPresent: !!String(process.env.MAIL_RELAY_URL || '').trim(),
+      tokenPresent: !!String(process.env.MAIL_RELAY_TOKEN || '').trim(),
     },
     appUrl: getPublicAppUrl(req),
     time: new Date().toISOString(),
@@ -4412,9 +4468,22 @@ async function adminSendTestEmail(req, res) {
     }
 
     debug.attempts = attempts;
+    // If relay is configured, try it as final fallback (and report outcome).
+    if (relayConfigured) {
+      try {
+        await sendEmailViaRelay({ to, subject, html, text, fromEmail: from });
+        debug.relay.sent = true;
+        return res.json({ success: true, debug });
+      } catch (e) {
+        debug.relay.sent = false;
+        debug.relay.error = String(e?.message || e || '').slice(0, 900);
+      }
+    }
+
     return res.status(500).json({
       success: false,
-      error: (attempts[attempts.length - 1]?.sendError || 'SMTP send failed').slice(0, 900),
+      error:
+        (debug.relay?.error || attempts[attempts.length - 1]?.sendError || 'SMTP send failed').slice(0, 900),
       debug,
     });
   } catch (e) {
