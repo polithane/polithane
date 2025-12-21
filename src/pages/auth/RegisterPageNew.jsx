@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { parties as partiesApi, users as usersApi } from '../../utils/api';
 import { CITY_CODES } from '../../utils/constants';
 import { isValidEmail, isValidPhone, isValidFileSize, isValidFileType } from '../../utils/validators';
+import { getUserTitle } from '../../utils/titleHelpers';
 
 // Şifre kuralları
 const PASSWORD_RULES = [
@@ -880,7 +881,9 @@ export const RegisterPageNew = () => {
                     <Avatar src={user.avatar_url} size="50px" />
                     <div className="ml-4">
                       <h4 className="font-bold text-gray-900">{user.full_name}</h4>
-                      <p className="text-sm text-gray-500">@{user.username} • {user.user_type}</p>
+                      <p className="text-sm text-gray-500">
+                        @{user.username} • {getUserTitle(user, true) || 'Üye'}
+                      </p>
                     </div>
                     <div className="ml-auto">
                       <Button size="sm" variant="outline">Seç</Button>

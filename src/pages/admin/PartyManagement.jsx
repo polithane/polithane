@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Save, Trash2, X, Flag, AlertCircle, Layers, UserCheck, MapPin, Building2, Mail, Phone, Globe } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
+import { getUserTitle } from '../../utils/titleHelpers';
 
 export const PartyManagement = () => {
   const [loading, setLoading] = useState(false);
@@ -524,12 +525,12 @@ export const PartyManagement = () => {
                         <option value="">Seçiniz...</option>
                         {(hierData?.users?.officials || []).map((u) => (
                           <option key={u.id} value={u.id}>
-                            {u.full_name} (@{u.username}) — {u.politician_type || u.user_type}
+                            {u.full_name} (@{u.username}) — {getUserTitle(u, true) || 'Üye'}
                           </option>
                         ))}
                         {(hierData?.users?.mps || []).map((u) => (
                           <option key={u.id} value={u.id}>
-                            {u.full_name} (@{u.username}) — mp
+                            {u.full_name} (@{u.username}) — {getUserTitle(u, true) || 'Milletvekili'}
                           </option>
                         ))}
                       </select>

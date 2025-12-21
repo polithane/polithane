@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, FileText, TrendingUp, Activity, DollarSign, Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { admin as adminApi } from '../../utils/api';
+import { getUserTitle } from '../../utils/titleHelpers';
 
 export const AdminDashboardNew = () => {
   const [stats, setStats] = useState({
@@ -124,7 +125,7 @@ export const AdminDashboardNew = () => {
                 <img src={user.avatar_url || user.profile_image} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-gray-900 truncate">{user.full_name}</div>
-                  <div className="text-xs text-gray-500">{user.user_type}</div>
+                  <div className="text-xs text-gray-500">{getUserTitle(user, true) || 'Üye'}</div>
                 </div>
                 <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-semibold">Yeni</span>
               </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Avatar } from '../components/common/Avatar';
-import { isUiVerifiedUser } from '../utils/titleHelpers';
+import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 
 const pretty = (v) => JSON.stringify(v, null, 2);
 
@@ -58,11 +58,11 @@ export const TestPage = () => {
             <div className="min-w-0 flex-1">
               <div className="font-bold truncate">{sampleUser.full_name}</div>
               <div className="text-xs text-gray-600 truncate">@{sampleUser.username}</div>
-              <div className="text-xs text-gray-500 truncate">{sampleUser.user_type}</div>
+              <div className="text-xs text-gray-500 truncate">{getUserTitle(sampleUser, true) || 'Üye'}</div>
             </div>
             {sampleUser.avatar_url && (
               <a className="text-xs text-primary-blue hover:underline" href={sampleUser.avatar_url} target="_blank" rel="noreferrer">
-                avatar link
+                Avatar linki
               </a>
             )}
           </div>
