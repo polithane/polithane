@@ -14,10 +14,11 @@
     <!-- Preload brand logo -->
     <link rel="preload" href="/logo.png" as="image" type="image/png" />
     <!-- Preload Polit/Fast content-type icons (local png) -->
-    <link rel="preload" href="/icons/videoikon.png" as="image" type="image/png" />
-    <link rel="preload" href="/icons/resimikon.png" as="image" type="image/png" />
-    <link rel="preload" href="/icons/sesikon.png" as="image" type="image/png" />
-    <link rel="preload" href="/icons/yaziikon.png" as="image" type="image/png" />
+    <!-- Use prefetch (not preload) to avoid "preloaded but not used" warnings on pages that don't need them immediately -->
+    <link rel="prefetch" href="/icons/videoikon.png" as="image" />
+    <link rel="prefetch" href="/icons/resimikon.png" as="image" />
+    <link rel="prefetch" href="/icons/sesikon.png" as="image" />
+    <link rel="prefetch" href="/icons/yaziikon.png" as="image" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
