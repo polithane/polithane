@@ -759,11 +759,6 @@ export const RegisterPageNew = () => {
   // 0. Initial Choice
   const renderChoice = () => (
     <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-black text-gray-900 mb-2">Üyelik Seçenekleri</h1>
-        <p className="text-gray-600">Yeni üyelik veya mevcut profili sahiplenme.</p>
-      </div>
-
       <div className="grid gap-4">
         <button
           onClick={() => setStep(2)}
