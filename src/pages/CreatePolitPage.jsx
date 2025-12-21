@@ -113,6 +113,7 @@ export const CreatePolitPage = () => {
   const [contentType, setContentType] = useState('');
   const [content, setContent] = useState('');
   const [agendaTag, setAgendaTag] = useState(''); // '' => Gündem dışı
+  const [step, setStep] = useState('type'); // type | agenda | media | desc
   const [agendas, setAgendas] = useState([]);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -129,6 +130,8 @@ export const CreatePolitPage = () => {
   // Hidden inputs for image upload/capture
   const imageUploadRef = useRef(null);
   const imageCaptureRef = useRef(null);
+  const videoUploadRef = useRef(null);
+  const audioUploadRef = useRef(null);
 
   // Recording state (video/audio)
   const streamRef = useRef(null);
@@ -234,6 +237,56 @@ export const CreatePolitPage = () => {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+  };
+
+  // Reset wizard when switching between /polit-at and /fast-at
+  useEffect(() => {
+    setStep('type');
+    setContentType('');
+    setAgendaTag('');
+    setContent('');
+    resetMedia();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFastMode]);
+
+  const goBack = () => {
+    if (step === 'agenda') return setStep('type');
+    if (step === 'media') return setStep('agenda');
+    if (step === 'desc') return setStep(contentType === 'text' ? 'agenda' : 'media');
+    return setStep('type');
+  };
+
+  const pickType = (nextType) => {
+    setContentType(nextType);
+    setAgendaTag('');
+    setContent('');
+    resetMedia();
+    setStep('agenda');
+  };
+
+  const pickAgenda = (value) => {
+    setAgendaTag(String(value || ''));
+    setStep(contentType === 'text' ? 'desc' : 'media');
+  };
+
+  const canProceedMedia = () => {
+    if (contentType === 'video' || contentType === 'audio') return files.length > 0 || !!recordedUrl;
+    if (contentType === 'image') return files.length > 0;
+    return true;
+  };
+
+  const goNextFromMedia = () => {
+    if (!canProceedMedia()) {
+      toast.error(
+        contentType === 'video'
+          ? 'Önce video kaydedin veya yükleyin.'
+          : contentType === 'audio'
+            ? 'Önce ses kaydı alın veya yükleyin.'
+            : 'Önce en az 1 resim seçin.'
+      );
+      return;
+    }
+    setStep('desc');
   };
 
   const startRecording = async () => {
@@ -532,7 +585,44 @@ export const CreatePolitPage = () => {
                 </label>
               </div>
 
-            {/* Content type tabs */}
+            {/* Step heading */}
+            <div className="mb-4">
+              {step === 'type' ? (
+                <div className="text-center">
+                  <div className="text-xl font-black text-gray-900">Önce bir ikon seç!</div>
+                  <div className="text-xs text-gray-600 mt-1">Video, Resim, Ses veya Yazı</div>
+                </div>
+              ) : step === 'agenda' ? (
+                <div className="text-center">
+                  <div className="text-xl font-black text-gray-900">
+                    {isFastMode ? "Fast'ine gündem ekle!" : "Polit'ine gündem ekle!"}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">Gündem seçebilir ya da “Gündem Dışı” ile devam edebilirsin.</div>
+                </div>
+              ) : step === 'media' ? (
+                <div className="text-center">
+                  <div className="text-xl font-black text-gray-900">
+                    {contentType === 'video'
+                      ? 'Videonu ekle'
+                      : contentType === 'audio'
+                        ? 'Sesini ekle'
+                        : contentType === 'image'
+                          ? 'Resmini ekle'
+                          : 'Devam'}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">Kaydet / çek / yükle</div>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <div className="text-xl font-black text-gray-900">
+                    {contentType === 'text' ? 'Metnini yaz' : 'Başlık / kısa açıklama ekle'}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">{contentType === 'text' ? 'Net ve kısa yaz.' : 'Bu alan zorunlu.'}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Content type icons */}
             <div className="flex items-center justify-center gap-4 sm:gap-6 mb-5">
               {contentTabs.map((t) => {
                 const active = t.key === contentType;
@@ -546,8 +636,7 @@ export const CreatePolitPage = () => {
                     key={t.key}
                     type="button"
                     onClick={() => {
-                      setContentType(t.key);
-                      resetMedia();
+                      pickType(t.key);
                     }}
                     className="group p-0 bg-transparent border-0 outline-none"
                     title={t.alt}
@@ -620,157 +709,166 @@ export const CreatePolitPage = () => {
             </div>
 
             <form onSubmit={onSubmit} className="space-y-4">
-              {/* Preview area */}
-              <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4">
-                {!contentType && (
-                  <div className="text-sm text-gray-700">
-                    Önce yukarıdan bir <span className="font-semibold">içerik türü</span> seç: Video, Resim, Ses veya Yazı.
-                  </div>
-                )}
-                {contentType === 'video' && (
-                  <>
-                    <div className="text-xs font-black text-gray-700 mb-2">Video Önizleme</div>
-                    {recordedUrl ? (
-                      <video src={recordedUrl} controls className="w-full rounded-xl bg-black" />
-                    ) : (
-                      <div className="text-sm text-gray-600">
-                        <span className="font-semibold">Kayda Başla</span> ile videonu çek ve burada önizle.
-                      </div>
-                    )}
-                  </>
-                )}
+              {/* STEP: Agenda */}
+              {step === 'agenda' && (
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => pickAgenda('')}
+                    className="w-full rounded-2xl border-2 border-gray-200 bg-white hover:bg-gray-50 px-4 py-4 text-left"
+                  >
+                    <div className="font-black text-gray-900">Gündem Dışı</div>
+                    <div className="text-xs text-gray-600 mt-0.5">Gündem seçmeden devam et</div>
+                  </button>
 
-                {contentType === 'audio' && (
-                  <>
-                    <div className="text-xs font-black text-gray-700 mb-2">Ses Önizleme</div>
-                    {recordedUrl ? (
-                      <audio src={recordedUrl} controls className="w-full" />
-                    ) : (
-                      <div className="text-sm text-gray-600">
-                        <span className="font-semibold">Kayda Başla</span> ile ses kaydı al.
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {contentType === 'image' && (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs font-black text-gray-700">Resim Önizleme</div>
-                      <div className="text-[11px] text-gray-500">
-                        {Math.min(files.length, 10)}/{10}
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="text-sm font-black text-gray-900 mb-2">Gündem Seçin</div>
+                    <div
+                      className={[
+                        'relative rounded-xl p-[2px]',
+                        isFastMode
+                          ? 'bg-gradient-to-r from-red-500/70 via-rose-500/70 to-orange-400/70'
+                          : 'bg-gradient-to-r from-primary-blue/70 via-indigo-400/70 to-emerald-400/70',
+                      ].join(' ')}
+                    >
+                      <select
+                        value={agendaTag}
+                        onChange={(e) => pickAgenda(e.target.value)}
+                        className={[
+                          'w-full px-4 py-3 pr-11 bg-white/95 border border-transparent rounded-[10px] outline-none',
+                          isFastMode
+                            ? 'focus:ring-2 focus:ring-rose-500/35 focus:border-rose-500'
+                            : 'focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue',
+                        ].join(' ')}
+                      >
+                        <option value="">Gündem seçin…</option>
+                        {agendas
+                          .filter((a) => a?.is_active !== false)
+                          .map((a) => (
+                            <option key={a.id || a.slug || a.title} value={a.title || ''}>
+                              {a.title}
+                            </option>
+                          ))}
+                      </select>
+                      <div
+                        className={[
+                          'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2',
+                          isFastMode ? 'text-rose-600' : 'text-primary-blue',
+                        ].join(' ')}
+                      >
+                        <Flame className="w-5 h-5" />
                       </div>
                     </div>
-                    {imagePreviews.length > 0 ? (
-                      <div className="flex gap-2 overflow-x-auto pb-1">
-                        {imagePreviews.map((u, idx) => (
-                          <div
-                            key={u}
-                            draggable
-                            onDragStart={() => {
-                              setDragImageIdx(idx);
-                              setDragOverImageIdx(null);
-                            }}
-                            onDragOver={(e) => {
-                              e.preventDefault();
-                              if (dragOverImageIdx !== idx) setDragOverImageIdx(idx);
-                            }}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              if (dragImageIdx === null || dragImageIdx === undefined) return;
-                              reorderFiles(dragImageIdx, idx);
-                              setDragImageIdx(null);
-                              setDragOverImageIdx(null);
-                            }}
-                            onDragEnd={() => {
-                              setDragImageIdx(null);
-                              setDragOverImageIdx(null);
-                            }}
-                            className={`w-24 h-24 rounded-xl flex-shrink-0 border ${
-                              dragOverImageIdx === idx
-                                ? isFastMode
-                                  ? 'border-rose-500 ring-2 ring-rose-500/30'
-                                  : 'border-primary-blue ring-2 ring-primary-blue/30'
-                                : 'border-gray-200'
-                            }`}
-                            title="Sürükle-bırak ile sırala"
-                          >
-                            <img src={u} alt="" className="w-full h-full rounded-xl object-cover" />
-                          </div>
-                        ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    className="w-full py-3 rounded-xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                  >
+                    Geri Dön
+                  </button>
+                </div>
+              )}
+
+              {/* STEP: Media preview */}
+              {step === 'media' && (
+                <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4">
+                  {contentType === 'video' && (
+                    <>
+                      <div className="text-xs font-black text-gray-700 mb-2">Video Önizleme</div>
+                      {recordedUrl ? (
+                        <video src={recordedUrl} controls className="w-full rounded-xl bg-black" />
+                      ) : (
+                        <div className="text-sm text-gray-600">
+                          <span className="font-semibold">Kayda Başla</span> ile videonu çek ve burada önizle.
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {contentType === 'audio' && (
+                    <>
+                      <div className="text-xs font-black text-gray-700 mb-2">Ses Önizleme</div>
+                      {recordedUrl ? (
+                        <audio src={recordedUrl} controls className="w-full" />
+                      ) : (
+                        <div className="text-sm text-gray-600">
+                          <span className="font-semibold">Kayda Başla</span> ile ses kaydı al.
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {contentType === 'image' && (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-black text-gray-700">Resim Önizleme</div>
+                        <div className="text-[11px] text-gray-500">
+                          {Math.min(files.length, 10)}/{10}
+                        </div>
                       </div>
-                    ) : (
-                      <div className="text-sm text-gray-600">Resim ekleyince burada gözükecek.</div>
-                    )}
-                  </>
-                )}
-
-                {contentType === 'text' && (
-                  <div className="text-sm text-gray-600">
-                    <span className="font-semibold">Yazı</span> politin anında yayınlanır. Net ve kısa yaz.
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Gündem</label>
-                <div
-                  className={[
-                    'relative rounded-xl p-[2px]',
-                    isFastMode
-                      ? 'bg-gradient-to-r from-red-500/70 via-rose-500/70 to-orange-400/70'
-                      : 'bg-gradient-to-r from-primary-blue/70 via-indigo-400/70 to-emerald-400/70',
-                  ].join(' ')}
-                >
-                  <select
-                    value={agendaTag}
-                    onChange={(e) => setAgendaTag(e.target.value)}
-                    className={[
-                      'w-full px-4 py-3 pr-11 bg-white/95 border border-transparent rounded-[10px] outline-none',
-                      isFastMode
-                        ? 'focus:ring-2 focus:ring-rose-500/35 focus:border-rose-500'
-                        : 'focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue',
-                    ].join(' ')}
-                  >
-                    <option value="">Gündem dışı</option>
-                    {agendas
-                      .filter((a) => a?.is_active !== false)
-                      .map((a) => (
-                        <option key={a.id || a.slug || a.title} value={a.title || ''}>
-                          {a.title}
-                        </option>
-                      ))}
-                  </select>
-                  <div
-                    className={[
-                      'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2',
-                      isFastMode ? 'text-rose-600' : 'text-primary-blue',
-                    ].join(' ')}
-                  >
-                    <Flame className="w-5 h-5" />
-                  </div>
+                      {imagePreviews.length > 0 ? (
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {imagePreviews.map((u, idx) => (
+                            <div
+                              key={u}
+                              draggable
+                              onDragStart={() => {
+                                setDragImageIdx(idx);
+                                setDragOverImageIdx(null);
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                if (dragOverImageIdx !== idx) setDragOverImageIdx(idx);
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (dragImageIdx === null || dragImageIdx === undefined) return;
+                                reorderFiles(dragImageIdx, idx);
+                                setDragImageIdx(null);
+                                setDragOverImageIdx(null);
+                              }}
+                              onDragEnd={() => {
+                                setDragImageIdx(null);
+                                setDragOverImageIdx(null);
+                              }}
+                              className={`w-24 h-24 rounded-xl flex-shrink-0 border ${
+                                dragOverImageIdx === idx
+                                  ? isFastMode
+                                    ? 'border-rose-500 ring-2 ring-rose-500/30'
+                                    : 'border-primary-blue ring-2 ring-primary-blue/30'
+                                  : 'border-gray-200'
+                              }`}
+                              title="Sürükle-bırak ile sırala"
+                            >
+                              <img src={u} alt="" className="w-full h-full rounded-xl object-cover" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-600">Resim ekleyince burada gözükecek.</div>
+                      )}
+                    </>
+                  )}
                 </div>
-                <div className="mt-1 text-[11px] text-gray-500">
-                  Gündem listesi admin panelindeki gündemlerden gelir. Bulamazsanız “Gündem dışı” seçebilirsiniz.
-                </div>
-              </div>
+              )}
 
-              {/* VIDEO: Kayda Başla */}
-              {contentType === 'video' && (
+              {/* VIDEO */}
+              {step === 'media' && contentType === 'video' && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Video</label>
-                  <div className="flex items-center gap-2">
+                  <div className={isFastMode ? 'space-y-2' : 'grid grid-cols-1 sm:grid-cols-2 gap-2'}>
                     {!isRecording ? (
                       <button
                         type="button"
                         onClick={startRecording}
                         className={[
-                          'flex-1 py-3 rounded-xl text-white font-black',
+                          'py-4 rounded-xl text-white font-black',
                           isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
                         ].join(' ')}
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <Video className="w-5 h-5" />
+                          <Video className="w-6 h-6" />
                           Kayda Başla
                         </div>
                       </button>
@@ -778,54 +876,87 @@ export const CreatePolitPage = () => {
                       <button
                         type="button"
                         onClick={stopRecording}
-                        className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black"
+                        className="py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <StopCircle className="w-5 h-5" />
+                          <StopCircle className="w-6 h-6" />
                           Kaydı Durdur
                         </div>
                       </button>
                     )}
 
-                    {(files.length > 0 || recordedUrl) && (
+                    {!isFastMode ? (
                       <button
                         type="button"
-                        onClick={resetMedia}
-                        className="px-4 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50"
-                        title="Temizle"
+                        onClick={() => videoUploadRef.current?.click()}
+                        className="py-4 rounded-xl border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-black"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <div className="flex items-center justify-center gap-2">
+                          <UploadCloud className="w-6 h-6" />
+                          Video Yükle
+                        </div>
                       </button>
-                    )}
+                    ) : null}
                   </div>
+
+                  <input
+                    ref={videoUploadRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      resetMedia();
+                      setFiles([f]);
+                      try {
+                        setRecordedUrl(URL.createObjectURL(f));
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  />
+
+                  {(files.length > 0 || recordedUrl) && (
+                    <button
+                      type="button"
+                      onClick={resetMedia}
+                      className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-black"
+                      title="Temizle"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Trash2 className="w-5 h-5" />
+                        Temizle
+                      </div>
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* IMAGE: Resim Yükle / Resim Çek */}
-              {contentType === 'image' && (
+              {/* IMAGE */}
+              {step === 'media' && contentType === 'image' && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Resim</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => imageUploadRef.current?.click()}
                       className={[
-                        'py-3 rounded-xl text-white font-black',
+                        'py-4 rounded-xl text-white font-black',
                         isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
                       ].join(' ')}
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <UploadCloud className="w-5 h-5" />
+                        <UploadCloud className="w-6 h-6" />
                         Resim Yükle
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => imageCaptureRef.current?.click()}
-                      className="py-3 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-800 font-black"
+                      className="py-4 rounded-xl border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-black"
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <Camera className="w-5 h-5" />
+                        <Camera className="w-6 h-6" />
                         Resim Çek
                       </div>
                     </button>
@@ -856,22 +987,21 @@ export const CreatePolitPage = () => {
                 </div>
               )}
 
-              {/* AUDIO: Kayda Başla */}
-              {contentType === 'audio' && (
+              {/* AUDIO */}
+              {step === 'media' && contentType === 'audio' && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Ses</label>
-                  <div className="flex items-center gap-2">
+                  <div className={isFastMode ? 'space-y-2' : 'grid grid-cols-1 sm:grid-cols-2 gap-2'}>
                     {!isRecording ? (
                       <button
                         type="button"
                         onClick={startRecording}
                         className={[
-                          'flex-1 py-3 rounded-xl text-white font-black',
+                          'py-4 rounded-xl text-white font-black',
                           isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
                         ].join(' ')}
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <Mic className="w-5 h-5" />
+                          <Mic className="w-6 h-6" />
                           Kayda Başla
                         </div>
                       </button>
@@ -879,82 +1009,148 @@ export const CreatePolitPage = () => {
                       <button
                         type="button"
                         onClick={stopRecording}
-                        className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black"
+                        className="py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <StopCircle className="w-5 h-5" />
+                          <StopCircle className="w-6 h-6" />
                           Kaydı Durdur
                         </div>
                       </button>
                     )}
 
-                    {(files.length > 0 || recordedUrl) && (
+                    {!isFastMode ? (
                       <button
                         type="button"
-                        onClick={resetMedia}
-                        className="px-4 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50"
-                        title="Temizle"
+                        onClick={() => audioUploadRef.current?.click()}
+                        className="py-4 rounded-xl border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-black"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <div className="flex items-center justify-center gap-2">
+                          <UploadCloud className="w-6 h-6" />
+                          Ses Yükle
+                        </div>
                       </button>
-                    )}
+                    ) : null}
                   </div>
+
+                  <input
+                    ref={audioUploadRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      resetMedia();
+                      setFiles([f]);
+                      try {
+                        setRecordedUrl(URL.createObjectURL(f));
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  />
+
+                  {(files.length > 0 || recordedUrl) && (
+                    <button
+                      type="button"
+                      onClick={resetMedia}
+                      className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-black"
+                      title="Temizle"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Trash2 className="w-5 h-5" />
+                        Temizle
+                      </div>
+                    </button>
+                  )}
                 </div>
               )}
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-700">Metin</label>
+              {step === 'media' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={goNextFromMedia}
+                    disabled={loading || approvalPending}
+                    className={[
+                      'w-full py-3 rounded-xl text-white font-black disabled:opacity-60',
+                      isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
+                    ].join(' ')}
+                  >
+                    Devam Et
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    className="w-full py-3 rounded-xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                  >
+                    Geri Dön
+                  </button>
+                </>
+              )}
+
+              {step === 'desc' && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-gray-700">Metin</label>
+                    {contentType === 'text' && (
+                      <span className="text-xs text-gray-500">
+                        {Math.max(0, TEXT_LIMIT - (content?.length || 0))} karakter kaldı
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    rows={6}
+                    placeholder={
+                      contentType === 'text'
+                        ? 'Ne düşünüyorsun? (Maks. 350 karakter)'
+                        : 'Gönderinize Başlık veya Kısa Açıklama yazmalısınız.'
+                    }
+                    maxLength={contentType === 'text' ? TEXT_LIMIT : undefined}
+                    className={[
+                      'w-full px-4 py-3 border border-gray-300 rounded-xl outline-none resize-none bg-white/95',
+                      isFastMode
+                        ? 'focus:ring-2 focus:ring-rose-500/35 focus:border-rose-500'
+                        : 'focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue',
+                    ].join(' ')}
+                  />
                   {contentType === 'text' && (
-                    <span className="text-xs text-gray-500">
-                      {Math.max(0, TEXT_LIMIT - (content?.length || 0))} karakter kaldı
-                    </span>
+                    <div className="mt-2 text-[11px] text-gray-500">
+                      Metin politleri için maksimum <span className="font-semibold">350 karakter</span> sınırı uygulanır.
+                    </div>
                   )}
                 </div>
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  rows={6}
-                  placeholder={
-                    contentType === 'text'
-                      ? 'Ne düşünüyorsun? (Maks. 350 karakter)'
-                      : contentType
-                        ? 'Açıklama ekleyin (önerilir)'
-                        : 'Önce bir içerik türü seçin, sonra yazın…'
-                  }
-                  maxLength={contentType === 'text' ? TEXT_LIMIT : undefined}
-                  className={[
-                    'w-full px-4 py-3 border border-gray-300 rounded-xl outline-none resize-none bg-white/95',
-                    isFastMode
-                      ? 'focus:ring-2 focus:ring-rose-500/35 focus:border-rose-500'
-                      : 'focus:ring-2 focus:ring-primary-blue/40 focus:border-primary-blue',
-                  ].join(' ')}
-                />
-                {contentType === 'text' && (
-                  <div className="mt-2 text-[11px] text-gray-500">
-                    Metin politleri için maksimum <span className="font-semibold">350 karakter</span> sınırı uygulanır.
-                  </div>
-                )}
-              </div>
+              )}
 
-              <button
-                type="submit"
-                disabled={loading || approvalPending || !contentType}
-                className={[
-                  'w-full py-3 rounded-xl text-white font-black disabled:opacity-60',
-                  isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
-                ].join(' ')}
-              >
-                {!contentType
-                  ? 'Önce tür seç'
-                  : approvalPending
-                    ? 'Onay bekleniyor'
-                    : loading
-                      ? 'Paylaşılıyor…'
-                      : isFastMode
-                        ? 'Fast At!'
-                        : 'Polit At!'}
-              </button>
+              {step === 'desc' && (
+                <>
+                  <button
+                    type="submit"
+                    disabled={loading || approvalPending || !contentType}
+                    className={[
+                      'w-full py-3 rounded-xl text-white font-black disabled:opacity-60',
+                      isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
+                    ].join(' ')}
+                  >
+                    {approvalPending
+                      ? 'Onay bekleniyor'
+                      : loading
+                        ? 'Paylaşılıyor…'
+                        : isFastMode
+                          ? 'Fast At!'
+                          : 'Polit At!'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    className="w-full py-3 rounded-xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                  >
+                    Geri Dön
+                  </button>
+                </>
+              )}
 
             </form>
           </div>
