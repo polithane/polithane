@@ -62,10 +62,18 @@ export const CreatePolitPage = () => {
     const out = {};
     (['video', 'image', 'audio', 'text'] || []).forEach((k) => {
       const list = [];
+      // 1) Same-origin PNG icons (fastest on mobile + cached by Vercel CDN)
+      if (k === 'video') list.push('/icons/videoikon.png');
+      if (k === 'image') list.push('/icons/resimikon.png');
+      if (k === 'audio') list.push('/icons/sesikon.png');
+      if (k === 'text') list.push('/icons/yaziikon.png');
+
+      // 2) Your existing icon hosting (Supabase public buckets etc.)
       for (const b of iconBaseUrls || []) {
         for (const n of names[k] || []) list.push(join(b, n));
       }
-      // Same-origin fallback icons (only if remote icons are missing)
+
+      // 3) Same-origin SVG fallback (if PNG missing for any reason)
       if (k === 'video') list.push('/icons/videoikon.svg');
       if (k === 'image') list.push('/icons/resimikon.svg');
       if (k === 'audio') list.push('/icons/sesikon.svg');
@@ -80,8 +88,8 @@ export const CreatePolitPage = () => {
     try {
       (['video', 'image', 'audio', 'text'] || []).forEach((k) => {
         const list = iconCandidates?.[k] || [];
-        // try a couple of candidates
-        list.slice(0, 2).forEach((src) => {
+        // preload a few candidates (local png + first remote)
+        list.slice(0, 3).forEach((src) => {
           const img = new Image();
           img.src = src;
         });
