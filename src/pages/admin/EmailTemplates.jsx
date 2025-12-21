@@ -170,7 +170,15 @@ export const EmailTemplates = () => {
             </div>
             <div className="p-6">
               <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                <div dangerouslySetInnerHTML={{ __html: selectedTemplate.content }} />
+                {/* Render in a sandboxed iframe to avoid XSS in admin context */}
+                <iframe
+                  title="Email Preview"
+                  sandbox=""
+                  className="w-full h-[420px] bg-white rounded-lg border border-gray-200"
+                  srcDoc={`<!doctype html><html><head><meta charset="utf-8" /></head><body style="margin:0;padding:16px;font-family:Arial,sans-serif;line-height:1.6;color:#111827;">${String(
+                    selectedTemplate.content || ''
+                  )}</body></html>`}
+                />
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex gap-3">

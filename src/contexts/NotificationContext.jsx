@@ -37,6 +37,7 @@ export const NotificationProvider = ({ children }) => {
   // Fetch notifications
   const fetchNotifications = async () => {
     if (!isAuthenticated || !pushEnabled) return;
+    if (typeof document !== 'undefined' && document?.hidden) return;
     
     setLoading(true);
     try {
@@ -101,8 +102,9 @@ export const NotificationProvider = ({ children }) => {
       fetchNotifications();
       
       const interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document?.hidden) return;
         fetchNotifications();
-      }, 15000);
+      }, 30000);
       
       return () => clearInterval(interval);
     }

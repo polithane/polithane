@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, Bell, MessageCircle, LogIn, Settings, User, Shield, LogOut, ChevronDown, X, CheckCheck, Trash2 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { AnimatedSlogan } from '../common/AnimatedSlogan';
@@ -13,6 +13,7 @@ import { Modal } from '../common/Modal';
 
 export const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { unreadCount, notifications, loading: notifLoading, fetchNotifications, markAsRead, markAllAsRead, deleteNotification } =
     useNotifications();
@@ -92,6 +93,11 @@ export const Header = () => {
       setMessageUnreadCount(0);
       return;
     }
+    // If user is on messages page, do not double-poll conversations here.
+    if (String(location?.pathname || '').startsWith('/messages')) {
+      setMessageUnreadCount(0);
+      return;
+    }
 
     let cancelled = false;
 
@@ -108,12 +114,12 @@ export const Header = () => {
     };
 
     loadUnread();
-    const interval = setInterval(loadUnread, 15000);
+    const interval = setInterval(loadUnread, 30000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, location?.pathname]);
 
   const openMessageCompose = async () => {
     if (!isAuthenticated) {

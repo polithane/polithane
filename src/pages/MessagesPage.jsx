@@ -8,7 +8,7 @@ import { formatTimeAgo } from '../utils/formatters';
 import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck } from 'lucide-react';
 import { messages as messagesApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
-import { isUiVerifiedUser } from '../utils/titleHelpers';
+import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 import { apiCall } from '../utils/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -104,6 +104,7 @@ export const MessagesPage = () => {
     const otherId = String(selectedConv.participant_id);
     const tick = async () => {
       try {
+        if (document?.hidden) return;
         const r = await messagesApi.getMessages(otherId);
         if (!r?.success) return;
         const next = Array.isArray(r.data) ? r.data : [];
@@ -129,7 +130,7 @@ export const MessagesPage = () => {
         // ignore
       }
     };
-    msgPollRef.current = setInterval(tick, 4000);
+    msgPollRef.current = setInterval(tick, 8000);
     return () => {
       if (msgPollRef.current) clearInterval(msgPollRef.current);
       msgPollRef.current = null;
@@ -157,13 +158,14 @@ export const MessagesPage = () => {
     if (convPollRef.current) clearInterval(convPollRef.current);
     const tick = async () => {
       try {
+        if (document?.hidden) return;
         const r = await messagesApi.getConversations();
         if (r?.success) setConversations(r.data || []);
       } catch {
         // ignore
       }
     };
-    convPollRef.current = setInterval(tick, 8000);
+    convPollRef.current = setInterval(tick, 20000);
     return () => {
       if (convPollRef.current) clearInterval(convPollRef.current);
       convPollRef.current = null;
@@ -525,7 +527,7 @@ export const MessagesPage = () => {
                         {selectedConv.participant?.full_name}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        {selectedConv.participant?.user_type || 'Kullanıcı'}
+                        {getUserTitle(selectedConv.participant, true) || 'Üye'}
                       </p>
                     </div>
                     {selectedConv.message_type === 'request' && (
