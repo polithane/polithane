@@ -118,6 +118,12 @@ function verifyJwtFromRequest(req) {
   }
 }
 
+function isSafeId(value) {
+  const s = String(value || '').trim();
+  // Accept numeric IDs or UUIDv4+ (common Supabase patterns).
+  return /^(?:\d+|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(s);
+}
+
 async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   const chunks = [];
@@ -4160,10 +4166,12 @@ async function getMessagesBetween(req, res, otherId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
   const userId = auth.id;
+  const oid = String(otherId || '').trim();
+  if (!isSafeId(oid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
 
   const rows = await supabaseRestGet('messages', {
     select: '*',
-    or: `(and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId}))`,
+    or: `(and(sender_id.eq.${userId},receiver_id.eq.${oid}),and(sender_id.eq.${oid},receiver_id.eq.${userId}))`,
     order: 'created_at.asc',
     limit: '500',
   }).catch(() => []);
@@ -4175,7 +4183,7 @@ async function getMessagesBetween(req, res, otherId) {
   });
 
   // mark received messages as read
-  await supabaseRestPatch('messages', { receiver_id: `eq.${userId}`, sender_id: `eq.${otherId}`, is_read: 'eq.false' }, { is_read: true }).catch(() => {});
+  await supabaseRestPatch('messages', { receiver_id: `eq.${userId}`, sender_id: `eq.${oid}`, is_read: 'eq.false' }, { is_read: true }).catch(() => {});
 
   res.json({ success: true, data: filtered });
 }
@@ -4189,14 +4197,15 @@ function safeParseJson(input) {
 }
 
 async function isBlockedBetween(userId, otherId) {
-  const ids = [Number(userId), Number(otherId)].filter((x) => Number.isFinite(x));
-  if (ids.length !== 2) return false;
-  const rows = await supabaseRestGet('users', { select: 'id,metadata', id: `in.(${ids.join(',')})`, limit: '2' }).catch(() => []);
-  const m = new Map((rows || []).map((u) => [u.id, u?.metadata && typeof u.metadata === 'object' ? u.metadata : {}]));
-  const a = m.get(Number(userId)) || {};
-  const b = m.get(Number(otherId)) || {};
-  const aBlocked = Array.isArray(a.blocked_user_ids) && a.blocked_user_ids.map(String).includes(String(otherId));
-  const bBlocked = Array.isArray(b.blocked_user_ids) && b.blocked_user_ids.map(String).includes(String(userId));
+  const aId = String(userId || '').trim();
+  const bId = String(otherId || '').trim();
+  if (!isSafeId(aId) || !isSafeId(bId)) return false;
+  const rows = await supabaseRestGet('users', { select: 'id,metadata', id: `in.(${aId},${bId})`, limit: '2' }).catch(() => []);
+  const m = new Map((rows || []).map((u) => [String(u.id), u?.metadata && typeof u.metadata === 'object' ? u.metadata : {}]));
+  const a = m.get(String(aId)) || {};
+  const b = m.get(String(bId)) || {};
+  const aBlocked = Array.isArray(a.blocked_user_ids) && a.blocked_user_ids.map(String).includes(String(bId));
+  const bBlocked = Array.isArray(b.blocked_user_ids) && b.blocked_user_ids.map(String).includes(String(aId));
   return aBlocked || bBlocked;
 }
 
@@ -4205,7 +4214,7 @@ async function rejectMessageRequest(req, res, otherId) {
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
   const userId = auth.id;
   const oid = String(otherId || '').trim();
-  if (!/^\d+$/.test(oid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  if (!isSafeId(oid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
   // Soft-delete incoming messages for me (this effectively removes the request)
   await supabaseRestPatch(
     'messages',
@@ -4265,7 +4274,7 @@ async function sendMessage(req, res) {
   const rawContent = body.content;
   const attachment = body.attachment && typeof body.attachment === 'object' ? body.attachment : null;
   const text = typeof rawContent === 'string' ? String(rawContent).trim() : '';
-  if (!receiver_id || !/^\d+$/.test(String(receiver_id))) return res.status(400).json({ success: false, error: 'Geçersiz alıcı.' });
+  if (!receiver_id || !isSafeId(receiver_id)) return res.status(400).json({ success: false, error: 'Geçersiz alıcı.' });
   if (String(receiver_id) === String(auth.id)) return res.status(400).json({ success: false, error: 'Kendinize mesaj gönderemezsiniz.' });
 
   // Sender must be active (deactivated / claim-pending accounts cannot message)
@@ -4350,7 +4359,7 @@ async function sendMessage(req, res) {
 
   const inserted = await supabaseRestInsert('messages', [{
     sender_id: auth.id,
-    receiver_id: Number(receiver_id),
+    receiver_id,
     content,
     is_read: false,
     is_deleted_by_sender: false,
@@ -4368,7 +4377,7 @@ async function sendMessage(req, res) {
       }
       return String(text || content || '').slice(0, 220);
     })();
-    sendMessageEmail(req, { receiverId: Number(receiver_id), senderId: auth.id, messagePreview: preview }).catch(() => null);
+    sendMessageEmail(req, { receiverId: receiver_id, senderId: auth.id, messagePreview: preview }).catch(() => null);
   } catch {
     // ignore
   }
@@ -4379,8 +4388,10 @@ async function deleteMessage(req, res, messageId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
   const userId = auth.id;
+  const mid = String(messageId || '').trim();
+  if (!isSafeId(mid)) return res.status(400).json({ success: false, error: 'Geçersiz mesaj.' });
 
-  const rows = await supabaseRestGet('messages', { select: '*', id: `eq.${messageId}`, limit: '1' }).catch(() => []);
+  const rows = await supabaseRestGet('messages', { select: '*', id: `eq.${mid}`, limit: '1' }).catch(() => []);
   const msg = rows?.[0];
   if (!msg) return res.status(404).json({ success: false, error: 'Mesaj bulunamadı' });
 
@@ -4389,7 +4400,7 @@ async function deleteMessage(req, res, messageId) {
   if (msg.receiver_id === userId) patch.is_deleted_by_receiver = true;
   if (Object.keys(patch).length === 0) return res.status(403).json({ success: false, error: 'Forbidden' });
 
-  const updated = await supabaseRestPatch('messages', { id: `eq.${messageId}` }, patch);
+  const updated = await supabaseRestPatch('messages', { id: `eq.${mid}` }, patch);
   res.json({ success: true, data: updated?.[0] || null });
 }
 

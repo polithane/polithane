@@ -13,7 +13,7 @@ import { apiCall } from '../utils/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export const MessagesPage = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedConv, setSelectedConv] = useState(null);
@@ -31,6 +31,14 @@ export const MessagesPage = () => {
   const [conversations, setConversations] = useState([]);
   const convPollRef = useRef(null);
   const msgPollRef = useRef(null);
+
+  // Hard guard: messages require authentication.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      navigate('/login-new');
+    }
+  }, [authLoading, isAuthenticated, navigate]);
 
   // Compose modal
   const [showCompose, setShowCompose] = useState(false);
