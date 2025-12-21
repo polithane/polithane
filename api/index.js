@@ -1981,7 +1981,7 @@ async function sendEmailViaRelay({ to, subject, html, text, fromEmail }) {
       },
       body: JSON.stringify(payload),
     }),
-    10_000,
+    6_000,
     'MAIL_RELAY fetch'
   );
 
@@ -2007,6 +2007,20 @@ async function sendEmail({ to, subject, html, text }) {
   // Try candidate ports in order (helps if 587 is blocked but 465 works, or vice versa).
   const ports = getSmtpPortCandidates();
   let lastErr = null;
+
+  // Prefer relay first when configured (Vercel commonly blocks outbound SMTP ports).
+  const relayConfigured = isMailRelayConfigured();
+  const relayPrefer = String(process.env.MAIL_RELAY_PREFER || 'true').trim().toLowerCase() !== 'false';
+  if (relayConfigured && relayPrefer) {
+    try {
+      await sendEmailViaRelay({ to, subject, html, text, fromEmail });
+      return;
+    } catch (e) {
+      lastErr = e;
+      // fall through to SMTP as a best-effort fallback
+    }
+  }
+
   for (const p of ports) {
     try {
       const transporter = getSmtpTransporterForPort(p);
@@ -2019,8 +2033,8 @@ async function sendEmail({ to, subject, html, text }) {
       // continue trying next port
     }
   }
-  // If SMTP ports are blocked in hosting (common on Vercel), optionally fallback to HTTPS relay.
-  if (isMailRelayConfigured()) {
+  // If SMTP fails and we didn't try relay first, try relay as final fallback.
+  if (relayConfigured && !relayPrefer) {
     await sendEmailViaRelay({ to, subject, html, text, fromEmail });
     return;
   }
