@@ -342,22 +342,31 @@ export const PostDetailPage = () => {
             {/* Kullanıcı Bilgisi */}
             <div className="card mb-6">
               <div className="flex items-center gap-4 mb-4">
-                <Avatar
-                  src={uiPost.user?.avatar_url || uiPost.user?.profile_image}
-                  size="60px"
-                  verified={isUiVerifiedUser(uiPost.user)}
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-lg break-words">{uiPost.user?.full_name}</h3>
-                    {uiPost.user?.party_id && uiPost.user?.party?.short_name && (
-                      <Badge variant="secondary" size="small">
-                        {uiPost.user.party.short_name}
-                      </Badge>
-                    )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (uiPost.user) navigate(getProfilePath(uiPost.user));
+                  }}
+                  className="flex items-center gap-4 flex-1 min-w-0 text-left"
+                  title="Profili görüntüle"
+                >
+                  <Avatar
+                    src={uiPost.user?.avatar_url || uiPost.user?.profile_image}
+                    size="60px"
+                    verified={isUiVerifiedUser(uiPost.user)}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-lg break-words">{uiPost.user?.full_name}</h3>
+                      {uiPost.user?.party_id && uiPost.user?.party?.short_name && (
+                        <Badge variant="secondary" size="small">
+                          {uiPost.user.party.short_name}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
                   </div>
-                  <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
-                </div>
+                </button>
                 {uiPost.user_id ? (
                   <FollowButton targetUserId={uiPost.user_id} size="md" />
                 ) : (
