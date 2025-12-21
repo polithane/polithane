@@ -13,13 +13,66 @@ function getJwtSecret() {
 }
 
 function setCors(res) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // NOTE:
+  // - We use Authorization: Bearer <token> (not cookies), so credentials are not required.
+  // - Keep CORS strict to reduce cross-origin attack surface.
+  res.setHeader('Access-Control-Allow-Credentials', 'false');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,DELETE');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, apikey, authorization, x-admin-bootstrap-token'
   );
+}
+
+function isProd() {
+  return String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+}
+
+function getCorsAllowedOrigins() {
+  const out = new Set();
+  const add = (v) => {
+    const s = String(v || '').trim();
+    if (!s) return;
+    out.add(s.replace(/\/+$/, ''));
+  };
+  add(process.env.PUBLIC_APP_URL);
+  add(process.env.APP_URL);
+  // Local dev
+  add('http://localhost:5173');
+  add('http://localhost:5000');
+  add('http://127.0.0.1:5173');
+  add('http://127.0.0.1:5000');
+  return out;
+}
+
+function resolveCorsOrigin(req) {
+  const origin = String(req?.headers?.origin || '').trim().replace(/\/+$/, '');
+  if (!origin) return null;
+  const allow = getCorsAllowedOrigins();
+  return allow.has(origin) ? origin : null;
+}
+
+function setCorsOrigin(req, res) {
+  const allowed = resolveCorsOrigin(req);
+  if (allowed) {
+    res.setHeader('Access-Control-Allow-Origin', allowed);
+    res.setHeader('Vary', 'Origin');
+  }
+}
+
+function setSecurityHeaders(req, res) {
+  // Basic protection headers (safe for JSON responses)
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()');
+  res.setHeader('X-Frame-Options', 'DENY');
+  // CSP for API responses: deny everything by default.
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+
+  // HSTS only in production (assumes HTTPS at the edge)
+  if (isProd()) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
 }
 
 function signJwt(payload) {
@@ -697,7 +750,8 @@ async function toggleCommentLike(req, res, commentId) {
 }
 
 async function adminListPendingComments(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const { limit = 50, offset = 0 } = req.query || {};
   const rows = await supabaseRestGet('comments', {
     select: '*,user:users(*),post:posts(*)',
@@ -710,7 +764,8 @@ async function adminListPendingComments(req, res) {
 }
 
 async function adminApproveComment(req, res, commentId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const updated = await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { is_deleted: false }).catch(() => []);
   return res.json({ success: true, data: updated?.[0] || null });
 }
@@ -2807,7 +2862,8 @@ async function supabaseCount(table, params = {}) {
 // -----------------------
 
 async function adminGetStats(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   // counts
   const [userCount, postCount] = await Promise.all([
     supabaseCount('users', { select: 'id' }).catch(() => 0),
@@ -2823,7 +2879,8 @@ async function adminGetStats(req, res) {
 }
 
 async function adminGetUsers(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const { page = 1, limit = 20, search, user_type, is_verified } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
@@ -2860,7 +2917,8 @@ async function adminGetUsers(req, res) {
 }
 
 async function adminUpdateUser(req, res, userId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const body = await readJsonBody(req);
   const allowed = {};
   if (typeof body.is_verified === 'boolean') allowed.is_verified = body.is_verified;
@@ -2892,7 +2950,8 @@ function normalizeAvatarKey(url) {
 }
 
 async function adminFindDuplicateUsers(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const { limit = 5000 } = req.query || {};
   const lim = Math.min(Math.max(parseInt(limit, 10) || 5000, 200), 5000);
 
@@ -2927,7 +2986,8 @@ async function adminFindDuplicateUsers(req, res) {
 }
 
 async function adminDedupeUsers(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const body = await readJsonBody(req);
   const primaryId = String(body?.primaryId || '').trim();
   const duplicateIds = Array.isArray(body?.duplicateIds) ? body.duplicateIds.map((x) => String(x).trim()).filter(Boolean) : [];
@@ -2986,13 +3046,15 @@ async function adminDedupeUsers(req, res) {
 }
 
 async function adminDeleteUser(req, res, userId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const updated = await supabaseRestPatch('users', { id: `eq.${userId}` }, { is_active: false });
   res.json({ success: true, data: updated?.[0] || null });
 }
 
 async function adminGetPosts(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const { page = 1, limit = 20, search } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
@@ -3046,13 +3108,15 @@ async function adminGetPosts(req, res) {
 }
 
 async function adminDeletePost(req, res, postId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const updated = await supabaseRestPatch('posts', { id: `eq.${postId}` }, { is_deleted: true });
   res.json({ success: true, data: updated?.[0] || null });
 }
 
 async function adminGetAgendas(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const { page = 1, limit = 50, search, is_active, is_trending } = req.query || {};
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
@@ -3094,7 +3158,8 @@ async function adminGetAgendas(req, res) {
 }
 
 async function adminCreateAgenda(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const body = await readJsonBody(req);
   const title = String(body?.title || '').trim();
   if (!title) return res.status(400).json({ success: false, error: 'title zorunludur.' });
@@ -3122,7 +3187,8 @@ async function adminCreateAgenda(req, res) {
 }
 
 async function adminUpdateAgenda(req, res, agendaId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const body = await readJsonBody(req);
   const allowed = {};
   const fields = ['title', 'slug', 'description', 'trending_score', 'post_count', 'total_polit_score'];
@@ -3139,7 +3205,8 @@ async function adminUpdateAgenda(req, res, agendaId) {
 }
 
 async function adminDeleteAgenda(req, res, agendaId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, { is_active: false, updated_at: new Date().toISOString() }).catch(() => []);
   return res.json({ success: true, data: updated?.[0] || null });
 }
@@ -3158,7 +3225,8 @@ function slugifyParty(input) {
 }
 
 async function adminGetParties(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const { page = 1, limit = 20, search, is_active } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
@@ -3198,7 +3266,8 @@ async function adminGetParties(req, res) {
 }
 
 async function adminCreateParty(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const body = await readJsonBody(req);
   const name = String(body?.name || '').trim();
   const short_name = String(body?.short_name || '').trim();
@@ -3221,7 +3290,8 @@ async function adminCreateParty(req, res) {
 }
 
 async function adminUpdateParty(req, res, partyId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const body = await readJsonBody(req);
   const allowed = {};
   const fields = ['name', 'short_name', 'slug', 'description', 'logo_url', 'flag_url', 'color', 'foundation_date'];
@@ -3240,7 +3310,8 @@ async function adminUpdateParty(req, res, partyId) {
 }
 
 async function adminDeleteParty(req, res, partyId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const updated = await supabaseRestPatch('parties', { id: `eq.${partyId}` }, { is_active: false });
   res.json({ success: true, data: updated?.[0] || null });
 }
@@ -3304,7 +3375,8 @@ function groupBy(list, keyFn) {
 }
 
 async function adminGetPartyHierarchy(req, res, partyId) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const pid = String(partyId || '').trim();
   if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
 
@@ -4581,7 +4653,9 @@ async function searchAll(req, res) {
 
 // --- DISPATCHER ---
 export default async function handler(req, res) {
+  setSecurityHeaders(req, res);
   setCors(res);
+  setCorsOrigin(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
@@ -4785,7 +4859,12 @@ export default async function handler(req, res) {
 
       res.status(404).json({ error: 'Endpoint Not Found (Monolith)', url });
   } catch (error) {
+      const requestId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
       console.error('API Error:', error);
-      res.status(500).json({ error: error.message, stack: error.stack });
+      if (isProd()) {
+        res.status(500).json({ error: 'Sunucu hatası.', requestId });
+        return;
+      }
+      res.status(500).json({ error: error.message, stack: error.stack, requestId });
   }
 }
