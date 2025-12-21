@@ -491,12 +491,56 @@ function analyzeCommentContent(input) {
 
   const lower = text.toLocaleLowerCase('tr-TR');
 
+  const normalizeForProfanity = (s) => {
+    // Normalize Turkish + common obfuscations/leetspeak and remove separators.
+    let x = String(s || '').toLocaleLowerCase('tr-TR');
+    x = x
+      .replace(/ç/g, 'c')
+      .replace(/ğ/g, 'g')
+      .replace(/ı/g, 'i')
+      .replace(/ö/g, 'o')
+      .replace(/ş/g, 's')
+      .replace(/ü/g, 'u');
+    // Leetspeak-ish replacements
+    x = x
+      .replace(/0/g, 'o')
+      .replace(/[1!|]/g, 'i')
+      .replace(/3/g, 'e')
+      .replace(/4/g, 'a')
+      .replace(/5/g, 's')
+      .replace(/7/g, 't')
+      .replace(/8/g, 'b')
+      .replace(/9/g, 'g');
+    // Remove anything that's not a letter/number (spaces, dots, underscores, etc.)
+    x = x.replace(/[^a-z0-9]+/g, '');
+    // Collapse repeated characters (e.g. sssiiikkk -> sik)
+    x = x.replace(/(.)\1+/g, '$1');
+    return x;
+  };
+  const norm = normalizeForProfanity(lower);
+
   // Basic threat heuristics (profanity/harassment/links/code).
   const reasons = [];
   if (/(https?:\/\/|www\.)/i.test(text)) reasons.push('link');
   if (/<\s*script|\bon\w+\s*=|javascript:/i.test(text)) reasons.push('zararlı_kod');
   if (/\b(select|union|drop|insert|update|delete)\b/i.test(text)) reasons.push('sql');
-  if (/(?:\b(amk|aq|orospu|siktir|yarrak|ibne|piç|kahpe|ananı)\b)/i.test(lower)) reasons.push('hakaret');
+  // Profanity filter (normalized to catch spacing/punct/leetspeak variants)
+  const profanityPatterns = [
+    /amk/,
+    /aq/,
+    /orospu/,
+    /siktir/,
+    /sik/, // includes sikim/sikmek etc after normalization
+    /yarrak/,
+    /ibne/,
+    /pic/,
+    /kahpe/,
+    /anani|anana|anan/,
+    /got/,
+    /serefsiz|serefs/,
+    /salak|aptal|malsin|mal/,
+  ];
+  if (profanityPatterns.some((re) => re.test(norm))) reasons.push('hakaret');
   if (/(?:\b(öl|öldür|vur|kes|tehdit)\b)/i.test(lower)) reasons.push('tehdit');
 
   const flagged = reasons.length > 0;
@@ -855,7 +899,7 @@ async function createPost(req, res) {
 
     // Get party_id from user (if exists)
     const userRows = await supabaseRestGet('users', {
-      select: 'id,party_id,user_type,is_verified,is_admin,is_active',
+      select: 'id,party_id,user_type,is_verified,is_admin,is_active,metadata',
       id: `eq.${auth.id}`,
       limit: '1',
     }).catch(() => []);
@@ -874,6 +918,32 @@ async function createPost(req, res) {
         success: false,
         error: 'Üyeliğiniz onay bekliyor. Onay gelene kadar Polit Atamazsınız.',
         code: 'APPROVAL_REQUIRED',
+      });
+    }
+
+    // Claim flow gate: allow login, but do not allow posting until admin approval.
+    try {
+      const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+      const cr = meta?.claim_request && typeof meta.claim_request === 'object' ? meta.claim_request : null;
+      if (cr && String(cr.status || '') === 'pending') {
+        return res.status(403).json({
+          success: false,
+          error: 'Profil sahiplenme başvurunuz inceleniyor. Onay gelene kadar paylaşım yapamazsınız.',
+          code: 'CLAIM_PENDING',
+        });
+      }
+    } catch {
+      // ignore
+    }
+
+    // Profanity/security filter for posts (strict: block publishing)
+    const analyzed = analyzeCommentContent(content);
+    if (analyzed?.flagged) {
+      return res.status(400).json({
+        success: false,
+        error: 'İçerik güvenlik filtresine takıldı. Lütfen metni düzenleyip tekrar deneyin.',
+        code: 'CONTENT_FILTERED',
+        reasons: analyzed.reasons || [],
       });
     }
 
@@ -3728,20 +3798,15 @@ async function authLogin(req, res) {
       return res.status(403).json({ success: false, error: 'Bu hesap aktif değil.' });
     }
 
-    // Claim flow safety: block login until admin approval.
+    // Claim flow: allow login (read-only), block posting/uploading elsewhere.
+    let claimPending = false;
     try {
       const meta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : {};
       const cr = meta?.claim_request && typeof meta.claim_request === 'object' ? meta.claim_request : null;
       const status = cr ? String(cr.status || '') : '';
-      if (status === 'pending') {
-        return res.status(403).json({
-          success: false,
-          error: 'Profil sahiplenme başvurunuz inceleniyor. Admin onayı sonrası giriş yapabilirsiniz.',
-          code: 'CLAIM_PENDING',
-        });
-      }
+      if (status === 'pending') claimPending = true;
     } catch {
-      // ignore
+      claimPending = false;
     }
     
     // Email verification gate (optional)
@@ -3790,7 +3855,7 @@ async function authLogin(req, res) {
     const token = signJwt({ id: user.id, username: user.username, email: user.email, is_admin: !!user.is_admin });
     delete user.password_hash;
     
-    res.json({ success: true, message: 'Giriş başarılı.', data: { user, token } });
+    res.json({ success: true, message: 'Giriş başarılı.', data: { user, token, claimPending } });
 }
 
 async function authForgotPassword(req, res) {
@@ -4426,6 +4491,17 @@ async function sendMessage(req, res) {
   const text = typeof rawContent === 'string' ? String(rawContent).trim() : '';
   if (!receiver_id || !isSafeId(receiver_id)) return res.status(400).json({ success: false, error: 'Geçersiz alıcı.' });
   if (String(receiver_id) === String(auth.id)) return res.status(400).json({ success: false, error: 'Kendinize mesaj gönderemezsiniz.' });
+
+  if (text) {
+    const analyzed = analyzeCommentContent(text);
+    if (analyzed?.flagged) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mesajınız uygunsuz içerik içeriyor. Lütfen düzeltip tekrar deneyin.',
+        code: 'CONTENT_FILTERED',
+      });
+    }
+  }
 
   // Sender must be active (deactivated / claim-pending accounts cannot message)
   try {
