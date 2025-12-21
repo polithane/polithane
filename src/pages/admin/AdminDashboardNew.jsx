@@ -31,8 +31,17 @@ export const AdminDashboardNew = () => {
         if (r?.success) {
           setStats((prev) => ({
             ...prev,
-            totalUsers: r.data?.totalUsers || 0,
-            totalPosts: r.data?.totalPosts || 0,
+            totalUsers: r.data?.totalUsers ?? 0,
+            totalPosts: r.data?.totalPosts ?? 0,
+            totalViews: r.data?.totalViews ?? 0,
+            totalLikes: r.data?.totalLikes ?? 0,
+            totalComments: r.data?.totalComments ?? 0,
+            totalShares: r.data?.totalShares ?? 0,
+            totalPolitScore: r.data?.totalPolitScore ?? 0,
+            activeUsers24h: r.data?.activeUsers24h ?? 0,
+            newUsersToday: r.data?.newUsersToday ?? 0,
+            newPostsToday: r.data?.newPostsToday ?? 0,
+            avgPolitScore: r.data?.avgPolitScore ?? 0,
           }));
         }
       } catch (e) {
@@ -51,8 +60,17 @@ export const AdminDashboardNew = () => {
       if (s?.success) {
         setStats((prev) => ({
           ...prev,
-          totalUsers: s.data?.totalUsers || prev.totalUsers,
-          totalPosts: s.data?.totalPosts || prev.totalPosts,
+          totalUsers: s.data?.totalUsers ?? prev.totalUsers,
+          totalPosts: s.data?.totalPosts ?? prev.totalPosts,
+          totalViews: s.data?.totalViews ?? prev.totalViews,
+          totalLikes: s.data?.totalLikes ?? prev.totalLikes,
+          totalComments: s.data?.totalComments ?? prev.totalComments,
+          totalShares: s.data?.totalShares ?? prev.totalShares,
+          totalPolitScore: s.data?.totalPolitScore ?? prev.totalPolitScore,
+          activeUsers24h: s.data?.activeUsers24h ?? prev.activeUsers24h,
+          newUsersToday: s.data?.newUsersToday ?? prev.newUsersToday,
+          newPostsToday: s.data?.newPostsToday ?? prev.newPostsToday,
+          avgPolitScore: s.data?.avgPolitScore ?? prev.avgPolitScore,
         }));
       }
     } catch (e) {

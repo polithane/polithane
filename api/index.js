@@ -3106,16 +3106,67 @@ async function supabaseCount(table, params = {}) {
 async function adminGetStats(req, res) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
-  // counts
-  const [userCount, postCount] = await Promise.all([
+
+  const now = Date.now();
+  const iso24h = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const isoToday = startOfDay.toISOString();
+
+  const [userCount, postCount, newUsersToday, newPostsToday, activeUsers24h] = await Promise.all([
     supabaseCount('users', { select: 'id' }).catch(() => 0),
     supabaseCount('posts', { select: 'id', is_deleted: 'eq.false' }).catch(() => 0),
+    supabaseCount('users', { select: 'id', created_at: `gte.${isoToday}` }).catch(() => 0),
+    supabaseCount('posts', { select: 'id', is_deleted: 'eq.false', created_at: `gte.${isoToday}` }).catch(() => 0),
+    // Best-effort: users with posts in last 24h
+    supabaseRestGet('posts', {
+      select: 'user_id',
+      is_deleted: 'eq.false',
+      created_at: `gte.${iso24h}`,
+      limit: '2000',
+    })
+      .then((rows) => new Set((rows || []).map((r) => String(r?.user_id || '')).filter(Boolean)).size)
+      .catch(() => 0),
   ]);
+
+  // Engagement totals: best-effort sum over a capped set of posts (admin-only).
+  // If there are more than 5000 posts, this provides a stable approximation (recent-weighted).
+  let totals = {
+    totalViews: 0,
+    totalLikes: 0,
+    totalComments: 0,
+    totalShares: 0,
+    totalPolitScore: 0,
+    avgPolitScore: 0,
+  };
+  try {
+    const rows = await supabaseRestGet('posts', {
+      select: 'view_count,like_count,comment_count,share_count,polit_score,created_at',
+      is_deleted: 'eq.false',
+      order: 'created_at.desc',
+      limit: '5000',
+    }).catch(() => []);
+    const list = Array.isArray(rows) ? rows : [];
+    const sum = (k) => list.reduce((acc, r) => acc + (Number(r?.[k] || 0) || 0), 0);
+    totals.totalViews = sum('view_count');
+    totals.totalLikes = sum('like_count');
+    totals.totalComments = sum('comment_count');
+    totals.totalShares = sum('share_count');
+    totals.totalPolitScore = sum('polit_score');
+    totals.avgPolitScore = list.length ? Math.round(totals.totalPolitScore / list.length) : 0;
+  } catch {
+    // ignore
+  }
+
   res.json({
     success: true,
     data: {
       totalUsers: userCount,
       totalPosts: postCount,
+      newUsersToday,
+      newPostsToday,
+      activeUsers24h,
+      ...totals,
     },
   });
 }
