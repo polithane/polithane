@@ -33,10 +33,10 @@ export const AgendaBar = ({ agendas = [] }) => {
       fireIcon = <Flame className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" fill="currentColor" style={{animation: 'pulse 0.3s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     } else if (index === 1) {
       // 2. orta sıcak - orta ateş - ORTA HIZLI (0.6s - orta hız flash)
-      fireIcon = <Flame className="w-5 h-5 sm:w-4 sm:h-4 text-orange-500" fill="currentColor" style={{animation: 'pulse 0.6s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
+      fireIcon = <Flame className="w-6 h-6 sm:w-5 sm:h-5 text-orange-500" fill="currentColor" style={{animation: 'pulse 0.6s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     } else if (index === 2) {
       // 3. hafif sıcak - küçük ateş - YAVAŞ (1s - yavaş flash)
-      fireIcon = <Flame className="w-5 h-5 sm:w-4 sm:h-4 text-yellow-500" fill="currentColor" style={{animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
+      fireIcon = <Flame className="w-6 h-6 sm:w-5 sm:h-5 text-yellow-500" fill="currentColor" style={{animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     }
     
     return (

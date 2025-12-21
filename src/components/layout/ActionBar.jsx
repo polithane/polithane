@@ -1,20 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, PenTool, Wind, ArrowRight, Search, Compass, MessageCircle } from 'lucide-react';
-
-const FastWindIcon = (props) => {
-  // "Wind" + small arrow tip to mimic the requested icon
-  // (keeps Lucide style + clear arrow head on the front)
-  return (
-    <span className="relative inline-flex">
-      <Wind {...props} />
-      <ArrowRight
-        className="absolute -right-1 -top-1 w-3.5 h-3.5"
-        style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}
-      />
-    </span>
-  );
-};
+import { Home, PenTool, Zap, Search, Compass, MessageCircle } from 'lucide-react';
 
 export const ActionBar = () => {
   const navigate = useNavigate();
@@ -48,7 +34,8 @@ export const ActionBar = () => {
       key: 'fast',
       label: 'Fast At',
       onClick: () => navigate('/fast-at'),
-      icon: FastWindIcon,
+      // Use lightning icon as requested.
+      icon: Zap,
       iconClass: 'text-white',
       bgClass: 'bg-gradient-to-br from-red-500 to-rose-600',
       pulse: true,
@@ -109,7 +96,7 @@ export const ActionBar = () => {
                   'transition-transform duration-200',
                   'group-hover:scale-110',
                   it.bgClass,
-                  it.pulse ? 'animate-pulse' : '',
+                  it.pulse ? 'animate-[pulse_0.6s_ease-in-out_infinite]' : '',
                 ].join(' ')}
               >
                 <Icon className={['w-7 h-7', it.iconClass].join(' ')} />
@@ -147,7 +134,7 @@ export const ActionBar = () => {
                     className={[
                       'w-9 h-9 rounded-full flex items-center justify-center shadow-md',
                       it.bgClass,
-                      it.key === 'fast' ? 'animate-pulse' : '',
+                      it.key === 'fast' ? 'animate-[pulse_0.6s_ease-in-out_infinite]' : '',
                     ].join(' ')}
                   >
                     <Icon className={['w-5 h-5', it.iconClass].join(' ')} />

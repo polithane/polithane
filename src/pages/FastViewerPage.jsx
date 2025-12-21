@@ -14,7 +14,8 @@ export const FastViewerPage = () => {
   const [items, setItems] = useState([]);
   const [idx, setIdx] = useState(0);
   const timerRef = useRef(null);
-  const closeToList = useCallback(() => navigate('/fast'), [navigate]);
+  // UX: closing Fast should return to home.
+  const closeToList = useCallback(() => navigate('/'), [navigate]);
 
   const current = items[idx] || null;
   const progressCount = Math.max(items.length, 1);
@@ -94,7 +95,7 @@ export const FastViewerPage = () => {
           </div>
         </div>
         <button onClick={closeToList} className="p-2 rounded-full bg-white/10 hover:bg-white/20">
-          <X className="w-5 h-5" />
+          <X className="w-8 h-8" />
         </button>
       </div>
 
@@ -120,17 +121,21 @@ export const FastViewerPage = () => {
       {/* nav tap areas */}
       <button
         onClick={() => go(-1)}
-        className="absolute left-0 top-0 bottom-0 w-1/3 flex items-center justify-start px-2 text-white/60 hover:text-white"
+        className="absolute left-0 top-0 bottom-0 w-1/3 flex items-center justify-start px-3 text-white/70 hover:text-white"
         aria-label="Önceki"
       >
-        <ChevronLeft className="w-8 h-8" />
+        <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-black/25 backdrop-blur-sm border border-white/20">
+          <ChevronLeft className="w-10 h-10" />
+        </span>
       </button>
       <button
         onClick={() => go(1)}
-        className="absolute right-0 top-0 bottom-0 w-1/3 flex items-center justify-end px-2 text-white/60 hover:text-white"
+        className="absolute right-0 top-0 bottom-0 w-1/3 flex items-center justify-end px-3 text-white/70 hover:text-white"
         aria-label="Sonraki"
       >
-        <ChevronRight className="w-8 h-8" />
+        <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-black/25 backdrop-blur-sm border border-white/20">
+          <ChevronRight className="w-10 h-10" />
+        </span>
       </button>
     </div>
   );
