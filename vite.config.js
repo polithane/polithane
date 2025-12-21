@@ -1,13 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import legacy from '@vitejs/plugin-legacy'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Safari (especially older iOS Safari) compatibility
+    legacy({
+      targets: ['defaults', 'safari >= 12'],
+    }),
+  ],
   build: {
-    // Improve compatibility on non-Chrome browsers (Safari/Firefox/mobile)
-    // while keeping a reasonable modern baseline.
-    target: 'es2018',
+    // build.target is controlled by plugin-legacy targets
     rollupOptions: {
       output: {
         manualChunks: {

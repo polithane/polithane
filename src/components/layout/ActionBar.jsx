@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PenTool, Wind, ArrowRight, Search, Compass, MessageCircle } from 'lucide-react';
+import { Home, PenTool, Wind, ArrowRight, Search, Compass, MessageCircle } from 'lucide-react';
 
 const FastWindIcon = (props) => {
   // "Wind" + small arrow tip to mimic the requested icon
@@ -28,6 +28,14 @@ export const ActionBar = () => {
   }, []);
 
   const items = [
+    {
+      key: 'home',
+      label: 'Ana Sayfa',
+      onClick: () => navigate('/'),
+      icon: Home,
+      iconClass: 'text-white',
+      bgClass: 'bg-gradient-to-br from-gray-700 to-gray-900',
+    },
     {
       key: 'polit',
       label: 'Polit At',
@@ -137,7 +145,7 @@ export const ActionBar = () => {
                 >
                   <span
                     className={[
-                      'w-10 h-10 rounded-full flex items-center justify-center shadow-md',
+                      'w-9 h-9 rounded-full flex items-center justify-center shadow-md',
                       it.bgClass,
                       it.key === 'fast' ? 'animate-pulse' : '',
                     ].join(' ')}
@@ -151,9 +159,6 @@ export const ActionBar = () => {
           </div>
         </div>
       </div>
-
-      {/* Spacer so content isn't hidden behind bottom bar on mobile */}
-      <div className="lg:hidden h-[86px]" />
     </>
   );
 };

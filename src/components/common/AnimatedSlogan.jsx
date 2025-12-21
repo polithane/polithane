@@ -38,7 +38,7 @@ export const AnimatedSlogan = () => {
       {/* Logo - Tıklanabilir */}
       {!logoFailed && (
         <img
-          src="/favicon.ico"
+          src="/logo-mark.svg"
           alt="Polithane"
           className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
           onClick={() => navigate('/')}
@@ -52,7 +52,8 @@ export const AnimatedSlogan = () => {
         Polithane
       </span>
       
-      <span className="text-gray-600 text-sm md:text-base min-h-[1.25rem] flex items-center min-w-0">
+      {/* Hide rotating slogan on mobile to keep header compact */}
+      <span className="hidden sm:flex text-gray-600 text-sm md:text-base min-h-[1.25rem] items-center min-w-0">
         <span
           className={`transition-opacity duration-300 inline-block ${
             isVisible ? 'opacity-100' : 'opacity-0'

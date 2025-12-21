@@ -226,13 +226,13 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
              <span className="text-[10px] font-black tracking-wide text-white">TR</span>
            </div>
            <select
-             className="w-full appearance-none bg-white border-2 border-gray-900/80 text-gray-900 text-sm rounded-lg focus:ring-primary-blue focus:border-primary-blue block py-2.5 pr-9 pl-12 shadow-sm"
+             className="w-full appearance-none bg-white border-2 border-gray-900/80 text-gray-900 text-base font-black text-center rounded-lg focus:ring-primary-blue focus:border-primary-blue block py-2.5 pr-12 pl-12 shadow-sm"
              onChange={(e) => {
                if(e.target.value) navigate(`/city/${e.target.value}`);
              }}
              defaultValue=""
            >
-             <option value="" disabled>Plaka Seç</option>
+             <option value="" disabled>PLAKA SEÇ</option>
              {cityNamesList.map((city) => (
                <option key={city.code} value={city.code}>
                  {city.code} - {city.name}

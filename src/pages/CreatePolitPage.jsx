@@ -62,6 +62,11 @@ export const CreatePolitPage = () => {
     const out = {};
     (['video', 'image', 'audio', 'text'] || []).forEach((k) => {
       const list = [];
+      // Local, same-origin icons (fast on mobile + Safari)
+      if (k === 'video') list.push('/icons/videoikon.svg');
+      if (k === 'image') list.push('/icons/resimikon.svg');
+      if (k === 'audio') list.push('/icons/sesikon.svg');
+      if (k === 'text') list.push('/icons/yaziikon.svg');
       for (const b of iconBaseUrls || []) {
         for (const n of names[k] || []) list.push(join(b, n));
       }

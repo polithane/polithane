@@ -46,7 +46,7 @@ export const ForgotPasswordPage = () => {
             >
               {!logoFailed && (
                 <img 
-                  src="/favicon.ico" 
+                  src="/logo-mark.svg" 
                 alt="Polithane" 
                 className="w-20 h-20 object-contain drop-shadow-lg"
                   onError={() => setLogoFailed(true)}

@@ -25,7 +25,7 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
   }, [mode]);
   
   return (
-    <div className="mb-4 relative">
+    <div className="mb-4 relative z-30">
       {/* Stories Container - Scroll alanı */}
       <div className="overflow-x-auto scrollbar-hide pr-[60px]">
         <div className="flex items-center gap-2 py-2">
