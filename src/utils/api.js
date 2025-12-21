@@ -321,6 +321,11 @@ export const messages = {
     return apiCall(`/api/messages/contacts${query ? `?${query}` : ''}`);
   },
 
+  getSuggestions: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/messages/suggestions${query ? `?${query}` : ''}`);
+  },
+
   searchUsers: (q) => {
     const query = new URLSearchParams({ q: String(q || '') }).toString();
     return apiCall(`/api/messages/search?${query}`);

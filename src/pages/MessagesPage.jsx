@@ -46,6 +46,9 @@ export const MessagesPage = () => {
   const [composeLoading, setComposeLoading] = useState(false);
   const [composeQuery, setComposeQuery] = useState('');
   const [composeResults, setComposeResults] = useState([]);
+  const [composeSuggestions, setComposeSuggestions] = useState([]);
+  const [composeFollowingIds, setComposeFollowingIds] = useState(new Set());
+  const [composeMutualIds, setComposeMutualIds] = useState(new Set());
   const composeTimerRef = useRef(null);
   
   const filteredConversations = useMemo(() => {
@@ -225,13 +228,32 @@ export const MessagesPage = () => {
     setShowCompose(true);
     setComposeQuery('');
     setComposeResults([]);
+    setComposeSuggestions([]);
     setComposeLoading(true);
     try {
-      const r = await messagesApi.getContacts({ limit: 60 }).catch(() => null);
-      const list = r?.data || r?.data?.data || [];
-      setComposeContacts(Array.isArray(list) ? list : []);
+      const [contactsRes, followingRes, suggestionsRes] = await Promise.all([
+        messagesApi.getContacts({ limit: 80 }).catch(() => null),
+        user?.id ? apiCall(`/api/users/${encodeURIComponent(user.id)}/following?limit=200`).catch(() => null) : Promise.resolve(null),
+        messagesApi.getSuggestions({ limit: 24 }).catch(() => null),
+      ]);
+
+      const contactsList = contactsRes?.data || contactsRes?.data?.data || [];
+      const contacts = Array.isArray(contactsList) ? contactsList : [];
+      setComposeContacts(contacts);
+      setComposeMutualIds(new Set(contacts.map((u) => String(u?.id || '')).filter(Boolean)));
+
+      const followingData = followingRes?.data || followingRes?.data?.data || followingRes || [];
+      const following = Array.isArray(followingData) ? followingData : [];
+      setComposeFollowingIds(new Set(following.map((u) => String(u?.id || u?.user_id || '')).filter(Boolean)));
+
+      const suggestionsData = suggestionsRes?.data || suggestionsRes?.data?.data || [];
+      const suggestions = Array.isArray(suggestionsData) ? suggestionsData : [];
+      setComposeSuggestions(suggestions);
     } catch {
       setComposeContacts([]);
+      setComposeSuggestions([]);
+      setComposeFollowingIds(new Set());
+      setComposeMutualIds(new Set());
     } finally {
       setComposeLoading(false);
     }
@@ -255,6 +277,32 @@ export const MessagesPage = () => {
     }, 250);
     return () => clearTimeout(composeTimerRef.current);
   }, [composeQuery, showCompose]);
+
+  const sortedComposeResults = useMemo(() => {
+    const list = Array.isArray(composeResults) ? composeResults : [];
+    if (list.length === 0) return [];
+
+    const mutual = composeMutualIds instanceof Set ? composeMutualIds : new Set();
+    const following = composeFollowingIds instanceof Set ? composeFollowingIds : new Set();
+
+    const score = (u) => Number(u?.polit_score || 0) || 0;
+    const bucket = (u) => {
+      const id = String(u?.id || '');
+      if (!id) return 9;
+      if (mutual.has(id)) return 0; // takipleştiklerin
+      if (following.has(id)) return 1; // ben takip ediyorum (tek yön)
+      return 2; // diğerleri
+    };
+
+    return list
+      .slice()
+      .sort((a, b) => {
+        const ba = bucket(a);
+        const bb = bucket(b);
+        if (ba !== bb) return ba - bb;
+        return score(b) - score(a);
+      });
+  }, [composeResults, composeFollowingIds, composeMutualIds]);
 
   const startConversationWith = (u) => {
     const id = u?.id;
@@ -711,32 +759,71 @@ export const MessagesPage = () => {
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
               />
             </div>
-            <div className="mt-1 text-xs text-gray-500">
-              Takipleştiklerin en üstte; ayrıca arama ile herkese mesaj başlatabilirsin (izin varsa).
-            </div>
           </div>
 
           {composeLoading && <div className="text-sm text-gray-600">Kişiler yükleniyor…</div>}
 
           {!composeLoading && composeQuery.trim().length < 2 && (
-            <div className="space-y-2">
-              <div className="text-xs font-black text-gray-500 uppercase">Takipleştiklerin</div>
-              {composeContacts.length === 0 && <div className="text-sm text-gray-600">Takipleştiğin kişi yok.</div>}
-              <div className="max-h-[320px] overflow-y-auto space-y-2">
-                {composeContacts.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-left"
-                    onClick={() => startConversationWith(u)}
-                  >
-                    <Avatar src={u.avatar_url} size="40px" verified={isUiVerifiedUser(u)} />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
-                      <div className="text-xs text-gray-500 truncate">@{u.username}</div>
-                    </div>
-                  </button>
-                ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Left: mutual contacts */}
+              <div className="space-y-2 min-w-0">
+                <div className="text-xs font-black text-gray-500 uppercase">Takipleştiklerin</div>
+                <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1">
+                  {composeContacts.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-left"
+                      onClick={() => startConversationWith(u)}
+                    >
+                      <Avatar src={u.avatar_url} size="40px" verified={isUiVerifiedUser(u)} />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
+                        <div className="text-xs text-gray-500 truncate">@{u.username}</div>
+                      </div>
+                    </button>
+                  ))}
+                  {composeContacts.length === 0 ? (
+                    <div className="text-sm text-gray-600">Henüz takipleştiğin kişi yok.</div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Right: suggestions (followings of my followings) */}
+              <div className="space-y-2 min-w-0">
+                <div className="text-xs font-black text-gray-500 uppercase">Öneriler</div>
+                <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1">
+                  {composeSuggestions.map((u) => {
+                    const friendCount = Number(u?.friend_count || 0) || 0;
+                    const friendNames = Array.isArray(u?.friend_names) ? u.friend_names : [];
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-left"
+                        onClick={() => startConversationWith(u)}
+                      >
+                        <Avatar src={u.avatar_url} size="40px" verified={isUiVerifiedUser(u)} />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
+                          <div className="text-xs text-gray-500 truncate">@{u.username}</div>
+                          {friendCount > 0 ? (
+                            <div className="text-[11px] text-gray-600 mt-0.5 leading-4">
+                              <span className="font-black">{friendNames.join(', ')}</span>
+                              {friendCount > friendNames.length ? (
+                                <span className="font-semibold"> ve {friendCount - friendNames.length} kişi daha</span>
+                              ) : null}
+                              <span className="font-semibold"> takip ediyor</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {composeSuggestions.length === 0 ? (
+                    <div className="text-sm text-gray-600">Şimdilik öneri yok.</div>
+                  ) : null}
+                </div>
               </div>
             </div>
           )}
@@ -744,9 +831,9 @@ export const MessagesPage = () => {
           {!composeLoading && composeQuery.trim().length >= 2 && (
             <div className="space-y-2">
               <div className="text-xs font-black text-gray-500 uppercase">Arama Sonuçları</div>
-              {composeResults.length === 0 && <div className="text-sm text-gray-600">Sonuç bulunamadı.</div>}
+              {sortedComposeResults.length === 0 && <div className="text-sm text-gray-600">Sonuç bulunamadı.</div>}
               <div className="max-h-[320px] overflow-y-auto space-y-2">
-                {composeResults.map((u) => (
+                {sortedComposeResults.map((u) => (
                   <button
                     key={u.id}
                     type="button"

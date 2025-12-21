@@ -1392,7 +1392,8 @@ async function getMessageContacts(req, res) {
   if (mutualIds.length === 0) return res.json({ success: true, data: [] });
 
   const users = await supabaseRestGet('users', {
-    select: 'id,username,full_name,avatar_url,user_type,politician_type,party_id,province,is_verified,is_active,metadata,party:parties(*)',
+    select:
+      'id,username,full_name,avatar_url,user_type,politician_type,party_id,province,is_verified,is_active,polit_score,metadata,party:parties(*)',
     id: `in.(${mutualIds.join(',')})`,
     is_active: 'eq.true',
     order: 'polit_score.desc',
@@ -1408,6 +1409,114 @@ async function getMessageContacts(req, res) {
     });
 
   return res.json({ success: true, data: out });
+}
+
+async function getMessageSuggestions(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const ip = getClientIp(req);
+  const rl = rateLimit(`msg_suggest:${auth.id}:${ip}`, { windowMs: 60_000, max: 20 });
+  if (!rl.ok) return res.status(429).json({ success: false, error: 'Çok fazla deneme. Lütfen biraz sonra tekrar deneyin.' });
+
+  const me = String(auth.id);
+  const { limit = 24 } = req.query || {};
+  const lim = Math.min(60, Math.max(1, parseInt(limit, 10) || 24));
+
+  // 1) Get my following (friends) (cap for URL-length safety)
+  const myFollowingRows = await supabaseRestGet('follows', {
+    select: 'following_id',
+    follower_id: `eq.${me}`,
+    limit: '200',
+  }).catch(() => []);
+  const friendIds = (myFollowingRows || []).map((r) => String(r?.following_id || '')).filter(Boolean);
+  if (friendIds.length === 0) return res.json({ success: true, data: [] });
+
+  // Also load mutual contacts to exclude them from suggestions (they already appear under "Takipleştiklerin")
+  const [myFollowing, myFollowers] = await Promise.all([
+    supabaseRestGet('follows', { select: 'following_id', follower_id: `eq.${me}`, limit: '500' }).catch(() => []),
+    supabaseRestGet('follows', { select: 'follower_id', following_id: `eq.${me}`, limit: '500' }).catch(() => []),
+  ]);
+  const followingSet = new Set((myFollowing || []).map((r) => String(r.following_id)).filter(Boolean));
+  const mutualSet = new Set((myFollowers || []).map((r) => String(r.follower_id)).filter((id) => id && followingSet.has(id)));
+
+  // 2) Fetch "followings of my followings" in chunks
+  const chunk = (arr, size) => {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  };
+
+  const friendIdsCapped = friendIds.slice(0, 120);
+  const friendChunks = chunk(friendIdsCapped, 40);
+
+  const candidateToFriends = new Map(); // candidateId -> Set(friendId)
+  for (const c of friendChunks) {
+    // eslint-disable-next-line no-await-in-loop
+    const rows = await supabaseRestGet('follows', {
+      select: 'follower_id,following_id',
+      follower_id: `in.(${c.join(',')})`,
+      limit: '2000',
+    }).catch(() => []);
+
+    (rows || []).forEach((r) => {
+      const fid = String(r?.follower_id || '');
+      const cid = String(r?.following_id || '');
+      if (!fid || !cid) return;
+      if (cid === me) return;
+      if (followingSet.has(cid)) return; // already following
+      if (mutualSet.has(cid)) return; // already mutual contact
+      if (!candidateToFriends.has(cid)) candidateToFriends.set(cid, new Set());
+      candidateToFriends.get(cid).add(fid);
+    });
+  }
+
+  const candidateIds = Array.from(candidateToFriends.keys());
+  if (candidateIds.length === 0) return res.json({ success: true, data: [] });
+
+  // 3) Load my friend user map (for "X arkadaşın takip ediyor" label)
+  const friendUserRows = await supabaseRestGet('users', {
+    select: 'id,full_name,username',
+    id: `in.(${friendIdsCapped.join(',')})`,
+    is_active: 'eq.true',
+    limit: String(friendIdsCapped.length),
+  }).catch(() => []);
+  const friendNameById = new Map((friendUserRows || []).map((u) => [String(u?.id || ''), String(u?.full_name || u?.username || '').trim()]));
+
+  // 4) Load candidate user records (chunked)
+  const candidateChunks = chunk(candidateIds, 60);
+  const usersOut = [];
+  for (const ids of candidateChunks) {
+    // eslint-disable-next-line no-await-in-loop
+    const rows = await supabaseRestGet('users', {
+      select:
+        'id,username,full_name,avatar_url,user_type,politician_type,party_id,province,is_verified,is_active,polit_score,metadata,party:parties(*)',
+      id: `in.(${ids.join(',')})`,
+      is_active: 'eq.true',
+      limit: String(ids.length),
+    }).catch(() => []);
+
+    (rows || []).forEach((u) => {
+      if (!u) return;
+      const cid = String(u.id || '');
+      const friends = candidateToFriends.get(cid);
+      const friendList = friends ? Array.from(friends) : [];
+      const friendNames = friendList
+        .map((fid) => friendNameById.get(String(fid)) || null)
+        .filter(Boolean)
+        .slice(0, 3);
+      const friendCount = friendList.length;
+      const { metadata, ...rest } = u;
+      usersOut.push({ ...rest, friend_count: friendCount, friend_names: friendNames });
+    });
+  }
+
+  usersOut.sort((a, b) => {
+    const fc = Number(b.friend_count || 0) - Number(a.friend_count || 0);
+    if (fc !== 0) return fc;
+    return Number(b.polit_score || 0) - Number(a.polit_score || 0);
+  });
+
+  return res.json({ success: true, data: usersOut.slice(0, lim) });
 }
 
 async function toggleFollow(req, res, targetId) {
@@ -4276,7 +4385,8 @@ async function searchMessageUsers(req, res) {
   const blocked = new Set(Array.isArray(meMeta.blocked_user_ids) ? meMeta.blocked_user_ids.map(String) : []);
 
   const candidates = await supabaseRestGet('users', {
-    select: 'id,username,full_name,avatar_url,user_type,politician_type,party_id,province,is_verified,is_active,metadata,party:parties(*)',
+    select:
+      'id,username,full_name,avatar_url,user_type,politician_type,party_id,province,is_verified,is_active,polit_score,metadata,party:parties(*)',
     is_active: 'eq.true',
     or: `(username.ilike.*${safe}*,full_name.ilike.*${safe}*)`,
     limit: '12',
@@ -4820,6 +4930,7 @@ export default async function handler(req, res) {
       // Messages
       if (url === '/api/messages/conversations' && req.method === 'GET') return await getConversations(req, res);
       if (url === '/api/messages/contacts' && req.method === 'GET') return await getMessageContacts(req, res);
+      if (url === '/api/messages/suggestions' && req.method === 'GET') return await getMessageSuggestions(req, res);
       if (url === '/api/messages/search' && req.method === 'GET') return await searchMessageUsers(req, res);
       if (url.startsWith('/api/messages/send') && req.method === 'POST') return await sendMessage(req, res);
       if (url.startsWith('/api/messages/requests/') && url.endsWith('/reject') && req.method === 'POST') {
