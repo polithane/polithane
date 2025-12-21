@@ -1881,34 +1881,62 @@ function sha256Hex(input) {
   return crypto.createHash('sha256').update(String(input)).digest('hex');
 }
 
-let _smtpTransporter = null;
-function getSmtpTransporter() {
-  if (_smtpTransporter) return _smtpTransporter;
+const _smtpTransportersByPort = new Map();
+function createSmtpTransporter({ port }) {
   const host = String(process.env.SMTP_HOST || 'mail.polithane.com').trim();
-  const port = parseInt(String(process.env.SMTP_PORT || '587'), 10) || 587;
   const user = String(process.env.SMTP_USER || '').trim();
   const pass = String(process.env.SMTP_PASS || '').trim();
-  const secure = port === 465;
+  const p = parseInt(String(port || process.env.SMTP_PORT || '587'), 10) || 587;
+  const secure = p === 465;
   const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').trim().toLowerCase() !== 'false';
 
   if (!host || !user || !pass) {
     throw new Error('SMTP is not configured (SMTP_HOST/SMTP_USER/SMTP_PASS missing).');
   }
 
-  _smtpTransporter = nodemailer.createTransport({
+  return nodemailer.createTransport({
     host,
-    port,
+    port: p,
     secure,
     auth: { user, pass },
     requireTLS: !secure,
     // Tighten network behavior and make TLS behavior configurable.
-    connectionTimeout: 15_000,
-    greetingTimeout: 15_000,
-    socketTimeout: 30_000,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
     // In some hosting environments, STARTTLS negotiation is picky; keep defaults but set servername.
     tls: { servername: host, rejectUnauthorized },
   });
-  return _smtpTransporter;
+}
+
+function getSmtpTransporterForPort(port) {
+  const p = parseInt(String(port || ''), 10) || 587;
+  const existing = _smtpTransportersByPort.get(p);
+  if (existing) return existing;
+  const t = createSmtpTransporter({ port: p });
+  _smtpTransportersByPort.set(p, t);
+  return t;
+}
+
+function getSmtpPortCandidates() {
+  const raw = String(process.env.SMTP_PORTS || '').trim();
+  const fromEnv = parseInt(String(process.env.SMTP_PORT || ''), 10);
+  const base = Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 587;
+  const list = raw
+    ? raw
+        .split(',')
+        .map((x) => parseInt(String(x).trim(), 10))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    : [base, base === 587 ? 465 : 587];
+  // Unique + preserve order
+  const seen = new Set();
+  const out = [];
+  for (const p of list) {
+    if (seen.has(p)) continue;
+    seen.add(p);
+    out.push(p);
+  }
+  return out.length > 0 ? out : [587, 465];
 }
 
 function withTimeout(promise, ms, label) {
@@ -1922,7 +1950,6 @@ function withTimeout(promise, ms, label) {
 }
 
 async function sendEmail({ to, subject, html, text }) {
-  const transporter = getSmtpTransporter();
   const fromEmail = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim();
   if (!fromEmail) throw new Error('SMTP_FROM (or EMAIL_FROM) is missing.');
   const mail = {
@@ -1932,8 +1959,23 @@ async function sendEmail({ to, subject, html, text }) {
     text: text ? String(text) : undefined,
     html: html ? String(html) : undefined,
   };
-  // Make sure API requests never hang forever on SMTP.
-  await withTimeout(transporter.sendMail(mail), 12_000, 'SMTP sendMail');
+
+  // Try candidate ports in order (helps if 587 is blocked but 465 works, or vice versa).
+  const ports = getSmtpPortCandidates();
+  let lastErr = null;
+  for (const p of ports) {
+    try {
+      const transporter = getSmtpTransporterForPort(p);
+      // Make sure API requests never hang forever on SMTP.
+      // eslint-disable-next-line no-await-in-loop
+      await withTimeout(transporter.sendMail(mail), 10_000, `SMTP sendMail:${p}`);
+      return;
+    } catch (e) {
+      lastErr = e;
+      // continue trying next port
+    }
+  }
+  throw lastErr || new Error('SMTP send failed');
 }
 
 function isSmtpConfigured() {
@@ -4313,6 +4355,7 @@ async function adminSendTestEmail(req, res) {
   const from = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '').trim() || user;
   const secure = port === 465;
   const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').trim().toLowerCase() !== 'false';
+  const portCandidates = getSmtpPortCandidates();
 
   const debug = {
     smtp: {
@@ -4323,47 +4366,56 @@ async function adminSendTestEmail(req, res) {
       hasPass: !!String(process.env.SMTP_PASS || '').trim(),
       hasFrom: !!from,
       tlsRejectUnauthorized: rejectUnauthorized,
+      portCandidates,
     },
     appUrl: getPublicAppUrl(req),
     time: new Date().toISOString(),
   };
 
   try {
-    // Use a fresh transporter for diagnosis to avoid any stale cached sockets.
-    const transporter = nodemailer.createTransport({
-      host: String(process.env.SMTP_HOST || 'mail.polithane.com').trim(),
-      port: parseInt(String(process.env.SMTP_PORT || '587'), 10) || 587,
-      secure: (parseInt(String(process.env.SMTP_PORT || '587'), 10) || 587) === 465,
-      auth: { user: String(process.env.SMTP_USER || '').trim(), pass: String(process.env.SMTP_PASS || '').trim() },
-      requireTLS: (parseInt(String(process.env.SMTP_PORT || '587'), 10) || 587) !== 465,
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 15_000,
-      tls: { servername: String(process.env.SMTP_HOST || 'mail.polithane.com').trim(), rejectUnauthorized },
-    });
-    // Optional verify (best-effort)
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      await withTimeout(transporter.verify(), 10_000, 'SMTP verify');
-      debug.smtpVerified = true;
-    } catch (e) {
-      debug.smtpVerified = false;
-      debug.verifyError = String(e?.message || e || '').slice(0, 600);
+    const attempts = [];
+    for (const p of portCandidates) {
+      const attempt = { port: p, verified: null, verifyError: null, sent: false, sendError: null };
+      try {
+        const transporter = createSmtpTransporter({ port: p });
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await withTimeout(transporter.verify(), 8_000, `SMTP verify:${p}`);
+          attempt.verified = true;
+        } catch (e) {
+          attempt.verified = false;
+          attempt.verifyError = String(e?.message || e || '').slice(0, 600);
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        await withTimeout(
+          transporter.sendMail({
+            from: `Polithane <${from}>`,
+            to,
+            subject,
+            text: text || undefined,
+            html: html || undefined,
+          }),
+          10_000,
+          `SMTP sendMail:${p}`
+        );
+        attempt.sent = true;
+        attempts.push(attempt);
+        debug.attempts = attempts;
+        debug.usedPort = p;
+        return res.json({ success: true, debug });
+      } catch (e) {
+        attempt.sendError = String(e?.message || e || '').slice(0, 900);
+        attempts.push(attempt);
+      }
     }
 
-    await withTimeout(
-      transporter.sendMail({
-      from: `Polithane <${from}>`,
-      to,
-      subject,
-      text: text || undefined,
-      html: html || undefined,
-      }),
-      12_000,
-      'SMTP sendMail'
-    );
-
-    return res.json({ success: true, debug });
+    debug.attempts = attempts;
+    return res.status(500).json({
+      success: false,
+      error: (attempts[attempts.length - 1]?.sendError || 'SMTP send failed').slice(0, 900),
+      debug,
+    });
   } catch (e) {
     const msg = String(e?.message || e || 'SMTP send failed');
     return res.status(500).json({
