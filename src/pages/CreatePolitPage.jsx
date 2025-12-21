@@ -62,18 +62,34 @@ export const CreatePolitPage = () => {
     const out = {};
     (['video', 'image', 'audio', 'text'] || []).forEach((k) => {
       const list = [];
-      // Local, same-origin icons (fast on mobile + Safari)
+      for (const b of iconBaseUrls || []) {
+        for (const n of names[k] || []) list.push(join(b, n));
+      }
+      // Same-origin fallback icons (only if remote icons are missing)
       if (k === 'video') list.push('/icons/videoikon.svg');
       if (k === 'image') list.push('/icons/resimikon.svg');
       if (k === 'audio') list.push('/icons/sesikon.svg');
       if (k === 'text') list.push('/icons/yaziikon.svg');
-      for (const b of iconBaseUrls || []) {
-        for (const n of names[k] || []) list.push(join(b, n));
-      }
       out[k] = Array.from(new Set(list));
     });
     return out;
   }, [iconBaseUrls]);
+
+  // Preload icon candidates early so they appear instantly when selecting types
+  useEffect(() => {
+    try {
+      (['video', 'image', 'audio', 'text'] || []).forEach((k) => {
+        const list = iconCandidates?.[k] || [];
+        // try a couple of candidates
+        list.slice(0, 2).forEach((src) => {
+          const img = new Image();
+          img.src = src;
+        });
+      });
+    } catch {
+      // noop
+    }
+  }, [iconCandidates]);
 
   const contentTabs = useMemo(
     () => [
@@ -559,7 +575,8 @@ export const CreatePolitPage = () => {
                               'transition-transform duration-200',
                               active ? 'scale-[1.03]' : 'opacity-95 group-hover:opacity-100',
                             ].join(' ')}
-                            loading="lazy"
+                            loading="eager"
+                            fetchpriority="high"
                             onError={() => {
                               const nextIdx = idx + 1;
                               if (nextIdx < candidates.length) {

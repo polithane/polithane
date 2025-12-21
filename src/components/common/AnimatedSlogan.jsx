@@ -38,7 +38,7 @@ export const AnimatedSlogan = () => {
       {/* Logo - Tıklanabilir */}
       {!logoFailed && (
         <img
-          src="/logo-mark.svg"
+          src="/logo.png"
           alt="Polithane"
           className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
           onClick={() => navigate('/')}
