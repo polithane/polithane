@@ -22,6 +22,7 @@ export const AdminDashboardNew = () => {
   const [recentUsers, setRecentUsers] = useState([]);
   const [recentPosts, setRecentPosts] = useState([]);
   const [topPosts, setTopPosts] = useState([]);
+  const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -40,6 +41,27 @@ export const AdminDashboardNew = () => {
     };
     load();
   }, []);
+
+  const seedDemo = async () => {
+    setSeeding(true);
+    try {
+      const r = await adminApi.seedDemo({ posts: 200, fast: 50 }).catch(() => null);
+      if (!r?.success) throw new Error(r?.error || 'Demo içerik oluşturma başarısız.');
+      const s = await adminApi.getStats().catch(() => null);
+      if (s?.success) {
+        setStats((prev) => ({
+          ...prev,
+          totalUsers: s.data?.totalUsers || prev.totalUsers,
+          totalPosts: s.data?.totalPosts || prev.totalPosts,
+        }));
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-alert
+      alert(String(e?.message || e || 'Demo içerik oluşturma başarısız.'));
+    } finally {
+      setSeeding(false);
+    }
+  };
   
   const statCards = [
     { label: 'Toplam Kullanıcı', value: stats.totalUsers.toLocaleString('tr-TR'), icon: Users, color: 'blue', change: '+12%', link: '/admin/users' },
@@ -54,9 +76,20 @@ export const AdminDashboardNew = () => {
   
   return (
     <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-gray-600">Platform yönetim merkezi - Tüm istatistikler</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Dashboard</h1>
+          <p className="text-gray-600">Platform yönetim merkezi - Tüm istatistikler</p>
+        </div>
+        <button
+          type="button"
+          onClick={seedDemo}
+          disabled={seeding}
+          className="px-4 py-2 rounded-xl bg-gray-900 text-white font-black hover:bg-black disabled:opacity-60"
+          title="DB'ye demo içerik ekler (200 Polit + 50 Fast)"
+        >
+          {seeding ? 'Demo içerik ekleniyor…' : 'Demo içerik oluştur'}
+        </button>
       </div>
       
       {/* Stats Grid */}

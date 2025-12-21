@@ -3120,6 +3120,131 @@ async function adminGetStats(req, res) {
   });
 }
 
+async function adminSeedDemoContent(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const clampInt = (v, { min, max, def }) => {
+    const n = parseInt(String(v ?? ''), 10);
+    const x = Number.isFinite(n) ? n : def;
+    return Math.min(max, Math.max(min, x));
+  };
+
+  const postsCount = clampInt(body?.posts, { min: 0, max: 600, def: 200 });
+  const fastCount = clampInt(body?.fast, { min: 0, max: 300, def: 50 });
+  const dryRun = body?.dryRun === true;
+
+  const users = await supabaseRestGet('users', {
+    select: 'id,is_active',
+    is_active: 'eq.true',
+    order: 'polit_score.desc',
+    limit: '200',
+  }).catch(() => []);
+  const userIds = (users || []).map((u) => String(u?.id || '')).filter(Boolean);
+  if (userIds.length === 0) return res.status(400).json({ success: false, error: 'Seed için aktif kullanıcı bulunamadı.' });
+
+  const agendas = await supabaseRestGet('agendas', {
+    select: 'title,is_active',
+    is_active: 'eq.true',
+    order: 'trending_score.desc',
+    limit: '60',
+  }).catch(() => []);
+  const agendaTitles = (agendas || []).map((a) => String(a?.title || '').trim()).filter(Boolean);
+
+  const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const pick = (arr) => arr[rand(0, Math.max(0, (arr?.length || 1) - 1))];
+  const maybeAgenda = () => {
+    if (!agendaTitles.length) return null;
+    // 35% gündem dışı, 65% gündemli
+    if (Math.random() < 0.35) return null;
+    return pick(agendaTitles);
+  };
+
+  const snippets = [
+    'Bu konu hakkında görüşünüz nedir?',
+    'Sizce çözüm ne olmalı?',
+    'Veriler ve sahadaki durum aynı şeyi mi söylüyor?',
+    'Toplumsal etkilerini birlikte değerlendirelim.',
+    'Şeffaflık ve hesap verebilirlik şart.',
+    'Bugün konuşalım, yarın geç kalmayalım.',
+  ];
+  const makeText = (kind, i) => {
+    const tag = kind === 'fast' ? 'FAST' : 'POLIT';
+    const n = i + 1;
+    return `DEMO ${tag} #${n} — ${pick(snippets)}`;
+  };
+
+  const build = (kind, n) => {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const text = makeText(kind, i);
+      out.push({
+        user_id: pick(userIds),
+        party_id: null,
+        content_type: 'text',
+        content_text: text,
+        content: text,
+        category: 'general',
+        agenda_tag: maybeAgenda(),
+        media_urls: [],
+        is_deleted: false,
+        is_trending: kind === 'fast',
+        polit_score: rand(5, 800),
+        view_count: rand(0, 500),
+        like_count: rand(0, 40),
+        comment_count: rand(0, 12),
+        share_count: rand(0, 8),
+        created_at: new Date(Date.now() - rand(0, 7 * 24 * 60 * 60 * 1000)).toISOString(),
+      });
+    }
+    return out;
+  };
+
+  const rows = [...build('polit', postsCount), ...build('fast', fastCount)];
+  if (dryRun) return res.json({ success: true, dryRun: true, planned: rows.length, sample: rows.slice(0, 3) });
+
+  const chunkSize = 100;
+  const inserted = { ok: 0, failed: 0 };
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const batch = rows.slice(i, i + chunkSize);
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await supabaseRestInsert('posts', batch);
+      inserted.ok += batch.length;
+    } catch (e) {
+      const msg = String(e?.message || '');
+      // Retry without schema-specific fields
+      try {
+        const safeBatch = batch.map(({ content_text, is_trending, ...rest }) => ({ ...rest, content: rest.content || content_text }));
+        // eslint-disable-next-line no-await-in-loop
+        await supabaseRestInsert('posts', safeBatch);
+        inserted.ok += batch.length;
+      } catch (e2) {
+        const msg2 = String(e2?.message || msg || '');
+        // Final retry: remove is_trending if DB doesn't support it
+        if (msg2.includes('is_trending')) {
+          try {
+            const safeBatch = batch.map(({ content_text, is_trending, ...rest }) => ({
+              ...rest,
+              content: rest.content || content_text,
+              is_trending: undefined,
+            }));
+            // eslint-disable-next-line no-await-in-loop
+            await supabaseRestInsert('posts', safeBatch);
+            inserted.ok += batch.length;
+            continue;
+          } catch {
+            // fallthrough
+          }
+        }
+        inserted.failed += batch.length;
+      }
+    }
+  }
+
+  return res.json({ success: true, inserted });
+}
+
 async function adminGetUsers(req, res) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
@@ -5060,6 +5185,7 @@ export default async function handler(req, res) {
       if (url === '/api/admin/env-check' && req.method === 'GET') return await adminEnvCheck(req, res);
       if (url === '/api/admin/schema-check' && req.method === 'GET') return await adminSchemaCheck(req, res);
       if (url === '/api/admin/stats' && req.method === 'GET') return await adminGetStats(req, res);
+      if (url === '/api/admin/seed/demo' && req.method === 'POST') return await adminSeedDemoContent(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
       if (url === '/api/admin/users/duplicates' && req.method === 'GET') return await adminFindDuplicateUsers(req, res);
       if (url === '/api/admin/users/dedupe' && req.method === 'POST') return await adminDedupeUsers(req, res);

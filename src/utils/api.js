@@ -354,6 +354,12 @@ export const messages = {
 export const admin = {
   getStats: () => apiCall('/api/admin/stats'),
 
+  seedDemo: (params = {}) =>
+    apiCall('/api/admin/seed/demo', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
   // Users
   getUsers: (params = {}) => {
     const query = new URLSearchParams(params).toString();
