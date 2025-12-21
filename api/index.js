@@ -4216,7 +4216,8 @@ async function deleteNotification(req, res, id) {
 
 // Admin: send notification to a user, or broadcast
 async function adminSendNotification(req, res) {
-  requireAdmin(req, res);
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
   const body = await readJsonBody(req);
   const { user_id, type = 'system', title, message, broadcast } = body || {};
   const t = String(type || 'system').slice(0, 20);
@@ -4248,6 +4249,70 @@ async function adminSendNotification(req, res) {
     await supabaseInsertNotifications(rows.slice(i, i + chunkSize));
   }
   res.json({ success: true, sent: targets.length });
+}
+
+// Admin: send a one-off SMTP test email (debug-safe)
+async function adminSendTestEmail(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  const body = await readJsonBody(req);
+  const to = String(body?.to || '').trim();
+  const subject = String(body?.subject || 'Polithane SMTP Test').trim().slice(0, 200);
+  const text = String(body?.text || '').trim().slice(0, 10_000);
+  const html = body?.html ? String(body.html).slice(0, 50_000) : null;
+
+  if (!to || !to.includes('@')) return res.status(400).json({ success: false, error: 'Geçerli bir alıcı e-posta gerekli.' });
+  if (!text && !html) return res.status(400).json({ success: false, error: 'Mesaj (text veya html) gerekli.' });
+
+  const host = String(process.env.SMTP_HOST || '').trim();
+  const port = parseInt(String(process.env.SMTP_PORT || ''), 10) || null;
+  const user = String(process.env.SMTP_USER || '').trim();
+  const from = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '').trim() || user;
+  const secure = port === 465;
+
+  const debug = {
+    smtp: {
+      host: host || null,
+      port,
+      secure,
+      hasUser: !!user,
+      hasPass: !!String(process.env.SMTP_PASS || '').trim(),
+      hasFrom: !!from,
+    },
+    appUrl: getPublicAppUrl(req),
+    time: new Date().toISOString(),
+  };
+
+  try {
+    const transporter = getSmtpTransporter();
+    // Optional verify (best-effort)
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await transporter.verify();
+      debug.smtpVerified = true;
+    } catch (e) {
+      debug.smtpVerified = false;
+      debug.verifyError = String(e?.message || e || '').slice(0, 600);
+    }
+
+    await transporter.sendMail({
+      from: `Polithane <${from}>`,
+      to,
+      subject,
+      text: text || undefined,
+      html: html || undefined,
+    });
+
+    return res.json({ success: true, debug });
+  } catch (e) {
+    const msg = String(e?.message || e || 'SMTP send failed');
+    return res.status(500).json({
+      success: false,
+      error: msg.slice(0, 900),
+      debug,
+    });
+  }
 }
 
 // -----------------------
@@ -4463,6 +4528,7 @@ export default async function handler(req, res) {
       if (url === '/api/admin/agendas' && req.method === 'POST') return await adminCreateAgenda(req, res);
       if (url === '/api/admin/parties' && req.method === 'GET') return await adminGetParties(req, res);
       if (url === '/api/admin/parties' && req.method === 'POST') return await adminCreateParty(req, res);
+      if (url === '/api/admin/email/test' && req.method === 'POST') return await adminSendTestEmail(req, res);
       if (url === '/api/admin/notifications' && req.method === 'POST') return await adminSendNotification(req, res);
       if (url === '/api/admin/comments/pending' && req.method === 'GET') return await adminListPendingComments(req, res);
       if (url.startsWith('/api/admin/parties/') && req.method === 'GET') {

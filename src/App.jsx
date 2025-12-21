@@ -57,6 +57,7 @@ import { AnalyticsDashboard } from './pages/admin/AnalyticsDashboard';
 import { CommentModeration } from './pages/admin/CommentModeration';
 import { MediaManagement } from './pages/admin/MediaManagement';
 import { EmailTemplates } from './pages/admin/EmailTemplates';
+import { MailTest } from './pages/admin/MailTest';
 import { NotificationRules } from './pages/admin/NotificationRules';
 import { ScrapingManagement } from './pages/admin/ScrapingManagement';
 import { SourceManagement } from './pages/admin/SourceManagement';
@@ -148,6 +149,7 @@ function App() {
           <Route path="theme" element={<ThemeEditor />} />
           <Route path="seo" element={<SEOSettings />} />
           <Route path="email" element={<EmailTemplates />} />
+          <Route path="email-test" element={<MailTest />} />
           <Route path="notifications" element={<NotificationRules />} />
           <Route path="automation" element={<AutomationControl />} />
           <Route path="scraping" element={<ScrapingManagement />} />

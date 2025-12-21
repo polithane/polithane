@@ -455,6 +455,13 @@ export const admin = {
       method: 'POST',
       body: JSON.stringify(payload || {}),
     }),
+
+  // Email
+  sendTestEmail: ({ to, subject, text, html } = {}) =>
+    apiCall('/api/admin/email/test', {
+      method: 'POST',
+      body: JSON.stringify({ to, subject, text, html }),
+    }),
 };
 
 // ============================================

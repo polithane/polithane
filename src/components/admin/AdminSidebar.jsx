@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, FileText, TrendingUp, Settings, Palette, 
   Shield, Search, DollarSign, Megaphone, Bot, BarChart3, Mail, 
-  Globe, Image, Bell, Database, Code, Zap, Flag, Flame
+  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send
 } from 'lucide-react';
 
 export const AdminSidebar = () => {
@@ -35,6 +35,7 @@ export const AdminSidebar = () => {
         { path: '/admin/theme', icon: Palette, label: 'Tasarım & Tema' },
         { path: '/admin/seo', icon: Search, label: 'SEO Ayarları' },
         { path: '/admin/email', icon: Mail, label: 'Email Şablonları' },
+        { path: '/admin/email-test', icon: Send, label: 'Mail Test' },
         { path: '/admin/notifications', icon: Bell, label: 'Bildirim Kuralları' },
       ]
     },
