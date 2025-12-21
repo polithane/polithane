@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
-import { mockParties } from '../mock/parties';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
 
 export const HitFeedPage = () => {
@@ -152,13 +151,13 @@ export const HitFeedPage = () => {
       setOffset(0);
       try {
         const partiesData = await api.parties.getAll().catch(() => []);
-        const nextParties = partiesData && partiesData.length > 0 ? partiesData : mockParties;
+        const nextParties = Array.isArray(partiesData) ? partiesData : [];
         const pm = new Map((nextParties || []).map((p) => [p.id, p]));
         if (!cancelled) setParties(nextParties);
         if (!cancelled) await fetchPage({ nextOffset: 0, replace: true, pm });
       } catch {
-        const pm = new Map((mockParties || []).map((p) => [p.id, p]));
-        if (!cancelled) setParties(mockParties);
+        const pm = new Map();
+        if (!cancelled) setParties([]);
         if (!cancelled) await fetchPage({ nextOffset: 0, replace: true, pm });
       } finally {
         if (!cancelled) setLoading(false);

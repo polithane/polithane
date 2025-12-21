@@ -9,8 +9,7 @@ import { HorizontalScroll } from '../components/common/HorizontalScroll';
 import { MediaSidebar } from '../components/media/MediaSidebar';
 import { Avatar } from '../components/common/Avatar';
 import { FollowSuggestionsSidebar } from '../components/home/FollowSuggestionsSidebar';
-import { mockParties } from '../mock/parties';
-import { mockAgendas } from '../mock/agendas';
+// NOTE: No mock fallbacks in production. Everything should come from DB.
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
 import api from '../utils/api';
@@ -102,12 +101,8 @@ export const HomePage = () => {
           api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: 0, order: 'created_at.desc' }).catch(() => []),
         ]);
 
-        // Partileri ayarla
-        if (partiesData && partiesData.length > 0) {
-          setParties(partiesData);
-        } else {
-          setParties(mockParties);
-        }
+        // Partiler (DB)
+        setParties(Array.isArray(partiesData) ? partiesData : []);
 
         const partyMap = new Map((partiesData || []).map((p) => [p.id, p]));
 
@@ -178,7 +173,7 @@ export const HomePage = () => {
             .slice(0, 80);
           setAgendas(normalized);
         } catch {
-          setAgendas(import.meta.env.PROD ? [] : mockAgendas);
+          setAgendas([]);
         }
 
         // Fast: only followings (plus self), last 24h (server-filtered)
@@ -197,8 +192,8 @@ export const HomePage = () => {
       } catch (error) {
         console.error('Error loading data:', error);
         setPosts([]);
-        setParties(mockParties);
-        setAgendas(mockAgendas);
+        setParties([]);
+        setAgendas([]);
         setPolifest([]);
         setPostsOffset(0);
         setHasMorePosts(false);

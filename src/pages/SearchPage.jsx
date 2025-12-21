@@ -1,31 +1,56 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '../components/common/Input';
 import { PostCard } from '../components/post/PostCard';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
-import { isUiVerifiedUser } from '../utils/titleHelpers';
-import { mockPosts } from '../mock/posts';
-import { mockUsers } from '../mock/users';
-import { mockAgendas } from '../mock/agendas';
+import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
+import { apiCall } from '../utils/api';
 
 export const SearchPage = () => {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  
-  const filteredPosts = mockPosts.filter(p => 
-    p.content_text?.toLowerCase().includes(query.toLowerCase()) ||
-    p.user?.full_name?.toLowerCase().includes(query.toLowerCase())
-  );
-  
-  const filteredUsers = mockUsers.filter(u =>
-    u.full_name?.toLowerCase().includes(query.toLowerCase()) ||
-    u.username?.toLowerCase().includes(query.toLowerCase())
-  );
-  
-  const filteredAgendas = mockAgendas.filter(a =>
-    a.agenda_title?.toLowerCase().includes(query.toLowerCase())
-  );
+
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [agendas, setAgendas] = useState([]);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const q = String(query || '').trim();
+    if (q.length < 2) {
+      setUsers([]);
+      setPosts([]);
+      setAgendas([]);
+      setLoading(false);
+      return () => {};
+    }
+
+    setLoading(true);
+    timerRef.current = setTimeout(async () => {
+      try {
+        const [searchRes, agendaRes] = await Promise.all([
+          apiCall(`/api/search?q=${encodeURIComponent(q)}`).catch(() => null),
+          apiCall(`/api/agendas?limit=30&search=${encodeURIComponent(q)}`).catch(() => null),
+        ]);
+        const data = searchRes?.data || searchRes?.data?.data || searchRes || {};
+        const nextUsers = Array.isArray(data?.users) ? data.users : [];
+        const nextPosts = Array.isArray(data?.posts) ? data.posts : [];
+        const nextAgendas = Array.isArray(agendaRes?.data) ? agendaRes.data : Array.isArray(agendaRes?.data?.data) ? agendaRes.data.data : [];
+        setUsers(nextUsers);
+        setPosts(nextPosts);
+        setAgendas(nextAgendas);
+      } finally {
+        setLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [query]);
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -56,16 +81,17 @@ export const SearchPage = () => {
             ))}
           </div>
           
-          {(filter === 'all' || filter === 'users') && filteredUsers.length > 0 && (
+          {(filter === 'all' || filter === 'users') && users.length > 0 && (
             <div className="mb-8">
               <h2 className="text-xl font-bold mb-4">Kullanıcılar</h2>
               <div className="space-y-3">
-                {filteredUsers.map(user => (
-                  <div key={user.user_id} className="card flex items-center gap-4">
+                {users.map(user => (
+                  <div key={user.id || user.user_id} className="card flex items-center gap-4">
                     <Avatar src={user.avatar_url || user.profile_image} size="48px" verified={isUiVerifiedUser(user)} />
                     <div className="flex-1">
                       <h3 className="font-semibold">{user.full_name}</h3>
                       <p className="text-sm text-gray-500">@{user.username}</p>
+                      <p className="text-xs text-gray-500">{getUserTitle(user, true) || 'Üye'}</p>
                     </div>
                     <Badge variant="primary">Takip Et</Badge>
                   </div>
@@ -74,27 +100,27 @@ export const SearchPage = () => {
             </div>
           )}
           
-          {(filter === 'all' || filter === 'posts') && filteredPosts.length > 0 && (
+          {(filter === 'all' || filter === 'posts') && posts.length > 0 && (
             <div className="mb-8">
               <h2 className="text-xl font-bold mb-4">Paylaşımlar</h2>
               <div className="space-y-4">
-                {filteredPosts.map(post => (
+                {posts.map(post => (
                   <PostCard key={post.post_id ?? post.id} post={post} />
                 ))}
               </div>
             </div>
           )}
           
-          {(filter === 'all' || filter === 'agendas') && filteredAgendas.length > 0 && (
+          {(filter === 'all' || filter === 'agendas') && agendas.length > 0 && (
             <div>
               <h2 className="text-xl font-bold mb-4">Gündemler</h2>
               <div className="space-y-3">
-                {filteredAgendas.map(agenda => (
-                  <div key={agenda.agenda_id} className="card">
-                    <h3 className="font-semibold text-lg">{agenda.agenda_title}</h3>
+                {agendas.map(agenda => (
+                  <div key={agenda.id || agenda.slug || agenda.title} className="card">
+                    <h3 className="font-semibold text-lg">{agenda.title}</h3>
                     <div className="flex gap-4 mt-2 text-sm text-gray-500">
-                      <span>{agenda.post_count} paylaşım</span>
-                      <span>{agenda.total_polit_score} polit puan</span>
+                      <span>{agenda.post_count ?? 0} paylaşım</span>
+                      <span>{agenda.total_polit_score ?? 0} polit puan</span>
                     </div>
                   </div>
                 ))}
@@ -102,7 +128,11 @@ export const SearchPage = () => {
             </div>
           )}
           
-          {query && filteredPosts.length === 0 && filteredUsers.length === 0 && filteredAgendas.length === 0 && (
+          {loading && (
+            <div className="text-center py-10 text-gray-600">Aranıyor…</div>
+          )}
+
+          {query && !loading && users.length === 0 && posts.length === 0 && agendas.length === 0 && (
             <div className="text-center py-12">
               <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">Sonuç bulunamadı</p>
