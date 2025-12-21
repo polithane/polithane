@@ -96,7 +96,8 @@ export const AgendaBar = ({ agendas = [] }) => {
       <div className="md:hidden sticky top-0 z-20 bg-gray-50 pb-3 -mx-4 px-4 pt-2">
         
         {/* Gündem Pills - İlk 3 Gündem + Reklam */}
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-3">
+          <div className="flex gap-2 w-max min-w-full">
           {/* İlk 3 Gündem */}
           {visibleAgendas.slice(0, 3).map((agenda, index) => (
             <button
@@ -106,9 +107,9 @@ export const AgendaBar = ({ agendas = [] }) => {
             >
               <Flame 
                 className={
-                  index === 0 ? "w-5 h-5 sm:w-4 sm:h-4 text-red-600" : 
-                  index === 1 ? "w-5 h-5 sm:w-4 sm:h-4 text-orange-500" : 
-                  "w-5 h-5 sm:w-4 sm:h-4 text-yellow-500"
+                  index === 0 ? "w-6 h-6 text-red-600" : 
+                  index === 1 ? "w-6 h-6 text-orange-500" : 
+                  "w-6 h-6 text-yellow-500"
                 } 
                 fill="currentColor"
                 style={{
@@ -129,6 +130,7 @@ export const AgendaBar = ({ agendas = [] }) => {
           >
             🏦 YusufBANK
           </button>
+          </div>
         </div>
         
         {/* Expanded Agendas - Grid Layout (eğer 4'ten fazla gösteriliyorsa) */}

@@ -32,7 +32,8 @@ export const HomePage = () => {
   const postsSentinelRef = useRef(null);
   const postsObserverRef = useRef(null);
 
-  const POSTS_PAGE_SIZE = 120;
+  // Keep initial payload small for mobile performance.
+  const POSTS_PAGE_SIZE = 60;
 
   const computeHitPosts = (input = [], limit = 30) => {
     const now = Date.now();
@@ -355,17 +356,26 @@ export const HomePage = () => {
     return selected;
   };
 
-  const mpPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'mp').sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0))));
-  const organizationPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'party_official').sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0))));
-  const citizenPosts = pickFixedMix(
-    posts
-      .filter((p) => p.user?.user_type === 'party_member' || p.user?.user_type === 'citizen')
-      .sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0)))
-  );
-  const mediaPosts = pickFixedMix(posts.filter((p) => p.user?.user_type === 'media').sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0))));
-  const featuredPosts = posts.length > 0 
-    ? posts.filter(p => p.is_featured).sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0)).slice(0, 5) 
-    : [];
+  const { mpPosts, organizationPosts, citizenPosts, mediaPosts, featuredPosts } = useMemo(() => {
+    const byScoreDesc = (a, b) => (Number(b?.polit_score || 0) - Number(a?.polit_score || 0));
+    const list = Array.isArray(posts) ? posts : [];
+    const mp = list.filter((p) => p?.user?.user_type === 'mp').slice().sort(byScoreDesc);
+    const org = list.filter((p) => p?.user?.user_type === 'party_official').slice().sort(byScoreDesc);
+    const citizens = list
+      .filter((p) => p?.user?.user_type === 'party_member' || p?.user?.user_type === 'citizen')
+      .slice()
+      .sort(byScoreDesc);
+    const media = list.filter((p) => p?.user?.user_type === 'media').slice().sort(byScoreDesc);
+    const featured =
+      list.length > 0 ? list.filter((p) => p?.is_featured).slice().sort(byScoreDesc).slice(0, 5) : [];
+    return {
+      mpPosts: pickFixedMix(mp),
+      organizationPosts: pickFixedMix(org),
+      citizenPosts: pickFixedMix(citizens),
+      mediaPosts: pickFixedMix(media),
+      featuredPosts: featured,
+    };
+  }, [posts]);
   
   // TÜM kategori - Her kategoriden sırayla, round-robin tarzında
   const allPosts = (() => {
@@ -447,22 +457,44 @@ export const HomePage = () => {
         {/* Gündem Bar */}
         {agendas.length > 0 && <AgendaBar agendas={agendas} />}
         
-        {/* MOBİL: Tab Navigation - Sticky */}
+        {/* MOBİL: Tab Navigation - Sticky (full-width, no right gap) */}
         <div className="md:hidden sticky top-[72px] z-10 bg-gray-50 -mx-4 px-4 pb-3 mb-4 border-b border-gray-200">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {categories.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full font-semibold text-sm transition-all ${
-                  activeCategory === cat.id
-                    ? 'bg-primary-blue text-white shadow-md'
-                    : 'bg-white text-gray-700 border border-gray-300'
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
+          <div className="grid grid-cols-5 gap-2">
+            {categories.map((cat) => {
+              const isActive = activeCategory === cat.id;
+              const base =
+                cat.id === 'mps'
+                  ? 'border-sky-300 text-sky-800 bg-sky-50'
+                  : cat.id === 'organization'
+                    ? 'border-lime-300 text-lime-800 bg-lime-50'
+                    : cat.id === 'citizens'
+                      ? 'border-gray-300 text-gray-800 bg-white'
+                      : cat.id === 'media'
+                        ? 'border-amber-300 text-amber-900 bg-amber-50'
+                        : 'border-blue-200 text-blue-900 bg-blue-50';
+              const active =
+                cat.id === 'mps'
+                  ? 'bg-sky-600 text-white border-sky-600'
+                  : cat.id === 'organization'
+                    ? 'bg-lime-600 text-white border-lime-600'
+                    : cat.id === 'citizens'
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : cat.id === 'media'
+                        ? 'bg-amber-500 text-white border-amber-500'
+                        : 'bg-primary-blue text-white border-primary-blue';
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={[
+                    'w-full px-2 py-2 rounded-full font-black text-xs tracking-tight transition-all border',
+                    isActive ? `${active} shadow-sm` : `${base} hover:shadow-sm`,
+                  ].join(' ')}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
           </div>
         </div>
         

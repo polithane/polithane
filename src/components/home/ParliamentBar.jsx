@@ -222,11 +222,11 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
          </label>
          <div className="relative">
            {/* TR plate styling (visual only) */}
-           <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 rounded-l-lg bg-[#0B3D91] flex items-center justify-center">
+           <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-20 rounded-l-lg bg-[#0B3D91] flex items-center justify-center">
              <span className="text-[10px] font-black tracking-wide text-white">TR</span>
            </div>
            <select
-             className="w-full appearance-none bg-white border-2 border-gray-900/80 text-gray-900 text-base font-black text-center [text-align-last:center] rounded-lg focus:ring-primary-blue focus:border-primary-blue block py-2.5 pr-12 pl-14 shadow-sm"
+             className="w-full appearance-none bg-white border-2 border-gray-900/80 text-gray-900 text-base font-black text-center [text-align-last:center] rounded-lg focus:ring-primary-blue focus:border-primary-blue block py-2.5 pr-12 pl-24 shadow-sm"
              onChange={(e) => {
                if(e.target.value) navigate(`/city/${e.target.value}`);
              }}
