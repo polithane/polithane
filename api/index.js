@@ -5046,6 +5046,96 @@ async function searchAll(req, res) {
   });
 }
 
+function escapeHtml(input) {
+  return String(input || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildOgHtml({ title, description, image, canonicalUrl, redirectUrl }) {
+  const t = escapeHtml(title || 'Polithane');
+  const d = escapeHtml(description || 'Polithane');
+  const img = escapeHtml(image || 'https://polithane.com/favicon.ico');
+  const canon = escapeHtml(canonicalUrl || 'https://polithane.com/');
+  const redir = escapeHtml(redirectUrl || canon);
+  return `<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${t}</title>
+    <link rel="canonical" href="${canon}" />
+
+    <meta name="description" content="${d}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="${t}" />
+    <meta property="og:description" content="${d}" />
+    <meta property="og:image" content="${img}" />
+    <meta property="og:url" content="${canon}" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${t}" />
+    <meta name="twitter:description" content="${d}" />
+    <meta name="twitter:image" content="${img}" />
+
+    <meta http-equiv="refresh" content="0; url=${redir}" />
+  </head>
+  <body>
+    <p>Yönlendiriliyorsunuz… <a href="${redir}">Devam etmek için tıklayın</a></p>
+  </body>
+</html>`;
+}
+
+async function ogPost(req, res) {
+  const id = String(req.query?.id || '').trim();
+  if (!id) return res.status(400).send('Missing id');
+  const appUrl = getPublicAppUrl(req) || 'https://polithane.com';
+  const canonicalUrl = `${appUrl.replace(/\/+$/, '')}/post/${encodeURIComponent(id)}`;
+
+  let row = null;
+  try {
+    const rows = await supabaseRestGet('posts', {
+      select: 'id,content_text,content,media_urls,thumbnail_url,created_at,user:users(id,full_name,username,avatar_url)',
+      id: `eq.${id}`,
+      is_deleted: 'eq.false',
+      limit: '1',
+    });
+    row = rows?.[0] || null;
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('content_text')) {
+      const rows = await supabaseRestGet('posts', {
+        select: 'id,content,media_urls,thumbnail_url,created_at,user:users(id,full_name,username,avatar_url)',
+        id: `eq.${id}`,
+        is_deleted: 'eq.false',
+        limit: '1',
+      }).catch(() => []);
+      row = rows?.[0] || null;
+    }
+  }
+
+  if (!row) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(404).send(buildOgHtml({ title: 'Paylaşım bulunamadı', description: 'Polithane', canonicalUrl, redirectUrl: appUrl }));
+  }
+
+  const author = String(row?.user?.full_name || row?.user?.username || 'Polithane').trim();
+  const rawText = String(row?.content_text ?? row?.content ?? '').trim();
+  const oneLine = rawText.replace(/\s+/g, ' ').slice(0, 180);
+  const title = oneLine ? `${author}: ${oneLine.slice(0, 80)}` : `${author} • Polithane`;
+  const description = oneLine || 'Polithane paylaşımları';
+
+  const media = row?.thumbnail_url || (Array.isArray(row?.media_urls) ? row.media_urls[0] : row?.media_urls);
+  const image = media && String(media).startsWith('http') ? String(media) : 'https://polithane.com/favicon.ico';
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+  return res.status(200).send(buildOgHtml({ title, description, image, canonicalUrl, redirectUrl: canonicalUrl }));
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setSecurityHeaders(req, res);
@@ -5056,6 +5146,9 @@ export default async function handler(req, res) {
   try {
       const url = req.url.split('?')[0];
       if (url === '/api/avatar' && req.method === 'GET') return await proxyAvatar(req, res);
+
+      // Dynamic share/OG previews
+      if (url === '/api/og/post' && req.method === 'GET') return await ogPost(req, res);
       
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);

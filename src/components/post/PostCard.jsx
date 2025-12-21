@@ -26,9 +26,10 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
 
   const postUrl = useMemo(() => {
     try {
-      return `${window.location.origin}/post/${postId}`;
+      // Use server-rendered OG preview for social sharing (bots read meta tags).
+      return `${window.location.origin}/api/og/post?id=${encodeURIComponent(postId)}`;
     } catch {
-      return `/post/${postId}`;
+      return `/api/og/post?id=${encodeURIComponent(postId)}`;
     }
   }, [postId]);
 
