@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="160" viewBox="0 0 560 160">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#009fd6"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="136" height="136" rx="34" fill="url(#g)"/>
+  <path d="M52 58c14-16 34-24 58-24v18c-18 0-32 6-42 18-9 11-14 26-14 46H36c0-22 6-42 16-58z" fill="#fff" opacity="0.92"/>
+  <path d="M110 92c-10 0-18 8-18 18v6H74v-6c0-20 16-36 36-36h18v18h-18z" fill="#fff" opacity="0.92"/>
+  <text x="172" y="96" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" font-size="54" font-weight="900" fill="#111827">
+    POLITHANE
+  </text>
+  <text x="172" y="128" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" font-size="16" font-weight="700" fill="#6b7280">
+    özgür " aç1k " _effaf " siyaset " ba1ms1z medya
+  </text>
+</svg>
+
