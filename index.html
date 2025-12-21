@@ -10,6 +10,7 @@
     <meta name="keywords" content="polithane, siyaset, politika, türkiye, sosyal medya, demokrasi, parti, milletvekili" />
     <meta name="author" content="Polithane" />
     <meta name="theme-color" content="#009fd6" />
+    <link rel="canonical" href="https://polithane.com/" />
 
     <!-- Preload brand logo -->
     <link rel="preload" href="/logo.png" as="image" type="image/png" />
@@ -35,6 +36,21 @@
     <meta property="twitter:image" content="https://polithane.com/favicon.ico" />
     
     <title>Polithane - Türkiye Siyasi Sosyal Medya Platformu</title>
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Polithane",
+        "url": "https://polithane.com/",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://polithane.com/search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
