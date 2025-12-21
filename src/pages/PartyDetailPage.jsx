@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useLocation } from 'react-router-dom';
 import { Avatar } from '../components/common/Avatar';
 import { formatNumber, formatPolitScore, formatDate } from '../utils/formatters';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
@@ -13,6 +13,7 @@ import { apiCall } from '../utils/api';
 export const PartyDetailPage = () => {
   const { partyId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [party, setParty] = useState(null);
   const [mainTab, setMainTab] = useState('mps'); // mps | org | members | provincial | district | metro_mayor | district_mayor
   const [subTab, setSubTab] = useState('profiles'); // profiles | posts
@@ -143,6 +144,34 @@ export const PartyDetailPage = () => {
 
     load();
   }, [partyId]);
+
+  // Support deep-linking via query string (e.g. /party/:id?tab=mps)
+  useEffect(() => {
+    const qs = new URLSearchParams(location.search || '');
+    const t = String(qs.get('tab') || '').trim();
+    if (!t) return;
+    const map = {
+      mps: 'mps',
+      mp: 'mps',
+      org: 'org',
+      organization: 'org',
+      officials: 'org',
+      members: 'members',
+      member: 'members',
+      provincial: 'provincial',
+      district: 'district',
+      metropolitan: 'metro_mayor',
+      metro_mayor: 'metro_mayor',
+      district_mayor: 'district_mayor',
+    };
+    const next = map[t] || null;
+    if (next && next !== mainTab) {
+      setMainTab(next);
+      // Reset sub tab to profiles when jumping tabs
+      setSubTab('profiles');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   // IMPORTANT: Hooks must run on every render in same order.
   // These memos must be ABOVE any early returns (loading/error) to avoid React hook-order crashes.

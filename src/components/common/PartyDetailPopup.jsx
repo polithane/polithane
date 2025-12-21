@@ -1,4 +1,4 @@
-import { Users, Building2, MapPin, TrendingUp } from 'lucide-react';
+import { Users, Building2, User, Flag, Building, MapPin, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMouseLeave }) => {
@@ -11,6 +11,22 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
     navigate(path);
     onClose();
   };
+
+  const seatPct = (() => {
+    const seats = Number(party.seats || 0) || 0;
+    const total = Number(party.totalSeats || 600) || 600;
+    if (!total) return '0.0%';
+    return `${((seats / total) * 100).toFixed(1)}%`;
+  })();
+
+  const navItems = [
+    { key: 'mps', label: 'Milletvekilleri', icon: Users, to: `/party/${party.party_id}?tab=mps` },
+    { key: 'org', label: 'Teşkilat Görevlileri', icon: Building2, to: `/party/${party.party_id}?tab=org` },
+    { key: 'members', label: 'Üyeler', icon: User, to: `/party/${party.party_id}?tab=members` },
+    { key: 'provincial', label: 'İl Başkanları', icon: Flag, to: `/party/${party.party_id}?tab=provincial` },
+    { key: 'metro', label: 'İl Belediye Başkanları', icon: Building, to: `/party/${party.party_id}?tab=metro_mayor` },
+    { key: 'district_mayor', label: 'İlçe Belediye Başkanları', icon: MapPin, to: `/party/${party.party_id}?tab=district_mayor` },
+  ];
   
   return (
     <>
@@ -47,73 +63,31 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
             <div>
               <h3 className="font-bold text-lg text-gray-900">{party.party_short_name}</h3>
               <p className="text-xs text-gray-500">{party.party_name}</p>
-              <p className="text-xs text-primary-blue font-semibold mt-1">
-                {party.seats} Sandalye ({((party.seats / 600) * 100).toFixed(1)}%)
+              <p className="mt-1 text-primary-blue font-black">
+                <span className="text-lg">{party.seats}</span> <span className="text-sm">Sandalye</span>{' '}
+                <span className="text-lg">({seatPct})</span>
               </p>
             </div>
           </div>
         </div>
         
-        <div className="space-y-3">
-          <button
-            onClick={(e) => handleNavigation(`/party/${party.party_id}?tab=mps`, e)}
-            className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-primary-blue rounded-full p-2">
-                <Users className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
-              </div>
-              <span className="text-sm font-semibold text-gray-700">Milletvekili Sayısı</span>
-            </div>
-            <span className="text-lg font-bold text-primary-blue group-hover:scale-110 transition-transform">
-              {party.mp_count || party.seats || 0}
-            </span>
-          </button>
-          
-          <button
-            onClick={(e) => handleNavigation(`/party/${party.party_id}?tab=metropolitan`, e)}
-            className="w-full flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-primary-green rounded-full p-2">
-                <Building2 className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
-              </div>
-              <span className="text-sm font-semibold text-gray-700">Büyükşehir Belediye</span>
-            </div>
-            <span className="text-lg font-bold text-primary-green group-hover:scale-110 transition-transform">
-              {party.metropolitan_count || 0}
-            </span>
-          </button>
-          
-          <button
-            onClick={(e) => handleNavigation(`/party/${party.party_id}?tab=district`, e)}
-            className="w-full flex items-center justify-between p-3 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-accent-mustard rounded-full p-2">
-                <MapPin className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
-              </div>
-              <span className="text-sm font-semibold text-gray-700">İlçe Belediye</span>
-            </div>
-            <span className="text-lg font-bold text-accent-mustard group-hover:scale-110 transition-transform">
-              {party.district_count || 0}
-            </span>
-          </button>
-          
-          <button
-            onClick={(e) => handleNavigation(`/party/${party.party_id}?tab=agendas`, e)}
-            className="w-full flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-purple-600 rounded-full p-2">
-                <TrendingUp className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
-              </div>
-              <span className="text-sm font-semibold text-gray-700">Gündeme Katkı</span>
-            </div>
-            <span className="text-lg font-bold text-purple-600 group-hover:scale-110 transition-transform">
-              {party.agenda_contribution || 0}
-            </span>
-          </button>
+        <div className="space-y-2">
+          {navItems.map((it) => {
+            const Icon = it.icon;
+            return (
+              <button
+                key={it.key}
+                onClick={(e) => handleNavigation(it.to, e)}
+                className="w-full flex items-center gap-3 p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
+              >
+                <span className="w-9 h-9 rounded-lg bg-gray-900 text-white flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-5 h-5" />
+                </span>
+                <span className="text-sm font-black text-gray-800 flex-1 text-left">{it.label}</span>
+                <ChevronRight className="w-6 h-6 text-gray-400 flex-shrink-0" />
+              </button>
+            );
+          })}
         </div>
         
         <button
