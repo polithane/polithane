@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { admin as adminApi } from '../../utils/api';
 import { Save, Plus, Trash2, Search, Flame } from 'lucide-react';
+import { apiCall } from '../../utils/api';
 
 export const AgendaManagement = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState('');
+  const [bootstrapping, setBootstrapping] = useState(false);
 
   const [q, setQ] = useState('');
   const [showInactive, setShowInactive] = useState(false);
@@ -117,6 +119,20 @@ export const AgendaManagement = () => {
     }
   };
 
+  const bootstrapAgendas = async () => {
+    setBootstrapping(true);
+    setError('');
+    try {
+      // Triggers server-side "empty-table bootstrap" logic (best-effort).
+      await apiCall('/api/agendas?limit=1').catch(() => null);
+      await fetchList();
+    } catch (e) {
+      setError(e?.message || 'Varsayılan gündemler yüklenemedi.');
+    } finally {
+      setBootstrapping(false);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-start justify-between gap-4 mb-6">
@@ -206,6 +222,30 @@ export const AgendaManagement = () => {
 
       {loading ? (
         <div className="text-gray-600">Yükleniyor…</div>
+      ) : sorted.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="text-lg font-black text-gray-900">Henüz gündem yok</div>
+          <div className="text-sm text-gray-600 mt-1">
+            Gündem listesi veritabanından gelir. İstersen varsayılan gündem listesini tek tıkla oluşturabilirsin.
+          </div>
+          <div className="mt-4 flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={bootstrapAgendas}
+              disabled={bootstrapping}
+              className="px-5 py-3 rounded-xl bg-gray-900 hover:bg-black text-white font-black disabled:opacity-60"
+            >
+              {bootstrapping ? 'Varsayılan gündemler oluşturuluyor…' : 'Varsayılan gündemleri oluştur'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="px-5 py-3 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+            >
+              Yeni gündem ekle
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
