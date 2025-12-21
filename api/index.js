@@ -101,6 +101,49 @@ async function supabaseRestGet(path, params) {
   return await res.json();
 }
 
+function isAllowedAvatarUrl(u) {
+  try {
+    const url = new URL(String(u || ''));
+    if (url.protocol !== 'https:') return false;
+    // Only allow our own Supabase Storage public avatars bucket
+    if (!/\.supabase\.co$/i.test(url.hostname)) return false;
+    const p = url.pathname || '';
+    return p.includes('/storage/v1/object/public/avatars/');
+  } catch {
+    return false;
+  }
+}
+
+async function proxyAvatar(req, res) {
+  const u = String(req.query?.u || '').trim();
+  if (!u || !isAllowedAvatarUrl(u)) {
+    // Always return a valid image (avoid console spam)
+    res.statusCode = 302;
+    res.setHeader('Location', '/favicon.ico');
+    return res.end();
+  }
+
+  try {
+    const r = await fetch(u, { method: 'GET' });
+    if (!r.ok) {
+      res.statusCode = 302;
+      res.setHeader('Location', '/favicon.ico');
+      return res.end();
+    }
+    const ct = r.headers.get('content-type') || 'image/jpeg';
+    res.setHeader('Content-Type', ct);
+    // Cache a bit to reduce repeated hits
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.statusCode = 200;
+    return res.end(buf);
+  } catch {
+    res.statusCode = 302;
+    res.setHeader('Location', '/favicon.ico');
+    return res.end();
+  }
+}
+
 async function supabaseStorageRequest(method, path, body) {
   const { supabaseUrl } = getSupabaseKeys();
   const key = getSupabaseServiceRoleKey();
@@ -4283,6 +4326,7 @@ export default async function handler(req, res) {
 
   try {
       const url = req.url.split('?')[0];
+      if (url === '/api/avatar' && req.method === 'GET') return await proxyAvatar(req, res);
       
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);

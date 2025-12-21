@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { normalizeAvatarUrl } from '../../utils/avatarUrl';
 
 export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
   const navigate = useNavigate();
@@ -52,7 +53,7 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
                 {/* Inner circle - profile image */}
                 <div className={['w-full h-full rounded-full p-[1.5px]', cfg.isFast ? 'bg-white' : 'bg-white'].join(' ')}>
                   <img 
-                    src={story.profile_image || story.avatar_url} 
+                    src={normalizeAvatarUrl(story.profile_image || story.avatar_url)} 
                     alt={story.full_name}
                     className="w-full h-full rounded-full object-cover group-hover:scale-105 transition-transform"
                   />

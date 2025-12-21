@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react';
 import { clsx } from 'clsx';
+import { normalizeAvatarUrl } from '../../utils/avatarUrl';
 
 // Default avatar
 const DEFAULT_AVATAR = '/favicon.ico';
@@ -19,14 +20,8 @@ export const Avatar = ({
   const partyLogoSize = sizeNum * 0.35;
   
   const getAvatarUrl = (url) => {
-    // Eğer geçerli URL varsa kullan
-    if (url && (url.startsWith('/') || url.startsWith('http'))) {
-      // Supabase Storage gibi URL'lerde Türkçe karakter/boşluk sorunlarını önlemek için encode et
-      if (url.startsWith('http') && !url.includes('%')) {
-        return encodeURI(url);
-      }
-      return url;
-    }
+    // If valid URL/path, normalize (proxy Supabase avatars + safe encoding)
+    if (url && (url.startsWith('/') || url.startsWith('http'))) return normalizeAvatarUrl(url);
     // Yoksa default logo
     return DEFAULT_AVATAR;
   };
