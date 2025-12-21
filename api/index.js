@@ -1551,7 +1551,9 @@ async function adminEnvCheck(req, res) {
     'SMTP_USER',
     'SMTP_PASS',
     'SMTP_FROM',
+    'SMTP_TLS_REJECT_UNAUTHORIZED',
     'ADMIN_BOOTSTRAP_TOKEN',
+    'ADMIN_BOOTSTRAP_ALLOW_RESET',
     'PUBLIC_APP_URL',
     'APP_URL',
     'EMAIL_VERIFICATION_ENABLED',
@@ -1887,6 +1889,7 @@ function getSmtpTransporter() {
   const user = String(process.env.SMTP_USER || '').trim();
   const pass = String(process.env.SMTP_PASS || '').trim();
   const secure = port === 465;
+  const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').trim().toLowerCase() !== 'false';
 
   if (!host || !user || !pass) {
     throw new Error('SMTP is not configured (SMTP_HOST/SMTP_USER/SMTP_PASS missing).');
@@ -1898,8 +1901,12 @@ function getSmtpTransporter() {
     secure,
     auth: { user, pass },
     requireTLS: !secure,
+    // Tighten network behavior and make TLS behavior configurable.
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 30_000,
     // In some hosting environments, STARTTLS negotiation is picky; keep defaults but set servername.
-    tls: { servername: host },
+    tls: { servername: host, rejectUnauthorized },
   });
   return _smtpTransporter;
 }
