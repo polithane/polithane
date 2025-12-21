@@ -1911,6 +1911,16 @@ function getSmtpTransporter() {
   return _smtpTransporter;
 }
 
+function withTimeout(promise, ms, label) {
+  const t = Math.max(1, Number(ms) || 1);
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label || 'Operation'} timed out after ${t}ms`)), t);
+    }),
+  ]);
+}
+
 async function sendEmail({ to, subject, html, text }) {
   const transporter = getSmtpTransporter();
   const fromEmail = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim();
@@ -1922,7 +1932,8 @@ async function sendEmail({ to, subject, html, text }) {
     text: text ? String(text) : undefined,
     html: html ? String(html) : undefined,
   };
-  await transporter.sendMail(mail);
+  // Make sure API requests never hang forever on SMTP.
+  await withTimeout(transporter.sendMail(mail), 12_000, 'SMTP sendMail');
 }
 
 function isSmtpConfigured() {
@@ -1956,7 +1967,7 @@ function emailLayout({ title, bodyHtml }) {
 async function safeSendEmail(payload) {
   try {
     if (!isSmtpConfigured()) return false;
-    await sendEmail(payload);
+    await withTimeout(sendEmail(payload), 15_000, 'SMTP send');
     return true;
   } catch {
     return false;
@@ -4301,6 +4312,7 @@ async function adminSendTestEmail(req, res) {
   const user = String(process.env.SMTP_USER || '').trim();
   const from = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '').trim() || user;
   const secure = port === 465;
+  const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').trim().toLowerCase() !== 'false';
 
   const debug = {
     smtp: {
@@ -4310,30 +4322,46 @@ async function adminSendTestEmail(req, res) {
       hasUser: !!user,
       hasPass: !!String(process.env.SMTP_PASS || '').trim(),
       hasFrom: !!from,
+      tlsRejectUnauthorized: rejectUnauthorized,
     },
     appUrl: getPublicAppUrl(req),
     time: new Date().toISOString(),
   };
 
   try {
-    const transporter = getSmtpTransporter();
+    // Use a fresh transporter for diagnosis to avoid any stale cached sockets.
+    const transporter = nodemailer.createTransport({
+      host: String(process.env.SMTP_HOST || 'mail.polithane.com').trim(),
+      port: parseInt(String(process.env.SMTP_PORT || '587'), 10) || 587,
+      secure: (parseInt(String(process.env.SMTP_PORT || '587'), 10) || 587) === 465,
+      auth: { user: String(process.env.SMTP_USER || '').trim(), pass: String(process.env.SMTP_PASS || '').trim() },
+      requireTLS: (parseInt(String(process.env.SMTP_PORT || '587'), 10) || 587) !== 465,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
+      tls: { servername: String(process.env.SMTP_HOST || 'mail.polithane.com').trim(), rejectUnauthorized },
+    });
     // Optional verify (best-effort)
     try {
       // eslint-disable-next-line no-await-in-loop
-      await transporter.verify();
+      await withTimeout(transporter.verify(), 10_000, 'SMTP verify');
       debug.smtpVerified = true;
     } catch (e) {
       debug.smtpVerified = false;
       debug.verifyError = String(e?.message || e || '').slice(0, 600);
     }
 
-    await transporter.sendMail({
+    await withTimeout(
+      transporter.sendMail({
       from: `Polithane <${from}>`,
       to,
       subject,
       text: text || undefined,
       html: html || undefined,
-    });
+      }),
+      12_000,
+      'SMTP sendMail'
+    );
 
     return res.json({ success: true, debug });
   } catch (e) {
