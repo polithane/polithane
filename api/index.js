@@ -1968,7 +1968,7 @@ async function sendEmail({ to, subject, html, text }) {
       const transporter = getSmtpTransporterForPort(p);
       // Make sure API requests never hang forever on SMTP.
       // eslint-disable-next-line no-await-in-loop
-      await withTimeout(transporter.sendMail(mail), 10_000, `SMTP sendMail:${p}`);
+      await withTimeout(transporter.sendMail(mail), 6_000, `SMTP sendMail:${p}`);
       return;
     } catch (e) {
       lastErr = e;
@@ -2009,7 +2009,8 @@ function emailLayout({ title, bodyHtml }) {
 async function safeSendEmail(payload) {
   try {
     if (!isSmtpConfigured()) return false;
-    await withTimeout(sendEmail(payload), 15_000, 'SMTP send');
+    // Keep this bounded so user-facing API endpoints don't stall.
+    await withTimeout(sendEmail(payload), 12_000, 'SMTP send');
     return true;
   } catch {
     return false;
@@ -4380,7 +4381,7 @@ async function adminSendTestEmail(req, res) {
         const transporter = createSmtpTransporter({ port: p });
         try {
           // eslint-disable-next-line no-await-in-loop
-          await withTimeout(transporter.verify(), 8_000, `SMTP verify:${p}`);
+          await withTimeout(transporter.verify(), 4_000, `SMTP verify:${p}`);
           attempt.verified = true;
         } catch (e) {
           attempt.verified = false;
@@ -4396,7 +4397,7 @@ async function adminSendTestEmail(req, res) {
             text: text || undefined,
             html: html || undefined,
           }),
-          10_000,
+          6_000,
           `SMTP sendMail:${p}`
         );
         attempt.sent = true;
