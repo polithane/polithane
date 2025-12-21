@@ -1706,6 +1706,30 @@ async function adminBootstrap(req, res) {
     return res.status(400).json({ success: false, error: 'Geçerli bir şifre gönderin (en az 8 karakter).' });
   }
 
+  // SECURITY: By default, this endpoint is "initial setup only".
+  // If an admin already exists, we refuse unless explicitly allowed by env.
+  //
+  // - Recommended production practice:
+  //   - Use this endpoint ONCE to create the first admin.
+  //   - Then remove/clear ADMIN_BOOTSTRAP_TOKEN from Vercel to disable it.
+  //
+  // If you truly need emergency recovery later, you can set:
+  //   ADMIN_BOOTSTRAP_ALLOW_RESET=true
+  // and re-deploy, then clear it again after use.
+  const allowReset = String(process.env.ADMIN_BOOTSTRAP_ALLOW_RESET || '').trim().toLowerCase() === 'true';
+  try {
+    const anyAdmin = await supabaseRestGet('users', { select: 'id', is_admin: 'eq.true', limit: '1' }).catch(() => []);
+    if (!allowReset && Array.isArray(anyAdmin) && anyAdmin.length > 0) {
+      return res.status(403).json({
+        success: false,
+        error:
+          'Admin bootstrap devre dışı: sistemde zaten admin var. Güvenlik için bu endpoint sadece ilk kurulumda çalışır. Acil durumda geçici olarak ADMIN_BOOTSTRAP_ALLOW_RESET=true ayarlayabilirsiniz.',
+      });
+    }
+  } catch {
+    // If schema/RLS prevents the check, continue (best-effort).
+  }
+
   // Allow operator to override defaults (kept safe by bootstrap token)
   const username = String(body?.username || 'admin').trim().toLowerCase();
   const email = String(body?.email || 'admin@polithane.com').trim().toLowerCase();
