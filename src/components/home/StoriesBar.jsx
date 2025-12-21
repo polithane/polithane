@@ -62,7 +62,7 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
               
               {/* Story count badge */}
               {story.story_count > 1 && (
-                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary-blue text-white text-[8px] font-bold rounded-full flex items-center justify-center border-[1.5px] border-white shadow-sm">
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary-blue text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                   {story.story_count}
                 </div>
               )}

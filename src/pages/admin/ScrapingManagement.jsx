@@ -168,22 +168,22 @@ export const ScrapingManagement = () => {
         <h3 className="text-lg font-bold text-gray-900 mb-4">Son Aktiviteler</h3>
         <div className="space-y-3">
           <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             <span className="text-sm text-gray-700">Twitter Scraper: 247 yeni içerik toplandı</span>
             <span className="text-xs text-gray-500 ml-auto">5 dk önce</span>
           </div>
           <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             <span className="text-sm text-gray-700">Instagram Scraper: 156 yeni içerik toplandı</span>
             <span className="text-xs text-gray-500 ml-auto">8 dk önce</span>
           </div>
           <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
             <span className="text-sm text-gray-700">YouTube Scraper: API limiti aşıldı</span>
             <span className="text-xs text-gray-500 ml-auto">1 saat önce</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
             <span className="text-sm text-gray-700">News RSS Feed: Manuel olarak duraklatıldı</span>
             <span className="text-xs text-gray-500 ml-auto">2 saat önce</span>
           </div>

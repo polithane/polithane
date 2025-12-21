@@ -739,7 +739,7 @@ export const RegisterPageNew = () => {
                       isValid ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                     }`}
                   >
-                    {isValid ? <Check size={10} className="mr-1" /> : <div className="w-2 h-2 rounded-full bg-gray-400 mr-1" />}
+                    {isValid ? <Check size={14} className="mr-1" /> : <X size={14} className="mr-1" />}
                     {rule.label}
                   </span>
                 );

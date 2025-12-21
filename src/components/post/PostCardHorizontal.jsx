@@ -225,7 +225,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
                 <Tooltip content={`${plateCode} ili detayını gör`} delay={300}>
                 <Link
                   to={`/city/${plateCode}`}
-                  className="inline-flex items-center justify-center px-1.5 py-0.5 bg-gray-900 hover:bg-primary-blue text-white text-[9px] font-bold rounded-full transition-colors"
+                  className="inline-flex items-center justify-center px-2 py-1 bg-gray-900 hover:bg-primary-blue text-white text-[11px] font-black rounded-full transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {plateCode}

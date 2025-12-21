@@ -144,8 +144,8 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
           {posts.map((_, index) => (
             <button
               key={index}
-              className={`w-2 h-2 rounded-full transition-all ${
-                index === currentIndex ? 'bg-white w-6' : 'bg-white/50'
+              className={`h-3 rounded-full transition-all ${
+                index === currentIndex ? 'bg-white w-8' : 'bg-white/50 w-3'
               }`}
               onClick={(e) => {
                 e.stopPropagation();

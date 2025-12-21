@@ -398,7 +398,7 @@ export const Header = () => {
                                   <div className={`text-sm ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
                                     {title}
                                   </div>
-                                  {!isRead && <span className="w-2 h-2 rounded-full bg-primary-blue flex-shrink-0" />}
+                                  {!isRead && <span className="w-3 h-3 rounded-full bg-primary-blue flex-shrink-0" />}
                                 </div>
                                 {msg && <div className="text-xs text-gray-600 line-clamp-2 mt-0.5">{msg}</div>}
                               </div>
