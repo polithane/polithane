@@ -1030,6 +1030,7 @@ async function getFastUsers(req, res) {
   const since = fastSinceIso(24);
   const { limit = 80 } = req.query || {};
   const lim = Math.min(200, Math.max(1, parseInt(limit, 10) || 80));
+  const FALLBACK_THRESHOLD = Math.min(3, lim);
 
   // Only show followings (+ self)
   const followingRows = await supabaseRestGet('follows', {
@@ -1066,35 +1067,77 @@ async function getFastUsers(req, res) {
   }
 
   const activeIds = Array.from(byUser.keys());
-  if (activeIds.length === 0) return res.json({ success: true, data: [] });
+  // We may still return fallback fast users if followings have none.
 
-  const users = await supabaseRestGet('users', {
-    select: 'id,username,full_name,avatar_url,is_active',
-    id: `in.(${activeIds.join(',')})`,
-    is_active: 'eq.true',
-    limit: String(Math.min(200, activeIds.length)),
-  }).catch(() => []);
+  const fetchUserCards = async (idsIn, infoMap) => {
+    const idsList = Array.isArray(idsIn) ? idsIn : [];
+    if (idsList.length === 0) return [];
+    const users = await supabaseRestGet('users', {
+      select: 'id,username,full_name,avatar_url,is_active,polit_score',
+      id: `in.(${idsList.join(',')})`,
+      is_active: 'eq.true',
+      limit: String(Math.min(200, idsList.length)),
+    }).catch(() => []);
+    const userMap = new Map((users || []).map((u) => [String(u.id), u]));
+    return idsList
+      .map((id) => {
+        const u = userMap.get(String(id));
+        const info = infoMap.get(String(id));
+        if (!u || !info) return null;
+        return {
+          user_id: u.id,
+          username: u.username,
+          full_name: u.full_name,
+          avatar_url: u.avatar_url,
+          profile_image: u.avatar_url,
+          story_count: info.story_count,
+          latest_created_at: info.latest ? new Date(info.latest).toISOString() : null,
+          polit_score: u.polit_score ?? 0,
+        };
+      })
+      .filter(Boolean);
+  };
 
-  const userMap = new Map((users || []).map((u) => [String(u.id), u]));
-  const out = activeIds
-    .map((id) => {
-      const u = userMap.get(String(id));
-      const info = byUser.get(String(id));
-      if (!u || !info) return null;
-      return {
-        user_id: u.id,
-        username: u.username,
-        full_name: u.full_name,
-        avatar_url: u.avatar_url,
-        profile_image: u.avatar_url,
-        story_count: info.story_count,
-        latest_created_at: info.latest ? new Date(info.latest).toISOString() : null,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => new Date(b.latest_created_at || 0).getTime() - new Date(a.latest_created_at || 0).getTime())
-    .slice(0, lim);
+  const primaryCards = await fetchUserCards(activeIds, byUser);
+  primaryCards.sort((a, b) => new Date(b.latest_created_at || 0).getTime() - new Date(a.latest_created_at || 0).getTime());
+  let out = primaryCards.slice(0, lim);
 
+  // Fallback: If followings have no/very few Fast, fill with global top PolitPuan Fast users.
+  if (out.length < FALLBACK_THRESHOLD) {
+    const exclude = new Set(out.map((x) => String(x.user_id)));
+    exclude.add(String(auth.id));
+
+    const globalPosts = await supabaseRestGet('posts', {
+      select: 'id,user_id,created_at',
+      is_deleted: 'eq.false',
+      is_trending: 'eq.true',
+      created_at: `gte.${since}`,
+      order: 'created_at.desc',
+      limit: '2000',
+    }).catch(() => []);
+
+    const globalByUser = new Map();
+    for (const p of Array.isArray(globalPosts) ? globalPosts : []) {
+      const uid = p?.user_id != null ? String(p.user_id) : '';
+      if (!uid) continue;
+      if (exclude.has(uid)) continue;
+      const cur = globalByUser.get(uid) || { user_id: uid, story_count: 0, latest: 0 };
+      cur.story_count += 1;
+      const t = new Date(p.created_at || 0).getTime();
+      if (t > cur.latest) cur.latest = t;
+      globalByUser.set(uid, cur);
+    }
+
+    const globalIds = Array.from(globalByUser.keys()).slice(0, 200);
+    const globalCards = await fetchUserCards(globalIds, globalByUser);
+    globalCards.sort((a, b) => Number(b.polit_score || 0) - Number(a.polit_score || 0));
+
+    const needed = Math.max(0, lim - out.length);
+    out = out.concat(globalCards.slice(0, needed));
+  }
+
+  // Do not leak polit_score to the client here; keep output schema stable.
+  out = out.map(({ polit_score, ...rest }) => rest);
   return res.json({ success: true, data: out });
 }
 
@@ -1104,17 +1147,7 @@ async function getFastForUser(req, res, userKey) {
   const uid = await resolveUserId(userKey);
   if (!uid) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
 
-  // Only allow if viewer follows target (or self)
-  if (String(uid) !== String(auth.id)) {
-    const existing = await supabaseRestGet('follows', {
-      select: 'id',
-      follower_id: `eq.${auth.id}`,
-      following_id: `eq.${uid}`,
-      limit: '1',
-    }).catch(() => []);
-    const ok = Array.isArray(existing) && existing.length > 0;
-    if (!ok) return res.status(403).json({ success: false, error: 'Bu Fast içeriğini görüntülemek için takip etmelisiniz.' });
-  }
+  // Allow viewing Fast even without following (needed for fallback/global fast discovery).
 
   const since = fastSinceIso(24);
   const rows = await supabaseRestGet('posts', {
