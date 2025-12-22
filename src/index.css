@@ -29,6 +29,13 @@
     /* On mid-size desktops, add a bit more gutter so the fixed left/right bars don't feel stuck to content. */
     @apply max-w-[1230px] mx-auto px-4 lg:px-8 xl:px-4;
   }
+
+  /* Home route: keep centered, but shrink on xl+ to make room for fixed sidebars */
+  @media (min-width: 1280px) {
+    .home-layout .container-main {
+      max-width: min(1230px, calc(100vw - 360px));
+    }
+  }
   
   .btn-primary {
     @apply bg-primary-blue hover:bg-[#0088bb] text-white font-medium rounded-lg px-4 py-2 transition-all duration-200;

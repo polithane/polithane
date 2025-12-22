@@ -71,20 +71,20 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
           </div>
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {navItems.map((it) => {
             const Icon = it.icon;
             return (
               <button
                 key={it.key}
                 onClick={(e) => handleNavigation(it.to, e)}
-                className="w-full flex items-center gap-3 p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
+                className="w-full flex items-center gap-2.5 py-2 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
               >
-                <span className="w-9 h-9 rounded-lg bg-gray-900 text-white flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-5 h-5" />
+                <span className="w-8 h-8 rounded-lg bg-gray-900 text-white flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4 h-4" />
                 </span>
-                <span className="text-sm font-black text-gray-800 flex-1 text-left">{it.label}</span>
-                <ChevronRight className="w-6 h-6 text-gray-400 flex-shrink-0" />
+                <span className="text-[13px] font-bold text-gray-800 flex-1 text-left leading-tight">{it.label}</span>
+                <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
               </button>
             );
           })}

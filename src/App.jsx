@@ -87,8 +87,8 @@ function App() {
           element={
             <>
               <Header />
-              {/* Reserve space for the fixed right suggestions bar on large screens */}
-              <div className="xl:pr-[270px] 2xl:pr-[300px]">
+              {/* Keep homepage centered; shrink max-width on xl+ via CSS to make room for fixed sidebars */}
+              <div className="home-layout">
                 <HomePage />
                 <Footer />
               </div>

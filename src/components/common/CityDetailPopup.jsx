@@ -51,63 +51,63 @@ export const CityDetailPopup = ({ cityCode, cityName, onClose, position, onMouse
           </div>
         </div>
         
-        <div className="space-y-3">
+        <div className="space-y-2">
           <button
             onClick={(e) => handleNavigation(`/city/${cityCode}?tab=mps`, e)}
-            className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
+            className="w-full flex items-center justify-between py-2 px-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
           >
             <div className="flex items-center gap-3">
-              <div className="bg-primary-blue rounded-full p-2">
-                <Users className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
+              <div className="bg-primary-blue rounded-full p-1.5">
+                <Users className="w-5 h-5 text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-700">Milletvekili Sayısı</span>
+              <span className="text-[13px] font-semibold text-gray-700">Milletvekili Sayısı</span>
             </div>
-            <span className="text-lg font-bold text-primary-blue group-hover:scale-110 transition-transform">
+            <span className="text-base font-bold text-primary-blue group-hover:scale-110 transition-transform">
               {cityData.mp_count}
             </span>
           </button>
           
           <button
             onClick={(e) => handleNavigation(`/city/${cityCode}?tab=metropolitan`, e)}
-            className="w-full flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group"
+            className="w-full flex items-center justify-between py-2 px-2.5 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group"
           >
             <div className="flex items-center gap-3">
-              <div className="bg-primary-green rounded-full p-2">
-                <Building2 className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
+              <div className="bg-primary-green rounded-full p-1.5">
+                <Building2 className="w-5 h-5 text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-700">Büyükşehir Belediyesi</span>
+              <span className="text-[13px] font-semibold text-gray-700">Büyükşehir Belediyesi</span>
             </div>
-            <span className="text-sm font-bold text-primary-green group-hover:scale-110 transition-transform">
+            <span className="text-[13px] font-bold text-primary-green group-hover:scale-110 transition-transform">
               {cityData.metropolitan_mayor}
             </span>
           </button>
           
           <button
             onClick={(e) => handleNavigation(`/city/${cityCode}?tab=districts`, e)}
-            className="w-full flex items-center justify-between p-3 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors group"
+            className="w-full flex items-center justify-between py-2 px-2.5 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors group"
           >
             <div className="flex items-center gap-3">
-              <div className="bg-accent-mustard rounded-full p-2">
-                <MapPin className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
+              <div className="bg-accent-mustard rounded-full p-1.5">
+                <MapPin className="w-5 h-5 text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-700">İlçe Sayısı</span>
+              <span className="text-[13px] font-semibold text-gray-700">İlçe Sayısı</span>
             </div>
-            <span className="text-lg font-bold text-accent-mustard group-hover:scale-110 transition-transform">
+            <span className="text-base font-bold text-accent-mustard group-hover:scale-110 transition-transform">
               {cityData.district_count}
             </span>
           </button>
           
           <button
             onClick={(e) => handleNavigation(`/city/${cityCode}?tab=posts`, e)}
-            className="w-full flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group"
+            className="w-full flex items-center justify-between py-2 px-2.5 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group"
           >
             <div className="flex items-center gap-3">
-              <div className="bg-purple-600 rounded-full p-2">
-                <TrendingUp className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
+              <div className="bg-purple-600 rounded-full p-1.5">
+                <TrendingUp className="w-5 h-5 text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-700">Paylaşım Sayısı</span>
+              <span className="text-[13px] font-semibold text-gray-700">Paylaşım Sayısı</span>
             </div>
-            <span className="text-lg font-bold text-purple-600 group-hover:scale-110 transition-transform">
+            <span className="text-base font-bold text-purple-600 group-hover:scale-110 transition-transform">
               {cityData.post_count}
             </span>
           </button>
