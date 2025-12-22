@@ -453,7 +453,7 @@ export const HomePage = () => {
         
         {/* MOBİL: Tab Navigation - Sticky (full-width, no right gap) */}
         <div className="md:hidden sticky top-[72px] z-10 bg-gray-50 -mx-4 px-4 pb-3 mb-4 border-b border-gray-200">
-          <div className="grid grid-cols-5 gap-2">
+          <div className="flex items-center gap-2">
             {categories.map((cat) => {
               const isActive = activeCategory === cat.id;
               const base =
@@ -481,7 +481,7 @@ export const HomePage = () => {
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
                   className={[
-                    'w-full px-2 py-2 rounded-full font-black text-xs tracking-tight transition-all border',
+                    'flex-1 min-w-0 px-2 py-2 rounded-full font-black text-xs tracking-tight transition-all border text-center truncate',
                     isActive ? `${active} shadow-sm` : `${base} hover:shadow-sm`,
                   ].join(' ')}
                 >
