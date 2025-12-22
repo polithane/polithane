@@ -82,7 +82,21 @@ function App() {
     <div className="min-h-screen flex flex-col">
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<><Header /><HomePage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route
+          path="/"
+          element={
+            <>
+              <Header />
+              {/* Reserve space for the fixed right suggestions bar on large screens */}
+              <div className="xl:pr-[270px] 2xl:pr-[300px]">
+                <HomePage />
+                <Footer />
+              </div>
+              <ActionBar />
+              <FollowSuggestionsBar limit={8} />
+            </>
+          }
+        />
         <Route path="/post/:postId" element={<><Header /><PostDetailPage /><Footer /><ActionBar /></>} />
         <Route path="/profile/:userId" element={<><Header /><ProfilePage /><Footer /><ActionBar /></>} />
         <Route path="/@:username" element={<><Header /><ProfilePage /><Footer /><ActionBar /></>} />
