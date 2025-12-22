@@ -65,12 +65,12 @@ export const LoginPageNew = () => {
               <img 
                 src="/logo.png" 
               alt="Polithane" 
-              className="w-32 sm:w-36 h-auto object-contain drop-shadow-lg"
+              className="w-40 sm:w-44 h-auto object-contain drop-shadow-lg"
                 onError={() => setLogoFailed(true)}
               />
             )}
-            <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-28 h-28 bg-primary-blue rounded-2xl shadow-lg`}>
-              <span className="text-5xl font-black text-white">P</span>
+            <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-32 h-32 bg-primary-blue rounded-2xl shadow-lg`}>
+              <span className="text-6xl font-black text-white">P</span>
             </div>
           </div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Hoş Geldiniz</h1>
