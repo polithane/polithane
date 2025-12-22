@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { apiCall } from '../utils/api';
 
 const ThemeContext = createContext(null);
 
@@ -27,7 +28,7 @@ export const ThemeProvider = ({ children }) => {
 
   // Load theme from localStorage
   useEffect(() => {
-    const read = () => {
+    const readLocal = () => {
       const savedTheme = localStorage.getItem('theme');
       const savedDarkMode = localStorage.getItem('darkMode');
       if (savedTheme) {
@@ -42,13 +43,27 @@ export const ThemeProvider = ({ children }) => {
       }
     };
 
-    read();
+    const savedThemeRaw = localStorage.getItem('theme');
+    readLocal();
+
+    // Apply global (server) theme only if user hasn't customized locally.
+    (async () => {
+      try {
+        if (savedThemeRaw) return;
+        const r = await apiCall('/api/theme', { method: 'GET' }).catch(() => null);
+        if (r?.success && r?.data && typeof r.data === 'object') {
+          setTheme((prev) => ({ ...prev, ...r.data }));
+        }
+      } catch {
+        // ignore
+      }
+    })();
 
     // React to updates triggered elsewhere (e.g., settings saved after login)
     const onStorage = (e) => {
-      if (e?.key === 'theme' || e?.key === 'darkMode') read();
+      if (e?.key === 'theme' || e?.key === 'darkMode') readLocal();
     };
-    const onThemeApply = () => read();
+    const onThemeApply = () => readLocal();
     window.addEventListener('storage', onStorage);
     window.addEventListener('theme:apply', onThemeApply);
     return () => {

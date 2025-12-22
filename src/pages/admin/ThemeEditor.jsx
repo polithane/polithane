@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Save, RotateCcw, Eye, Download, Upload } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { apiCall } from '../../utils/api';
 
 export const ThemeEditor = () => {
   const { theme, updateTheme, resetTheme } = useTheme();
+
+  const inferredFont = useMemo(() => {
+    const ff = String(theme?.fontFamily || '').trim();
+    if (!ff) return 'Inter';
+    const first = ff.split(',')[0]?.trim()?.replace(/^["']|["']$/g, '');
+    return first || 'Inter';
+  }, [theme?.fontFamily]);
   
   const [colors, setColors] = useState({
     primary: theme.primaryColor || '#009FD6',
@@ -13,9 +21,12 @@ export const ThemeEditor = () => {
   });
   
   const [fonts, setFonts] = useState({
-    heading: 'Inter',
-    body: 'Inter',
+    heading: inferredFont,
+    body: inferredFont,
   });
+
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
   const handleColorChange = (key, value) => {
     setColors(prev => ({ ...prev, [key]: value }));
@@ -31,14 +42,84 @@ export const ThemeEditor = () => {
     return map[key] || key;
   };
 
-  const handleSave = () => {
-    updateTheme({
+  const persistToDb = async (nextTheme, nextFonts) => {
+    const payload = {
+      theme_primary_color: nextTheme.primaryColor,
+      theme_secondary_color: nextTheme.secondaryColor,
+      theme_accent_color: nextTheme.accentColor,
+      theme_danger_color: nextTheme.dangerColor,
+      theme_font_family: nextTheme.fontFamily,
+      theme_font_heading: nextFonts.heading,
+      theme_font_body: nextFonts.body,
+    };
+    return await apiCall('/api/settings', { method: 'PUT', body: JSON.stringify(payload) });
+  };
+
+  const handleSave = async () => {
+    const nextTheme = {
       primaryColor: colors.primary,
       secondaryColor: colors.secondary,
       accentColor: colors.accent,
       dangerColor: colors.danger,
-    });
-    alert('Tema kaydedildi!');
+      fontFamily: `${fonts.body}, system-ui, sans-serif`,
+    };
+
+    // Apply immediately for preview.
+    updateTheme(nextTheme);
+
+    setSaving(true);
+    setSaveMessage('');
+    try {
+      const r = await persistToDb(nextTheme, fonts);
+      if (r?.success) {
+        setSaveMessage('✅ Tema kaydedildi!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        setSaveMessage(`❌ ${r?.error || 'Kaydetme başarısız'}`);
+      }
+    } catch (e) {
+      setSaveMessage(`❌ ${String(e?.message || 'Bir hata oluştu')}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    const defaultColors = {
+      primary: '#009FD6',
+      secondary: '#10b981',
+      accent: '#f59e0b',
+      danger: '#ef4444',
+    };
+    const defaultFonts = { heading: 'Inter', body: 'Inter' };
+    setColors(defaultColors);
+    setFonts(defaultFonts);
+
+    const nextTheme = {
+      primaryColor: defaultColors.primary,
+      secondaryColor: defaultColors.secondary,
+      accentColor: defaultColors.accent,
+      dangerColor: defaultColors.danger,
+      fontFamily: 'Inter, system-ui, sans-serif',
+    };
+    updateTheme(nextTheme);
+    resetTheme();
+
+    setSaving(true);
+    setSaveMessage('');
+    try {
+      const r = await persistToDb(nextTheme, defaultFonts);
+      if (r?.success) {
+        setSaveMessage('✅ Tema varsayılana döndürüldü.');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        setSaveMessage(`❌ ${r?.error || 'Kaydetme başarısız'}`);
+      }
+    } catch (e) {
+      setSaveMessage(`❌ ${String(e?.message || 'Bir hata oluştu')}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -50,13 +131,26 @@ export const ThemeEditor = () => {
         </div>
         
         <div className="flex gap-3">
-          <button onClick={resetTheme} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
+          {saveMessage && (
+            <span className={`self-center text-sm font-medium ${saveMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+              {saveMessage}
+            </span>
+          )}
+          <button
+            onClick={handleReset}
+            disabled={saving}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <RotateCcw className="w-6 h-6 sm:w-5 sm:h-5" />
             Sıfırla
           </button>
-          <button onClick={handleSave} className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Save className="w-6 h-6 sm:w-5 sm:h-5" />
-            Kaydet
+            {saving ? 'Kaydediliyor...' : 'Kaydet'}
           </button>
         </div>
       </div>

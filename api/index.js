@@ -5287,6 +5287,43 @@ async function updateSiteSettings(req, res) {
   return res.json({ success: true, data: { updated: rows.length } });
 }
 
+function isValidHexColor(input) {
+  const s = String(input || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(s) || /^#[0-9a-f]{3}$/i.test(s);
+}
+
+async function getPublicTheme(req, res) {
+  // Public, read-only subset of site_settings (no auth).
+  const rows = await supabaseRestGet('site_settings', { select: 'key,value', limit: '2000' }).catch(() => []);
+  const map = {};
+  for (const r of rows || []) {
+    const k = String(r?.key || '').trim();
+    if (!k) continue;
+    map[k] = normalizeSiteSettingValue(r?.value);
+  }
+
+  const out = {};
+  const primary = map.theme_primary_color;
+  const secondary = map.theme_secondary_color;
+  const accent = map.theme_accent_color;
+  const danger = map.theme_danger_color;
+  const background = map.theme_background_color;
+  const text = map.theme_text_color;
+  const borderRadius = map.theme_border_radius;
+  const fontFamily = map.theme_font_family;
+
+  if (isValidHexColor(primary)) out.primaryColor = primary;
+  if (isValidHexColor(secondary)) out.secondaryColor = secondary;
+  if (isValidHexColor(accent)) out.accentColor = accent;
+  if (isValidHexColor(danger)) out.dangerColor = danger;
+  if (isValidHexColor(background)) out.backgroundColor = background;
+  if (isValidHexColor(text)) out.textColor = text;
+  if (typeof borderRadius === 'string' && borderRadius.trim()) out.borderRadius = borderRadius.trim();
+  if (typeof fontFamily === 'string' && fontFamily.trim()) out.fontFamily = fontFamily.trim();
+
+  return res.json({ success: true, data: out });
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setSecurityHeaders(req, res);
@@ -5307,6 +5344,9 @@ export default async function handler(req, res) {
       // Backwards-compatible alias (some admin UI calls this)
       if (url === '/api/admin/settings' && req.method === 'GET') return await getSiteSettings(req, res);
       if (url === '/api/admin/settings' && req.method === 'PUT') return await updateSiteSettings(req, res);
+
+      // Public theme settings (read-only)
+      if (url === '/api/theme' && req.method === 'GET') return await getPublicTheme(req, res);
       
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);
