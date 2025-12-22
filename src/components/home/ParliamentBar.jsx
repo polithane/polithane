@@ -160,7 +160,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
         })}
         </div>
       
-        <div className="bg-gray-50 px-2 py-2 rounded-b-lg border border-t-0 border-gray-300 overflow-x-auto">
+        <div className="bg-gray-50 px-1 py-2 rounded-b-lg border border-t-0 border-gray-300 overflow-x-hidden">
           <div className="flex gap-0 justify-center">
           {Array.from({ length: 81 }, (_, i) => {
             const code = i + 1;
@@ -188,7 +188,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               <button
                 key={code}
                 onClick={() => navigate(`/city/${cityCode}`)}
-                className="w-[15px] h-[15px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[7px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
+                className="w-[14px] h-[14px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[6px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
                 onMouseEnter={(e) => {
                   clearCloseTimeout();
                   isMouseOverPopup.current = false;
