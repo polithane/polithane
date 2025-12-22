@@ -594,7 +594,7 @@ export const MessagesPage = () => {
                         {selectedConv.participant?.full_name}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        {getUserTitle(selectedConv.participant, true) || 'Üye'}
+                        {selectedConv.participant?.username ? `@${selectedConv.participant.username}` : ''}
                       </p>
                     </div>
                     {selectedConv.message_type === 'request' && (
