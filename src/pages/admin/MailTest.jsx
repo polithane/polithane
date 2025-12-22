@@ -47,10 +47,10 @@ export const MailTest = () => {
     try {
       const res = await api.admin.sendTestEmail(payload);
       setResult(res);
-      if (res?.success) toast.success('Test mail gönderildi.');
-      else toast.error(res?.error || 'Mail gönderilemedi.');
+      if (res?.success) toast.success('Test e-postası gönderildi.');
+      else toast.error(res?.error || 'E-posta gönderilemedi.');
     } catch (e) {
-      const msg = String(e?.message || 'Mail gönderilemedi.');
+      const msg = String(e?.message || 'E-posta gönderilemedi.');
       setResult({ success: false, error: msg });
       toast.error(msg);
     } finally {
@@ -64,9 +64,9 @@ export const MailTest = () => {
     <div className="p-6 sm:p-8">
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-900">Mail Test</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900">E-posta Testi</h1>
           <p className="text-gray-600 mt-1">
-            SMTP üzerinden tek seferlik test maili gönder (debug sonucu burada görünür).
+            SMTP üzerinden tek seferlik test e-postası gönder (hata ayıklama sonucu burada görünür).
           </p>
         </div>
         <div className="flex gap-2">
@@ -95,12 +95,12 @@ export const MailTest = () => {
           <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
             <Mail className="w-6 h-6 text-primary-blue" />
           </div>
-          <div className="font-black text-gray-900">SMTP Test Maili</div>
+          <div className="font-black text-gray-900">SMTP Test E-postası</div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Alıcı (To)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Alıcı</label>
             <input
               value={to}
               onChange={(e) => setTo(e.target.value)}
@@ -117,7 +117,7 @@ export const MailTest = () => {
             />
           </div>
           <div className="lg:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-1">Mesaj (Text)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Mesaj (Metin)</label>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -145,14 +145,14 @@ export const MailTest = () => {
                     {ok ? 'Başarılı' : 'Başarısız'}
                   </div>
                   <div className={`text-sm mt-1 ${ok ? 'text-green-800/80' : 'text-red-800/80'}`}>
-                    {ok ? 'Mail gönderimi tamamlandı.' : String(result?.error || 'Mail gönderilemedi.')}
+                    {ok ? 'E-posta gönderimi tamamlandı.' : String(result?.error || 'E-posta gönderilemedi.')}
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="mt-3">
-              <div className="text-xs font-bold text-gray-500 uppercase mb-2">Debug JSON</div>
+              <div className="text-xs font-bold text-gray-500 uppercase mb-2">Hata Ayıklama (JSON)</div>
               <pre className="text-xs bg-gray-900 text-gray-100 rounded-xl p-4 overflow-auto max-h-[320px]">
                 {JSON.stringify(result, null, 2)}
               </pre>

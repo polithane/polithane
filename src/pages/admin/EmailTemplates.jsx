@@ -7,7 +7,7 @@ export const EmailTemplates = () => {
   const mockTemplates = [
     {
       id: 1,
-      name: 'Hoş Geldin Email',
+      name: 'Hoş Geldin E-postası',
       subject: 'Polithane\'e Hoş Geldiniz!',
       type: 'welcome',
       content: '<h1>Merhaba {{user_name}}</h1><p>Polithane ailesine hoş geldiniz...</p>',
@@ -25,10 +25,10 @@ export const EmailTemplates = () => {
     },
     {
       id: 3,
-      name: 'Email Doğrulama',
-      subject: 'Email Adresinizi Doğrulayın',
+      name: 'E-posta Doğrulama',
+      subject: 'E-posta Adresinizi Doğrulayın',
       type: 'email_verification',
-      content: '<h1>Email Doğrulama</h1><p>Hesabınızı aktifleştirmek için email adresinizi doğrulayın...</p>',
+      content: '<h1>E-posta Doğrulama</h1><p>Hesabınızı aktifleştirmek için e-posta adresinizi doğrulayın...</p>',
       last_updated: '2024-01-13',
       usage_count: 896,
     },
@@ -63,8 +63,8 @@ export const EmailTemplates = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 mb-2">Email Şablonları</h1>
-          <p className="text-gray-600">Otomatik email şablonlarını düzenleyin</p>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">E-posta Şablonları</h1>
+          <p className="text-gray-600">Otomatik e-posta şablonlarını düzenleyin</p>
         </div>
         <button className="flex items-center gap-2 px-6 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold">
           <Plus className="w-5 h-5" />
@@ -172,7 +172,7 @@ export const EmailTemplates = () => {
               <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                 {/* Render in a sandboxed iframe to avoid XSS in admin context */}
                 <iframe
-                  title="Email Preview"
+                  title="E-posta Önizleme"
                   sandbox=""
                   className="w-full h-[420px] bg-white rounded-lg border border-gray-200"
                   srcDoc={`<!doctype html><html><head><meta charset="utf-8" /></head><body style="margin:0;padding:16px;font-family:Arial,sans-serif;line-height:1.6;color:#111827;">${String(

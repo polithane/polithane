@@ -336,7 +336,13 @@ export const UserManagement = () => {
                     <p className="text-gray-500">@{selectedUser.username || 'user'}</p>
                     <div className="flex gap-2 mt-2">
                       <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                        {selectedUser.user_type}
+                        {selectedUser.user_type === 'mp' ? 'Milletvekili' :
+                         selectedUser.user_type === 'party_official' ? 'Teşkilat Görevlisi' :
+                         selectedUser.user_type === 'politician' ? 'Siyasetçi' :
+                         selectedUser.user_type === 'media' ? 'Medya' :
+                         selectedUser.user_type === 'party_member' ? 'Parti Üyesi' :
+                         selectedUser.user_type === 'citizen' ? 'Vatandaş' :
+                         (selectedUser.user_type || 'Kullanıcı')}
                       </span>
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedUser.is_verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                         {selectedUser.is_verified ? 'Onaylı Hesap' : 'Onay Bekliyor'}
@@ -358,7 +364,7 @@ export const UserManagement = () => {
               {/* Metadata / Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Email</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase">E-posta</label>
                   <p className="font-medium">{selectedUser.email}</p>
                 </div>
                 <div>

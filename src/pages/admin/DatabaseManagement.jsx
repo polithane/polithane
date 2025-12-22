@@ -5,7 +5,7 @@ export const DatabaseManagement = () => {
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Database Yönetimi</h1>
+        <h1 className="text-3xl font-black text-gray-900 mb-2">Veritabanı Yönetimi</h1>
         <p className="text-gray-600">Veritabanı performansını izleyin ve optimize edin</p>
       </div>
 
@@ -17,7 +17,7 @@ export const DatabaseManagement = () => {
             <Activity className="w-5 h-5 text-green-600" />
           </div>
           <div className="text-2xl font-black text-green-700">Sağlıklı</div>
-          <div className="text-xs text-green-600 mt-1">100% Uptime</div>
+          <div className="text-xs text-green-600 mt-1">100% Çalışma Süresi</div>
         </div>
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
           <div className="flex items-center justify-between mb-2">
@@ -56,7 +56,7 @@ export const DatabaseManagement = () => {
             </div>
             <div className="flex items-center justify-between py-3 border-b border-gray-100">
               <span className="text-sm text-gray-600">Host:</span>
-              <span className="text-sm font-semibold text-gray-900">Supabase (Managed)</span>
+              <span className="text-sm font-semibold text-gray-900">Supabase (Yönetilen)</span>
             </div>
             <div className="flex items-center justify-between py-3 border-b border-gray-100">
               <span className="text-sm text-gray-600">Bölge:</span>

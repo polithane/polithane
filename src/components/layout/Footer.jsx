@@ -33,7 +33,7 @@ export const Footer = () => {
           <div>
             <h4 className="font-semibold mb-3">İletişim</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li>Email: info@polithane.com</li>
+              <li>E-posta: info@polithane.com</li>
               <li>Telefon: +90 (212) 123 45 67</li>
             </ul>
           </div>

@@ -5,7 +5,7 @@ export const ScrapingManagement = () => {
   const mockScrapers = [
     {
       id: 1,
-      name: 'Twitter Scraper',
+      name: 'Twitter Tarayıcı',
       source: 'Twitter/X',
       status: 'active',
       last_run: '5 dakika önce',
@@ -16,7 +16,7 @@ export const ScrapingManagement = () => {
     },
     {
       id: 2,
-      name: 'Instagram Scraper',
+      name: 'Instagram Tarayıcı',
       source: 'Instagram',
       status: 'active',
       last_run: '8 dakika önce',
@@ -27,7 +27,7 @@ export const ScrapingManagement = () => {
     },
     {
       id: 3,
-      name: 'News RSS Feed',
+      name: 'Haber RSS Akışı',
       source: 'Haber Siteleri',
       status: 'paused',
       last_run: '2 saat önce',
@@ -38,7 +38,7 @@ export const ScrapingManagement = () => {
     },
     {
       id: 4,
-      name: 'YouTube Scraper',
+      name: 'YouTube Tarayıcı',
       source: 'YouTube',
       status: 'error',
       last_run: '1 saat önce',
@@ -69,14 +69,14 @@ export const ScrapingManagement = () => {
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Scraping Yönetimi</h1>
+        <h1 className="text-3xl font-black text-gray-900 mb-2">Tarama Yönetimi</h1>
         <p className="text-gray-600">İçerik toplama botlarını yönetin ve izleyin</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
-          <div className="text-sm text-green-600 mb-1">Aktif Scraper</div>
+          <div className="text-sm text-green-600 mb-1">Aktif Tarayıcı</div>
           <div className="text-2xl font-black text-green-700">2</div>
         </div>
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
@@ -156,7 +156,7 @@ export const ScrapingManagement = () => {
               </button>
               <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold">
                 <TrendingUp className="w-6 h-6 sm:w-5 sm:h-5" />
-                Logları Gör
+                Kayıtları Gör
               </button>
             </div>
           </div>
@@ -169,22 +169,22 @@ export const ScrapingManagement = () => {
         <div className="space-y-3">
           <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-gray-700">Twitter Scraper: 247 yeni içerik toplandı</span>
+            <span className="text-sm text-gray-700">Twitter Tarayıcı: 247 yeni içerik toplandı</span>
             <span className="text-xs text-gray-500 ml-auto">5 dk önce</span>
           </div>
           <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-gray-700">Instagram Scraper: 156 yeni içerik toplandı</span>
+            <span className="text-sm text-gray-700">Instagram Tarayıcı: 156 yeni içerik toplandı</span>
             <span className="text-xs text-gray-500 ml-auto">8 dk önce</span>
           </div>
           <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
             <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <span className="text-sm text-gray-700">YouTube Scraper: API limiti aşıldı</span>
+            <span className="text-sm text-gray-700">YouTube Tarayıcı: API limiti aşıldı</span>
             <span className="text-xs text-gray-500 ml-auto">1 saat önce</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <span className="text-sm text-gray-700">News RSS Feed: Manuel olarak duraklatıldı</span>
+            <span className="text-sm text-gray-700">Haber RSS Akışı: Manuel olarak duraklatıldı</span>
             <span className="text-xs text-gray-500 ml-auto">2 saat önce</span>
           </div>
         </div>

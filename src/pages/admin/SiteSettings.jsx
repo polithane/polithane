@@ -124,19 +124,19 @@ export const SiteSettings = () => {
       </div>
       
       <div className="space-y-6">
-        {/* Email Ayarları */}
+        {/* E-posta Ayarları */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
             <Mail className="w-5 h-5 text-primary-blue" />
-            Email Doğrulama Ayarları
+            E-posta Doğrulama Ayarları
           </h3>
           
           <div className="space-y-4">
-            {/* Email Doğrulama Aktif/Pasif */}
+            {/* E-posta Doğrulama Aktif/Pasif */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
-                <p className="font-semibold">Email Doğrulama Sistemi</p>
-                <p className="text-sm text-gray-600">Yeni kullanıcılar email doğrulaması yapmalı mı?</p>
+                <p className="font-semibold">E-posta Doğrulama Sistemi</p>
+                <p className="text-sm text-gray-600">Yeni kullanıcılar e-posta doğrulaması yapmalı mı?</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -149,14 +149,14 @@ export const SiteSettings = () => {
               </label>
             </div>
 
-            {/* Email Ayarları (sadece email doğrulama açıksa göster) */}
+            {/* E-posta Ayarları (sadece e-posta doğrulama açıksa göster) */}
             {settings.email_verification_enabled === 'true' && (
               <div className="border-t pt-4 space-y-4">
-                <p className="text-sm font-semibold text-gray-700">Email Servisi Yapılandırması</p>
+                <p className="text-sm font-semibold text-gray-700">E-posta Servisi Yapılandırması</p>
                 
                 {/* Service Provider */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Email Servis Sağlayıcısı</label>
+                  <label className="block text-sm font-medium mb-2">E-posta Servis Sağlayıcısı</label>
                   <select
                     value={settings.email_service_provider}
                     onChange={(e) => handleChange('email_service_provider', e.target.value)}
@@ -257,7 +257,7 @@ export const SiteSettings = () => {
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">İletişim Email</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">İletişim E-postası</label>
                 <input
                   type="email"
                   value={settings.contactEmail}
@@ -267,7 +267,7 @@ export const SiteSettings = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Destek Email</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Destek E-postası</label>
                 <input
                   type="email"
                   value={settings.supportEmail}

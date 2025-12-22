@@ -15,7 +15,7 @@ export const NotificationRules = () => {
     {
       id: 2,
       name: 'Post Beğenildi',
-      description: 'Kullanıcının postu beğenildiğinde bildirim gönder',
+      description: 'Kullanıcının paylaşımı beğenildiğinde bildirim gönder',
       trigger: 'post_liked',
       enabled: true,
       channels: ['in_app'],
@@ -24,7 +24,7 @@ export const NotificationRules = () => {
     {
       id: 3,
       name: 'Yeni Yorum',
-      description: 'Posta yeni yorum yapıldığında bildirim gönder',
+      description: 'Paylaşıma yeni yorum yapıldığında bildirim gönder',
       trigger: 'new_comment',
       enabled: true,
       channels: ['in_app', 'push', 'email'],
@@ -32,8 +32,8 @@ export const NotificationRules = () => {
     },
     {
       id: 4,
-      name: 'Mention',
-      description: 'Kullanıcı bir postta bahsedildiğinde bildirim gönder',
+      name: 'Bahsetme',
+      description: 'Kullanıcı bir paylaşımda etiketlendiğinde bildirim gönder',
       trigger: 'mentioned',
       enabled: true,
       channels: ['in_app', 'push'],
@@ -73,8 +73,8 @@ export const NotificationRules = () => {
   const getChannelBadges = (channels) => {
     const channelNames = {
       in_app: 'Uygulama İçi',
-      push: 'Push',
-      email: 'Email',
+      push: 'Anlık Bildirim',
+      email: 'E-posta',
       sms: 'SMS',
     };
     return (
@@ -176,17 +176,17 @@ export const NotificationRules = () => {
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="font-semibold text-gray-900">Push Notification</h4>
+              <h4 className="font-semibold text-gray-900">Anlık Bildirim</h4>
               <ToggleRight className="w-6 h-6 text-green-500" />
             </div>
-            <p className="text-sm text-gray-600">Mobil ve desktop push bildirimleri</p>
+            <p className="text-sm text-gray-600">Mobil ve masaüstü anlık bildirimler</p>
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="font-semibold text-gray-900">Email</h4>
+              <h4 className="font-semibold text-gray-900">E-posta</h4>
               <ToggleRight className="w-6 h-6 text-green-500" />
             </div>
-            <p className="text-sm text-gray-600">Email ile bildirim gönderimi</p>
+            <p className="text-sm text-gray-600">E-posta ile bildirim gönderimi</p>
           </div>
           <div className="border border-gray-200 rounded-lg p-4 opacity-50">
             <div className="flex items-center justify-between mb-2">
