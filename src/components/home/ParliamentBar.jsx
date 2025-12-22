@@ -68,7 +68,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
       <div className="hidden md:block">
         <div className="flex h-24 overflow-hidden rounded-t-lg border border-gray-300 w-full">
         {parliamentData.map((party, index) => {
-          const widthPercentage = (party.seats / totalSeats) * 100;
+          const seats = Math.max(0, Number(party.seats || 0) || 0);
           const flagPath = getPartyFlagPath(party.shortName, index + 1);
           const partySlug = shortNameToPartySlug(party.shortName) || String(index + 1);
           
@@ -115,13 +115,14 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               key={`${party.shortName}-${index}`}
               className="h-full cursor-pointer transition-all hover:opacity-90 hover:brightness-110 relative"
               style={{
-                width: `${widthPercentage}%`,
+                // Use flex-grow instead of percentage widths to avoid rounding gaps.
+                flexGrow: seats || 0,
+                flexBasis: 0,
                 backgroundColor: party.color,
                 backgroundImage: `url(${flagPath})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
-                flexShrink: 0
               }}
               onClick={() => navigate(`/party/${partySlug}`)}
               onMouseEnter={(e) => {
@@ -142,7 +143,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 }
               }}
             >
-              {widthPercentage > 5 && (
+              {seats > 0 && (seats / totalSeats) * 100 > 5 && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span 
                     className="text-white text-xs font-bold drop-shadow-lg px-1 text-center"
