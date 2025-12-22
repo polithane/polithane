@@ -303,7 +303,7 @@ export const PrivacySettings = () => {
         </div>
       </div>
 
-      {/* Search Engine */}
+      {/* Arama Motorları */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">

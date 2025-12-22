@@ -19,7 +19,7 @@ export const AutomationControl = () => {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Otomasyon Kontrolü</h1>
-        <p className="text-gray-600">n8n workflow'larını yönetin</p>
+        <p className="text-gray-600">n8n iş akışlarını yönetin</p>
       </div>
       
       {/* Stats */}
@@ -39,7 +39,7 @@ export const AutomationControl = () => {
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <Bot className="w-8 h-8 text-blue-500 mb-2" />
           <div className="text-2xl font-black text-gray-900">4</div>
-          <div className="text-sm text-gray-600">Aktif Workflow</div>
+          <div className="text-sm text-gray-600">Aktif İş Akışı</div>
         </div>
         
         <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">

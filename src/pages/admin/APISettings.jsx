@@ -40,11 +40,11 @@ export const APISettings = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">API Ayarları</h1>
-          <p className="text-gray-600">API anahtarlarını ve endpoint'leri yönetin</p>
+          <p className="text-gray-600">API anahtarlarını ve uç noktaları yönetin</p>
         </div>
         <button className="flex items-center gap-2 px-6 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold">
           <Plus className="w-5 h-5" />
-          Yeni API Key
+          Yeni API Anahtarı
         </button>
       </div>
 

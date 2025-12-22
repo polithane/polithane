@@ -127,7 +127,7 @@ export const SecuritySettings = () => {
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Sertifika Türü:</span>
-              <span className="text-sm font-semibold text-gray-900">Let's Encrypt</span>
+              <span className="text-sm font-semibold text-gray-900">Let’s Encrypt</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Geçerlilik:</span>
@@ -144,7 +144,7 @@ export const SecuritySettings = () => {
               </div>
               <div>
                 <h3 className="font-bold text-gray-900">DDoS Koruması</h3>
-                <p className="text-sm text-gray-600">Cloudflare Pro</p>
+                <p className="text-sm text-gray-600">Cloudflare (Pro)</p>
               </div>
             </div>
             <span className="text-green-600 font-semibold text-sm">Aktif</span>

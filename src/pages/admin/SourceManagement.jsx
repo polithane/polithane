@@ -201,7 +201,7 @@ export const SourceManagement = () => {
         </table>
       </div>
 
-      {/* Add Source Form (Preview) */}
+      {/* Hızlı Kaynak Ekle */}
       <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="text-lg font-bold text-gray-900 mb-4">Hızlı Kaynak Ekle</h3>
         <div className="grid grid-cols-3 gap-4">

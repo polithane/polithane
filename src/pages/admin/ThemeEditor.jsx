@@ -110,19 +110,19 @@ export const ThemeEditor = () => {
           </div>
         </div>
         
-        {/* Preview */}
+        {/* Önizleme */}
         <div>
           <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Önizleme</h3>
             
             <div className="space-y-4">
               <div className="p-4 rounded-lg" style={{ backgroundColor: colors.primary + '20' }}>
-                <div style={{ color: colors.primary }} className="font-bold text-lg mb-2">Primary Renk</div>
+                <div style={{ color: colors.primary }} className="font-bold text-lg mb-2">Ana Renk</div>
                 <p className="text-sm text-gray-600">Bu renk butonlar ve linkler için kullanılır</p>
               </div>
               
               <div className="p-4 rounded-lg" style={{ backgroundColor: colors.secondary + '20' }}>
-                <div style={{ color: colors.secondary }} className="font-bold text-lg mb-2">Secondary Renk</div>
+                <div style={{ color: colors.secondary }} className="font-bold text-lg mb-2">İkincil Renk</div>
                 <p className="text-sm text-gray-600">İkincil öğeler için</p>
               </div>
               
