@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { getPartyFlagPath } from '../../utils/imagePaths';
 import { PartyDetailPopup } from '../common/PartyDetailPopup';
 import { CityDetailPopup } from '../common/CityDetailPopup';
@@ -180,9 +180,9 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               type="button"
               aria-label="Sola kaydır"
               onClick={() => scrollPlates(-1)}
-              className="w-[16px] h-[16px] rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow flex items-center justify-center flex-shrink-0"
+              className="w-5 h-5 rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow flex items-center justify-center flex-shrink-0"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ArrowLeft className="w-[18px] h-[18px]" strokeWidth={3} />
             </button>
 
             <div
@@ -246,9 +246,9 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               type="button"
               aria-label="Sağa kaydır"
               onClick={() => scrollPlates(1)}
-              className="w-[16px] h-[16px] rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow flex items-center justify-center flex-shrink-0"
+              className="w-5 h-5 rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow flex items-center justify-center flex-shrink-0"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ArrowRight className="w-[18px] h-[18px]" strokeWidth={3} />
             </button>
           </div>
         </div>
