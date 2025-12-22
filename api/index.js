@@ -4109,18 +4109,28 @@ async function authLogin(req, res) {
 
 async function authForgotPassword(req, res) {
     const ip = getClientIp(req);
-    const rl = rateLimit(`forgot:${ip}`, { windowMs: 60_000, max: 3 });
-    if (!rl.ok) return res.status(429).json({ success: false, error: 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyin.' });
-
     const body = await readJsonBody(req);
     const emailRaw = String(body?.email || '').trim();
+    const emailLower = emailRaw ? emailRaw.toLowerCase() : '';
+
+    // Layered rate limits (best-effort, per serverless instance)
+    // - IP burst: limit total attempts from the same IP
+    // - IP+email burst: limit repeated targeting of a specific email from the same IP
+    // - Email sustained: limit total attempts for the same email across IPs (best-effort)
+    const rlIp = rateLimit(`forgot:ip:${ip}`, { windowMs: 60_000, max: 5 });
+    const rlEmail = emailLower ? rateLimit(`forgot:email:${emailLower}`, { windowMs: 15 * 60_000, max: 5 }) : { ok: true };
+    const rlIpEmail = emailLower ? rateLimit(`forgot:ip_email:${ip}:${emailLower}`, { windowMs: 60_000, max: 2 }) : { ok: true };
+    if (!rlIp.ok || !rlEmail.ok || !rlIpEmail.ok) {
+      return res.status(429).json({ success: false, error: 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyin.' });
+    }
+
     // Keep response generic to prevent user enumeration.
     const okResponse = () =>
       res.json({ success: true, message: 'Eğer bu e-posta kayıtlıysa, sıfırlama bağlantısı gönderilecektir.' });
     if (!emailRaw) return okResponse();
 
     try {
-      const email = emailRaw.toLowerCase();
+      const email = emailLower;
       const rows = await supabaseRestGet('users', { select: 'id,email,metadata', email: `eq.${email}`, limit: '1' }).catch(() => []);
       const u = rows?.[0] || null;
       if (!u?.id || !u?.email) return okResponse();
