@@ -491,8 +491,8 @@ function analyzeCommentContent(input) {
 
   const lower = text.toLocaleLowerCase('tr-TR');
 
-  const normalizeForProfanity = (s) => {
-    // Normalize Turkish + common obfuscations/leetspeak and remove separators.
+  const normalizeCore = (s) => {
+    // Normalize Turkish + common obfuscations/leetspeak.
     let x = String(s || '').toLocaleLowerCase('tr-TR');
     x = x
       .replace(/ç/g, 'c')
@@ -511,36 +511,97 @@ function analyzeCommentContent(input) {
       .replace(/7/g, 't')
       .replace(/8/g, 'b')
       .replace(/9/g, 'g');
-    // Remove anything that's not a letter/number (spaces, dots, underscores, etc.)
-    x = x.replace(/[^a-z0-9]+/g, '');
-    // Collapse repeated characters (e.g. sssiiikkk -> sik)
-    x = x.replace(/(.)\1+/g, '$1');
     return x;
   };
+
+  const collapseRepeats = (s) => String(s || '').replace(/(.)\1+/g, '$1');
+
+  const normalizeForProfanity = (s) => {
+    // Compact form: remove separators entirely (catches s.i.k / s i k / etc)
+    let x = normalizeCore(s);
+    x = x.replace(/[^a-z0-9]+/g, '');
+    x = collapseRepeats(x);
+    return x;
+  };
+
+  const normalizeTokensForProfanity = (s) => {
+    // Token form: keep word-ish boundaries to avoid false positives like "şikayet" -> "sikayet"
+    let x = normalizeCore(s);
+    x = x.replace(/[^a-z0-9]+/g, ' ');
+    const parts = x.split(/\s+/g).map((t) => collapseRepeats(t)).filter(Boolean);
+    return parts;
+  };
+
   const norm = normalizeForProfanity(lower);
+  const tokens = normalizeTokensForProfanity(lower);
 
   // Basic threat heuristics (profanity/harassment/links/code).
   const reasons = [];
   if (/(https?:\/\/|www\.)/i.test(text)) reasons.push('link');
   if (/<\s*script|\bon\w+\s*=|javascript:/i.test(text)) reasons.push('zararlı_kod');
   if (/\b(select|union|drop|insert|update|delete)\b/i.test(text)) reasons.push('sql');
-  // Profanity filter (normalized to catch spacing/punct/leetspeak variants)
-  const profanityPatterns = [
-    /amk/,
-    /aq/,
-    /orospu/,
-    /siktir/,
-    /sik/, // includes sikim/sikmek etc after normalization
-    /yarrak/,
-    /ibne/,
-    /pic/,
-    /kahpe/,
-    /anani|anana|anan/,
-    /got/,
-    /serefsiz|serefs/,
-    /salak|aptal|malsin|mal/,
+  // Profanity filter (stronger, with false-positive guards for Turkish words like "şikayet"/"sıkıntı")
+  const hardRoots = [
+    // common insults
+    'amk',
+    'aq',
+    'orospu',
+    'kahpe',
+    'yarrak',
+    'ibne',
+    'pic',
+    'oc', // oç -> normalized
+    'pezevenk',
+    'yavsak',
+    'pust',
+    'gerizekal',
+    'dangalak',
+    'haysiyetsiz',
+    'namussuz',
+    'serefsiz',
   ];
-  if (profanityPatterns.some((re) => re.test(norm))) reasons.push('hakaret');
+  const softExact = new Set(['mal', 'aptal', 'salak', 'malsin']);
+  const sikExcludes = [
+    // "şikayet"/"sıkıntı" and derivatives should NOT trigger
+    'sikayet',
+    'sikayetci',
+    'sikayetler',
+    'sikint',
+    'sikinti',
+    'sikintili',
+    'sikintilar',
+    'sikintisiz',
+  ];
+  const isSikFamily = (t) => {
+    const tok = String(t || '');
+    if (!tok) return false;
+    if (sikExcludes.some((x) => tok.startsWith(x))) return false;
+    // catch siktir / sikmek / sikim / sikecem / etc.
+    return /^(sik|siktir|sikim|siker|sikey|sikme|sikin|sikini|sikiyor|sikiyo|sikicem|sikcem|siktig)/.test(tok);
+  };
+
+  const tokenProfane =
+    tokens.some((t) => {
+      const tok = String(t || '');
+      if (!tok) return false;
+      if (isSikFamily(tok)) return true;
+      if (softExact.has(tok)) return true;
+      // allow substring match for longer roots (>=4) within the token (covers basic obfuscations)
+      for (const r of hardRoots) {
+        if (!r) continue;
+        if (r.length <= 2) {
+          if (tok === r || tok.endsWith(r) || tok.startsWith(r)) return true;
+          continue;
+        }
+        if (tok.includes(r)) return true;
+      }
+      return false;
+    }) ||
+    // Compact scan for split/obfuscated versions across separators
+    hardRoots.some((r) => r && r.length >= 4 && norm.includes(r)) ||
+    isSikFamily(norm);
+
+  if (tokenProfane) reasons.push('hakaret');
   if (/(?:\b(öl|öldür|vur|kes|tehdit)\b)/i.test(lower)) reasons.push('tehdit');
 
   const flagged = reasons.length > 0;
