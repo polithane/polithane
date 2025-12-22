@@ -152,7 +152,7 @@ export const SourceManagement = () => {
             <tr>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Kaynak</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Tür</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">URL</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Bağlantı</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Öncelik</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Toplanan</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Son Çekme</th>
@@ -213,7 +213,7 @@ export const SourceManagement = () => {
             <option value="politician_instagram">Siyasetçi Instagram</option>
             <option value="media_twitter">Medya Twitter</option>
           </select>
-          <input type="url" placeholder="URL" className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none" />
+          <input type="url" placeholder="Bağlantı" className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none" />
         </div>
         <div className="mt-4 flex justify-end">
           <button className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold">

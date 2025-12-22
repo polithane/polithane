@@ -44,7 +44,7 @@ export const AdsManagement = () => {
         </div>
         <div className="bg-white rounded-xl border p-4">
           <div className="text-2xl font-black text-gray-900">1.82%</div>
-          <div className="text-sm text-gray-600">Ort. CTR</div>
+          <div className="text-sm text-gray-600">Ort. Tıklama Oranı</div>
         </div>
       </div>
       
@@ -58,7 +58,7 @@ export const AdsManagement = () => {
               <th className="px-6 py-3 text-left text-sm font-bold text-gray-900">Durum</th>
               <th className="px-6 py-3 text-left text-sm font-bold text-gray-900">Tıklama</th>
               <th className="px-6 py-3 text-left text-sm font-bold text-gray-900">Gösterim</th>
-              <th className="px-6 py-3 text-left text-sm font-bold text-gray-900">CTR</th>
+              <th className="px-6 py-3 text-left text-sm font-bold text-gray-900">Tıklama Oranı</th>
               <th className="px-6 py-3 text-left text-sm font-bold text-gray-900">Aksiyon</th>
             </tr>
           </thead>

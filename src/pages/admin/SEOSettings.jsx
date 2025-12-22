@@ -43,11 +43,11 @@ export const SEOSettings = () => {
       <div className="space-y-6">
         {/* Meta Tags */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Meta Tags</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Meta Etiketleri</h3>
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Meta Title</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Meta Başlık</label>
               <input
                 type="text"
                 value={seo.metaTitle}
@@ -59,7 +59,7 @@ export const SEOSettings = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Meta Description</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Meta Açıklama</label>
               <textarea
                 value={seo.metaDescription}
                 onChange={(e) => handleChange('metaDescription', e.target.value)}
@@ -71,7 +71,7 @@ export const SEOSettings = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Meta Keywords (virgülle ayırın)</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Anahtar Kelimeler (virgülle ayırın)</label>
               <input
                 type="text"
                 value={seo.metaKeywords}
@@ -88,7 +88,7 @@ export const SEOSettings = () => {
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">OG Title</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">OG Başlık</label>
               <input
                 type="text"
                 value={seo.ogTitle}
@@ -98,7 +98,7 @@ export const SEOSettings = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">OG Description</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">OG Açıklama</label>
               <textarea
                 value={seo.ogDescription}
                 onChange={(e) => handleChange('ogDescription', e.target.value)}
@@ -108,7 +108,7 @@ export const SEOSettings = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">OG Image URL</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">OG Görsel Bağlantısı</label>
               <input
                 type="url"
                 value={seo.ogImage}
@@ -127,7 +127,7 @@ export const SEOSettings = () => {
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Google Analytics ID</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Google Analytics Kimliği</label>
               <input
                 type="text"
                 value={seo.googleAnalyticsID}
@@ -138,7 +138,7 @@ export const SEOSettings = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Google AdSense ID</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Google AdSense Kimliği</label>
               <input
                 type="text"
                 value={seo.googleAdsenseID}

@@ -21,6 +21,16 @@ export const ThemeEditor = () => {
     setColors(prev => ({ ...prev, [key]: value }));
   };
 
+  const getColorName = (key) => {
+    const map = {
+      primary: 'Ana',
+      secondary: 'İkincil',
+      accent: 'Vurgu',
+      danger: 'Uyarı',
+    };
+    return map[key] || key;
+  };
+
   const handleSave = () => {
     updateTheme({
       primaryColor: colors.primary,
@@ -60,8 +70,8 @@ export const ThemeEditor = () => {
             <div className="grid grid-cols-2 gap-6">
               {Object.entries(colors).map(([key, value]) => (
                 <div key={key}>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3 capitalize">
-                    {key} Renk
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    {getColorName(key)} Rengi
                   </label>
                   <div className="flex items-center gap-3">
                     <input
