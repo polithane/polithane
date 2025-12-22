@@ -3158,6 +3158,44 @@ async function adminGetStats(req, res) {
     // ignore
   }
 
+  // Lists for dashboard widgets (best-effort)
+  let recentUsers = [];
+  try {
+    const rows = await supabaseRestGet('users', {
+      select: 'id,full_name,username,avatar_url,user_type,politician_type,is_active,created_at',
+      is_active: 'eq.true',
+      order: 'created_at.desc',
+      limit: '8',
+    }).catch(() => []);
+    recentUsers = (Array.isArray(rows) ? rows : []).map((u) => ({ ...u, user_id: u?.id ?? u?.user_id }));
+  } catch {
+    recentUsers = [];
+  }
+
+  let topPosts = [];
+  try {
+    const rows = await supabaseRestGet('posts', {
+      select: 'id,polit_score,content_text,content,created_at,user:users(id,full_name,username,avatar_url,user_type,politician_type)',
+      is_deleted: 'eq.false',
+      order: 'polit_score.desc',
+      limit: '8',
+    });
+    topPosts = Array.isArray(rows) ? rows : [];
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('content_text')) {
+      const rows = await supabaseRestGet('posts', {
+        select: 'id,polit_score,content,created_at,user:users(id,full_name,username,avatar_url,user_type,politician_type)',
+        is_deleted: 'eq.false',
+        order: 'polit_score.desc',
+        limit: '8',
+      }).catch(() => []);
+      topPosts = Array.isArray(rows) ? rows : [];
+    } else {
+      topPosts = [];
+    }
+  }
+
   res.json({
     success: true,
     data: {
@@ -3167,6 +3205,8 @@ async function adminGetStats(req, res) {
       newPostsToday,
       activeUsers24h,
       ...totals,
+      recentUsers,
+      topPosts,
     },
   });
 }

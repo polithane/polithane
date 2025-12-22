@@ -43,6 +43,8 @@ export const AdminDashboardNew = () => {
             newPostsToday: r.data?.newPostsToday ?? 0,
             avgPolitScore: r.data?.avgPolitScore ?? 0,
           }));
+          setRecentUsers(Array.isArray(r.data?.recentUsers) ? r.data.recentUsers : []);
+          setTopPosts(Array.isArray(r.data?.topPosts) ? r.data.topPosts : []);
         }
       } catch (e) {
         console.error('Admin stats load error:', e);
@@ -72,6 +74,8 @@ export const AdminDashboardNew = () => {
           newPostsToday: s.data?.newPostsToday ?? prev.newPostsToday,
           avgPolitScore: s.data?.avgPolitScore ?? prev.avgPolitScore,
         }));
+        setRecentUsers(Array.isArray(s.data?.recentUsers) ? s.data.recentUsers : []);
+        setTopPosts(Array.isArray(s.data?.topPosts) ? s.data.topPosts : []);
       }
     } catch (e) {
       // eslint-disable-next-line no-alert
@@ -172,7 +176,7 @@ export const AdminDashboardNew = () => {
           
           <div className="space-y-3">
             {recentUsers.map(user => (
-              <div key={user.user_id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+              <div key={user.user_id || user.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
                 <img src={user.avatar_url || user.profile_image} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-gray-900 truncate">{user.full_name}</div>
@@ -198,7 +202,7 @@ export const AdminDashboardNew = () => {
               <div key={post.post_id ?? post.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-gray-900 truncate">{post.user?.full_name}</div>
-                  <div className="text-xs text-gray-500 truncate">{post.content_text?.slice(0, 50)}...</div>
+                  <div className="text-xs text-gray-500 truncate">{String(post.content_text ?? post.content ?? '').slice(0, 50)}...</div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-primary-blue">{(post.polit_score / 1000).toFixed(1)}K</div>
