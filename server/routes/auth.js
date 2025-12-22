@@ -82,8 +82,19 @@ router.post('/register', upload.single('document'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Geçersiz email formatı.' });
     }
 
-    if (password.length < 8) {
+    // Password rules (align with production /api)
+    const pw = String(password || '');
+    if (pw.length < 8) {
       return res.status(400).json({ success: false, error: 'Şifre en az 8 karakter olmalıdır.' });
+    }
+    if (pw.length > 50) {
+      return res.status(400).json({ success: false, error: 'Şifre en fazla 50 karakter olabilir.' });
+    }
+    if (!/[a-zA-Z]/.test(pw)) {
+      return res.status(400).json({ success: false, error: 'Şifre en az 1 harf içermelidir.' });
+    }
+    if (!/[0-9]/.test(pw)) {
+      return res.status(400).json({ success: false, error: 'Şifre en az 1 rakam içermelidir.' });
     }
 
     const [existingEmail] = await sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${email})`;
