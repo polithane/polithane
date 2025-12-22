@@ -5227,6 +5227,66 @@ async function ogPost(req, res) {
   return res.status(200).send(buildOgHtml({ title, description, image, canonicalUrl, redirectUrl: canonicalUrl }));
 }
 
+function normalizeSiteSettingValue(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  // Some environments stored JSON-stringified values (e.g. "\"true\"").
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    try {
+      const parsed = JSON.parse(raw);
+      return typeof parsed === 'string' ? parsed : String(parsed);
+    } catch {
+      return raw;
+    }
+  }
+  // Keep as string; callers expect string flags like "true"/"false".
+  return typeof value === 'string' ? value : String(value ?? '');
+}
+
+async function getSiteSettings(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  const rows = await supabaseRestGet('site_settings', { select: 'key,value', order: 'key.asc', limit: '2000' }).catch(() => []);
+  const out = {};
+  for (const r of rows || []) {
+    const k = String(r?.key || '').trim();
+    if (!k) continue;
+    out[k] = normalizeSiteSettingValue(r?.value);
+  }
+  return res.json({ success: true, data: out });
+}
+
+async function updateSiteSettings(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  const body = await readJsonBody(req);
+  const obj = body && typeof body === 'object' ? body : {};
+  const entries = Object.entries(obj);
+  if (entries.length > 200) return res.status(400).json({ success: false, error: 'Çok fazla ayar gönderildi.' });
+
+  const rows = [];
+  for (const [key, value] of entries) {
+    const k = String(key || '').trim();
+    if (!k || k.length > 120) continue;
+    const v =
+      typeof value === 'string'
+        ? value
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : JSON.stringify(value ?? null);
+    rows.push({ key: k, value: v });
+  }
+  if (rows.length === 0) return res.json({ success: true, data: { updated: 0 } });
+
+  // Upsert in bulk.
+  await supabaseRestRequest('POST', 'site_settings', { on_conflict: 'key' }, rows, {
+    Prefer: 'return=representation,resolution=merge-duplicates',
+  });
+
+  return res.json({ success: true, data: { updated: rows.length } });
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setSecurityHeaders(req, res);
@@ -5240,6 +5300,10 @@ export default async function handler(req, res) {
 
       // Dynamic share/OG previews
       if (url === '/api/og/post' && req.method === 'GET') return await ogPost(req, res);
+
+      // Admin site settings (used by /admin/site-settings and /admin/seo)
+      if (url === '/api/settings' && req.method === 'GET') return await getSiteSettings(req, res);
+      if (url === '/api/settings' && req.method === 'PUT') return await updateSiteSettings(req, res);
       
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Save, Search, Globe, Image } from 'lucide-react';
+import { apiCall } from '../../utils/api';
 
 export const SEOSettings = () => {
   const [seo, setSeo] = useState({
@@ -18,12 +19,70 @@ export const SEOSettings = () => {
     googleAdsenseID: '',
   });
 
+  const [loading, setLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+
+  const keyMap = {
+    metaTitle: 'seo_metaTitle',
+    metaDescription: 'seo_metaDescription',
+    metaKeywords: 'seo_metaKeywords',
+    ogTitle: 'seo_ogTitle',
+    ogDescription: 'seo_ogDescription',
+    ogImage: 'seo_ogImage',
+    twitterCard: 'seo_twitterCard',
+    twitterSite: 'seo_twitterSite',
+    favicon: 'seo_favicon',
+    robots: 'seo_robots',
+    canonicalURL: 'seo_canonicalURL',
+    googleAnalyticsID: 'seo_googleAnalyticsID',
+    googleAdsenseID: 'seo_googleAdsenseID',
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await apiCall('/api/settings', { method: 'GET' });
+        if (r?.success && r?.data && typeof r.data === 'object') {
+          setSeo((prev) => {
+            const next = { ...prev };
+            for (const [field, k] of Object.entries(keyMap)) {
+              if (r.data[k] !== undefined && r.data[k] !== null) next[field] = String(r.data[k]);
+            }
+            return next;
+          });
+        }
+      } catch {
+        // ignore (best-effort)
+      }
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleChange = (field, value) => {
     setSeo(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    alert('SEO ayarları kaydedildi!');
+  const handleSave = async () => {
+    setLoading(true);
+    setSaveMessage('');
+    try {
+      const payload = {};
+      for (const [field, k] of Object.entries(keyMap)) {
+        payload[k] = seo[field] ?? '';
+      }
+      const r = await apiCall('/api/settings', { method: 'PUT', body: JSON.stringify(payload) });
+      if (r?.success) {
+        setSaveMessage('✅ SEO ayarları kaydedildi!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        setSaveMessage(`❌ ${r?.error || 'Kaydetme başarısız'}`);
+      }
+    } catch (e) {
+      setSaveMessage(`❌ ${String(e?.message || 'Bir hata oluştu')}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,10 +93,21 @@ export const SEOSettings = () => {
           <p className="text-gray-600">Arama motoru optimizasyonu</p>
         </div>
         
-        <button onClick={handleSave} className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 flex items-center gap-2">
-          <Save className="w-6 h-6 sm:w-5 sm:h-5" />
-          Kaydet
-        </button>
+        <div className="flex items-center gap-3">
+          {saveMessage && (
+            <span className={`text-sm font-medium ${saveMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+              {saveMessage}
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-6 h-6 sm:w-5 sm:h-5" />
+            {loading ? 'Kaydediliyor...' : 'Kaydet'}
+          </button>
+        </div>
       </div>
       
       <div className="space-y-6">
