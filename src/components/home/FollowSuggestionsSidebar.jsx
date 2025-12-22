@@ -155,16 +155,16 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-3 shadow-sm">
+    <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 shadow-sm overflow-hidden text-[10px] leading-tight">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs font-black text-gray-900">TAKİP ÖNERİLERİ</div>
-        <Link to="/search" className="text-[11px] font-black text-primary-blue hover:underline">
+        <div className="text-[10px] font-black text-gray-900">TAKİP ÖNERİLERİ</div>
+        <Link to="/search" className="text-[10px] font-black text-primary-blue hover:underline">
           Keşfet
         </Link>
       </div>
 
-      {loading ? <div className="text-xs text-gray-600">Yükleniyor…</div> : null}
-      {!loading && users.length === 0 ? <div className="text-xs text-gray-600">Öneri bulunamadı.</div> : null}
+      {loading ? <div className="text-[10px] text-gray-600">Yükleniyor…</div> : null}
+      {!loading && users.length === 0 ? <div className="text-[10px] text-gray-600">Öneri bulunamadı.</div> : null}
 
       <div className="space-y-2">
         {users.map((u) => {
@@ -185,11 +185,11 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
                 <Link to={`/profile/${id}`} className="flex items-center gap-2 min-w-0">
                   <Avatar src={u?.avatar_url} alt={name} size="34px" />
                   <div className="min-w-0">
-                    <div className="text-xs font-black text-gray-900 truncate leading-4">{name}</div>
-                    {username ? <div className="text-[11px] text-gray-500 truncate leading-4">{username}</div> : null}
+                    <div className="text-[10px] font-black text-gray-900 truncate leading-4">{name}</div>
+                    {username ? <div className="text-[9px] text-gray-500 truncate leading-4">{username}</div> : null}
                     {isAuthenticated ? (
                       friendCount > 0 ? (
-                        <div className="text-[11px] text-gray-600 leading-4 mt-0.5">
+                        <div className="text-[9px] text-gray-600 leading-4 mt-0.5">
                           <span className="font-black">{friendNames.join(', ')}</span>
                           {friendCount > friendNames.length ? (
                             <span className="font-semibold"> ve {friendCount - friendNames.length} kişi daha</span>
@@ -197,7 +197,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
                           <span className="font-semibold"> takip ediyor</span>
                         </div>
                       ) : social?.friends_loaded ? null : (
-                        <div className="text-[11px] text-gray-400 leading-4 mt-0.5">Arkadaşların kontrol ediliyor…</div>
+                        <div className="text-[9px] text-gray-400 leading-4 mt-0.5">Arkadaşların kontrol ediliyor…</div>
                       )
                     ) : null}
                   </div>
@@ -214,9 +214,9 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
                     <div className="flex items-center gap-3">
                       <Avatar src={u?.avatar_url} alt={name} size="54px" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-black text-gray-900 truncate">{name}</div>
-                        {username ? <div className="text-xs text-gray-600 truncate">{username}</div> : null}
-                        <div className="mt-2 flex items-center gap-3 text-[11px] text-gray-700">
+                        <div className="text-[12px] font-black text-gray-900 truncate">{name}</div>
+                        {username ? <div className="text-[10px] text-gray-600 truncate">{username}</div> : null}
+                        <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-700">
                           <span className="font-black">
                             {(detailsById[id]?.followStats?.followers_count ?? '—')}{' '}
                             <span className="font-semibold text-gray-500">Takipçi</span>
