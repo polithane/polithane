@@ -36,7 +36,7 @@ export const AnalyticsDashboard = () => {
         <div className="bg-white rounded-xl border p-6">
           <FileText className="w-8 h-8 text-green-500 mb-2" />
           <div className="text-3xl font-black text-gray-900">45,678</div>
-          <div className="text-sm text-gray-600">Toplam Post</div>
+          <div className="text-sm text-gray-600">Toplam Paylaşım</div>
           <div className="text-xs text-green-500 mt-1">+8% bu hafta</div>
         </div>
         

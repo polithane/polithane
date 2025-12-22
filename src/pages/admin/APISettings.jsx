@@ -168,7 +168,7 @@ export const APISettings = () => {
             <div className="text-xs text-gray-500">istek / dakika</div>
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-2">Premium Plan</div>
+            <div className="text-sm text-gray-600 mb-2">Ücretli Plan</div>
             <div className="text-2xl font-black text-gray-900 mb-1">1,000</div>
             <div className="text-xs text-gray-500">istek / dakika</div>
           </div>

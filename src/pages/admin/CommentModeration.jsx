@@ -174,7 +174,7 @@ export const CommentModeration = () => {
                   />
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Kullanıcı</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Post</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Paylaşım</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Yorum</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Durum</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Beğeni</th>

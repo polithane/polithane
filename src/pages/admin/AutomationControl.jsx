@@ -3,10 +3,10 @@ import { Bot, Play, Pause, RefreshCw, AlertCircle, CheckCircle, Clock } from 'lu
 
 export const AutomationControl = () => {
   const [workflows, setWorkflows] = useState([
-    { id: 1, name: 'Twitter Scraper', status: 'running', lastRun: '5 dakika önce', success: 145, failed: 2 },
-    { id: 2, name: 'Instagram Scraper', status: 'running', lastRun: '12 dakika önce', success: 89, failed: 0 },
-    { id: 3, name: 'RSS Feed Reader', status: 'paused', lastRun: '1 saat önce', success: 234, failed: 5 },
-    { id: 4, name: 'Post Scheduler', status: 'running', lastRun: '2 dakika önce', success: 567, failed: 1 },
+    { id: 1, name: 'Twitter Tarayıcı', status: 'running', lastRun: '5 dakika önce', success: 145, failed: 2 },
+    { id: 2, name: 'Instagram Tarayıcı', status: 'running', lastRun: '12 dakika önce', success: 89, failed: 0 },
+    { id: 3, name: 'RSS Okuyucu', status: 'paused', lastRun: '1 saat önce', success: 234, failed: 5 },
+    { id: 4, name: 'Paylaşım Zamanlayıcı', status: 'running', lastRun: '2 dakika önce', success: 567, failed: 1 },
   ]);
 
   const handleToggleWorkflow = (id) => {

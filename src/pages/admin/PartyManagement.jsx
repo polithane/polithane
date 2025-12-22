@@ -200,7 +200,7 @@ export const PartyManagement = () => {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ara: parti adı / kısa ad / slug"
+            placeholder="Ara: parti adı / kısa ad / kısa adres"
             className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none"
           />
         </div>
@@ -331,7 +331,7 @@ export const PartyManagement = () => {
               <tr className="text-left text-gray-600">
                 <th className="px-5 py-3">ID</th>
                 <th className="px-5 py-3">Parti</th>
-                <th className="px-5 py-3">Slug</th>
+                <th className="px-5 py-3">Kısa Adres</th>
                 <th className="px-5 py-3">Durum</th>
                 <th className="px-5 py-3 text-right">İşlem</th>
               </tr>

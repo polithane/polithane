@@ -88,11 +88,11 @@ export const AdminDashboardNew = () => {
   // NOTE: Avoid dynamic Tailwind classes like `bg-${color}-100` in production builds.
   const statCards = [
     { label: 'Toplam Kullanıcı', value: stats.totalUsers.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-blue-100', iconText: 'text-blue-600', change: '+12%', link: '/admin/users' },
-    { label: 'Toplam Post', value: stats.totalPosts.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-green-100', iconText: 'text-green-600', change: '+8%', link: '/admin/posts' },
+    { label: 'Toplam Paylaşım', value: stats.totalPosts.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-green-100', iconText: 'text-green-600', change: '+8%', link: '/admin/posts' },
     { label: 'Toplam Görüntülenme', value: stats.totalViews.toLocaleString('tr-TR'), icon: Eye, iconBg: 'bg-purple-100', iconText: 'text-purple-600', change: '+25%' },
     { label: 'Toplam Polit Puan', value: `${(stats.totalPolitScore / 1000000).toFixed(1)}M`, icon: TrendingUp, iconBg: 'bg-orange-100', iconText: 'text-orange-600', change: '+15%', link: '/admin/algorithm' },
     { label: 'Bugün Yeni Kullanıcı', value: stats.newUsersToday.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-green-100', iconText: 'text-green-600', change: '+5%' },
-    { label: 'Bugün Yeni Post', value: stats.newPostsToday.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-blue-100', iconText: 'text-blue-600', change: '+10%' },
+    { label: 'Bugün Yeni Paylaşım', value: stats.newPostsToday.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-blue-100', iconText: 'text-blue-600', change: '+10%' },
     { label: 'Aktif Kullanıcı (24s)', value: stats.activeUsers24h.toLocaleString('tr-TR'), icon: Activity, iconBg: 'bg-red-100', iconText: 'text-red-600', change: '+18%' },
     { label: 'Ort. Polit Puan', value: stats.avgPolitScore.toLocaleString('tr-TR'), icon: TrendingUp, iconBg: 'bg-yellow-100', iconText: 'text-yellow-600', change: '+3%' },
   ];
@@ -225,7 +225,7 @@ export const AdminDashboardNew = () => {
         
         <Link to="/admin/posts" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
           <FileText className="w-8 h-8 text-green-500 mb-2" />
-          <div className="font-bold text-gray-900">Postlar</div>
+          <div className="font-bold text-gray-900">Paylaşımlar</div>
           <div className="text-xs text-gray-500">Moderasyon</div>
         </Link>
         

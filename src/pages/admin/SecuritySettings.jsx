@@ -231,7 +231,7 @@ export const SecuritySettings = () => {
               <Eye className="w-5 h-5 text-yellow-600 flex-shrink-0" />
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 text-sm">Şüpheli API İsteği</div>
-                <div className="text-xs text-gray-600">Rate limit aşımı tespit edildi</div>
+                <div className="text-xs text-gray-600">Hız sınırı aşımı tespit edildi</div>
               </div>
               <span className="text-xs text-gray-500">12 dk önce</span>
             </div>

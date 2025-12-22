@@ -14,7 +14,7 @@ export const NotificationRules = () => {
     },
     {
       id: 2,
-      name: 'Post Beğenildi',
+      name: 'Paylaşım Beğenildi',
       description: 'Kullanıcının paylaşımı beğenildiğinde bildirim gönder',
       trigger: 'post_liked',
       enabled: true,
