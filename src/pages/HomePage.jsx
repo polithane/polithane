@@ -494,7 +494,7 @@ export const HomePage = () => {
         </div>
         
         {/* Ana İçerik Alanı */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-4 lg:pr-0">
+        <div className="grid grid-cols-1 gap-4 lg:gap-8 lg:grid-cols-[minmax(0,1fr)_260px_260px] lg:pr-0">
           {/* Sol Ana Kolon */}
           <div className="space-y-8 min-w-0">
             {/* MOBİL: Sadece Aktif Kategori - TEK KOLON (X/Twitter Tarzı) */}
@@ -626,15 +626,21 @@ export const HomePage = () => {
           </div>
           
           {/* Sağ Medya Sidebar */}
-          <aside className="hidden lg:block lg:mr-0 min-w-0">
-            <div className="sticky top-20 space-y-3">
-              <FollowSuggestionsSidebar limit={8} />
+          <aside className="hidden lg:block min-w-0">
+            <div className="sticky top-20">
               <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg p-4 shadow-lg">
                 <h2 className="text-sm font-bold text-white mb-4 whitespace-nowrap">MEDYA GÜNDEMİ</h2>
                 <div className="-mx-4 -mb-4 px-4 pb-4">
                   <MediaSidebar posts={posts} />
                 </div>
               </div>
+            </div>
+          </aside>
+
+          {/* Sağ Takip Önerileri Sidebar (mobilde gizli) */}
+          <aside className="hidden lg:block min-w-0">
+            <div className="sticky top-20">
+              <FollowSuggestionsSidebar limit={8} />
             </div>
           </aside>
         </div>
