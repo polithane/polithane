@@ -5324,6 +5324,61 @@ async function getPublicTheme(req, res) {
   return res.json({ success: true, data: out });
 }
 
+let publicSiteCache = null;
+let publicSiteCacheAt = 0;
+const PUBLIC_SITE_CACHE_MS = 60_000;
+
+function safeParseJsonString(input) {
+  const s = String(input ?? '').trim();
+  if (!s) return null;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+async function getPublicSite(req, res) {
+  // Public, read-only site info (safe subset).
+  const now = Date.now();
+  if (publicSiteCache && (now - publicSiteCacheAt) < PUBLIC_SITE_CACHE_MS) {
+    return res.json({ success: true, data: publicSiteCache });
+  }
+
+  const rows = await supabaseRestGet('site_settings', { select: 'key,value', limit: '2000' }).catch(() => []);
+  const map = {};
+  for (const r of rows || []) {
+    const k = String(r?.key || '').trim();
+    if (!k) continue;
+    map[k] = normalizeSiteSettingValue(r?.value);
+  }
+
+  const social = map.social_links;
+  const socialObj =
+    social && typeof social === 'object'
+      ? social
+      : typeof social === 'string'
+        ? safeParseJsonString(social)
+        : null;
+
+  const out = {
+    siteName: String(map.site_name || 'Polithane').trim(),
+    siteSlogan: String(map.site_slogan || '').trim(),
+    siteDescription: String(map.site_description || '').trim(),
+    contactEmail: String(map.contact_email || 'info@polithane.com').trim(),
+    supportEmail: String(map.support_email || '').trim(),
+    maintenanceMode: String(map.maintenance_mode || '').trim() === 'true',
+    allowRegistration: String(map.allow_registration || '').trim() !== 'false',
+    allowComments: String(map.allow_comments || '').trim() !== 'false',
+    allowMessages: String(map.allow_messages || '').trim() !== 'false',
+    socialLinks: socialObj && typeof socialObj === 'object' ? socialObj : {},
+  };
+
+  publicSiteCache = out;
+  publicSiteCacheAt = now;
+  return res.json({ success: true, data: out });
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setSecurityHeaders(req, res);
@@ -5347,6 +5402,7 @@ export default async function handler(req, res) {
 
       // Public theme settings (read-only)
       if (url === '/api/theme' && req.method === 'GET') return await getPublicTheme(req, res);
+      if (url === '/api/public/site' && req.method === 'GET') return await getPublicSite(req, res);
       
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);

@@ -1,6 +1,26 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { apiCall } from '../../utils/api';
 
 export const Footer = () => {
+  const [contactEmail, setContactEmail] = useState('info@polithane.com');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const r = await apiCall('/api/public/site', { method: 'GET' }).catch(() => null);
+        const email = String(r?.data?.contactEmail || '').trim();
+        if (mounted && email) setContactEmail(email);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <footer className="bg-neutral-anthracite text-white py-8 mt-16">
       <div className="container-main">
@@ -33,7 +53,7 @@ export const Footer = () => {
           <div>
             <h4 className="font-semibold mb-3">İletişim</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li>E-posta: info@polithane.com</li>
+              <li>E-posta: {contactEmail}</li>
               <li>Telefon: +90 (212) 123 45 67</li>
             </ul>
           </div>
