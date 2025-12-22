@@ -32,6 +32,12 @@ export const MessagesPage = () => {
   const convPollRef = useRef(null);
   const msgPollRef = useRef(null);
 
+  const getReceiverId = (conv) => {
+    const pid = conv?.participant_id ?? conv?.participant?.id ?? null;
+    const s = String(pid ?? '').trim();
+    return s || '';
+  };
+
   // Hard guard: messages require authentication.
   useEffect(() => {
     if (authLoading) return;
@@ -338,12 +344,17 @@ export const MessagesPage = () => {
     if (!newMessage.trim() || !selectedConv) return;
     
     try {
-      const sent = await messagesApi.send(selectedConv.participant_id, newMessage.trim());
+      const receiverId = getReceiverId(selectedConv);
+      if (!receiverId) {
+        setError('Geçersiz alıcı.');
+        return;
+      }
+      const sent = await messagesApi.send(receiverId, newMessage.trim());
       if (sent?.success) {
         setMessages((prev) => [...prev, sent.data]);
         setConversations((prev) => {
           const list = Array.isArray(prev) ? prev.slice() : [];
-          const pid = String(selectedConv.participant_id);
+          const pid = String(receiverId);
           const i = list.findIndex((c) => String(c?.participant_id) === pid);
           const updated = {
             ...(i >= 0 ? list[i] : selectedConv),
@@ -405,12 +416,14 @@ export const MessagesPage = () => {
       const url = up?.data?.publicUrl;
       if (!url) throw new Error('Resim yüklenemedi.');
 
-      const sent = await messagesApi.send(selectedConv.participant_id, '', { kind: 'image', url });
+      const receiverId = getReceiverId(selectedConv);
+      if (!receiverId) throw new Error('Geçersiz alıcı.');
+      const sent = await messagesApi.send(receiverId, '', { kind: 'image', url });
       if (sent?.success) {
         setMessages((prev) => [...prev, sent.data]);
         setConversations((prev) => {
           const list = Array.isArray(prev) ? prev.slice() : [];
-          const pid = String(selectedConv.participant_id);
+          const pid = String(receiverId);
           const i = list.findIndex((c) => String(c?.participant_id) === pid);
           const updated = {
             ...(i >= 0 ? list[i] : selectedConv),
