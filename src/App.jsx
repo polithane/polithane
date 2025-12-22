@@ -69,6 +69,7 @@ import { DatabaseManagement } from './pages/admin/DatabaseManagement';
 import { APISettings } from './pages/admin/APISettings';
 import { PartyManagement } from './pages/admin/PartyManagement';
 import { AgendaManagement } from './pages/admin/AgendaManagement';
+import { ParliamentManagement } from './pages/admin/ParliamentManagement';
 import { DeleteConfirmPage } from './pages/DeleteConfirmPage';
 import { AboutPage } from './pages/AboutPage';
 import { MissionPage } from './pages/MissionPage';
@@ -76,6 +77,8 @@ import { ContactPage } from './pages/ContactPage';
 import { TermsPage } from './pages/TermsPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { CookiePolicyPage } from './pages/CookiePolicyPage';
+import { ParliamentInfoPage } from './pages/ParliamentInfoPage';
+import { PartiesDirectoryPage } from './pages/PartiesDirectoryPage';
 
 function App() {
   return (
@@ -121,6 +124,8 @@ function App() {
         <Route path="/about" element={<><Header /><AboutPage /><Footer /><ActionBar /></>} />
         <Route path="/mission" element={<><Header /><MissionPage /><Footer /><ActionBar /></>} />
         <Route path="/contact" element={<><Header /><ContactPage /><Footer /><ActionBar /></>} />
+        <Route path="/parliament" element={<><Header /><ParliamentInfoPage /><Footer /><ActionBar /></>} />
+        <Route path="/parties" element={<><Header /><PartiesDirectoryPage /><Footer /><ActionBar /></>} />
         <Route path="/terms" element={<><Header /><TermsPage /><Footer /><ActionBar /></>} />
         <Route path="/privacy-policy" element={<><Header /><PrivacyPolicyPage /><Footer /><ActionBar /></>} />
         <Route path="/cookie-policy" element={<><Header /><CookiePolicyPage /><Footer /><ActionBar /></>} />
@@ -155,6 +160,7 @@ function App() {
           <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="parties" element={<PartyManagement />} />
+          <Route path="parliament" element={<ParliamentManagement />} />
           <Route path="agendas" element={<AgendaManagement />} />
           <Route path="posts" element={<PostModeration />} />
           <Route path="comments" element={<CommentModeration />} />

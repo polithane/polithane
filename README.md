@@ -145,3 +145,5 @@ vercel
 ## 📄 Lisans
 
 Bu proje özel bir projedir.
+
+<!-- deploy-trigger: noop change to re-run Vercel -->

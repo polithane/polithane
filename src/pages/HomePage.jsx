@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { HeroSlider } from '../components/home/HeroSlider';
+import { IntroSlider } from '../components/home/IntroSlider';
 import { ParliamentBar } from '../components/home/ParliamentBar';
 import { StoriesBar } from '../components/home/StoriesBar';
 import { AgendaBar } from '../components/home/AgendaBar';
@@ -19,6 +20,7 @@ export const HomePage = () => {
   const { user, isAuthenticated } = useAuth();
   const [posts, setPosts] = useState([]);
   const [parties, setParties] = useState([]);
+  const [parliamentDistribution, setParliamentDistribution] = useState(currentParliamentDistribution);
   const [agendas, setAgendas] = useState([]);
   const [users, setUsers] = useState([]);
   const [polifest, setPolifest] = useState([]);
@@ -88,6 +90,26 @@ export const HomePage = () => {
   };
 
   const hitPosts = useMemo(() => computeHitPosts(posts, 30), [posts]);
+
+  // Merge static parliament distribution with DB parties (for correct slug/logo on click & popup)
+  const parliamentParties = useMemo(() => {
+    const dist = Array.isArray(parliamentDistribution) ? parliamentDistribution : [];
+    const db = Array.isArray(parties) ? parties : [];
+    const keyOf = (s) => String(s || '').trim().toUpperCase('tr-TR');
+    const dbByShort = new Map(db.map((p) => [keyOf(p?.short_name), p]).filter(([k]) => k));
+    return dist.map((p) => {
+      const match = dbByShort.get(keyOf(p?.shortName)) || null;
+      return {
+        ...p,
+        // Prefer DB slug/id when available (ParliamentBar will use this for navigation)
+        slug: match?.slug || null,
+        party_id: match?.id || null,
+        logo_url: match?.logo_url || null,
+        // Prefer DB color if set (but keep distribution as fallback)
+        color: match?.color || p?.color,
+      };
+    });
+  }, [parties]);
   
   useEffect(() => {
     // Load data from Supabase
@@ -95,13 +117,31 @@ export const HomePage = () => {
       setLoading(true);
       try {
         // Partiler + postlar (paged) (tamamı DB - Vercel /api üzerinden)
-        const [partiesData, postsData] = await Promise.all([
+        const [partiesData, postsData, parliamentRes] = await Promise.all([
           api.parties.getAll().catch(() => []),
           api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: 0, order: 'created_at.desc' }).catch(() => []),
+          apiCall('/api/public/parliament', { method: 'GET' }).catch(() => null),
         ]);
 
         // Partiler (DB)
         setParties(Array.isArray(partiesData) ? partiesData : []);
+
+        // Parliament distribution (admin-managed; fallback to bundled data)
+        const dist = parliamentRes?.data?.distribution;
+        if (Array.isArray(dist) && dist.length > 0) {
+          setParliamentDistribution(
+            dist.map((p) => ({
+              name: p?.name,
+              shortName: p?.shortName,
+              seats: p?.seats,
+              color: p?.color,
+              slug: p?.slug,
+              logo_url: p?.logo_url,
+            }))
+          );
+        } else {
+          setParliamentDistribution(currentParliamentDistribution);
+        }
 
         const partyMap = new Map((partiesData || []).map((p) => [p.id, p]));
 
@@ -192,6 +232,7 @@ export const HomePage = () => {
         console.error('Error loading data:', error);
         setPosts([]);
         setParties([]);
+        setParliamentDistribution(currentParliamentDistribution);
         setAgendas([]);
         setPolifest([]);
         setPostsOffset(0);
@@ -439,11 +480,11 @@ export const HomePage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-6 lg:pr-0">
-        {/* Manşet Slayt */}
-        {featuredPosts.length > 0 && <HeroSlider posts={featuredPosts} />}
+        {/* Üst Tanıtım Slaytı */}
+        <IntroSlider />
         
         {/* Parti Bayrakları - Meclis Dağılımı */}
-        <ParliamentBar parliamentData={currentParliamentDistribution} totalSeats={totalSeats} />
+        <ParliamentBar parliamentData={parliamentParties} totalSeats={totalSeats} />
         
         {/* Stories/Reels Bar */}
         <StoriesBar stories={polifest} mode="fast" />

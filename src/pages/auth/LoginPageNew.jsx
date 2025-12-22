@@ -57,22 +57,23 @@ export const LoginPageNew = () => {
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div 
+          <Link
+            to="/"
             className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform"
-            onClick={() => navigate('/')}
+            aria-label="Ana sayfaya git"
           >
             {!logoFailed && (
               <img 
-                src="/logo.png" 
-              alt="Polithane" 
-              className="w-40 sm:w-44 h-auto object-contain drop-shadow-lg"
+                src="/favicon.ico" 
+                alt="Polithane" 
+                className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-lg"
                 onError={() => setLogoFailed(true)}
               />
             )}
-            <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-32 h-32 bg-primary-blue rounded-2xl shadow-lg`}>
-              <span className="text-6xl font-black text-white">P</span>
+            <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-24 h-24 sm:w-28 sm:h-28 bg-primary-blue rounded-2xl shadow-lg`}>
+              <span className="text-5xl sm:text-6xl font-black text-white">P</span>
             </div>
-          </div>
+          </Link>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Hoş Geldiniz</h1>
           <p className="text-gray-600">Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
         </div>

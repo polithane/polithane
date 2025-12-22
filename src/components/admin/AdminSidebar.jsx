@@ -1,12 +1,14 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, FileText, TrendingUp, Settings, Palette, 
   Shield, Search, DollarSign, Megaphone, Bot, BarChart3, Mail, 
-  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send
+  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark
 } from 'lucide-react';
 
 export const AdminSidebar = () => {
   const location = useLocation();
+  const [logoFailed, setLogoFailed] = useState(false);
   
   const menuSections = [
     {
@@ -20,6 +22,7 @@ export const AdminSidebar = () => {
       title: 'İçerik Yönetimi',
       items: [
         { path: '/admin/users', icon: Users, label: 'Kullanıcı Yönetimi' },
+        { path: '/admin/parliament', icon: Landmark, label: 'Meclis Yönetimi' },
         { path: '/admin/parties', icon: Flag, label: 'Parti Yönetimi' },
         { path: '/admin/agendas', icon: Flame, label: 'Gündem Yönetimi' },
         { path: '/admin/posts', icon: FileText, label: 'Post Moderasyonu' },
@@ -68,15 +71,24 @@ export const AdminSidebar = () => {
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-screen overflow-y-auto sticky top-0">
       <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-blue rounded-lg flex items-center justify-center">
-            <span className="text-xl font-black text-white">P</span>
+        <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" aria-label="Ana sayfaya git">
+          {!logoFailed ? (
+            <img
+              src="/favicon.ico"
+              alt="Polithane"
+              className="w-12 h-12 rounded-2xl object-contain drop-shadow"
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <div className="w-12 h-12 bg-primary-blue rounded-2xl flex items-center justify-center shadow">
+              <span className="text-2xl font-black text-white">P</span>
+            </div>
+          )}
+          <div className="min-w-0">
+            <h2 className="font-black text-gray-900 truncate">Polithane</h2>
+            <p className="text-xs text-gray-500 truncate">Admin Paneli</p>
           </div>
-          <div>
-            <h2 className="font-black text-gray-900">Polithane</h2>
-            <p className="text-xs text-gray-500">Admin Paneli</p>
-          </div>
-        </div>
+        </Link>
       </div>
       
       <nav className="p-4">

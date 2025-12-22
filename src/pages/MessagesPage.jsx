@@ -287,7 +287,9 @@ export const MessagesPage = () => {
   useEffect(() => {
     if (!showCompose) return;
     if (composeTimerRef.current) clearTimeout(composeTimerRef.current);
-    const q = String(composeQuery || '').trim();
+    const raw = String(composeQuery || '').trim();
+    // Users often type "@username" because UI displays it with "@"
+    const q = raw.startsWith('@') ? raw.slice(1).trim() : raw;
     if (q.length < 2) {
       setComposeResults([]);
       return;
@@ -295,7 +297,12 @@ export const MessagesPage = () => {
     composeTimerRef.current = setTimeout(async () => {
       try {
         const r = await messagesApi.searchUsers(q);
-        if (r?.success) setComposeResults(r.data || []);
+        if (r?.success) {
+          const data = r?.data?.data ?? r?.data ?? [];
+          setComposeResults(Array.isArray(data) ? data : []);
+        } else {
+          setComposeResults([]);
+        }
       } catch {
         setComposeResults([]);
       }
@@ -870,6 +877,21 @@ export const MessagesPage = () => {
                     <div className="min-w-0 flex-1">
                       <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
                       <div className="text-xs text-gray-500 truncate">@{u.username}</div>
+                      {Number(u?.friend_count || 0) > 0 ? (
+                        <div className="text-[11px] text-gray-600 mt-0.5 leading-4">
+                          <span className="font-black">
+                            {Array.isArray(u?.friend_names) ? u.friend_names.filter(Boolean).join(', ') : ''}
+                          </span>
+                          {Number(u?.friend_count || 0) >
+                          (Array.isArray(u?.friend_names) ? u.friend_names.filter(Boolean).length : 0) ? (
+                            <span className="font-semibold">
+                              {' '}
+                              ve {Number(u?.friend_count || 0) - (Array.isArray(u?.friend_names) ? u.friend_names.filter(Boolean).length : 0)} kişi daha
+                            </span>
+                          ) : null}
+                          <span className="font-semibold"> takip ediyor</span>
+                        </div>
+                      ) : null}
                     </div>
                   </button>
                 ))}

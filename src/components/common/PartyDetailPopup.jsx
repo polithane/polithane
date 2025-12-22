@@ -63,24 +63,25 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
             <div>
               <h3 className="font-bold text-lg text-gray-900">{party.party_short_name}</h3>
               <p className="text-xs text-gray-500">{party.party_name}</p>
-              <p className="mt-1 text-primary-blue font-black">
-                <span className="text-lg">{party.seats}</span> <span className="text-sm">Sandalye</span>{' '}
-                <span className="text-lg">({seatPct})</span>
+              <p className="mt-1 text-primary-blue font-black leading-tight">
+                <span className="text-2xl">{party.seats}</span>
+                <span className="text-sm font-black ml-1">Sandalye</span>{' '}
+                <span className="text-xl">({seatPct})</span>
               </p>
             </div>
           </div>
         </div>
         
-        <div className="space-y-1.5">
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
           {navItems.map((it) => {
             const Icon = it.icon;
             return (
               <button
                 key={it.key}
                 onClick={(e) => handleNavigation(it.to, e)}
-                className="w-full flex items-center gap-2.5 py-2 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
+                className="w-full flex items-center gap-2.5 py-2 px-3 bg-white hover:bg-gray-50 transition-colors border-t border-gray-200 first:border-t-0"
               >
-                <span className="w-8 h-8 rounded-lg bg-gray-900 text-white flex items-center justify-center flex-shrink-0">
+                <span className="w-7 h-7 rounded-md bg-gray-900 text-white flex items-center justify-center flex-shrink-0">
                   <Icon className="w-4 h-4" />
                 </span>
                 <span className="text-[13px] font-bold text-gray-800 flex-1 text-left leading-tight">{it.label}</span>

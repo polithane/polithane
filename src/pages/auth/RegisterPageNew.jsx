@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Eye, EyeOff, Check, X, ChevronRight, AlertCircle, Search, 
   User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, CheckCircle, Mail, Lock
@@ -837,22 +837,23 @@ export const RegisterPageNew = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center p-4 py-10">
       <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 md:p-10 border border-gray-100">
         <div className="text-center mb-8">
-          <div 
+          <Link
+            to="/"
             className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform"
-            onClick={() => navigate('/')}
+            aria-label="Ana sayfaya git"
           >
             {!logoFailed && (
               <img 
-                src="/logo.png" 
-              alt="Polithane" 
-              className="w-24 h-auto object-contain drop-shadow-lg"
+                src="/favicon.ico" 
+                alt="Polithane" 
+                className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-lg"
                 onError={() => setLogoFailed(true)}
               />
             )}
-            <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-20 h-20 bg-primary-blue rounded-2xl shadow-lg`}>
-              <span className="text-4xl font-black text-white">P</span>
+            <div className={`${logoFailed ? 'flex' : 'hidden'} items-center justify-center w-24 h-24 sm:w-28 sm:h-28 bg-primary-blue rounded-2xl shadow-lg`}>
+              <span className="text-5xl sm:text-6xl font-black text-white">P</span>
             </div>
-          </div>
+          </Link>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Üye Ol</h1>
           <p className="text-gray-600">Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
         </div>

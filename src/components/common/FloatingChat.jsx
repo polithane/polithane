@@ -50,7 +50,7 @@ export const FloatingChat = () => {
 
   const visibleConversations = useMemo(() => {
     const list = (conversations || []).filter((c) => (view === 'requests' ? c.message_type === 'request' : c.message_type !== 'request'));
-    if (!searchQuery) return list;
+    if (!searchQuery || String(searchQuery || '').trim().length < 2) return list;
     const q = searchQuery.toLowerCase();
     return list.filter((c) => {
       const u = c?.participant;

@@ -84,7 +84,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
         {parliamentData.map((party, index) => {
           const seats = Math.max(0, Number(party.seats || 0) || 0);
           const flagPath = getPartyFlagPath(party.shortName, index + 1);
-          const partySlug = shortNameToPartySlug(party.shortName) || String(index + 1);
+          const partySlug = String(party?.slug || party?.party_slug || party?.party_id || '').trim() || shortNameToPartySlug(party.shortName) || '';
           
           const logoMap = {
             'AK PARTİ': 'ak_parti.png',
@@ -115,13 +115,11 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
             party_id: partySlug,
             party_name: party.name,
             party_short_name: party.shortName,
-            party_logo: `/assets/parties/logos/${logoMap[partyShortKey] || 'bagimsiz.png'}`,
+            party_logo: party?.logo_url ? String(party.logo_url) : `/assets/parties/logos/${logoMap[partyShortKey] || 'bagimsiz.png'}`,
             party_color: party.color,
             seats: party.seats,
             mp_count: party.seats,
-            metropolitan_count: Math.floor(Math.random() * 15) + 1,
-            district_count: Math.floor(Math.random() * 200) + 10,
-            agenda_contribution: Math.floor(Math.random() * 5000) + 100
+            totalSeats,
           };
           
           return (
@@ -132,13 +130,18 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 // Use flex-grow instead of percentage widths to avoid rounding gaps.
                 flexGrow: seats || 0,
                 flexBasis: 0,
+                // Ensure micro-parties (1-2 seats) are still visible as stripes.
+                minWidth: seats > 0 ? '10px' : '0px',
                 backgroundColor: party.color,
                 backgroundImage: `url(${flagPath})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
               }}
-              onClick={() => navigate(`/party/${partySlug}`)}
+              onClick={() => {
+                if (!partySlug) return;
+                navigate(`/party/${partySlug}`);
+              }}
               onMouseEnter={(e) => {
                 clearCloseTimeout();
                 isMouseOverPopup.current = false;

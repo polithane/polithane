@@ -1396,8 +1396,48 @@ async function getParties(req, res) {
       select: '*',
       is_active: 'eq.true',
       order: 'follower_count.desc',
-    });
-    res.json(data || []);
+      limit: '400',
+    }).catch(() => []);
+    const parties = Array.isArray(data) ? data : [];
+
+    // Enrich with party chair (best-effort, optional)
+    // NOTE: We keep the response shape as ARRAY for backward compatibility.
+    try {
+      const chairs = await supabaseRestGet('users', {
+        select: 'id,party_id,full_name,username,avatar_url,polit_score,politician_type,is_active',
+        politician_type: 'eq.party_chair',
+        is_active: 'eq.true',
+        order: 'polit_score.desc',
+        limit: '800',
+      }).catch(() => []);
+
+      const bestByParty = new Map(); // party_id -> chair user
+      for (const u of chairs || []) {
+        const pid = String(u?.party_id || '').trim();
+        if (!pid) continue;
+        if (!bestByParty.has(pid)) bestByParty.set(pid, u);
+      }
+
+      const out = parties.map((p) => {
+        const pid = String(p?.id || '').trim();
+        const chair = pid ? bestByParty.get(pid) : null;
+        if (!chair) return p;
+        return {
+          ...p,
+          party_chair: {
+            id: chair.id,
+            full_name: chair.full_name,
+            username: chair.username,
+            avatar_url: chair.avatar_url,
+            polit_score: chair.polit_score,
+          },
+        };
+      });
+
+      return res.json(out);
+    } catch {
+      return res.json(parties);
+    }
 }
 
 async function getPartyDetail(req, res, id) {
@@ -4059,6 +4099,57 @@ async function adminUnassignPartyUnit(req, res, partyId) {
   res.json({ success: true, data: updated?.[0] || null });
 }
 
+async function adminSetPartyChair(req, res, partyId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const pid = String(partyId || '').trim();
+  if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
+
+  const body = await readJsonBody(req);
+  const targetUserId = String(body?.user_id || '').trim();
+  if (!/^\d+$/.test(targetUserId)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+
+  // Ensure target belongs to party
+  const uRows = await supabaseRestGet('users', { select: 'id,party_id,is_active', id: `eq.${targetUserId}`, limit: '1' }).catch(() => []);
+  const u = uRows?.[0] || null;
+  if (!u) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+  if (u?.is_active === false) return res.status(400).json({ success: false, error: 'Bu kullanıcı aktif değil.' });
+  if (String(u?.party_id || '') !== String(pid)) return res.status(400).json({ success: false, error: 'Bu kullanıcı seçili partiye bağlı değil.' });
+
+  // Clear previous chairs in same party (best-effort; schema may vary)
+  try {
+    await supabaseRestPatch(
+      'users',
+      { party_id: `eq.${pid}`, politician_type: 'eq.party_chair' },
+      { politician_type: null }
+    ).catch(() => []);
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('politician_type')) {
+      return res.status(500).json({
+        success: false,
+        error: "Bu ortamda `politician_type` alanı yok. Parti başkanı atanamıyor.",
+      });
+    }
+    // ignore
+  }
+
+  // Set the new chair
+  try {
+    const updated = await supabaseRestPatch('users', { id: `eq.${targetUserId}` }, { politician_type: 'party_chair' }).catch(() => []);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('politician_type')) {
+      return res.status(500).json({
+        success: false,
+        error: "Bu ortamda `politician_type` alanı yok. Parti başkanı atanamıyor.",
+      });
+    }
+    throw e;
+  }
+}
+
 async function authCheckAvailability(req, res) {
     const { email } = req.query;
     const result = { emailAvailable: true };
@@ -4784,17 +4875,87 @@ async function searchMessageUsers(req, res) {
     .filter((u) => !blocked.has(String(u.id)))
     .slice(0, 10);
 
-  // Filter out users who blocked me (best-effort)
-  const out = [];
+  // Filter out users who blocked me (best-effort), then enrich with "friends who follow them"
+  const base = [];
   for (const u of list) {
     const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
     const theirBlocked = Array.isArray(meta.blocked_user_ids) ? meta.blocked_user_ids.map(String) : [];
     if (theirBlocked.includes(String(auth.id))) continue;
     // don't leak their metadata
     const { metadata, ...rest } = u;
-    out.push(rest);
+    base.push(rest);
   }
-  res.json({ success: true, data: out });
+  if (base.length === 0) return res.json({ success: true, data: [] });
+
+  // Social context: "X arkadaşın takip ediyor" (friends = my following)
+  try {
+    const me = String(auth.id);
+    const myFollowingRows = await supabaseRestGet('follows', {
+      select: 'following_id',
+      follower_id: `eq.${me}`,
+      limit: '200',
+    }).catch(() => []);
+    const friendIds = (myFollowingRows || []).map((r) => String(r?.following_id || '')).filter(Boolean);
+    if (friendIds.length === 0) return res.json({ success: true, data: base });
+
+    const friendIdsCapped = friendIds.slice(0, 120);
+    const friendUserRows = await supabaseRestGet('users', {
+      select: 'id,full_name,username',
+      id: `in.(${friendIdsCapped.join(',')})`,
+      is_active: 'eq.true',
+      limit: String(friendIdsCapped.length),
+    }).catch(() => []);
+    const friendNameById = new Map(
+      (friendUserRows || []).map((u) => [String(u?.id || ''), String(u?.full_name || u?.username || '').trim()])
+    );
+
+    const candidateIds = base.map((u) => String(u?.id || '')).filter(Boolean);
+    if (candidateIds.length === 0) return res.json({ success: true, data: base });
+
+    const chunk = (arr, size) => {
+      const out = [];
+      for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+      return out;
+    };
+
+    const candidateToFriends = new Map(); // candidateId -> Set(friendId)
+    const friendChunks = chunk(friendIdsCapped, 40);
+    for (const c of friendChunks) {
+      // eslint-disable-next-line no-await-in-loop
+      const rows = await supabaseRestGet('follows', {
+        select: 'follower_id,following_id',
+        follower_id: `in.(${c.join(',')})`,
+        limit: '2000',
+      }).catch(() => []);
+
+      (rows || []).forEach((r) => {
+        const fid = String(r?.follower_id || '');
+        const cid = String(r?.following_id || '');
+        if (!fid || !cid) return;
+        if (!candidateIds.includes(cid)) return;
+        if (!candidateToFriends.has(cid)) candidateToFriends.set(cid, new Set());
+        candidateToFriends.get(cid).add(fid);
+      });
+    }
+
+    const candidateIdSet = new Set(candidateIds);
+    const enriched = base.map((u) => {
+      const cid = String(u?.id || '');
+      if (!candidateIdSet.has(cid)) return { ...u, friend_count: 0, friend_names: [] };
+      const friends = candidateToFriends.get(cid);
+      const friendList = friends ? Array.from(friends) : [];
+      const friendNames = friendList
+        .map((fid) => friendNameById.get(String(fid)) || null)
+        .filter(Boolean)
+        .slice(0, 3);
+      const friendCount = friendList.length;
+      return { ...u, friend_count: friendCount, friend_names: friendNames };
+    });
+
+    return res.json({ success: true, data: enriched });
+  } catch {
+    return res.json({ success: true, data: base });
+  }
 }
 
 async function sendMessage(req, res) {
@@ -5399,6 +5560,8 @@ async function getPublicTheme(req, res) {
 let publicSiteCache = null;
 let publicSiteCacheAt = 0;
 const PUBLIC_SITE_CACHE_MS = 60_000;
+let publicParliamentCache = null;
+let publicParliamentCacheAt = 0;
 
 function safeParseJsonString(input) {
   const s = String(input ?? '').trim();
@@ -5451,6 +5614,97 @@ async function getPublicSite(req, res) {
   return res.json({ success: true, data: out });
 }
 
+async function getPublicParliament(req, res) {
+  // Public, read-only parliament data (distribution + general info).
+  const now = Date.now();
+  if (publicParliamentCache && (now - publicParliamentCacheAt) < PUBLIC_SITE_CACHE_MS) {
+    return res.json({ success: true, data: publicParliamentCache });
+  }
+
+  const rows = await supabaseRestGet('site_settings', { select: 'key,value', limit: '2000' }).catch(() => []);
+  const map = {};
+  for (const r of rows || []) {
+    const k = String(r?.key || '').trim();
+    if (!k) continue;
+    map[k] = normalizeSiteSettingValue(r?.value);
+  }
+
+  const rawDist = map.parliament_distribution;
+  const rawInfo = map.parliament_info;
+  const distParsed =
+    rawDist && Array.isArray(rawDist)
+      ? rawDist
+      : typeof rawDist === 'string'
+        ? safeParseJsonString(rawDist)
+        : null;
+  const infoParsed =
+    rawInfo && typeof rawInfo === 'object'
+      ? rawInfo
+      : typeof rawInfo === 'string'
+        ? safeParseJsonString(rawInfo)
+        : null;
+
+  const distribution = Array.isArray(distParsed)
+    ? distParsed
+        .map((p) => {
+          const name = String(p?.name || '').trim();
+          const shortName = String(p?.shortName || p?.short_name || '').trim();
+          const seats = Math.max(0, Number(p?.seats || 0) || 0);
+          const color = String(p?.color || '').trim();
+          const slug = String(p?.slug || p?.party_slug || '').trim();
+          const logo_url = String(p?.logo_url || '').trim();
+          if (!shortName || !name) return null;
+          return {
+            name,
+            shortName,
+            seats,
+            ...(isValidHexColor(color) ? { color } : {}),
+            ...(slug ? { slug } : {}),
+            ...(logo_url ? { logo_url } : {}),
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const info =
+    infoParsed && typeof infoParsed === 'object'
+      ? {
+          legislatureName: String(infoParsed.legislatureName || infoParsed.legislature_name || '').trim(),
+          legislatureYear: String(infoParsed.legislatureYear || infoParsed.legislature_year || '').trim(),
+          termStart: String(infoParsed.termStart || infoParsed.term_start || '').trim(),
+          termEnd: String(infoParsed.termEnd || infoParsed.term_end || '').trim(),
+          speakerName: String(infoParsed.speakerName || infoParsed.speaker_name || '').trim(),
+          speakerProfileId: String(infoParsed.speakerProfileId || infoParsed.speaker_profile_id || '').trim(),
+          description: String(infoParsed.description || '').trim(),
+          officials: Array.isArray(infoParsed.officials)
+            ? infoParsed.officials
+                .map((o) => {
+                  const role = String(o?.role || '').trim();
+                  const name = String(o?.name || '').trim();
+                  const profileId = String(o?.profileId || o?.profile_id || '').trim();
+                  if (!role || !name) return null;
+                  return { role, name, ...(profileId ? { profileId } : {}) };
+                })
+                .filter(Boolean)
+            : [],
+        }
+      : {
+          legislatureName: '',
+          legislatureYear: '',
+          termStart: '',
+          termEnd: '',
+          speakerName: '',
+          speakerProfileId: '',
+          description: '',
+          officials: [],
+        };
+
+  const out = { distribution, info };
+  publicParliamentCache = out;
+  publicParliamentCacheAt = now;
+  return res.json({ success: true, data: out });
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setSecurityHeaders(req, res);
@@ -5475,6 +5729,7 @@ export default async function handler(req, res) {
       // Public theme settings (read-only)
       if (url === '/api/theme' && req.method === 'GET') return await getPublicTheme(req, res);
       if (url === '/api/public/site' && req.method === 'GET') return await getPublicSite(req, res);
+      if (url === '/api/public/parliament' && req.method === 'GET') return await getPublicParliament(req, res);
       
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);
@@ -5630,6 +5885,7 @@ export default async function handler(req, res) {
         const tail = parts[1];
         if (pid && tail === 'assign') return await adminAssignPartyUnit(req, res, pid);
         if (pid && tail === 'unassign') return await adminUnassignPartyUnit(req, res, pid);
+        if (pid && tail === 'chair') return await adminSetPartyChair(req, res, pid);
       }
       if (url.startsWith('/api/admin/users/') && req.method === 'PUT') {
         const userId = url.split('/api/admin/users/')[1];

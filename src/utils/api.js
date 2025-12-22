@@ -466,6 +466,11 @@ export const admin = {
       method: 'POST',
       body: JSON.stringify(payload || {}),
     }),
+  setPartyChair: (partyId, userId) =>
+    apiCall(`/api/admin/parties/${partyId}/chair`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    }),
 
   // Email
   sendTestEmail: ({ to, subject, text, html } = {}) =>

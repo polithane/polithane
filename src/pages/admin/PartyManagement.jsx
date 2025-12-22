@@ -41,6 +41,7 @@ export const PartyManagement = () => {
   const [hierParty, setHierParty] = useState(null);
   const [hierLoading, setHierLoading] = useState(false);
   const [hierData, setHierData] = useState(null);
+  const [chairUserId, setChairUserId] = useState('');
   const [assignDraft, setAssignDraft] = useState({
     user_id: '',
     unit_type: 'provincial_chair',
@@ -57,11 +58,19 @@ export const PartyManagement = () => {
     setHierOpen(true);
     setHierLoading(true);
     setHierData(null);
+    setChairUserId('');
     setError('');
     try {
       const r = await adminApi.getPartyHierarchy(party.id);
       if (!r?.success) throw new Error(r?.error || 'Hiyerarşi yüklenemedi.');
       setHierData(r.data || null);
+      const users = [
+        ...((r.data?.users?.mps || []).slice()),
+        ...((r.data?.users?.officials || []).slice()),
+        ...((r.data?.users?.members || []).slice()),
+      ];
+      const chair = users.find((u) => String(u?.politician_type || '') === 'party_chair') || null;
+      if (chair?.id) setChairUserId(String(chair.id));
     } catch (e) {
       setError(e?.message || 'Hiyerarşi yüklenemedi.');
       setHierData(null);
@@ -505,6 +514,57 @@ export const PartyManagement = () => {
 
             <div className="p-5 grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5">
               <div className="space-y-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                  <div className="font-black text-gray-900 mb-2 flex items-center gap-2">
+                    <Flag className="w-5 h-5 text-primary-blue" />
+                    Parti Başkanı
+                  </div>
+                  <div className="text-xs text-gray-600 mb-3">
+                    Bu seçim “Siyasi Partiler” sayfasındaki Parti Başkanı alanını doldurur.
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-600">Kullanıcı</label>
+                      <select
+                        value={chairUserId}
+                        onChange={(e) => setChairUserId(e.target.value)}
+                        className="mt-1 w-full border border-gray-300 rounded-xl p-3 bg-white"
+                      >
+                        <option value="">Seçiniz...</option>
+                        {[
+                          ...(hierData?.users?.mps || []),
+                          ...(hierData?.users?.officials || []),
+                          ...(hierData?.users?.members || []),
+                        ].map((u) => (
+                          <option key={`chair-${u.id}`} value={u.id}>
+                            {u.full_name} (@{u.username})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={hierLoading || !chairUserId}
+                      onClick={async () => {
+                        try {
+                          setHierLoading(true);
+                          const r = await adminApi.setPartyChair(hierParty.id, Number(chairUserId));
+                          if (!r?.success) throw new Error(r?.error || 'Kaydedilemedi.');
+                          const fresh = await adminApi.getPartyHierarchy(hierParty.id);
+                          if (fresh?.success) setHierData(fresh.data || null);
+                        } catch (e) {
+                          setError(e?.message || 'Kaydedilemedi.');
+                        } finally {
+                          setHierLoading(false);
+                        }
+                      }}
+                      className="w-full bg-primary-blue hover:bg-blue-600 text-white font-black px-4 py-3 rounded-xl disabled:opacity-50"
+                    >
+                      {hierLoading ? 'Kaydediliyor…' : 'Genel Başkan Yap'}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
                   <div className="font-black text-gray-900 mb-2 flex items-center gap-2">
                     <UserCheck className="w-5 h-5 text-primary-blue" />
