@@ -72,7 +72,7 @@ export const MessagesPage = () => {
   
   const filteredConversations = useMemo(() => {
     const base = (conversations || []).filter((c) => (tab === 'requests' ? c.message_type === 'request' : c.message_type !== 'request'));
-    if (!searchQuery) return base;
+    if (!searchQuery || String(searchQuery || '').trim().length < 2) return base;
     return base.filter((conv) => {
       const u = conv.participant;
       return (
