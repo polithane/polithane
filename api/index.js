@@ -2561,7 +2561,7 @@ async function usersCheckUsername(req, res, username) {
   const ip = getClientIp(req);
   const rl = rateLimit(`check_username:${ip}`, { windowMs: 60_000, max: 60 });
   if (!rl.ok) return res.status(429).json({ success: false, available: false, message: 'Çok fazla istek. Lütfen biraz bekleyin.' });
-  if (!u || u.length < 3) return res.json({ success: true, available: false, message: 'En az 3 karakter olmalı' });
+  if (!u || u.length < 5) return res.json({ success: true, available: false, message: 'En az 5 karakter olmalı' });
   if (u.length > 15) return res.json({ success: true, available: false, message: 'En fazla 15 karakter olabilir' });
   if (!/^[a-z0-9._-]+$/.test(u)) {
     return res.json({
@@ -2580,7 +2580,7 @@ async function usersUpdateUsername(req, res) {
   if (!auth) return;
   const body = await readJsonBody(req);
   const u = String(body?.username || '').trim().toLowerCase();
-  if (!u || u.length < 3) return res.status(400).json({ success: false, error: 'Kullanıcı adı en az 3 karakter olmalı.' });
+  if (!u || u.length < 5) return res.status(400).json({ success: false, error: 'Kullanıcı adı en az 5 karakter olmalı.' });
   if (u.length > 15) return res.status(400).json({ success: false, error: 'Kullanıcı adı en fazla 15 karakter olabilir.' });
   if (!/^[a-z0-9._-]+$/.test(u)) {
     return res.status(400).json({

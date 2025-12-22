@@ -98,7 +98,8 @@ router.post('/register', upload.single('document'), async (req, res) => {
       let out = value.trim().split('').map((ch) => turkishMap[ch] ?? ch).join('').toLowerCase();
       out = out.replace(/^@+/, '').replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
       out = out.replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 20);
-      if (out && out.length < 3) out = (out + '___').slice(0, 3);
+      // Pad to minimum 5 chars with underscores (e.g. ali__ / ay___)
+      if (out && out.length < 5) out = (out + '_____').slice(0, 5);
       if (out && !/^[a-z]/.test(out)) out = `u${out}`.slice(0, 20);
       return out;
     };

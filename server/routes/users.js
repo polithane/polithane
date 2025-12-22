@@ -14,24 +14,41 @@ const validateUsername = (username) => {
     return { valid: false, error: 'Kullanıcı adı en fazla 15 karakter olabilir.' };
   }
   
-  // Min 3 karakter
-  if (username.length < 3) {
-    return { valid: false, error: 'Kullanıcı adı en az 3 karakter olmalıdır.' };
+  // Min 5 karakter
+  if (username.length < 5) {
+    return { valid: false, error: 'Kullanıcı adı en az 5 karakter olmalıdır.' };
   }
   
-  // Sadece harfler, rakamlar, - ve . kullanılabilir
-  const usernameRegex = /^[a-zA-Z0-9.-]+$/;
+  // Sadece harfler, rakamlar, alt çizgi (_), - ve . kullanılabilir
+  const usernameRegex = /^[a-zA-Z0-9._-]+$/;
   if (!usernameRegex.test(username)) {
-    return { valid: false, error: 'Kullanıcı adı sadece harfler, rakamlar, tire (-) ve nokta (.) içerebilir.' };
+    return { valid: false, error: 'Kullanıcı adı sadece harfler, rakamlar, alt çizgi (_), tire (-) ve nokta (.) içerebilir.' };
   }
   
   // İlk ve son karakter özel karakter olamaz
-  if (username.startsWith('-') || username.startsWith('.') || username.endsWith('-') || username.endsWith('.')) {
-    return { valid: false, error: 'Kullanıcı adı tire veya nokta ile başlayamaz/bitemez.' };
+  if (
+    username.startsWith('-') ||
+    username.startsWith('.') ||
+    username.startsWith('_') ||
+    username.endsWith('-') ||
+    username.endsWith('.') ||
+    username.endsWith('_')
+  ) {
+    return { valid: false, error: 'Kullanıcı adı tire/nokta/alt çizgi ile başlayamaz/bitemez.' };
   }
   
   // Ardışık özel karakterler yasak
-  if (username.includes('..') || username.includes('--') || username.includes('.-') || username.includes('-.')) {
+  if (
+    username.includes('..') ||
+    username.includes('--') ||
+    username.includes('__') ||
+    username.includes('.-') ||
+    username.includes('-.') ||
+    username.includes('._') ||
+    username.includes('_.') ||
+    username.includes('-_') ||
+    username.includes('_-')
+  ) {
     return { valid: false, error: 'Ardışık özel karakterler kullanılamaz.' };
   }
   
