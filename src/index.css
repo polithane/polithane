@@ -33,7 +33,7 @@
   /* Home route: keep centered, but shrink on xl+ to make room for fixed sidebars */
   @media (min-width: 1280px) {
     .home-layout .container-main {
-      max-width: min(1230px, calc(100vw - 360px));
+      max-width: min(1230px, calc(100vw - 280px));
     }
   }
   
