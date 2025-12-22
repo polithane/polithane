@@ -102,6 +102,13 @@ export const PostDetailPage = () => {
     user: safePost.user || null,
   };
 
+  const profilePath = useMemo(() => {
+    if (uiPost.user) return getProfilePath(uiPost.user);
+    if (uiPost.user_id) return `/profile/${uiPost.user_id}`;
+    return '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uiPost.user_id, uiPost.user]);
+
   const agendaSlug = useMemo(() => {
     if (!uiPost.agenda_tag) return '';
     return String(uiPost.agenda_tag)
@@ -345,7 +352,7 @@ export const PostDetailPage = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    if (uiPost.user) navigate(getProfilePath(uiPost.user));
+                    if (profilePath) navigate(profilePath);
                   }}
                   className="flex items-center gap-4 flex-1 min-w-0 text-left"
                   title="Profili görüntüle"
@@ -373,7 +380,7 @@ export const PostDetailPage = () => {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      if (uiPost.user) navigate(getProfilePath(uiPost.user));
+                      if (profilePath) navigate(profilePath);
                     }}
                   >
                     Takip Et
