@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPartyFlagPath } from '../../utils/imagePaths';
 import { PartyDetailPopup } from '../common/PartyDetailPopup';
 import { CityDetailPopup } from '../common/CityDetailPopup';
@@ -12,6 +13,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const closeTimeoutRef = useRef(null);
   const isMouseOverPopup = useRef(false);
+  const platesScrollRef = useRef(null);
   
   const cityNamesList = Object.entries(CITY_CODES).map(([code, name]) => ({
     code,
@@ -60,6 +62,17 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
         setHoveredCity(null);
       }
     }, 200);
+  };
+
+  const scrollPlates = (dir) => {
+    const el = platesScrollRef.current;
+    if (!el) return;
+    const step = Math.max(120, Math.floor(el.clientWidth * 0.6));
+    try {
+      el.scrollBy({ left: dir * step, behavior: 'smooth' });
+    } catch {
+      el.scrollLeft += dir * step;
+    }
   };
   
   return (
@@ -160,8 +173,30 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
         })}
         </div>
       
-        <div className="bg-gray-50 px-1 py-2 rounded-b-lg border border-t-0 border-gray-300 overflow-x-hidden">
-          <div className="flex gap-0 justify-center">
+        <div className="bg-gray-50 px-2 py-2 rounded-b-lg border border-t-0 border-gray-300 relative">
+          {/* Scroll buttons (no scrollbar) */}
+          <button
+            type="button"
+            aria-label="Sola kaydır"
+            onClick={() => scrollPlates(-1)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow-lg flex items-center justify-center"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Sağa kaydır"
+            onClick={() => scrollPlates(1)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow-lg flex items-center justify-center"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+
+          <div
+            ref={platesScrollRef}
+            className="overflow-x-auto scrollbar-hide px-10"
+          >
+            <div className="flex gap-0 w-max">
           {Array.from({ length: 81 }, (_, i) => {
             const code = i + 1;
             const cityCode = code.toString().padStart(2, '0');
@@ -188,7 +223,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               <button
                 key={code}
                 onClick={() => navigate(`/city/${cityCode}`)}
-                className="w-[14px] h-[14px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[6px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
+                className="w-[16px] h-[16px] rounded-full bg-gray-900 hover:bg-primary-blue text-white text-[7px] font-bold flex items-center justify-center transition-colors flex-shrink-0 leading-none"
                 onMouseEnter={(e) => {
                   clearCloseTimeout();
                   isMouseOverPopup.current = false;
@@ -211,6 +246,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               </button>
             );
           })}
+            </div>
           </div>
         </div>
       </div>
