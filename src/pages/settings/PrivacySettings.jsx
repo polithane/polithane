@@ -144,8 +144,8 @@ export const PrivacySettings = () => {
         <div className="space-y-3">
           <label className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
             <div>
-              <div className="font-semibold text-gray-900">Email Adresi</div>
-              <div className="text-sm text-gray-600">Profilimde email adresimi göster</div>
+              <div className="font-semibold text-gray-900">E-posta Adresi</div>
+              <div className="text-sm text-gray-600">Profilimde e-posta adresimi göster</div>
             </div>
             <input
               type="checkbox"

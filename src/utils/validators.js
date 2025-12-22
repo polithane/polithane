@@ -1,4 +1,4 @@
-// Email validasyonu
+// E-posta validasyonu
 export const isValidEmail = (email) => {
   if (!email) return false;
   const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

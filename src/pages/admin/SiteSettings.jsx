@@ -13,7 +13,7 @@ export const SiteSettings = () => {
     allowRegistration: true,
     allowComments: true,
     allowMessages: true,
-    // Email ayarları
+    // E-posta ayarları
     email_verification_enabled: 'true',
     email_service_provider: 'smtp',
     email_from_address: 'noreply@polithane.com',

@@ -274,11 +274,11 @@ export const RegisterPageNew = () => {
     const passwordOk = PASSWORD_RULES.every((r) => r.validator(String(formData.password || '')));
 
     if (emailStatus === 'taken' && !claimUser) {
-      setGlobalError('Bu email adresi zaten kullanımda.');
+      setGlobalError('Bu e-posta adresi zaten kullanımda.');
       return;
     }
     if (formData.email && (/[çğıöşüİÇĞÖŞÜ]/.test(formData.email) || !isValidEmail(formData.email))) {
-      setGlobalError('Geçerli bir email adresi giriniz (Türkçe karakter olmadan).');
+      setGlobalError('Geçerli bir e-posta adresi giriniz (Türkçe karakter olmadan).');
       return;
     }
     if (!passwordOk) {
@@ -525,7 +525,7 @@ export const RegisterPageNew = () => {
           </div>
 
           <div className="col-span-1 md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email Adresi</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">E-posta Adresi</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
               <input
@@ -546,7 +546,7 @@ export const RegisterPageNew = () => {
                 {emailStatus === 'taken' && <X className="w-5 h-5 text-red-600" />}
               </div>
             </div>
-            {emailStatus === 'taken' && <p className="text-xs text-red-600 mt-1">Bu email kullanımda.</p>}
+            {emailStatus === 'taken' && <p className="text-xs text-red-600 mt-1">Bu e-posta kullanımda.</p>}
             {fieldErrors.email && <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>}
           </div>
 

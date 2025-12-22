@@ -65,21 +65,21 @@ export const ForgotPasswordPage = () => {
               </div>
               
               <h2 className="text-2xl font-black text-gray-900 mb-3">
-                Email Gönderildi!
+                E-posta Gönderildi!
               </h2>
               
               <p className="text-gray-600 mb-6">
                 <strong>{email}</strong> adresine şifre sıfırlama linki gönderdik.
-                Lütfen email kutunuzu kontrol edin.
+                Lütfen e-posta kutunuzu kontrol edin.
               </p>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
                 <p className="text-sm text-blue-800 mb-2">
-                  <strong>📧 Email gelmediyse:</strong>
+                  <strong>📧 E-posta gelmediyse:</strong>
                 </p>
                 <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
                   <li>Spam/Gereksiz klasörünü kontrol edin</li>
-                  <li>Email adresinizi doğru yazdığınızdan emin olun</li>
+                  <li>E-posta adresinizi doğru yazdığınızdan emin olun</li>
                   <li>Birkaç dakika bekleyin (bazen geç gelebilir)</li>
                 </ul>
               </div>
@@ -132,10 +132,10 @@ export const ForgotPasswordPage = () => {
               </div>
             )}
 
-            {/* Email */}
+            {/* E-posta */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Email Adresiniz
+                E-posta Adresiniz
               </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
@@ -143,13 +143,13 @@ export const ForgotPasswordPage = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@ornek.com"
+                  placeholder="eposta@ornek.com"
                   className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
                   required
                 />
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                Kayıtlı email adresinizi girin. Size şifre sıfırlama linki göndereceğiz.
+                Kayıtlı e-posta adresinizi girin. Size şifre sıfırlama linki göndereceğiz.
               </p>
             </div>
 

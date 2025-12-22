@@ -117,8 +117,8 @@ export const NotificationSettings = () => {
             <div className="flex items-center gap-3">
               <Mail className="w-5 h-5 text-blue-500" />
               <div>
-                <div className="font-semibold text-gray-900">Email Bildirimleri</div>
-                <div className="text-sm text-gray-600">Email ile bildirim al</div>
+                <div className="font-semibold text-gray-900">E-posta Bildirimleri</div>
+                <div className="text-sm text-gray-600">E-posta ile bildirim al</div>
               </div>
             </div>
             <input
@@ -133,7 +133,7 @@ export const NotificationSettings = () => {
             <div className="flex items-center gap-3">
               <Bell className="w-5 h-5 text-purple-500" />
               <div>
-                <div className="font-semibold text-gray-900">Push Bildirimleri</div>
+                <div className="font-semibold text-gray-900">Anlık Bildirimler</div>
                 <div className="text-sm text-gray-600">Tarayıcı bildirimleri</div>
               </div>
             </div>
