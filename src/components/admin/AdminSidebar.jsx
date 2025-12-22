@@ -34,8 +34,8 @@ export const AdminSidebar = () => {
         { path: '/admin/site-settings', icon: Settings, label: 'Site Ayarları' },
         { path: '/admin/theme', icon: Palette, label: 'Tasarım & Tema' },
         { path: '/admin/seo', icon: Search, label: 'SEO Ayarları' },
-        { path: '/admin/email', icon: Mail, label: 'Email Şablonları' },
-        { path: '/admin/email-test', icon: Send, label: 'Mail Test' },
+        { path: '/admin/email', icon: Mail, label: 'E-posta Şablonları' },
+        { path: '/admin/email-test', icon: Send, label: 'E-posta Testi' },
         { path: '/admin/notifications', icon: Bell, label: 'Bildirim Kuralları' },
       ]
     },
@@ -43,7 +43,7 @@ export const AdminSidebar = () => {
       title: 'Otomasyon',
       items: [
         { path: '/admin/automation', icon: Bot, label: 'Otomasyon Kontrol' },
-        { path: '/admin/scraping', icon: Zap, label: 'Scraping Yönetimi' },
+        { path: '/admin/scraping', icon: Zap, label: 'Tarama Yönetimi' },
         { path: '/admin/sources', icon: Globe, label: 'Kaynak Yönetimi' },
       ]
     },
@@ -59,7 +59,7 @@ export const AdminSidebar = () => {
       title: 'Sistem',
       items: [
         { path: '/admin/security', icon: Shield, label: 'Güvenlik' },
-        { path: '/admin/database', icon: Database, label: 'Database Yönetimi' },
+        { path: '/admin/database', icon: Database, label: 'Veritabanı Yönetimi' },
         { path: '/admin/api', icon: Code, label: 'API Ayarları' },
       ]
     }
