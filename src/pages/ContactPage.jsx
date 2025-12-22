@@ -1,6 +1,26 @@
+import { useEffect, useState } from 'react';
 import { Mail, Phone, MapPin, HelpCircle } from 'lucide-react';
+import { apiCall } from '../utils/api';
 
 export const ContactPage = () => {
+  const [contactEmail, setContactEmail] = useState('info@polithane.com');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const r = await apiCall('/api/public/site', { method: 'GET' }).catch(() => null);
+        const email = String(r?.data?.contactEmail || '').trim();
+        if (mounted && email) setContactEmail(email);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-10">
@@ -20,7 +40,7 @@ export const ContactPage = () => {
               <div className="flex items-center gap-2 font-black text-gray-900">
                 <Mail className="w-5 h-5 text-emerald-600" /> E‑posta
               </div>
-              <div className="text-sm text-gray-700 mt-2">info@polithane.com</div>
+              <div className="text-sm text-gray-700 mt-2">{contactEmail}</div>
             </div>
             <div className="rounded-2xl border border-gray-200 p-6 bg-gray-50">
               <div className="flex items-center gap-2 font-black text-gray-900">
