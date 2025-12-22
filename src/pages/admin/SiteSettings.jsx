@@ -3,6 +3,25 @@ import { Save, Globe, Mail, Facebook, Twitter, Instagram, Youtube } from 'lucide
 import { apiCall } from '../../utils/api';
 
 export const SiteSettings = () => {
+  const fromSettingBool = (v, fallback = false) => {
+    if (typeof v === 'boolean') return v;
+    const s = String(v ?? '').trim().toLowerCase();
+    if (s === 'true') return true;
+    if (s === 'false') return false;
+    return fallback;
+  };
+
+  const tryParseJson = (v) => {
+    if (v && typeof v === 'object') return v;
+    const s = String(v ?? '').trim();
+    if (!s) return null;
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  };
+
   const [settings, setSettings] = useState({
     siteName: 'Polithane.',
     siteSlogan: 'Özgür, açık, şeffaf siyaset, bağımsız medya!',
@@ -42,9 +61,30 @@ export const SiteSettings = () => {
         });
         
         if (response.success) {
+          const d = response.data && typeof response.data === 'object' ? response.data : {};
+          const social = tryParseJson(d.social_links);
           setSettings(prev => ({
             ...prev,
-            ...response.data
+            siteName: d.site_name ?? prev.siteName,
+            siteSlogan: d.site_slogan ?? prev.siteSlogan,
+            siteDescription: d.site_description ?? prev.siteDescription,
+            contactEmail: d.contact_email ?? prev.contactEmail,
+            supportEmail: d.support_email ?? prev.supportEmail,
+            maintenanceMode: fromSettingBool(d.maintenance_mode, prev.maintenanceMode),
+            allowRegistration: fromSettingBool(d.allow_registration, prev.allowRegistration),
+            allowComments: fromSettingBool(d.allow_comments, prev.allowComments),
+            allowMessages: fromSettingBool(d.allow_messages, prev.allowMessages),
+
+            email_verification_enabled: d.email_verification_enabled ?? prev.email_verification_enabled,
+            email_service_provider: d.email_service_provider ?? prev.email_service_provider,
+            email_from_address: d.email_from_address ?? prev.email_from_address,
+            email_from_name: d.email_from_name ?? prev.email_from_name,
+            email_smtp_host: d.email_smtp_host ?? prev.email_smtp_host,
+            email_smtp_port: d.email_smtp_port ?? prev.email_smtp_port,
+            email_smtp_user: d.email_smtp_user ?? prev.email_smtp_user,
+            email_smtp_password: d.email_smtp_password ?? prev.email_smtp_password,
+
+            socialLinks: social && typeof social === 'object' ? { ...prev.socialLinks, ...social } : prev.socialLinks,
           }));
         }
       } catch (error) {
@@ -74,6 +114,16 @@ export const SiteSettings = () => {
       const response = await apiCall('/api/settings', {
         method: 'PUT',
         body: JSON.stringify({
+          site_name: settings.siteName,
+          site_slogan: settings.siteSlogan,
+          site_description: settings.siteDescription,
+          contact_email: settings.contactEmail,
+          support_email: settings.supportEmail,
+          maintenance_mode: !!settings.maintenanceMode,
+          allow_registration: !!settings.allowRegistration,
+          allow_comments: !!settings.allowComments,
+          allow_messages: !!settings.allowMessages,
+          social_links: settings.socialLinks || {},
           email_verification_enabled: settings.email_verification_enabled,
           email_service_provider: settings.email_service_provider,
           email_from_address: settings.email_from_address,
