@@ -8,7 +8,6 @@ import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { HorizontalScroll } from '../components/common/HorizontalScroll';
 import { MediaSidebar } from '../components/media/MediaSidebar';
 import { Avatar } from '../components/common/Avatar';
-import { FollowSuggestionsSidebar } from '../components/home/FollowSuggestionsSidebar';
 // NOTE: No mock fallbacks in production. Everything should come from DB.
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
@@ -627,8 +626,7 @@ export const HomePage = () => {
           
           {/* Sağ Medya Sidebar */}
           <aside className="hidden lg:block lg:mr-0 min-w-0">
-            <div className="sticky top-20 space-y-3">
-              <FollowSuggestionsSidebar limit={8} />
+            <div className="sticky top-20">
               <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg p-4 shadow-lg">
                 <h2 className="text-sm font-bold text-white mb-4 whitespace-nowrap">MEDYA GÜNDEMİ</h2>
                 <div className="-mx-4 -mb-4 px-4 pb-4">

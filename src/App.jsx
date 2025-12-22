@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { ActionBar } from './components/layout/ActionBar';
+import { FollowSuggestionsBar } from './components/layout/FollowSuggestionsBar';
 import { HomePage } from './pages/HomePage';
 import { PostDetailPage } from './pages/PostDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -81,7 +82,7 @@ function App() {
     <div className="min-h-screen flex flex-col">
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<><Header /><HomePage /><Footer /><ActionBar /></>} />
+        <Route path="/" element={<><Header /><HomePage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/post/:postId" element={<><Header /><PostDetailPage /><Footer /><ActionBar /></>} />
         <Route path="/profile/:userId" element={<><Header /><ProfilePage /><Footer /><ActionBar /></>} />
         <Route path="/@:username" element={<><Header /><ProfilePage /><Footer /><ActionBar /></>} />
