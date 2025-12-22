@@ -7,7 +7,7 @@ export const APISettings = () => {
   const mockAPIKeys = [
     {
       id: 1,
-      name: 'Production API Key',
+      name: 'Canlı API Anahtarı',
       key: 'pk_live_1234567890abcdefghijklmnop',
       created: '2024-01-01',
       last_used: '5 dakika önce',
@@ -16,7 +16,7 @@ export const APISettings = () => {
     },
     {
       id: 2,
-      name: 'Development API Key',
+      name: 'Geliştirme API Anahtarı',
       key: 'pk_test_abcdefghijklmnop1234567890',
       created: '2024-01-10',
       last_used: '1 saat önce',
@@ -25,7 +25,7 @@ export const APISettings = () => {
     },
     {
       id: 3,
-      name: 'Mobile App Key',
+      name: 'Mobil Uygulama Anahtarı',
       key: 'pk_live_zyxwvutsrqponmlkjihgfedcba',
       created: '2023-12-15',
       last_used: '1 gün önce',
@@ -59,7 +59,7 @@ export const APISettings = () => {
           <div className="text-2xl font-black text-green-700">98.7%</div>
         </div>
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
-          <div className="text-sm text-purple-600 mb-1">Aktif API Key</div>
+          <div className="text-sm text-purple-600 mb-1">Aktif API Anahtarı</div>
           <div className="text-2xl font-black text-purple-700">3</div>
         </div>
         <div className="bg-orange-50 rounded-xl border border-orange-200 p-4">
@@ -96,7 +96,7 @@ export const APISettings = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                    {apiKey.status}
+                    {apiKey.status === 'active' ? 'Aktif' : apiKey.status}
                   </span>
                   <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
                     <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />

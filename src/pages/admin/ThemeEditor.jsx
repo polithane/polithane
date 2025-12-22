@@ -127,12 +127,12 @@ export const ThemeEditor = () => {
               </div>
               
               <div className="p-4 rounded-lg" style={{ backgroundColor: colors.accent + '20' }}>
-                <div style={{ color: colors.accent }} className="font-bold text-lg mb-2">Accent Renk</div>
+                <div style={{ color: colors.accent }} className="font-bold text-lg mb-2">Vurgu Rengi</div>
                 <p className="text-sm text-gray-600">Vurgular için</p>
               </div>
               
               <div className="p-4 rounded-lg" style={{ backgroundColor: colors.danger + '20' }}>
-                <div style={{ color: colors.danger }} className="font-bold text-lg mb-2">Danger Renk</div>
+                <div style={{ color: colors.danger }} className="font-bold text-lg mb-2">Uyarı Rengi</div>
                 <p className="text-sm text-gray-600">Uyarılar için</p>
               </div>
             </div>
