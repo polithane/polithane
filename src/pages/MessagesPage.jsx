@@ -482,13 +482,13 @@ export const MessagesPage = () => {
               </div>
               {/* Search Bar */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-5 sm:h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-7 h-7 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Mesajlarda ara..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
+                  className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
                 />
               </div>
             </div>
@@ -770,12 +770,12 @@ export const MessagesPage = () => {
           <div>
             <div className="text-sm font-semibold text-gray-700 mb-2">Kime?</div>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-5 sm:h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-7 h-7 text-gray-400" />
               <input
                 value={composeQuery}
                 onChange={(e) => setComposeQuery(e.target.value)}
                 placeholder="İsim veya kullanıcı adı ara…"
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
+                className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
               />
             </div>
           </div>
