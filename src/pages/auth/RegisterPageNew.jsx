@@ -897,7 +897,7 @@ export const RegisterPageNew = () => {
                     <div className="ml-4">
                       <h4 className="font-bold text-gray-900">{user.full_name}</h4>
                       <p className="text-sm text-gray-500">
-                        @{user.username} • {getUserTitle(user, true) || 'Üye'}
+                        @{user.username}
                       </p>
                     </div>
                     <div className="ml-auto">
