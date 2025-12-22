@@ -66,7 +66,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
     <div className="mb-4">
       {/* Desktop Parliament Bar (hidden on mobile) */}
       <div className="hidden md:block">
-        <div className="flex h-24 overflow-x-auto overflow-y-hidden rounded-t-lg border border-gray-300 w-full">
+        <div className="flex h-24 overflow-hidden rounded-t-lg border border-gray-300 w-full">
         {parliamentData.map((party, index) => {
           const widthPercentage = (party.seats / totalSeats) * 100;
           const flagPath = getPartyFlagPath(party.shortName, index + 1);
@@ -121,7 +121,6 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
-                minWidth: '20px',
                 flexShrink: 0
               }}
               onClick={() => navigate(`/party/${partySlug}`)}
