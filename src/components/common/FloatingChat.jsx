@@ -21,6 +21,12 @@ export const FloatingChat = () => {
   const [loading, setLoading] = useState(false);
   const endRef = useRef(null);
 
+  const getReceiverId = (conv) => {
+    const pid = conv?.participant_id ?? conv?.participant?.id ?? null;
+    const s = String(pid ?? '').trim();
+    return s || '';
+  };
+
   const safeParseMessage = (message) => {
     const raw = String(message?.content || '');
     try {
@@ -99,9 +105,10 @@ export const FloatingChat = () => {
   };
 
   const handleSend = async () => {
-    if (!newMessage.trim() || !selectedConversation?.participant_id) return;
+    const receiverId = getReceiverId(selectedConversation);
+    if (!newMessage.trim() || !receiverId) return;
     try {
-      const sent = await messagesApi.send(selectedConversation.participant_id, newMessage.trim());
+      const sent = await messagesApi.send(receiverId, newMessage.trim());
       if (sent?.success && sent.data) {
         setMessages((prev) => [...prev, sent.data]);
         setNewMessage('');
@@ -206,13 +213,13 @@ export const FloatingChat = () => {
 
           <div className="p-3 border-b border-gray-200">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-5 sm:h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-7 h-7 text-gray-400" />
               <input
                 type="text"
                 placeholder="Mesajlarda ara..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
+                className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
               />
             </div>
           </div>
