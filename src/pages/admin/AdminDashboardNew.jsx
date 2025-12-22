@@ -101,7 +101,7 @@ export const AdminDashboardNew = () => {
     <div className="p-6">
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 mb-2">Dashboard</h1>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Genel Bakış</h1>
           <p className="text-gray-600">Platform yönetim merkezi - Tüm istatistikler</p>
         </div>
         <button

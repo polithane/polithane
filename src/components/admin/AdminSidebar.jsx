@@ -12,7 +12,7 @@ export const AdminSidebar = () => {
     {
       title: 'Genel',
       items: [
-        { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+        { path: '/admin', icon: LayoutDashboard, label: 'Genel Bakış' },
         { path: '/admin/analytics', icon: BarChart3, label: 'Analitik & Raporlar' },
       ]
     },
@@ -74,7 +74,7 @@ export const AdminSidebar = () => {
           </div>
           <div>
             <h2 className="font-black text-gray-900">Polithane</h2>
-            <p className="text-xs text-gray-500">Admin Panel</p>
+            <p className="text-xs text-gray-500">Admin Paneli</p>
           </div>
         </div>
       </div>
