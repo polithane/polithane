@@ -5304,6 +5304,9 @@ export default async function handler(req, res) {
       // Admin site settings (used by /admin/site-settings and /admin/seo)
       if (url === '/api/settings' && req.method === 'GET') return await getSiteSettings(req, res);
       if (url === '/api/settings' && req.method === 'PUT') return await updateSiteSettings(req, res);
+      // Backwards-compatible alias (some admin UI calls this)
+      if (url === '/api/admin/settings' && req.method === 'GET') return await getSiteSettings(req, res);
+      if (url === '/api/admin/settings' && req.method === 'PUT') return await updateSiteSettings(req, res);
       
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);

@@ -420,10 +420,10 @@ export const admin = {
     }),
 
   // Settings
-  getSettings: () => apiCall('/api/admin/settings'),
+  getSettings: () => apiCall('/api/settings'),
 
   updateSettings: (settings) =>
-    apiCall('/api/admin/settings', {
+    apiCall('/api/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
     }),

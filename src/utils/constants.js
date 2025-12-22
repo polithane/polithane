@@ -115,7 +115,7 @@ export const API_ENDPOINTS = {
     APPROVALS: '/api/admin/approvals',
     PARTIES: '/api/admin/parties',
     REPORTS: '/api/admin/reports',
-    SETTINGS: '/api/admin/settings'
+    SETTINGS: '/api/settings'
   }
 };
 
