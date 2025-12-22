@@ -792,8 +792,8 @@ export const RegisterPageNew = () => {
           onClick={() => setStep(2)}
           className="flex items-center p-6 bg-white border-2 border-gray-100 rounded-2xl hover:border-primary-blue hover:shadow-lg transition-all group text-left"
         >
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mr-6 group-hover:scale-110 transition-transform">
-            <User className="w-8 h-8 text-blue-600" />
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mr-6 group-hover:scale-110 transition-transform">
+            <User className="w-10 h-10 text-blue-600" />
           </div>
           <div className="flex-1">
             <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-primary-blue">Yeni Üye Ol</h3>
@@ -806,8 +806,8 @@ export const RegisterPageNew = () => {
           onClick={() => setStep(1)}
           className="flex items-center p-6 bg-white border-2 border-gray-100 rounded-2xl hover:border-purple-500 hover:shadow-lg transition-all group text-left"
         >
-          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mr-6 group-hover:scale-110 transition-transform">
-            <ShieldCheck className="w-8 h-8 text-purple-600" />
+          <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mr-6 group-hover:scale-110 transition-transform">
+            <ShieldCheck className="w-10 h-10 text-purple-600" />
           </div>
           <div className="flex-1">
             <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-purple-600">Mevcut Profili Sahiplen</h3>
@@ -926,8 +926,8 @@ export const RegisterPageNew = () => {
                       }}
                       className={`flex items-start p-4 bg-white border-2 border-gray-100 rounded-xl transition-all group text-left ${type.borderColor} hover:shadow-md`}
                     >
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mr-5 flex-shrink-0 shadow-lg transform group-hover:scale-110 transition-transform duration-300 ${type.iconBg}`}>
-                <Icon className="w-8 h-8" />
+              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mr-5 flex-shrink-0 shadow-lg transform group-hover:scale-110 transition-transform duration-300 ${type.iconBg}`}>
+                <Icon className="w-10 h-10" />
               </div>
                       <div className="flex-1">
                         <h3 className="font-bold text-gray-900 mb-1">{type.label}</h3>
