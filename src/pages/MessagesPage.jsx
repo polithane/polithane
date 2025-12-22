@@ -802,9 +802,6 @@ export const MessagesPage = () => {
                       </div>
                     </button>
                   ))}
-                  {composeContacts.length === 0 ? (
-                    <div className="text-sm text-gray-600">Henüz takipleştiğin kişi yok.</div>
-                  ) : null}
                 </div>
               </div>
 
@@ -839,9 +836,6 @@ export const MessagesPage = () => {
                       </button>
                     );
                   })}
-                  {composeSuggestions.length === 0 ? (
-                    <div className="text-sm text-gray-600">Şimdilik öneri yok.</div>
-                  ) : null}
                 </div>
               </div>
             </div>
