@@ -13,7 +13,9 @@ export const SecuritySettings = () => {
     (async () => {
       try {
         const res = await api.admin.getSettings();
-        if (res?.data) setSettings(res.data);
+        if (res?.success && res?.data && typeof res.data === 'object') {
+          setSettings((prev) => ({ ...prev, ...res.data }));
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -23,12 +25,15 @@ export const SecuritySettings = () => {
   }, []);
 
   const toggle = async (key) => {
-    const next = { ...settings, [key]: String(settings[key]) === 'true' ? 'false' : 'true' };
-    setSettings(next);
+    const nextValue = String(settings[key]) === 'true' ? 'false' : 'true';
+    setSettings((prev) => ({ ...prev, [key]: nextValue }));
     try {
-      await api.admin.updateSettings(next);
+      // Update only the changed key to avoid overwriting other settings.
+      await api.admin.updateSettings({ [key]: nextValue });
     } catch (e) {
       console.error(e);
+      // Best-effort rollback
+      setSettings((prev) => ({ ...prev, [key]: String(prev[key]) === 'true' ? 'false' : 'true' }));
     }
   };
 
