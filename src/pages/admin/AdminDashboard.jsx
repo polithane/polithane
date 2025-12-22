@@ -61,7 +61,7 @@ export const AdminDashboard = () => {
         <div className="card">
           <h2 className="text-xl font-bold mb-4">Yönetim Paneli</h2>
           <p className="text-gray-600">
-            Admin panel özellikleri yakında eklenecektir.
+            Admin paneli özellikleri yakında eklenecektir.
           </p>
         </div>
       </div>

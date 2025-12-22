@@ -122,22 +122,22 @@ export const APISettings = () => {
         </div>
       </div>
 
-      {/* API Endpoints */}
+      {/* API Uç Noktaları */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
         <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900">API Endpoints</h3>
+          <h3 className="text-lg font-bold text-gray-900">API Uç Noktaları</h3>
         </div>
         <div className="p-6">
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">GET</span>
               <code className="flex-1 text-sm text-gray-700">/api/v1/posts</code>
-              <span className="text-xs text-gray-500">Tüm postları getir</span>
+              <span className="text-xs text-gray-500">Tüm paylaşımları getir</span>
             </div>
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold">POST</span>
               <code className="flex-1 text-sm text-gray-700">/api/v1/posts</code>
-              <span className="text-xs text-gray-500">Yeni post oluştur</span>
+              <span className="text-xs text-gray-500">Yeni paylaşım oluştur</span>
             </div>
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">GET</span>
@@ -152,18 +152,18 @@ export const APISettings = () => {
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">DELETE</span>
               <code className="flex-1 text-sm text-gray-700">/api/v1/posts/:id</code>
-              <span className="text-xs text-gray-500">Post sil</span>
+              <span className="text-xs text-gray-500">Paylaşım sil</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Rate Limiting */}
+      {/* Hız Sınırı */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Rate Limiting</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Hız Sınırı</h3>
         <div className="grid grid-cols-3 gap-4">
           <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-2">Free Plan</div>
+            <div className="text-sm text-gray-600 mb-2">Ücretsiz Plan</div>
             <div className="text-2xl font-black text-gray-900 mb-1">100</div>
             <div className="text-xs text-gray-500">istek / dakika</div>
           </div>
@@ -173,9 +173,9 @@ export const APISettings = () => {
             <div className="text-xs text-gray-500">istek / dakika</div>
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-2">Enterprise</div>
+            <div className="text-sm text-gray-600 mb-2">Kurumsal</div>
             <div className="text-2xl font-black text-gray-900 mb-1">Sınırsız</div>
-            <div className="text-xs text-gray-500">Custom limit</div>
+            <div className="text-xs text-gray-500">Özel limit</div>
           </div>
         </div>
       </div>

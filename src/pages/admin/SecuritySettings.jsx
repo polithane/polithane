@@ -169,15 +169,15 @@ export const SecuritySettings = () => {
               </div>
               <div>
                 <h3 className="font-bold text-gray-900">API Güvenliği</h3>
-                <p className="text-sm text-gray-600">Rate limiting & JWT</p>
+                <p className="text-sm text-gray-600">Hız sınırı & JWT</p>
               </div>
             </div>
             <span className="text-green-600 font-semibold text-sm">Aktif</span>
           </div>
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Rate Limit:</span>
-              <span className="text-sm font-semibold text-gray-900">100 req/min</span>
+              <span className="text-sm text-gray-600">Hız Sınırı:</span>
+              <span className="text-sm font-semibold text-gray-900">100 istek/dk</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Token Süresi:</span>
@@ -194,7 +194,7 @@ export const SecuritySettings = () => {
               </div>
               <div>
                 <h3 className="font-bold text-gray-900">Güvenlik Duvarı</h3>
-                <p className="text-sm text-gray-600">WAF (Web Application Firewall)</p>
+                <p className="text-sm text-gray-600">WAF (Web Uygulama Güvenlik Duvarı)</p>
               </div>
             </div>
             <span className="text-green-600 font-semibold text-sm">Aktif</span>

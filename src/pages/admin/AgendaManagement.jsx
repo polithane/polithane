@@ -141,7 +141,7 @@ export const AgendaManagement = () => {
             <Flame className="w-7 h-7 sm:w-6 sm:h-6 text-orange-500" />
             Gündem Yönetimi
           </h1>
-          <p className="text-gray-600">Ana sayfa gündem sıralaması için trending_score kullanılır (yüksek skor üstte).</p>
+          <p className="text-gray-600">Ana sayfa gündem sıralaması için trend skoru kullanılır (yüksek skor üstte).</p>
         </div>
         <button
           type="button"
@@ -165,7 +165,7 @@ export const AgendaManagement = () => {
             <input
               value={createDraft.trending_score}
               onChange={(e) => setCreateDraft((p) => ({ ...p, trending_score: e.target.value }))}
-              placeholder="trending_score"
+              placeholder="trend_skoru"
               className="px-4 py-3 border border-gray-300 rounded-lg"
               inputMode="numeric"
             />
@@ -187,7 +187,7 @@ export const AgendaManagement = () => {
                 onChange={(e) => setCreateDraft((p) => ({ ...p, is_trending: e.target.checked }))}
                 className="w-5 h-5"
               />
-              Trending
+              Trend
             </label>
             <label className="inline-flex items-center gap-2 cursor-pointer">
               <input
@@ -208,7 +208,7 @@ export const AgendaManagement = () => {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Gündem ara (başlık/slug)…"
+            placeholder="Gündem ara (başlık/kısa adres)…"
             className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg"
           />
         </div>
@@ -253,9 +253,9 @@ export const AgendaManagement = () => {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left font-black text-gray-700">Başlık</th>
-                  <th className="px-4 py-3 text-left font-black text-gray-700">Slug</th>
+                  <th className="px-4 py-3 text-left font-black text-gray-700">Kısa Adres</th>
                   <th className="px-4 py-3 text-left font-black text-gray-700">Skor</th>
-                  <th className="px-4 py-3 text-left font-black text-gray-700">Trending</th>
+                  <th className="px-4 py-3 text-left font-black text-gray-700">Trend</th>
                   <th className="px-4 py-3 text-left font-black text-gray-700">Aktif</th>
                   <th className="px-4 py-3 text-right font-black text-gray-700">İşlem</th>
                 </tr>

@@ -251,7 +251,7 @@ export const PartyManagement = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-semibold text-gray-700">Slug (ops.)</label>
+              <label className="text-sm font-semibold text-gray-700">Kısa Adres (ops.)</label>
               <input
                 value={createForm.slug}
                 onChange={(e) => setCreateForm((p) => ({ ...p, slug: e.target.value }))}
@@ -269,7 +269,7 @@ export const PartyManagement = () => {
               />
             </div>
             <div className="md:col-span-2">
-              <label className="text-sm font-semibold text-gray-700">Logo URL (ops.)</label>
+              <label className="text-sm font-semibold text-gray-700">Logo Bağlantısı (ops.)</label>
               <input
                 value={createForm.logo_url}
                 onChange={(e) => setCreateForm((p) => ({ ...p, logo_url: e.target.value }))}
@@ -431,7 +431,7 @@ export const PartyManagement = () => {
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-gray-700">Slug</label>
+                <label className="text-sm font-semibold text-gray-700">Kısa Adres</label>
                 <input
                   value={editDraft.slug}
                   onChange={(e) => setEditDraft((p) => ({ ...p, slug: e.target.value }))}
@@ -448,7 +448,7 @@ export const PartyManagement = () => {
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-gray-700">Logo URL</label>
+                <label className="text-sm font-semibold text-gray-700">Logo Bağlantısı</label>
                 <input
                   value={editDraft.logo_url}
                   onChange={(e) => setEditDraft((p) => ({ ...p, logo_url: e.target.value }))}

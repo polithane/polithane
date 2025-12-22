@@ -86,7 +86,7 @@ export const AlgorithmSettings = () => {
       { label: 'Temel Puan', value: Math.round(baseScore), formula: 'Toplam aksiyon puanı' },
       { label: 'Zaman Bonusu', value: Math.round(timeBonus), formula: `${timeFactors.freshPostBonus}x (ilk ${timeFactors.freshPostHours} saat)` },
       { label: 'Doğrulama Bonusu', value: Math.round(verBonus), formula: `${verificationBonus}x bonus` },
-      { label: 'Gündem Çarpanı', value: agendaMultiplier, formula: isTrending ? 'Trending' : 'Normal' },
+      { label: 'Gündem Çarpanı', value: agendaMultiplier, formula: isTrending ? 'Trend' : 'Normal' },
       { label: 'TOPLAM POLİT PUAN', value: totalScore, formula: 'Final hesaplama', isTotal: true },
     ];
     
@@ -239,7 +239,7 @@ export const AlgorithmSettings = () => {
                   
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={testData.isTrending} onChange={(e) => setTestData(prev => ({ ...prev, isTrending: e.target.checked }))} className="w-4 h-4" />
-                    <span className="text-sm">Trending</span>
+                    <span className="text-sm">Trend</span>
                   </label>
                 </div>
               </div>

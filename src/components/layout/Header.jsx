@@ -501,7 +501,7 @@ export const Header = () => {
                           onClick={() => setShowUserMenu(false)}
                         >
                           <Shield className="w-5 h-5 text-primary-blue" />
-                          <span className="text-sm font-bold text-primary-blue">Admin Panel</span>
+                          <span className="text-sm font-bold text-primary-blue">Admin Paneli</span>
                         </Link>
                       </>
                     )}
