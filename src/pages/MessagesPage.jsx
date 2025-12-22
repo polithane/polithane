@@ -36,9 +36,28 @@ export const MessagesPage = () => {
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated) {
-      navigate('/login-new');
+      navigate('/login-new', {
+        replace: true,
+        state: { from: `${location.pathname || '/messages'}${location.search || ''}` },
+      });
     }
-  }, [authLoading, isAuthenticated, navigate]);
+  }, [authLoading, isAuthenticated, navigate, location.pathname, location.search]);
+
+  // Do not render messages UI until authenticated (prevents brief "guest access" flash).
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="container-main py-10">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 text-sm font-semibold text-gray-700">
+            Yükleniyor…
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (!isAuthenticated) {
+    return null;
+  }
 
   // Compose modal
   const [showCompose, setShowCompose] = useState(false);
