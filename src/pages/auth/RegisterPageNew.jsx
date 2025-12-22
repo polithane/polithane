@@ -383,6 +383,16 @@ export const RegisterPageNew = () => {
 
       const requiresApproval = !!(result?.requiresApproval ?? result?.data?.requiresApproval);
       if (requiresApproval) {
+        // Even if approval is required, user should still be online (token may be returned).
+        const token = result?.data?.token;
+        const u = result?.data?.user;
+        if (token) {
+          localStorage.setItem('auth_token', token);
+          if (u) localStorage.setItem('user', JSON.stringify(u));
+          // Force app reload so AuthContext picks up the new session.
+          window.location.href = '/';
+          return;
+        }
         setSuccessMessage(result?.message || 'Başvurunuz alındı. İnceleme sonrası bilgilendirileceksiniz.');
       } else {
         if (result.data?.token) {
