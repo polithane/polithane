@@ -96,7 +96,7 @@ export const ActionBar = () => {
                   'transition-transform duration-200',
                   'group-hover:scale-110',
                   it.bgClass,
-                  it.pulse ? 'animate-[pulse_0.6s_ease-in-out_infinite]' : '',
+                  it.pulse ? 'animate-[pulse_0.35s_ease-in-out_infinite]' : '',
                 ].join(' ')}
               >
                 <Icon className={['w-7 h-7', it.iconClass].join(' ')} />
@@ -134,7 +134,7 @@ export const ActionBar = () => {
                     className={[
                       'w-9 h-9 rounded-full flex items-center justify-center shadow-md',
                       it.bgClass,
-                      it.key === 'fast' ? 'animate-[pulse_0.6s_ease-in-out_infinite]' : '',
+                      it.key === 'fast' ? 'animate-[pulse_0.35s_ease-in-out_infinite]' : '',
                     ].join(' ')}
                   >
                     <Icon className={['w-5 h-5', it.iconClass].join(' ')} />
