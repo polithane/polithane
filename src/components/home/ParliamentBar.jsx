@@ -67,7 +67,8 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   const scrollPlates = (dir) => {
     const el = platesScrollRef.current;
     if (!el) return;
-    const step = Math.max(120, Math.floor(el.clientWidth * 0.6));
+    // Scroll one plate at a time (button-sized step)
+    const step = 16;
     try {
       el.scrollBy({ left: dir * step, behavior: 'smooth' });
     } catch {
@@ -173,30 +174,22 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
         })}
         </div>
       
-        <div className="bg-gray-50 px-2 py-2 rounded-b-lg border border-t-0 border-gray-300 relative">
-          {/* Scroll buttons (no scrollbar) */}
-          <button
-            type="button"
-            aria-label="Sola kaydır"
-            onClick={() => scrollPlates(-1)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow-lg flex items-center justify-center"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Sağa kaydır"
-            onClick={() => scrollPlates(1)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow-lg flex items-center justify-center"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
+        <div className="bg-gray-50 px-2 py-2 rounded-b-lg border border-t-0 border-gray-300">
+          <div className="flex items-center gap-0">
+            <button
+              type="button"
+              aria-label="Sola kaydır"
+              onClick={() => scrollPlates(-1)}
+              className="w-[16px] h-[16px] rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow flex items-center justify-center flex-shrink-0"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
 
-          <div
-            ref={platesScrollRef}
-            className="overflow-x-auto scrollbar-hide px-10"
-          >
-            <div className="flex gap-0 w-max">
+            <div
+              ref={platesScrollRef}
+              className="overflow-x-auto scrollbar-hide flex-1"
+            >
+              <div className="flex gap-0 w-max">
           {Array.from({ length: 81 }, (_, i) => {
             const code = i + 1;
             const cityCode = code.toString().padStart(2, '0');
@@ -246,7 +239,17 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
               </button>
             );
           })}
+              </div>
             </div>
+
+            <button
+              type="button"
+              aria-label="Sağa kaydır"
+              onClick={() => scrollPlates(1)}
+              className="w-[16px] h-[16px] rounded-full bg-primary-blue hover:bg-[#0088bb] text-white shadow flex items-center justify-center flex-shrink-0"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
