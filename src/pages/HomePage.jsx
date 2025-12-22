@@ -500,8 +500,8 @@ export const HomePage = () => {
             <div className="md:hidden">
               {activeTab && (
                 <section className="min-w-0 rounded-lg p-2" style={{ backgroundColor: activeTab.color }}>
-                  <div className="flex items-center justify-between mb-4 px-2">
-                    <h2 className="text-xl font-bold text-gray-900">
+                  <div className="flex items-center justify-center mb-4 px-2 text-center">
+                    <h2 className="text-xl font-bold text-gray-900 text-center">
                       {activeTab.id === 'all' ? 'TÜM İÇERİKLER' : `${activeTab.name.toUpperCase()} GÜNDEMİ`}
                     </h2>
                   </div>

@@ -97,7 +97,7 @@ export const AgendaBar = ({ agendas = [] }) => {
         
         {/* Gündem Pills - İlk 3 Gündem + Reklam */}
         <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-3">
-          <div className="flex gap-2 w-max min-w-full">
+          <div className="grid grid-flow-col auto-cols-max gap-2">
           {/* İlk 3 Gündem */}
           {visibleAgendas.slice(0, 3).map((agenda, index) => (
             <button
@@ -107,9 +107,9 @@ export const AgendaBar = ({ agendas = [] }) => {
             >
               <Flame 
                 className={
-                  index === 0 ? "w-6 h-6 text-red-600" : 
-                  index === 1 ? "w-6 h-6 text-orange-500" : 
-                  "w-6 h-6 text-yellow-500"
+                  index === 0 ? "w-5 h-5 text-red-600" : 
+                  index === 1 ? "w-5 h-5 text-orange-500" : 
+                  "w-5 h-5 text-yellow-500"
                 } 
                 fill="currentColor"
                 style={{
