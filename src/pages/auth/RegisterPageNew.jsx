@@ -272,6 +272,7 @@ export const RegisterPageNew = () => {
     }
     
     const passwordOk = PASSWORD_RULES.every((r) => r.validator(String(formData.password || '')));
+    const passwordMatch = String(formData.password || '') === String(formData.password_confirm || '');
 
     if (emailStatus === 'taken' && !claimUser) {
       setGlobalError('Bu e-posta adresi zaten kullanımda.');
@@ -283,6 +284,10 @@ export const RegisterPageNew = () => {
     }
     if (!passwordOk) {
       setGlobalError('Şifreniz kurallara uygun değil. Lütfen şifre kurallarını sağlayın.');
+      return;
+    }
+    if (!passwordMatch) {
+      setGlobalError('Şifreler eşleşmiyor. Lütfen kontrol edip tekrar deneyin.');
       return;
     }
     if (formData.phone && !isValidPhone(formData.phone)) {
