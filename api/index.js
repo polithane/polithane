@@ -4462,8 +4462,8 @@ async function authRegister(req, res) {
         // Verified is reserved for admin approval (non-citizen account types).
         // Citizens don't display a verified badge in UI anyway, but keep this false to avoid confusion.
         is_verified: false,
-        // Claim registrations must never create an immediately-usable account.
-        is_active: isClaim ? false : true,
+        // Claim registrations can login (online) but cannot post until approved.
+        is_active: true,
         email_verified: emailVerificationRequired ? false : true,
         is_admin: false
     };
@@ -4554,10 +4554,11 @@ async function authRegister(req, res) {
     // Claim registrations always require manual admin review.
     const requiresApproval = user_type !== 'citizen' || isClaim;
     if (isClaim) {
+      const token = signJwt({ id: user.id, username: user.username, email: user.email, user_type: user.user_type, is_admin: !!user.is_admin });
       return res.status(201).json({
         success: true,
         message: 'Profil sahiplenme başvurunuz alındı. Admin incelemesi sonrası bilgilendirileceksiniz.',
-        data: { requiresApproval: true },
+        data: { user, token, requiresApproval: true, claimPending: true },
       });
     }
 
