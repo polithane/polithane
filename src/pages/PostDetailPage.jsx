@@ -23,6 +23,8 @@ export const PostDetailPage = () => {
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [commentError, setCommentError] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentEditSubmittingId, setCommentEditSubmittingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -265,6 +267,7 @@ export const PostDetailPage = () => {
       navigate('/login-new');
       return;
     }
+    if (commentSubmitting) return;
     const text = newComment.trim();
     if (!text) return;
     if (text.length > 300) {
@@ -273,16 +276,19 @@ export const PostDetailPage = () => {
     }
     try {
       setCommentError('');
-      await postsApi.addComment(uiPost.post_id, text);
+      setCommentSubmitting(true);
+      const r = await postsApi.addComment(uiPost.post_id, text);
       setNewComment('');
+      // Fast UI feedback: update list immediately by reloading once
       const c = await postsApi.getComments(uiPost.post_id).catch(() => null);
       const rows = c?.data?.data || c?.data || c || [];
       setComments(Array.isArray(rows) ? rows : []);
-      const detail = await postsApi.getById(uiPost.post_id);
-      setPost(detail?.data ? detail.data : detail);
+      if (r?.message) setCommentError(String(r.message));
     } catch (e) {
       console.error(e);
       setCommentError(e?.message || 'Yorum gönderilemedi.');
+    } finally {
+      setCommentSubmitting(false);
     }
   };
 
@@ -587,7 +593,7 @@ export const PostDetailPage = () => {
                       {300 - (newComment?.length || 0)} karakter kaldı • {myCommentCount}/3 yorum
                     </div>
                     <Button className="mt-0" onClick={handleAddComment}>
-                      Gönder
+                      {commentSubmitting ? 'Kaydediliyor…' : 'Gönder'}
                     </Button>
                   </div>
                   {commentError && <div className="mt-2 text-sm text-red-600 font-semibold">{commentError}</div>}
@@ -652,7 +658,9 @@ export const PostDetailPage = () => {
                               if (!text) return;
                               try {
                                 setCommentError('');
-                                await postsApi.updateComment(comment.id || comment.comment_id, text);
+                                const id = comment.id || comment.comment_id;
+                                setCommentEditSubmittingId(id);
+                                await postsApi.updateComment(id, text);
                                 setEditingId(null);
                                 setEditingText('');
                                 const c = await postsApi.getComments(uiPost.post_id).catch(() => null);
@@ -660,13 +668,16 @@ export const PostDetailPage = () => {
                                 setComments(Array.isArray(rows) ? rows : []);
                               } catch (e) {
                                 setCommentError(e?.message || 'Yorum güncellenemedi.');
+                              } finally {
+                                setCommentEditSubmittingId(null);
                               }
                             }}
                             type="button"
+                            disabled={commentEditSubmittingId === (comment.id || comment.comment_id)}
                           >
                             <div className="flex items-center gap-2">
                               <Check className="w-6 h-6 sm:w-5 sm:h-5" />
-                              Kaydet
+                              {commentEditSubmittingId === (comment.id || comment.comment_id) ? 'Kaydediliyor…' : 'Kaydet'}
                             </div>
                           </button>
                         </div>

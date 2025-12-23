@@ -762,7 +762,10 @@ async function updateComment(req, res, commentId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
   const body = await readJsonBody(req);
-  const analyzed = analyzeCommentContent(body.content || '');
+  const raw = String(body?.content || '').trim();
+  if (!raw) return res.status(400).json({ success: false, error: 'Yorum boş olamaz.' });
+  if (raw.length > 300) return res.status(400).json({ success: false, error: 'Yorum en fazla 300 karakter olabilir.' });
+  const analyzed = analyzeCommentContent(raw);
   if (!analyzed.ok) return res.status(400).json({ success: false, error: analyzed.error });
 
   const rows = await supabaseRestGet('comments', { select: '*', id: `eq.${commentId}`, limit: '1' }).catch(() => []);
@@ -891,32 +894,47 @@ async function trackPostShare(req, res, postId) {
 async function toggleCommentLike(req, res, commentId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const cid = String(commentId || '').trim();
+  if (!isSafeId(cid)) return res.status(400).json({ success: false, error: 'Geçersiz yorum.' });
 
   // Try to use likes table with comment_id if available
   let supportsCommentId = true;
   try {
-    await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${commentId}`, user_id: `eq.${auth.id}`, limit: '1' });
+    await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${cid}`, user_id: `eq.${auth.id}`, limit: '1' });
   } catch (e) {
     const msg = String(e?.message || '');
     if (msg.includes('comment_id')) supportsCommentId = false;
   }
 
-  const commentRows = await supabaseRestGet('comments', { select: '*', id: `eq.${commentId}`, limit: '1' }).catch(() => []);
+  const commentRows = await supabaseRestGet('comments', { select: '*', id: `eq.${cid}`, limit: '1' }).catch(() => []);
   const c = commentRows?.[0];
   if (!c) return res.status(404).json({ success: false, error: 'Yorum bulunamadı.' });
 
   if (supportsCommentId) {
-    const existing = await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${commentId}`, user_id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
-    if (existing && existing.length > 0) {
-      await supabaseRestDelete('likes', { comment_id: `eq.${commentId}`, user_id: `eq.${auth.id}` }).catch(() => null);
-      const next = Math.max(0, Number(c.like_count || 0) - 1);
-      await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { like_count: next }).catch(() => null);
-      return res.json({ success: true, action: 'unliked', like_count: next });
+    try {
+      const existing = await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${cid}`, user_id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+      if (existing && existing.length > 0) {
+        await supabaseRestDelete('likes', { comment_id: `eq.${cid}`, user_id: `eq.${auth.id}` }).catch(() => null);
+        const next = Math.max(0, Number(c.like_count || 0) - 1);
+        await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: next }).catch(() => null);
+        return res.json({ success: true, action: 'unliked', like_count: next });
+      }
+      await supabaseRestInsert('likes', [{ comment_id: cid, user_id: auth.id }]).catch(() => {
+        // Insert can fail due to schema constraints (e.g. post_id NOT NULL) even if comment_id exists.
+        throw new Error('LIKES_SCHEMA_UNSUPPORTED');
+      });
+      const next = Number(c.like_count || 0) + 1;
+      await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: next }).catch(() => null);
+      return res.json({ success: true, action: 'liked', like_count: next });
+    } catch (e) {
+      const msg = String(e?.message || '');
+      if (msg.includes('comment_id') || msg.includes('post_id') || msg.includes('LIKES_SCHEMA_UNSUPPORTED')) {
+        supportsCommentId = false;
+      } else {
+        // If anything unexpected happens, fallback instead of 500.
+        supportsCommentId = false;
+      }
     }
-    await supabaseRestInsert('likes', [{ comment_id: commentId, user_id: auth.id }]);
-    const next = Number(c.like_count || 0) + 1;
-    await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { like_count: next }).catch(() => null);
-    return res.json({ success: true, action: 'liked', like_count: next });
   }
 
   // Fallback: track liked comment ids in user.metadata (requires users.metadata)
@@ -924,13 +942,12 @@ async function toggleCommentLike(req, res, commentId) {
   const me = users?.[0] || null;
   const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
   const liked = Array.isArray(meta.liked_comment_ids) ? meta.liked_comment_ids.map(String) : [];
-  const cid = String(commentId);
-  const has = liked.includes(cid);
-  const nextLiked = has ? liked.filter((x) => x !== cid) : [cid, ...liked].slice(0, 5000);
+  const has = liked.includes(String(cid));
+  const nextLiked = has ? liked.filter((x) => x !== String(cid)) : [String(cid), ...liked].slice(0, 5000);
   const nextCount = Math.max(0, Number(c.like_count || 0) + (has ? -1 : 1));
 
   await safeUserPatch(auth.id, { metadata: { ...meta, liked_comment_ids: nextLiked } }).catch(() => null);
-  await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { like_count: nextCount }).catch(() => null);
+  await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: nextCount }).catch(() => null);
   return res.json({ success: true, action: has ? 'unliked' : 'liked', like_count: nextCount });
 }
 
