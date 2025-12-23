@@ -64,7 +64,9 @@ export const CreatePolitPage = () => {
 
   const agendaScoreOf = (a) => {
     const v =
+      a?.total_polit_score ??
       a?.polit_score ??
+      a?.trending_score ??
       a?.trend_score ??
       a?.trend_skoru ??
       a?.score ??

@@ -1127,6 +1127,39 @@ async function createPost(req, res) {
       }
     }
     const post = inserted?.[0] || null;
+
+    // Agenda polit puanı: each post/fast increases selected agenda score by user type.
+    // Best-effort only: never block publishing if agenda update fails.
+    try {
+      const agendaTitle = String(agenda_tag || '').trim();
+      if (agendaTitle) {
+        const agendaDeltaForUserType = (userType) => {
+          const t = String(userType || 'citizen').trim().toLowerCase();
+          // Default mapping; can be made admin-configurable in a later phase.
+          if (t === 'media' || t === 'journalist' || t === 'press') return 25;
+          if (t === 'mp') return 25;
+          if (t === 'party_official') return 10;
+          if (t === 'party_member') return 5;
+          if (t === 'citizen' || t === 'normal') return 1;
+          return 1;
+        };
+        const delta = agendaDeltaForUserType(ut);
+        const rows = await supabaseRestGet('agendas', { select: 'id,title,trending_score,total_polit_score,post_count', title: `eq.${agendaTitle}`, limit: '1' }).catch(() => []);
+        const a = rows?.[0] || null;
+        if (a?.id) {
+          const next = {
+            updated_at: new Date().toISOString(),
+            trending_score: Math.max(0, Number(a.trending_score || 0) + delta),
+            total_polit_score: Math.max(0, Number(a.total_polit_score || 0) + delta),
+            post_count: Math.max(0, Number(a.post_count || 0) + 1),
+          };
+          await supabaseRestPatch('agendas', { id: `eq.${a.id}` }, next).catch(() => null);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     res.status(201).json({ success: true, data: post });
 }
 
