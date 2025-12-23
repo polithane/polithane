@@ -1,57 +1,16 @@
 import { useState } from 'react';
 import { Upload, Image as ImageIcon, Video, File, Trash2, Download, Eye, Search, Grid, List } from 'lucide-react';
-import { getPlaceholderImage } from '../../utils/imagePaths';
 
 export const MediaManagement = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [filterType, setFilterType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock media data
-  const mockMedia = [
-    {
-      id: 1,
-      type: 'image',
-      url: getPlaceholderImage('post', 1),
-      filename: 'politika-toplanti.jpg',
-      size: '2.4 MB',
-      uploaded_by: 'Ahmet Yılmaz',
-      uploaded_at: '2024-01-15 14:30',
-      usage_count: 12,
-    },
-    {
-      id: 2,
-      type: 'video',
-      url: getPlaceholderImage('post', 2),
-      filename: 'konusma-videosi.mp4',
-      size: '45.8 MB',
-      uploaded_by: 'Ayşe Demir',
-      uploaded_at: '2024-01-14 11:20',
-      usage_count: 8,
-    },
-    {
-      id: 3,
-      type: 'image',
-      url: getPlaceholderImage('post', 3),
-      filename: 'basin-aciklamasi.jpg',
-      size: '1.8 MB',
-      uploaded_by: 'Mehmet Kaya',
-      uploaded_at: '2024-01-13 09:45',
-      usage_count: 25,
-    },
-    {
-      id: 4,
-      type: 'document',
-      url: null,
-      filename: 'rapor-2024.pdf',
-      size: '3.2 MB',
-      uploaded_by: 'Zeynep Arslan',
-      uploaded_at: '2024-01-12 16:30',
-      usage_count: 5,
-    },
-  ];
+  // NOTE: This screen used to show mock media files. We intentionally show no fake data.
+  // Backend integration (list from storage + delete/download + usage count) will be wired here later.
+  const mediaItems = [];
 
-  const filteredMedia = mockMedia.filter(media => {
+  const filteredMedia = mediaItems.filter(media => {
     const matchesType = filterType === 'all' || media.type === filterType;
     const matchesSearch = media.filename.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
@@ -84,19 +43,26 @@ export const MediaManagement = () => {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
           <div className="text-sm text-blue-600 mb-1">Toplam Resim</div>
-          <div className="text-2xl font-black text-blue-700">1,847</div>
+          <div className="text-2xl font-black text-blue-700">—</div>
         </div>
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
           <div className="text-sm text-purple-600 mb-1">Toplam Video</div>
-          <div className="text-2xl font-black text-purple-700">234</div>
+          <div className="text-2xl font-black text-purple-700">—</div>
         </div>
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Toplam Doküman</div>
-          <div className="text-2xl font-black text-gray-700">567</div>
+          <div className="text-2xl font-black text-gray-700">—</div>
         </div>
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="text-sm text-green-600 mb-1">Toplam Boyut</div>
-          <div className="text-2xl font-black text-green-700">12.4 GB</div>
+          <div className="text-2xl font-black text-green-700">—</div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <div className="font-black">Bu modül henüz canlı backend’e bağlı değil</div>
+        <div className="text-sm mt-1">
+          Güvenlik ve doğruluk için sahte medya verisi göstermiyoruz. Depolama listesi/silme/indirme entegrasyonu bağlanınca bu ekran aktifleşecek.
         </div>
       </div>
 
@@ -174,6 +140,11 @@ export const MediaManagement = () => {
               </div>
             </div>
           ))}
+          {filteredMedia.length === 0 ? (
+            <div className="col-span-4 bg-white rounded-xl border border-gray-200 p-10 text-center text-sm text-gray-600">
+              Henüz dosya yok.
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -230,6 +201,9 @@ export const MediaManagement = () => {
               ))}
             </tbody>
           </table>
+          {filteredMedia.length === 0 ? (
+            <div className="p-10 text-center text-sm text-gray-600">Henüz dosya yok.</div>
+          ) : null}
         </div>
       )}
     </div>

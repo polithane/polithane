@@ -113,6 +113,7 @@ export const CreatePolitPage = () => {
   const [contentType, setContentType] = useState('');
   const [content, setContent] = useState('');
   const [agendaTag, setAgendaTag] = useState(''); // '' => Gündem dışı
+  const [agendaTouched, setAgendaTouched] = useState(false); // avoids defaulting to "Gündem dışı" without explicit choice
   const [step, setStep] = useState('type'); // type | agenda | media | desc
   const [agendas, setAgendas] = useState([]);
   const [files, setFiles] = useState([]);
@@ -259,13 +260,24 @@ export const CreatePolitPage = () => {
   const pickType = (nextType) => {
     setContentType(nextType);
     setAgendaTag('');
+    setAgendaTouched(false);
     setContent('');
     resetMedia();
     setStep('agenda');
   };
 
   const pickAgenda = (value) => {
+    setAgendaTouched(true);
     setAgendaTag(String(value || ''));
+    setStep(contentType === 'text' ? 'desc' : 'media');
+  };
+
+  const confirmAgendaAndContinue = () => {
+    // keep it explicit; even if default is "" we only allow continuing when user picked something
+    if (!agendaTouched) {
+      toast.error('Lütfen bir gündem seçin veya “Gündem Dışı” ile onaylayın.');
+      return;
+    }
     setStep(contentType === 'text' ? 'desc' : 'media');
   };
 
@@ -712,14 +724,32 @@ export const CreatePolitPage = () => {
               {/* STEP: Agenda */}
               {step === 'agenda' && (
                 <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => pickAgenda('')}
-                    className="w-full rounded-2xl border-2 border-gray-200 bg-white hover:bg-gray-50 px-4 py-4 text-left"
+                  <div
+                    className={[
+                      'w-full rounded-2xl border-2 bg-white px-4 py-4',
+                      agendaTouched && agendaTag === '' ? 'border-primary-blue/40' : 'border-gray-200',
+                    ].join(' ')}
                   >
-                    <div className="font-black text-gray-900">Gündem Dışı</div>
-                    <div className="text-xs text-gray-600 mt-0.5">Gündem seçmeden devam et</div>
-                  </button>
+                    <div className="flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => pickAgenda('')}
+                        className="flex-1 text-left"
+                        title="Gündem dışı seç"
+                      >
+                        <div className="font-black text-gray-900">Gündem Dışı</div>
+                        <div className="text-xs text-gray-600 mt-0.5">Gündem seçmeden devam et</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => pickAgenda('')}
+                        className="px-5 py-3 rounded-xl bg-gray-900 hover:bg-black text-white font-black"
+                        title="Onayla ve devam et"
+                      >
+                        Onayla
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <div className="text-sm font-black text-gray-900 mb-2">Gündem Seçin</div>
@@ -732,7 +762,7 @@ export const CreatePolitPage = () => {
                       ].join(' ')}
                     >
                       <select
-                        value={agendaTag}
+                        value={agendaTouched ? agendaTag : ''}
                         onChange={(e) => pickAgenda(e.target.value)}
                         className={[
                           'w-full px-4 py-3 pr-11 bg-white/95 border border-transparent rounded-[10px] outline-none',
@@ -756,9 +786,22 @@ export const CreatePolitPage = () => {
                           isFastMode ? 'text-rose-600' : 'text-primary-blue',
                         ].join(' ')}
                       >
-                        <Flame className="w-5 h-5" />
+                        <Flame className="w-7 h-7" />
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={confirmAgendaAndContinue}
+                      className={[
+                        'mt-3 w-full py-3 rounded-xl text-white font-black',
+                        agendaTouched ? '' : 'opacity-60',
+                        isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
+                      ].join(' ')}
+                      disabled={!agendaTouched}
+                      title="Onayla ve devam et"
+                    >
+                      Onayla ve Devam Et
+                    </button>
                   </div>
 
                   <button
@@ -868,7 +911,7 @@ export const CreatePolitPage = () => {
                         ].join(' ')}
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <Video className="w-6 h-6" />
+                          <Video className="w-8 h-8" />
                           Kayda Başla
                         </div>
                       </button>
@@ -879,7 +922,7 @@ export const CreatePolitPage = () => {
                         className="py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <StopCircle className="w-6 h-6" />
+                          <StopCircle className="w-8 h-8" />
                           Kaydı Durdur
                         </div>
                       </button>
@@ -892,7 +935,7 @@ export const CreatePolitPage = () => {
                         className="py-4 rounded-xl border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <UploadCloud className="w-6 h-6" />
+                          <UploadCloud className="w-8 h-8" />
                           Video Yükle
                         </div>
                       </button>
@@ -925,7 +968,7 @@ export const CreatePolitPage = () => {
                       title="Temizle"
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-7 h-7" />
                         Temizle
                       </div>
                     </button>
@@ -946,7 +989,7 @@ export const CreatePolitPage = () => {
                       ].join(' ')}
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <UploadCloud className="w-6 h-6" />
+                        <UploadCloud className="w-8 h-8" />
                         Resim Yükle
                       </div>
                     </button>
@@ -956,7 +999,7 @@ export const CreatePolitPage = () => {
                       className="py-4 rounded-xl border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-black"
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <Camera className="w-6 h-6" />
+                        <Camera className="w-8 h-8" />
                         Resim Çek
                       </div>
                     </button>
@@ -1001,7 +1044,7 @@ export const CreatePolitPage = () => {
                         ].join(' ')}
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <Mic className="w-6 h-6" />
+                          <Mic className="w-8 h-8" />
                           Kayda Başla
                         </div>
                       </button>
@@ -1012,7 +1055,7 @@ export const CreatePolitPage = () => {
                         className="py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <StopCircle className="w-6 h-6" />
+                          <StopCircle className="w-8 h-8" />
                           Kaydı Durdur
                         </div>
                       </button>
@@ -1025,7 +1068,7 @@ export const CreatePolitPage = () => {
                         className="py-4 rounded-xl border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-black"
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <UploadCloud className="w-6 h-6" />
+                          <UploadCloud className="w-8 h-8" />
                           Ses Yükle
                         </div>
                       </button>
@@ -1058,7 +1101,7 @@ export const CreatePolitPage = () => {
                       title="Temizle"
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-7 h-7" />
                         Temizle
                       </div>
                     </button>

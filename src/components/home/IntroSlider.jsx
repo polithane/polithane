@@ -46,7 +46,7 @@ export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
       {
         id: 'parties',
         title: 'SİYASİ PARTİLER',
-        subtitle: 'Partiler, profiller ve meclis sıralaması tek sayfada.',
+        subtitle: 'Meclisteki tüm partiler: sandalye gücü, başkan profili ve parti sayfaları tek dizinde.',
         to: '/parties',
         bg: '#6D28D9',
         Icon: Building2,
@@ -54,7 +54,7 @@ export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
       {
         id: 'media',
         title: 'MEDYA',
-        subtitle: 'Bağımsız, güncel ve güçlü medya içerikleri burada.',
+        subtitle: 'Türkiye’nin nabzı burada: bağımsız, hızlı ve doğrulanabilir medya akışı.',
         to: '/category/media',
         bg: '#F59E0B',
         Icon: Newspaper,
@@ -62,7 +62,7 @@ export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
       {
         id: 'citizens',
         title: 'VATANDAŞ',
-        subtitle: 'Özgür ifade, şeffaf tartışma ve gerçek gündem.',
+        subtitle: 'Özgür ifade, açık tartışma, gerçek gündem: sesi duyulan bir vatandaş meydanı.',
         to: '/category/citizens',
         bg: '#111827',
         Icon: Globe2,
@@ -70,7 +70,7 @@ export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
       {
         id: 'agenda',
         title: 'GÜNDEM',
-        subtitle: 'Türkiye’nin en güncel siyasi konuları burada konuşulur.',
+        subtitle: 'Bugünün konusu burada belirlenir: en sıcak siyasi başlıklar tek akışta.',
         to: '/hit',
         bg: '#009FD6',
         Icon: Flame,
@@ -78,7 +78,7 @@ export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
       {
         id: 'mps',
         title: 'VEKİLLER GÜNDEMİ',
-        subtitle: 'Milletvekillerinin gündemi (Polit Puan’a göre).',
+        subtitle: 'Milletvekillerinin gündemi: Polit Puan’a göre öne çıkanlar ve son paylaşımlar.',
         to: '/category/mps',
         bg: '#0EA5E9',
         Icon: Users,
@@ -86,7 +86,7 @@ export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
       {
         id: 'org',
         title: 'TEŞKİLAT GÜNDEMİ',
-        subtitle: 'Teşkilatın gündemi (Polit Puan’a göre).',
+        subtitle: 'Teşkilatın gündemi: Polit Puan’a göre öne çıkanlar ve yerel nabız.',
         to: '/category/organization',
         bg: '#84CC16',
         Icon: Users,

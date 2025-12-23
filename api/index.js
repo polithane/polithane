@@ -487,7 +487,6 @@ async function getPostComments(req, res, postId) {
 function analyzeCommentContent(input) {
   const text = String(input || '').trim();
   if (!text) return { ok: false, error: 'Yorum boş olamaz.' };
-  if (text.length > 300) return { ok: false, error: 'Yorum en fazla 300 karakter olabilir.' };
 
   const lower = text.toLocaleLowerCase('tr-TR');
 
@@ -542,15 +541,11 @@ function analyzeCommentContent(input) {
   if (/\b(select|union|drop|insert|update|delete)\b/i.test(text)) reasons.push('sql');
   // Profanity filter (stronger, with false-positive guards for Turkish words like "şikayet"/"sıkıntı")
   const hardRoots = [
-    // common insults
-    'amk',
-    'aq',
+    // common insults (longer roots here can be matched as substrings safely)
     'orospu',
     'kahpe',
     'yarrak',
     'ibne',
-    'pic',
-    'oc', // oç -> normalized
     'pezevenk',
     'yavsak',
     'pust',
@@ -559,8 +554,23 @@ function analyzeCommentContent(input) {
     'haysiyetsiz',
     'namussuz',
     'serefsiz',
+    // common sexual profanity roots (obfuscated spacing caught via `norm`)
+    'amcik',
+    'aminakoy',
+    'aminakoyim',
+    'amkoy',
+    'amkoyim',
+    'amnakoy',
+    'amnakoyim',
+    'ananikoy',
+    'ananisiker',
+    'anansiker',
+    'gavat',
+    'gotver',
   ];
-  const softExact = new Set(['mal', 'aptal', 'salak', 'malsin']);
+  // Short/ambiguous roots: handled with explicit logic to reduce false positives
+  const shortExact = new Set(['amk', 'aq']);
+  const softExact = new Set(['mal', 'aptal', 'salak', 'malsin', 'gerizekali', 'dangalak', 'salaksin', 'aptalsin']);
   const sikExcludes = [
     // "şikayet"/"sıkıntı" and derivatives should NOT trigger
     'sikayet',
@@ -580,25 +590,62 @@ function analyzeCommentContent(input) {
     return /^(sik|siktir|sikim|siker|sikey|sikme|sikin|sikini|sikiyor|sikiyo|sikicem|sikcem|siktig)/.test(tok);
   };
 
+  const ocExcludes = ['ocak', 'ocagi', 'ocakta', 'ocaklar', 'ocaktan'];
+  const isOcInsult = (t) => {
+    const tok = String(t || '');
+    if (!tok) return false;
+    if (ocExcludes.some((x) => tok.startsWith(x))) return false;
+    // normalized oç family (oc, ocun, oclar, ocug..., etc.) but keep strict to avoid "ocak"
+    if (tok === 'oc') return true;
+    if (tok.startsWith('oc') && tok.length <= 5) return true;
+    return false;
+  };
+
+  const picExcludes = ['picasso', 'picass', 'picnic', 'picture', 'pickup', 'picking', 'pickle'];
+  const isPicFamily = (t) => {
+    const tok = String(t || '');
+    if (!tok) return false;
+    if (picExcludes.some((x) => tok.startsWith(x))) return false;
+    // "piç" family (pic, piclik, picler...) – allow short suffixes
+    if (tok === 'pic') return true;
+    if (tok.startsWith('pic') && tok.length <= 7) return true;
+    return false;
+  };
+
+  const gotExcludes = ['gotik', 'gotikler', 'gotikce'];
+  const isGotFamily = (t) => {
+    const tok = String(t || '');
+    if (!tok) return false;
+    if (gotExcludes.some((x) => tok.startsWith(x))) return false;
+    // normalized göt family
+    if (tok === 'got') return true;
+    if (tok.startsWith('got') && tok.length <= 7) return true;
+    return false;
+  };
+
   const tokenProfane =
     tokens.some((t) => {
       const tok = String(t || '');
       if (!tok) return false;
       if (isSikFamily(tok)) return true;
+      if (shortExact.has(tok)) return true;
+      if (isOcInsult(tok)) return true;
+      if (isPicFamily(tok)) return true;
+      if (isGotFamily(tok)) return true;
       if (softExact.has(tok)) return true;
       // allow substring match for longer roots (>=4) within the token (covers basic obfuscations)
       for (const r of hardRoots) {
         if (!r) continue;
-        if (r.length <= 2) {
-          if (tok === r || tok.endsWith(r) || tok.startsWith(r)) return true;
-          continue;
-        }
+        // only match longer roots as substrings to avoid false positives ("picasso" etc.)
+        if (r.length < 4) continue;
         if (tok.includes(r)) return true;
       }
       return false;
     }) ||
     // Compact scan for split/obfuscated versions across separators
     hardRoots.some((r) => r && r.length >= 4 && norm.includes(r)) ||
+    // Compact scan for short exacts in collapsed text (e.g. "a m k")
+    Array.from(shortExact).some((r) => r && norm.includes(r)) ||
     isSikFamily(norm);
 
   if (tokenProfane) reasons.push('hakaret');
@@ -638,7 +685,10 @@ async function addPostComment(req, res, postId) {
       return res.status(429).json({ success: false, error: 'Çok fazla yorum denemesi. Lütfen 1 dakika sonra tekrar deneyin.' });
     }
     const body = await readJsonBody(req);
-    const analyzed = analyzeCommentContent(body.content || '');
+    const raw = String(body?.content || '').trim();
+    if (!raw) return res.status(400).json({ success: false, error: 'Yorum boş olamaz.' });
+    if (raw.length > 300) return res.status(400).json({ success: false, error: 'Yorum en fazla 300 karakter olabilir.' });
+    const analyzed = analyzeCommentContent(raw);
     if (!analyzed.ok) return res.status(400).json({ success: false, error: analyzed.error });
     const content = analyzed.text;
     const parent_id = body.parent_id || null;
@@ -5050,6 +5100,7 @@ async function sendMessage(req, res) {
   }
 
   let content = '';
+  let plainTextForSafety = '';
   if (attachment && attachment.url && attachment.kind) {
     const url = String(attachment.url || '').trim();
     const kind = String(attachment.kind || '').trim();
@@ -5058,12 +5109,29 @@ async function sendMessage(req, res) {
     if (kind !== 'image') return res.status(400).json({ success: false, error: 'Şimdilik sadece resim mesajı destekleniyor.' });
     const payload = { type: kind, url, text: text || '' };
     content = JSON.stringify(payload);
+    plainTextForSafety = String(payload.text || '').trim();
   } else {
     content = String(text || '').trim();
+    plainTextForSafety = content;
   }
 
   if (!content) return res.status(400).json({ success: false, error: 'Mesaj boş olamaz.' });
   if (content.length > 2000) return res.status(400).json({ success: false, error: 'Mesaj çok uzun.' });
+
+  // Safety/profanity filter (best-effort; same core logic as posts/comments)
+  try {
+    const analyzed = analyzeCommentContent(String(plainTextForSafety || '').slice(0, 2000));
+    if (analyzed?.flagged) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mesaj güvenlik filtresine takıldı. Lütfen metni düzenleyip tekrar deneyin.',
+        code: 'CONTENT_FILTERED',
+        reasons: analyzed.reasons || [],
+      });
+    }
+  } catch {
+    // ignore
+  }
 
   const inserted = await supabaseRestInsert('messages', [{
     sender_id: auth.id,

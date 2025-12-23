@@ -4,44 +4,9 @@ import { Mail, Edit, Trash2, Eye, Plus, Send } from 'lucide-react';
 export const EmailTemplates = () => {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
-  const mockTemplates = [
-    {
-      id: 1,
-      name: 'Hoş Geldin E-postası',
-      subject: 'Polithane\'e Hoş Geldiniz!',
-      type: 'welcome',
-      content: '<h1>Merhaba {{user_name}}</h1><p>Polithane ailesine hoş geldiniz...</p>',
-      last_updated: '2024-01-15',
-      usage_count: 1247,
-    },
-    {
-      id: 2,
-      name: 'Şifre Sıfırlama',
-      subject: 'Şifre Sıfırlama Talebi',
-      type: 'password_reset',
-      content: '<h1>Şifre Sıfırlama</h1><p>Şifrenizi sıfırlamak için aşağıdaki linke tıklayın...</p>',
-      last_updated: '2024-01-14',
-      usage_count: 342,
-    },
-    {
-      id: 3,
-      name: 'E-posta Doğrulama',
-      subject: 'E-posta Adresinizi Doğrulayın',
-      type: 'email_verification',
-      content: '<h1>E-posta Doğrulama</h1><p>Hesabınızı aktifleştirmek için e-posta adresinizi doğrulayın...</p>',
-      last_updated: '2024-01-13',
-      usage_count: 896,
-    },
-    {
-      id: 4,
-      name: 'Haftalık Özet',
-      subject: 'Bu Haftanın Öne Çıkanları',
-      type: 'weekly_digest',
-      content: '<h1>Haftalık Özet</h1><p>Bu hafta platformda neler oldu...</p>',
-      last_updated: '2024-01-12',
-      usage_count: 5432,
-    },
-  ];
+  // NOTE: This screen used to show mock templates. We intentionally show no fake templates.
+  // Backend integration (template storage + actual sending hooks) will be wired here later.
+  const templates = [];
 
   const getTypeBadge = (type) => {
     const badges = {
@@ -76,19 +41,27 @@ export const EmailTemplates = () => {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="text-sm text-gray-500 mb-1">Toplam Şablon</div>
-          <div className="text-2xl font-black text-gray-900">24</div>
+          <div className="text-2xl font-black text-gray-900">{templates.length}</div>
         </div>
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
           <div className="text-sm text-blue-600 mb-1">Aktif Şablon</div>
-          <div className="text-2xl font-black text-blue-700">18</div>
+          <div className="text-2xl font-black text-blue-700">—</div>
         </div>
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="text-sm text-green-600 mb-1">Bu Ay Gönderilen</div>
-          <div className="text-2xl font-black text-green-700">12,453</div>
+          <div className="text-2xl font-black text-green-700">—</div>
         </div>
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
           <div className="text-sm text-purple-600 mb-1">Açılma Oranı</div>
-          <div className="text-2xl font-black text-purple-700">68.4%</div>
+          <div className="text-2xl font-black text-purple-700">—</div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <div className="font-black">Bu modül henüz canlı backend’e bağlı değil</div>
+        <div className="text-sm mt-1">
+          Güvenlik ve doğruluk için sahte e-posta şablonları göstermiyoruz. Mail sistemi/sms sistemi sonraya bırakıldığı için bu sayfa
+          “boş ama doğru” halde.
         </div>
       </div>
 
@@ -106,7 +79,7 @@ export const EmailTemplates = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {mockTemplates.map((template) => (
+            {templates.map((template) => (
               <tr key={template.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -148,6 +121,13 @@ export const EmailTemplates = () => {
                 </td>
               </tr>
             ))}
+            {templates.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-600">
+                  Henüz şablon yok.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

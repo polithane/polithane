@@ -3,36 +3,9 @@ import { Key, Code, Copy, Plus, Trash2, Eye, EyeOff } from 'lucide-react';
 
 export const APISettings = () => {
   const [showKey, setShowKey] = useState(false);
-  
-  const mockAPIKeys = [
-    {
-      id: 1,
-      name: 'Canlı API Anahtarı',
-      key: 'pk_live_1234567890abcdefghijklmnop',
-      created: '2024-01-01',
-      last_used: '5 dakika önce',
-      requests: 124567,
-      status: 'active',
-    },
-    {
-      id: 2,
-      name: 'Geliştirme API Anahtarı',
-      key: 'pk_test_abcdefghijklmnop1234567890',
-      created: '2024-01-10',
-      last_used: '1 saat önce',
-      requests: 8945,
-      status: 'active',
-    },
-    {
-      id: 3,
-      name: 'Mobil Uygulama Anahtarı',
-      key: 'pk_live_zyxwvutsrqponmlkjihgfedcba',
-      created: '2023-12-15',
-      last_used: '1 gün önce',
-      requests: 456123,
-      status: 'active',
-    },
-  ];
+  // NOTE: This screen used to show mock data. We intentionally show no fake keys.
+  // Backend integration (real API keys table + management endpoints) will be wired here later.
+  const apiKeys = [];
 
   return (
     <div className="p-8">
@@ -52,19 +25,27 @@ export const APISettings = () => {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
           <div className="text-sm text-blue-600 mb-1">Toplam İstek (Bugün)</div>
-          <div className="text-2xl font-black text-blue-700">589,742</div>
+          <div className="text-2xl font-black text-blue-700">—</div>
         </div>
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="text-sm text-green-600 mb-1">Başarılı İstek</div>
-          <div className="text-2xl font-black text-green-700">98.7%</div>
+          <div className="text-2xl font-black text-green-700">—</div>
         </div>
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
           <div className="text-sm text-purple-600 mb-1">Aktif API Anahtarı</div>
-          <div className="text-2xl font-black text-purple-700">3</div>
+          <div className="text-2xl font-black text-purple-700">{apiKeys.length}</div>
         </div>
         <div className="bg-orange-50 rounded-xl border border-orange-200 p-4">
           <div className="text-sm text-orange-600 mb-1">Ort. Yanıt Süresi</div>
-          <div className="text-2xl font-black text-orange-700">127ms</div>
+          <div className="text-2xl font-black text-orange-700">—</div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <div className="font-black">Bu modül henüz canlı backend’e bağlı değil</div>
+        <div className="text-sm mt-1">
+          Güvenlik için sahte API anahtarı göstermiyoruz. Backend entegrasyonu (anahtar üretme/iptal etme ve kullanım istatistikleri) bu ekrana
+          bağlanınca burada listelenecek.
         </div>
       </div>
 
@@ -74,7 +55,7 @@ export const APISettings = () => {
           <h3 className="text-lg font-bold text-gray-900">API Anahtarları</h3>
         </div>
         <div className="divide-y divide-gray-200">
-          {mockAPIKeys.map((apiKey) => (
+          {apiKeys.map((apiKey) => (
             <div key={apiKey.id} className="p-6 hover:bg-gray-50 transition-colors">
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -119,6 +100,9 @@ export const APISettings = () => {
               </div>
             </div>
           ))}
+          {apiKeys.length === 0 ? (
+            <div className="p-6 text-sm text-gray-600">Henüz API anahtarı yok.</div>
+          ) : null}
         </div>
       </div>
 

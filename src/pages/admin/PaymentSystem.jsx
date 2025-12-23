@@ -1,45 +1,9 @@
-import { useState } from 'react';
 import { CreditCard, DollarSign, Check, X, Clock, TrendingUp } from 'lucide-react';
 
 export const PaymentSystem = () => {
-  const mockTransactions = [
-    {
-      id: 1,
-      user: 'Ahmet Yılmaz',
-      amount: 49.99,
-      plan: 'Premium Aylık',
-      status: 'completed',
-      payment_method: 'Kredi Kartı',
-      date: '2024-01-15 14:30',
-    },
-    {
-      id: 2,
-      user: 'Ayşe Demir',
-      amount: 499.99,
-      plan: 'Premium Yıllık',
-      status: 'completed',
-      payment_method: 'Banka Transferi',
-      date: '2024-01-15 13:45',
-    },
-    {
-      id: 3,
-      user: 'Mehmet Kaya',
-      amount: 29.99,
-      plan: 'Plus Aylık',
-      status: 'pending',
-      payment_method: 'Kredi Kartı',
-      date: '2024-01-15 12:20',
-    },
-    {
-      id: 4,
-      user: 'Zeynep Arslan',
-      amount: 49.99,
-      plan: 'Premium Aylık',
-      status: 'failed',
-      payment_method: 'Kredi Kartı',
-      date: '2024-01-15 11:15',
-    },
-  ];
+  // NOTE: This screen used to show mock transactions. We intentionally show no fake financial data.
+  // Backend integration (payments provider + transactions table + subscription states) will be wired here later.
+  const transactions = [];
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -72,30 +36,38 @@ export const PaymentSystem = () => {
             <div className="text-sm text-green-600">Bu Ay Gelir</div>
             <TrendingUp className="w-5 h-5 text-green-600" />
           </div>
-          <div className="text-2xl font-black text-green-700">₺24,567</div>
-          <div className="text-xs text-green-600 mt-1">↑ 12.5%</div>
+          <div className="text-2xl font-black text-green-700">—</div>
+          <div className="text-xs text-green-600 mt-1">—</div>
         </div>
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm text-blue-600">Aktif Abonelik</div>
             <CreditCard className="w-5 h-5 text-blue-600" />
           </div>
-          <div className="text-2xl font-black text-blue-700">1,247</div>
-          <div className="text-xs text-blue-600 mt-1">↑ 8.3%</div>
+          <div className="text-2xl font-black text-blue-700">—</div>
+          <div className="text-xs text-blue-600 mt-1">—</div>
         </div>
         <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm text-yellow-600">Bekleyen Ödeme</div>
             <Clock className="w-5 h-5 text-yellow-600" />
           </div>
-          <div className="text-2xl font-black text-yellow-700">23</div>
+          <div className="text-2xl font-black text-yellow-700">—</div>
         </div>
         <div className="bg-red-50 rounded-xl border border-red-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm text-red-600">Başarısız Ödeme</div>
             <X className="w-5 h-5 text-red-600" />
           </div>
-          <div className="text-2xl font-black text-red-700">15</div>
+          <div className="text-2xl font-black text-red-700">—</div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <div className="font-black">Bu modül henüz canlı backend’e bağlı değil</div>
+        <div className="text-sm mt-1">
+          Güvenlik ve doğruluk için sahte ödeme/abonelik verisi göstermiyoruz. Ödeme sağlayıcısı ve transaction kayıtları bağlanınca bu ekran
+          aktifleşecek.
         </div>
       </div>
 
@@ -153,7 +125,7 @@ export const PaymentSystem = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {mockTransactions.map((transaction) => (
+            {transactions.map((transaction) => (
               <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4">
                   <span className="font-semibold text-gray-900">{transaction.user}</span>
@@ -173,6 +145,13 @@ export const PaymentSystem = () => {
                 </td>
               </tr>
             ))}
+            {transactions.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-600">
+                  Henüz işlem yok.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

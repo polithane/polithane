@@ -1,57 +1,16 @@
 import { useState } from 'react';
-import { Search, Filter, Eye, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import { getPlaceholderImage } from '../../utils/imagePaths';
+import { Search, Eye, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
 export const CommentModeration = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedComments, setSelectedComments] = useState([]);
 
-  // Mock data
-  const mockComments = [
-    {
-      id: 1,
-      user: { name: 'Ahmet Yılmaz', avatar: getPlaceholderImage('avatar', 1), username: 'ahmetyilmaz' },
-      post_title: 'Ekonomik paket açıklaması yapıldı',
-      content: 'Çok güzel bir gelişme, umarım etkili olur.',
-      status: 'approved',
-      created_at: '2024-01-15 14:30',
-      likes: 12,
-      reports: 0,
-    },
-    {
-      id: 2,
-      user: { name: 'Ayşe Demir', avatar: getPlaceholderImage('avatar', 2), username: 'aysedemir' },
-      post_title: 'Yeni anayasa değişikliği önerisi',
-      content: 'Bu konuda daha fazla tartışma gerekiyor. Acele etmemeliyiz.',
-      status: 'pending',
-      created_at: '2024-01-15 13:45',
-      likes: 8,
-      reports: 0,
-    },
-    {
-      id: 3,
-      user: { name: 'Mehmet Kaya', avatar: getPlaceholderImage('avatar', 3), username: 'mehmetkaya' },
-      post_title: 'Dışişleri Bakanı açıklama yaptı',
-      content: 'Gerçekten çok kötü bir açıklama, hiç mantıklı değil!!!',
-      status: 'reported',
-      created_at: '2024-01-15 12:20',
-      likes: 3,
-      reports: 5,
-    },
-    {
-      id: 4,
-      user: { name: 'Zeynep Arslan', avatar: getPlaceholderImage('avatar', 4), username: 'zeyneparslan' },
-      post_title: 'Eğitim reformu tasarısı',
-      content: 'Eğitim sistemimizde köklü değişiklikler yapılması gerekiyor.',
-      status: 'approved',
-      created_at: '2024-01-15 11:15',
-      likes: 25,
-      reports: 0,
-    },
-  ];
+  // NOTE: This screen used to show mock comments. We intentionally show no fake moderation data.
+  // Backend integration (admin comments listing + approve/delete/report workflows) will be wired here later.
+  const comments = [];
 
-  const filteredComments = mockComments.filter(comment => {
+  const filteredComments = comments.filter(comment => {
     const matchesSearch = comment.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          comment.user.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || comment.status === statusFilter;
@@ -102,19 +61,26 @@ export const CommentModeration = () => {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="text-sm text-gray-500 mb-1">Toplam Yorum</div>
-          <div className="text-2xl font-black text-gray-900">1,247</div>
+          <div className="text-2xl font-black text-gray-900">{comments.length}</div>
         </div>
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="text-sm text-green-600 mb-1">Onaylanmış</div>
-          <div className="text-2xl font-black text-green-700">1,180</div>
+          <div className="text-2xl font-black text-green-700">—</div>
         </div>
         <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
           <div className="text-sm text-yellow-600 mb-1">Bekleyen</div>
-          <div className="text-2xl font-black text-yellow-700">52</div>
+          <div className="text-2xl font-black text-yellow-700">—</div>
         </div>
         <div className="bg-red-50 rounded-xl border border-red-200 p-4">
           <div className="text-sm text-red-600 mb-1">Şikayet Edilen</div>
-          <div className="text-2xl font-black text-red-700">15</div>
+          <div className="text-2xl font-black text-red-700">—</div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <div className="font-black">Bu modül henüz canlı backend’e bağlı değil</div>
+        <div className="text-sm mt-1">
+          Güvenlik ve doğruluk için sahte yorum/moderasyon verisi göstermiyoruz. Moderasyon iş akışları backend’e bağlanınca bu ekran aktifleşecek.
         </div>
       </div>
 
@@ -227,6 +193,13 @@ export const CommentModeration = () => {
                   </td>
                 </tr>
               ))}
+              {filteredComments.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-10 text-center text-sm text-gray-600">
+                    Henüz yorum yok.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

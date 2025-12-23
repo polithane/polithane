@@ -1,53 +1,9 @@
-import { useState } from 'react';
 import { Globe, Play, Pause, RefreshCw, Settings, TrendingUp, AlertCircle, Check } from 'lucide-react';
 
 export const ScrapingManagement = () => {
-  const mockScrapers = [
-    {
-      id: 1,
-      name: 'Twitter Tarayıcı',
-      source: 'Twitter/X',
-      status: 'active',
-      last_run: '5 dakika önce',
-      next_run: '10 dakika sonra',
-      success_rate: 98.5,
-      items_collected: 1247,
-      errors: 2,
-    },
-    {
-      id: 2,
-      name: 'Instagram Tarayıcı',
-      source: 'Instagram',
-      status: 'active',
-      last_run: '8 dakika önce',
-      next_run: '7 dakika sonra',
-      success_rate: 96.2,
-      items_collected: 856,
-      errors: 5,
-    },
-    {
-      id: 3,
-      name: 'Haber RSS Akışı',
-      source: 'Haber Siteleri',
-      status: 'paused',
-      last_run: '2 saat önce',
-      next_run: '-',
-      success_rate: 99.1,
-      items_collected: 2341,
-      errors: 1,
-    },
-    {
-      id: 4,
-      name: 'YouTube Tarayıcı',
-      source: 'YouTube',
-      status: 'error',
-      last_run: '1 saat önce',
-      next_run: '5 dakika sonra',
-      success_rate: 87.3,
-      items_collected: 423,
-      errors: 28,
-    },
-  ];
+  // NOTE: This screen used to show mock scrapers. We intentionally show no fake data.
+  // Backend integration (real scrapers config + logs + run/stop endpoints) will be wired here later.
+  const scrapers = [];
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -77,25 +33,33 @@ export const ScrapingManagement = () => {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="text-sm text-green-600 mb-1">Aktif Tarayıcı</div>
-          <div className="text-2xl font-black text-green-700">2</div>
+          <div className="text-2xl font-black text-green-700">—</div>
         </div>
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
           <div className="text-sm text-blue-600 mb-1">Bugün Toplanan</div>
-          <div className="text-2xl font-black text-blue-700">4,867</div>
+          <div className="text-2xl font-black text-blue-700">—</div>
         </div>
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
           <div className="text-sm text-purple-600 mb-1">Ortalama Başarı</div>
-          <div className="text-2xl font-black text-purple-700">95.3%</div>
+          <div className="text-2xl font-black text-purple-700">—</div>
         </div>
         <div className="bg-red-50 rounded-xl border border-red-200 p-4">
           <div className="text-sm text-red-600 mb-1">Toplam Hata</div>
-          <div className="text-2xl font-black text-red-700">36</div>
+          <div className="text-2xl font-black text-red-700">—</div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <div className="font-black">Bu modül henüz canlı backend’e bağlı değil</div>
+        <div className="text-sm mt-1">
+          Güvenlik ve doğruluk için sahte tarama botu verisi göstermiyoruz. Scraper ayarları ve çalıştırma/izleme endpoint’leri bağlanınca bu ekran
+          aktifleşecek.
         </div>
       </div>
 
       {/* Scrapers List */}
       <div className="space-y-4">
-        {mockScrapers.map((scraper) => (
+        {scrapers.map((scraper) => (
           <div key={scraper.id} className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
@@ -161,6 +125,9 @@ export const ScrapingManagement = () => {
             </div>
           </div>
         ))}
+        {scrapers.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 text-sm text-gray-600">Henüz tarayıcı yok.</div>
+        ) : null}
       </div>
 
       {/* Recent Activity */}
