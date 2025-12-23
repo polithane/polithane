@@ -14,6 +14,67 @@ export const CreatePolitPage = () => {
 
   const isFastMode = useMemo(() => String(location?.pathname || '') === '/fast-at', [location?.pathname]);
 
+  // Use user-provided icon images from Storage (ikons folder/bucket), fallback to local /icons.
+  const iconBaseUrls = useMemo(() => {
+    try {
+      const explicit = String(import.meta.env?.VITE_ICON_BASE_URL || '').trim();
+      const supabaseUrl = String(import.meta.env?.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
+      const bases = [];
+      if (explicit) bases.push(explicit.replace(/\/+$/, ''));
+      if (supabaseUrl) {
+        bases.push(`${supabaseUrl}/storage/v1/object/public/uploads/ikons`);
+        bases.push(`${supabaseUrl}/storage/v1/object/public/ikons`);
+      }
+      return Array.from(new Set(bases)).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const iconCandidates = useMemo(() => {
+    const join = (base, name) => `${String(base).replace(/\/+$/, '')}/${name}`;
+    const names = {
+      video: ['videoikon.png', 'video.png', 'videoikon.webp', 'video.webp', 'videoikon.jpg', 'video.jpg'],
+      image: ['resimikon.png', 'resim.png', 'resimikon.webp', 'resim.webp', 'resimikon.jpg', 'resim.jpg'],
+      audio: ['sesikon.png', 'ses.png', 'sesikon.webp', 'ses.webp', 'sesikon.jpg', 'ses.jpg'],
+      text: ['yaziikon.png', 'yazi.png', 'yaziikon.webp', 'yazi.webp', 'yaziikon.jpg', 'yazi.jpg'],
+    };
+    const out = {};
+    (['video', 'image', 'audio', 'text'] || []).forEach((k) => {
+      const list = [];
+      if (k === 'video') list.push('/icons/videoikon.png');
+      if (k === 'image') list.push('/icons/resimikon.png');
+      if (k === 'audio') list.push('/icons/sesikon.png');
+      if (k === 'text') list.push('/icons/yaziikon.png');
+      for (const b of iconBaseUrls || []) {
+        for (const n of names[k] || []) list.push(join(b, n));
+      }
+      if (k === 'video') list.push('/icons/videoikon.svg');
+      if (k === 'image') list.push('/icons/resimikon.svg');
+      if (k === 'audio') list.push('/icons/sesikon.svg');
+      if (k === 'text') list.push('/icons/yaziikon.svg');
+      out[k] = Array.from(new Set(list));
+    });
+    return out;
+  }, [iconBaseUrls]);
+
+  useEffect(() => {
+    try {
+      (['video', 'image', 'audio', 'text'] || []).forEach((k) => {
+        const list = iconCandidates?.[k] || [];
+        list.slice(0, 3).forEach((src) => {
+          const img = new Image();
+          img.src = src;
+        });
+      });
+    } catch {
+      // ignore
+    }
+  }, [iconCandidates]);
+
+  const [brokenIcons, setBrokenIcons] = useState({});
+  const [iconTryIndex, setIconTryIndex] = useState({});
+
   const theme = useMemo(() => {
     const primary = isFastMode ? '#E11D48' : '#0B3D91';
     return {
@@ -327,7 +388,7 @@ export const CreatePolitPage = () => {
 
     const isText = contentType === 'text';
     const requiresText = isText || !isFastMode; // polit always requires text; fast requires text only for text posts
-    const trimmed = String(text || '').trim();
+    let trimmed = String(text || '').trim();
     if (requiresText) {
       if (trimmed.length < TEXT_MIN) return toast.error(`Metin en az ${TEXT_MIN} karakter olmalı.`);
       if (trimmed.length > TEXT_MAX) return toast.error(`Metin en fazla ${TEXT_MAX} karakter olabilir.`);
@@ -335,6 +396,12 @@ export const CreatePolitPage = () => {
 
     if (!isText && !hasMedia) {
       return toast.error(contentType === 'image' ? 'Önce resim ekleyin.' : contentType === 'audio' ? 'Önce ses ekleyin.' : 'Önce video ekleyin.');
+    }
+
+    // Fast medya gönderilerinde metin zorunlu değil ama backend boş içerik kabul etmiyor:
+    // medyaya göre kısa bir placeholder koyuyoruz.
+    if (!requiresText && !trimmed && hasMedia) {
+      trimmed = contentType === 'video' ? '🎥' : contentType === 'audio' ? '🎙️' : contentType === 'image' ? '📷' : '📝';
     }
 
     // Basic file type checks
@@ -460,13 +527,34 @@ export const CreatePolitPage = () => {
                       key={key}
                       type="button"
                       onClick={() => pickType(key)}
-                      className={[
-                        'rounded-3xl border-2 p-4 bg-white hover:bg-gray-50 transition-colors',
-                        'flex flex-col items-center justify-center gap-2',
-                        theme.borderClass,
-                      ].join(' ')}
+                      className="rounded-3xl p-2 bg-transparent hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-2"
                     >
-                      <Icon className="w-16 h-16" style={{ color: theme.primary }} />
+                      {(() => {
+                        const candidates = iconCandidates?.[key] || [];
+                        const idx = Number(iconTryIndex?.[key] || 0);
+                        const src = candidates[idx] || '';
+                        const showImage = !!src && !brokenIcons[key];
+                        if (showImage) {
+                          return (
+                            <img
+                              src={src}
+                              alt={label}
+                              className="w-[120px] h-[120px] object-contain"
+                              loading="eager"
+                              fetchpriority="high"
+                              onError={() => {
+                                const next = idx + 1;
+                                if (next < candidates.length) {
+                                  setIconTryIndex((p) => ({ ...p, [key]: next }));
+                                } else {
+                                  setBrokenIcons((p) => ({ ...p, [key]: true }));
+                                }
+                              }}
+                            />
+                          );
+                        }
+                        return <Icon className="w-16 h-16" style={{ color: theme.primary }} />;
+                      })()}
                       <div className="text-sm font-black text-gray-900">{label}</div>
                     </button>
                   ))}
