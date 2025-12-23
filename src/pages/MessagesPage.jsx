@@ -5,7 +5,7 @@ import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { Modal } from '../components/common/Modal';
 import { formatTimeAgo } from '../utils/formatters';
-import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck } from 'lucide-react';
+import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck, Plus, ArrowLeft } from 'lucide-react';
 import { messages as messagesApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
@@ -87,10 +87,36 @@ export const MessagesPage = () => {
       );
     });
   }, [conversations, tab, searchQuery]);
+
+  const requestCount = useMemo(() => {
+    return (conversations || []).filter((c) => c?.message_type === 'request').length;
+  }, [conversations]);
   
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const canDeleteMessage = (m) => {
+    if (!m) return false;
+    if (String(m.sender_id) !== String(user?.id || '')) return false;
+    const createdAt = new Date(m.created_at || 0).getTime();
+    if (!Number.isFinite(createdAt) || createdAt <= 0) return false;
+    return Date.now() - createdAt <= 15 * 60 * 1000;
+  };
+
+  const previewConversationText = (v) => {
+    const s = String(v || '').trim();
+    if (!s) return '';
+    if (s.startsWith('{') && s.endsWith('}')) {
+      try {
+        const obj = JSON.parse(s);
+        if (obj && typeof obj === 'object' && obj.type === 'image') return 'Resim gönderildi.';
+      } catch {
+        // ignore
+      }
+    }
+    return s;
   };
   
   // Load messages when conversation is selected
@@ -468,16 +494,17 @@ export const MessagesPage = () => {
       <div className="container-main py-8">
         <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[600px]">
           {/* Konuşma Listesi */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+          <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col ${selectedConv ? 'hidden md:flex' : ''}`}>
             <div className="p-4 border-b">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <h2 className="text-xl font-bold">Mesajlar</h2>
                 <button
                   type="button"
                   onClick={openCompose}
-                  className="px-3 py-2 rounded-lg bg-primary-blue hover:bg-blue-600 text-white text-sm font-black"
+                  className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-black inline-flex items-center gap-2"
                 >
-                  Mesaj Gönder
+                  <Plus className="w-6 h-6 sm:w-5 sm:h-5" />
+                  Yeni Mesaj
                 </button>
               </div>
               <div className="flex gap-2 mb-3">
@@ -497,7 +524,14 @@ export const MessagesPage = () => {
                     tab === 'requests' ? 'bg-blue-50 border-blue-200 text-primary-blue' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  İstekler
+                  <span className="inline-flex items-center justify-center gap-2">
+                    İstekler
+                    {requestCount > 0 ? (
+                      <Badge variant="danger" size="small" className={tab === 'requests' ? 'animate-pulse' : 'animate-pulse'}>
+                        {requestCount > 99 ? '99+' : requestCount}
+                      </Badge>
+                    ) : null}
+                  </span>
                 </button>
               </div>
               {/* Search Bar */}
@@ -553,7 +587,7 @@ export const MessagesPage = () => {
                           </div>
                           <div className="flex items-center justify-between">
                             <p className={`text-sm truncate ${conv.unread_count > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
-                              {conv.last_message || 'Mesaj yok'}
+                              {previewConversationText(conv.last_message || '') || 'Mesaj yok'}
                             </p>
                             {conv.unread_count > 0 && (
                               <Badge variant="danger" size="small" className="ml-2 flex-shrink-0">
@@ -598,12 +632,23 @@ export const MessagesPage = () => {
           </div>
           
           {/* Mesaj Thread */}
-          <div className="bg-white rounded-xl border border-gray-200 flex flex-col">
+          <div className={`bg-white rounded-xl border border-gray-200 flex flex-col ${selectedConv ? '' : 'hidden md:flex'}`}>
             {selectedConv ? (
               <>
                 {/* Header */}
                 <div className="p-4 border-b">
                   <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedConv(null);
+                        setMessages([]);
+                      }}
+                      className="md:hidden p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+                      title="Mesaj listesi"
+                    >
+                      <ArrowLeft className="w-7 h-7 text-gray-700" />
+                    </button>
                     <Avatar 
                       src={selectedConv.participant?.avatar_url || selectedConv.participant?.profile_image} 
                       size="40px"
@@ -708,6 +753,7 @@ export const MessagesPage = () => {
                                       type="button"
                                       className="inline-flex items-center gap-1 text-gray-400 hover:text-red-600"
                                       title="Mesajı sil"
+                                      style={{ display: canDeleteMessage(message) ? undefined : 'none' }}
                                       onClick={async () => {
                                         try {
                                           await messagesApi.delete(message.id);

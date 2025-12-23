@@ -4810,6 +4810,20 @@ async function getConversations(req, res) {
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
   const userId = auth.id;
 
+  const conversationPreview = (content) => {
+    const s = String(content || '').trim();
+    if (!s) return '';
+    if (s.startsWith('{') && s.endsWith('}')) {
+      try {
+        const obj = JSON.parse(s);
+        if (obj && typeof obj === 'object' && obj.type === 'image') return 'Resim gönderildi.';
+      } catch {
+        // ignore
+      }
+    }
+    return s;
+  };
+
   const rows = await supabaseRestGet('messages', {
     select: '*',
     or: `(sender_id.eq.${userId},receiver_id.eq.${userId})`,
@@ -4831,7 +4845,7 @@ async function getConversations(req, res) {
       byOther.set(otherId, {
         conversation_id: `${userId}-${otherId}`,
         participant_id: otherId,
-        last_message: m.content,
+        last_message: conversationPreview(m.content),
         last_message_time: m.created_at,
         unread_count: unreadInc,
         has_outgoing: m.sender_id === userId,
@@ -4860,9 +4874,26 @@ async function getConversations(req, res) {
   }
   const userMap = new Map((users || []).map((u) => [u.id, u]));
 
+  // Determine if I follow the other user (if yes, treat incoming as regular, not request)
+  let followingSet = new Set();
+  try {
+    if (participants.length > 0) {
+      const fr = await supabaseRestGet('follows', {
+        select: 'following_id',
+        follower_id: `eq.${userId}`,
+        following_id: `in.(${participants.join(',')})`,
+        limit: String(Math.min(2000, participants.length)),
+      }).catch(() => []);
+      followingSet = new Set((fr || []).map((r) => String(r?.following_id)).filter(Boolean));
+    }
+  } catch {
+    // ignore
+  }
+
   const out = Array.from(byOther.values())
     .map((c) => {
-      const message_type = c.has_incoming && !c.has_outgoing ? 'request' : 'regular';
+      const isFollowingOther = followingSet.has(String(c.participant_id));
+      const message_type = c.has_incoming && !c.has_outgoing && !isFollowingOther ? 'request' : 'regular';
       const { has_incoming, has_outgoing, ...rest } = c;
       return { ...rest, message_type, participant: userMap.get(c.participant_id) || null };
     })
@@ -5203,6 +5234,22 @@ async function deleteMessage(req, res, messageId) {
   const rows = await supabaseRestGet('messages', { select: '*', id: `eq.${mid}`, limit: '1' }).catch(() => []);
   const msg = rows?.[0];
   if (!msg) return res.status(404).json({ success: false, error: 'Mesaj bulunamadı' });
+
+  // Don't allow sender to delete their message after 15 minutes
+  try {
+    if (String(msg.sender_id) === String(userId)) {
+      const createdAt = new Date(msg.created_at || 0).getTime();
+      const ageMs = Date.now() - (Number.isFinite(createdAt) ? createdAt : 0);
+      if (ageMs > 15 * 60 * 1000) {
+        return res.status(403).json({
+          success: false,
+          error: 'Gönderdiğiniz mesaj 15 dakika sonra silinemez.',
+        });
+      }
+    }
+  } catch {
+    // ignore
+  }
 
   const patch = {};
   if (msg.sender_id === userId) patch.is_deleted_by_sender = true;

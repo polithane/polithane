@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, PenTool, Zap, Search, Compass, MessageCircle } from 'lucide-react';
+import { apiCall } from '../../utils/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { Badge } from '../common/Badge';
 
 export const ActionBar = () => {
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
+  const { isAuthenticated } = useAuth();
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
 
   // Close hover labels on scroll (desktop nicety)
   useEffect(() => {
@@ -12,6 +17,32 @@ export const ActionBar = () => {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Poll unread message count for sidebar/bottombar badge
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setMessageUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        if (document?.hidden) return;
+        const r = await apiCall('/api/messages/conversations').catch(() => null);
+        const list = Array.isArray(r?.data) ? r.data : Array.isArray(r) ? r : [];
+        const total = (list || []).reduce((sum, c) => sum + (Number(c?.unread_count || 0) || 0), 0);
+        if (!cancelled) setMessageUnreadCount(total);
+      } catch {
+        if (!cancelled) setMessageUnreadCount(0);
+      }
+    };
+    tick();
+    const t = setInterval(tick, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [isAuthenticated]);
 
   const items = [
     {
@@ -82,6 +113,7 @@ export const ActionBar = () => {
       >
         {items.map((it) => {
           const Icon = it.icon;
+          const showBadge = it.key === 'messages' && messageUnreadCount > 0;
           return (
             <button
               key={it.key}
@@ -97,9 +129,15 @@ export const ActionBar = () => {
                   'group-hover:scale-110',
                   it.bgClass,
                   it.pulse ? 'animate-[pulse_0.35s_ease-in-out_infinite]' : '',
+                  showBadge ? 'animate-[pulse_0.9s_ease-in-out_infinite]' : '',
                 ].join(' ')}
               >
                 <Icon className={['w-7 h-7', it.iconClass].join(' ')} />
+                {showBadge ? (
+                  <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
+                    {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                  </Badge>
+                ) : null}
               </span>
 
               <span
@@ -122,6 +160,7 @@ export const ActionBar = () => {
           <div className="flex items-center justify-between">
             {items.map((it) => {
               const Icon = it.icon;
+              const showBadge = it.key === 'messages' && messageUnreadCount > 0;
               return (
                 <button
                   key={it.key}
@@ -132,12 +171,18 @@ export const ActionBar = () => {
                 >
                   <span
                     className={[
-                      'w-9 h-9 rounded-full flex items-center justify-center shadow-md',
+                      'relative w-9 h-9 rounded-full flex items-center justify-center shadow-md',
                       it.bgClass,
                       it.key === 'fast' ? 'animate-[pulse_0.35s_ease-in-out_infinite]' : '',
+                      showBadge ? 'animate-[pulse_0.9s_ease-in-out_infinite]' : '',
                     ].join(' ')}
                   >
                     <Icon className={['w-5 h-5', it.iconClass].join(' ')} />
+                    {showBadge ? (
+                      <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
+                        {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                      </Badge>
+                    ) : null}
                   </span>
                   <span className="mt-1 text-[10px] font-black text-gray-700">{it.label}</span>
                 </button>

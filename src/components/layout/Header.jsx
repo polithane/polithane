@@ -9,7 +9,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { apiCall } from '../../utils/api';
 import { getProfilePath } from '../../utils/paths';
 import { isUiVerifiedUser } from '../../utils/titleHelpers';
-import { Modal } from '../common/Modal';
+// NOTE: Message compose modal removed from header (messages icon exists in ActionBar)
 
 export const Header = () => {
   const navigate = useNavigate();
@@ -17,13 +17,6 @@ export const Header = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { unreadCount, notifications, loading: notifLoading, fetchNotifications, markAsRead, markAllAsRead, deleteNotification } =
     useNotifications();
-  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
-  const [showMessageCompose, setShowMessageCompose] = useState(false);
-  const [composeContacts, setComposeContacts] = useState([]);
-  const [composeLoading, setComposeLoading] = useState(false);
-  const [composeQuery, setComposeQuery] = useState('');
-  const [composeResults, setComposeResults] = useState([]);
-  const composeTimerRef = useRef(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef(null);
   const notifRef = useRef(null);
@@ -87,78 +80,7 @@ export const Header = () => {
     return () => window.removeEventListener('polithane:focus-search', handler);
   }, [q]);
 
-  // Poll message unread count (header badge)
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setMessageUnreadCount(0);
-      return;
-    }
-    // If user is on messages page, do not double-poll conversations here.
-    if (String(location?.pathname || '').startsWith('/messages')) {
-      setMessageUnreadCount(0);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadUnread = async () => {
-      try {
-        if (document?.hidden) return;
-        const r = await apiCall('/api/messages/conversations').catch(() => null);
-        const list = r?.data || [];
-        const total = (Array.isArray(list) ? list : []).reduce((sum, c) => sum + (Number(c?.unread_count || 0) || 0), 0);
-        if (!cancelled) setMessageUnreadCount(total);
-      } catch {
-        if (!cancelled) setMessageUnreadCount(0);
-      }
-    };
-
-    loadUnread();
-    const interval = setInterval(loadUnread, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [isAuthenticated, location?.pathname]);
-
-  const openMessageCompose = async () => {
-    if (!isAuthenticated) {
-      navigate('/login-new');
-      return;
-    }
-    setShowMessageCompose(true);
-    setComposeQuery('');
-    setComposeResults([]);
-    setComposeLoading(true);
-    try {
-      const r = await apiCall('/api/messages/contacts?limit=60').catch(() => null);
-      const list = r?.data || [];
-      setComposeContacts(Array.isArray(list) ? list : []);
-    } catch {
-      setComposeContacts([]);
-    } finally {
-      setComposeLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!showMessageCompose) return;
-    if (composeTimerRef.current) clearTimeout(composeTimerRef.current);
-    const q = String(composeQuery || '').trim();
-    if (q.length < 2) {
-      setComposeResults([]);
-      return;
-    }
-    composeTimerRef.current = setTimeout(async () => {
-      try {
-        const r = await apiCall(`/api/messages/search?q=${encodeURIComponent(q)}`).catch(() => null);
-        if (r?.success) setComposeResults(r.data || []);
-      } catch {
-        setComposeResults([]);
-      }
-    }, 250);
-    return () => clearTimeout(composeTimerRef.current);
-  }, [composeQuery, showMessageCompose]);
+  // NOTE: Messages icon + compose modal removed from header (exists in ActionBar).
 
   const notifItems = useMemo(() => {
     const list = Array.isArray(notifications) ? notifications : [];
@@ -434,15 +356,7 @@ export const Header = () => {
                 )}
               </div>
               
-              {/* Mesajlar */}
-              <button onClick={openMessageCompose} className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Mesajlar / Yeni Mesaj">
-                <MessageCircle className="w-5 h-5 text-gray-600" />
-                {messageUnreadCount > 0 && (
-                  <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
-                    {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
-                  </Badge>
-                )}
-              </button>
+              {/* Mesaj ikonu header'dan kaldırıldı (sol bar + mobil alt bar var) */}
               
               {/* Kullanıcı Menü */}
               <div className="relative" ref={menuRef}>
@@ -550,92 +464,7 @@ export const Header = () => {
         </div>
       </div>
 
-      <Modal isOpen={showMessageCompose} onClose={() => setShowMessageCompose(false)} title="Yeni Mesaj">
-        <div className="space-y-4">
-          <div>
-            <div className="text-sm font-semibold text-gray-700 mb-2">Kime?</div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-5 sm:h-5 text-gray-400" />
-              <input
-                value={composeQuery}
-                onChange={(e) => setComposeQuery(e.target.value)}
-                placeholder="İsim veya kullanıcı adı ara…"
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
-              />
-            </div>
-            <div className="mt-1 text-xs text-gray-500">
-              Takipleştiklerin en üstte; ayrıca arama ile herkese mesaj başlatabilirsin (izin varsa).
-            </div>
-          </div>
-
-          {composeLoading && <div className="text-sm text-gray-600">Kişiler yükleniyor…</div>}
-
-          {!composeLoading && composeQuery.trim().length < 2 && (
-            <div className="space-y-2">
-              <div className="text-xs font-black text-gray-500 uppercase">Takipleştiklerin</div>
-              {composeContacts.length === 0 && <div className="text-sm text-gray-600">Takipleştiğin kişi yok.</div>}
-              <div className="max-h-[320px] overflow-y-auto space-y-2">
-                {composeContacts.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-left"
-                    onClick={() => {
-                      setShowMessageCompose(false);
-                      navigate(`/messages?to=${encodeURIComponent(u.id)}`);
-                    }}
-                  >
-                    <Avatar src={u.avatar_url} size="40px" verified={isUiVerifiedUser(u)} />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
-                      <div className="text-xs text-gray-500 truncate">@{u.username}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!composeLoading && composeQuery.trim().length >= 2 && (
-            <div className="space-y-2">
-              <div className="text-xs font-black text-gray-500 uppercase">Arama Sonuçları</div>
-              {composeResults.length === 0 && <div className="text-sm text-gray-600">Sonuç bulunamadı.</div>}
-              <div className="max-h-[320px] overflow-y-auto space-y-2">
-                {composeResults.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-left"
-                    onClick={() => {
-                      setShowMessageCompose(false);
-                      navigate(`/messages?to=${encodeURIComponent(u.id)}`);
-                    }}
-                  >
-                    <Avatar src={u.avatar_url} size="40px" verified={isUiVerifiedUser(u)} />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-gray-900 truncate">{u.full_name}</div>
-                      <div className="text-xs text-gray-500 truncate">@{u.username}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="pt-2 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => {
-                setShowMessageCompose(false);
-                navigate('/messages');
-              }}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-800 font-black"
-            >
-              Tüm Mesajlara Git
-            </button>
-          </div>
-        </div>
-      </Modal>
+      {/* Header'daki "Yeni Mesaj" modalı kaldırıldı */}
     </header>
   );
 };
