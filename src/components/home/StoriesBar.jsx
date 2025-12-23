@@ -77,28 +77,28 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
       </div>
       
       {/* Tümü Butonu - SABİT SAĞDA (absolute) */}
-      <button
-        onClick={() => navigate(cfg.rightActionPath)}
-        className="absolute right-0 top-2 group z-10"
-        style={{
-          background: 'linear-gradient(to right, transparent, #F9FAFB 20%, #F9FAFB)',
-          paddingLeft: '20px'
-        }}
-        title={cfg.rightActionTitle}
-      >
-        <div className="relative">
-          <div
-            className={[
-              'w-[50px] h-[50px] rounded-full flex items-center justify-center transition-all shadow-lg border-2 border-gray-50',
-              cfg.isFast
-                ? 'bg-gradient-to-br from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700'
-                : 'bg-gradient-to-br from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400',
-            ].join(' ')}
-          >
-            <Plus className={['w-6 h-6', cfg.isFast ? 'text-white' : 'text-gray-600 group-hover:text-gray-700'].join(' ')} />
+      {!cfg.isFast ? (
+        <button
+          onClick={() => navigate(cfg.rightActionPath)}
+          className="absolute right-0 top-2 group z-10"
+          style={{
+            background: 'linear-gradient(to right, transparent, #F9FAFB 20%, #F9FAFB)',
+            paddingLeft: '20px',
+          }}
+          title={cfg.rightActionTitle}
+        >
+          <div className="relative">
+            <div
+              className={[
+                'w-[50px] h-[50px] rounded-full flex items-center justify-center transition-all shadow-lg border-2 border-gray-50',
+                'bg-gradient-to-br from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400',
+              ].join(' ')}
+            >
+              <Plus className="w-6 h-6 text-gray-600 group-hover:text-gray-700" />
+            </div>
           </div>
-        </div>
-      </button>
+        </button>
+      ) : null}
     </div>
   );
 };

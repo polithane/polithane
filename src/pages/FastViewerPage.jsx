@@ -94,8 +94,8 @@ export const FastViewerPage = () => {
             <div className="text-xs text-white/70 truncate">@{user?.username || '-'}</div>
           </div>
         </div>
-        <button onClick={closeToList} className="p-2 rounded-full bg-white/10 hover:bg-white/20">
-          <X className="w-8 h-8" />
+        <button onClick={closeToList} className="p-3 rounded-full bg-black/45 hover:bg-black/60">
+          <X className="w-10 h-10" />
         </button>
       </div>
 
@@ -124,7 +124,7 @@ export const FastViewerPage = () => {
         className="absolute left-0 top-0 bottom-0 w-1/3 flex items-center justify-start px-3 text-white/70 hover:text-white"
         aria-label="Önceki"
       >
-        <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/25 backdrop-blur-sm border border-white/20">
+        <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/55 backdrop-blur-sm border border-white/20">
           <ChevronLeft className="w-14 h-14" />
         </span>
       </button>
@@ -133,7 +133,7 @@ export const FastViewerPage = () => {
         className="absolute right-0 top-0 bottom-0 w-1/3 flex items-center justify-end px-3 text-white/70 hover:text-white"
         aria-label="Sonraki"
       >
-        <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/25 backdrop-blur-sm border border-white/20">
+        <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/55 backdrop-blur-sm border border-white/20">
           <ChevronRight className="w-14 h-14" />
         </span>
       </button>
