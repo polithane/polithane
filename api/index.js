@@ -814,13 +814,21 @@ async function reportComment(req, res, commentId) {
   const reason = String(body?.reason || '').trim();
   const details = String(body?.details || '').trim();
   if (!reason) return res.status(400).json({ success: false, error: 'Şikayet nedeni seçmelisiniz.' });
+  if (details.length > 200) return res.status(400).json({ success: false, error: 'Şikayet notu en fazla 200 karakter olabilir.' });
+  // Security filter for report notes (prevent code/SQL payloads)
+  if (details) {
+    const analyzed = analyzeCommentContent(details);
+    if (analyzed?.flagged && (analyzed.reasons || []).some((r) => r === 'zararlı_kod' || r === 'sql')) {
+      return res.status(400).json({ success: false, error: 'Şikayet notu güvenlik filtresine takıldı. Lütfen metni sadeleştirip tekrar deneyin.' });
+    }
+  }
 
   // Load comment for context (best effort)
   const rows = await supabaseRestGet('comments', { select: '*', id: `eq.${commentId}`, limit: '1' }).catch(() => []);
   const c = rows?.[0] || null;
   const postId = c?.post_id || null;
 
-  await notifyAdminsAboutComment({
+  await notifyAdminsAboutComment(req, {
     type: 'comment_report',
     commentId,
     postId,
@@ -842,8 +850,16 @@ async function reportPost(req, res, postId) {
   const reason = String(body?.reason || '').trim();
   const details = String(body?.details || '').trim();
   if (!reason) return res.status(400).json({ success: false, error: 'Şikayet nedeni seçmelisiniz.' });
+  if (details.length > 200) return res.status(400).json({ success: false, error: 'Şikayet notu en fazla 200 karakter olabilir.' });
+  // Security filter for report notes (prevent code/SQL payloads)
+  if (details) {
+    const analyzed = analyzeCommentContent(details);
+    if (analyzed?.flagged && (analyzed.reasons || []).some((r) => r === 'zararlı_kod' || r === 'sql')) {
+      return res.status(400).json({ success: false, error: 'Şikayet notu güvenlik filtresine takıldı. Lütfen metni sadeleştirip tekrar deneyin.' });
+    }
+  }
 
-  await notifyAdminsAboutComment({
+  await notifyAdminsAboutComment(req, {
     type: 'post_report',
     commentId: null,
     postId,

@@ -490,7 +490,7 @@ export const MessagesPage = () => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
       <div className="container-main py-8">
         <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[600px]">
           {/* Konuşma Listesi */}
