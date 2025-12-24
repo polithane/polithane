@@ -95,17 +95,3 @@ export const getFollowing = (userId) => {
     })
     .filter(u => u);
 };
-
-// Takip istekleri
-export const getFollowRequests = (userId) => {
-  return mockFollows
-    .filter(f => f.following_id === userId && f.status === 'pending')
-    .map(f => {
-      const user = mockUsers.find(u => u.user_id === f.follower_id);
-      return {
-        ...user,
-        request_date: f.created_at
-      };
-    })
-    .filter(u => u);
-};

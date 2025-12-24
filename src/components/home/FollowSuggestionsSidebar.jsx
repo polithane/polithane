@@ -183,7 +183,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
             >
               <div className="flex items-center justify-between gap-2">
                 <Link to={`/profile/${id}`} className="flex items-center gap-2 min-w-0">
-                  <Avatar src={u?.avatar_url} alt={name} size="34px" />
+                  <Avatar src={u?.avatar_url || u?.profile_image} alt={name} size="34px" />
                   <div className="min-w-0">
                     <div className="text-[10px] font-black text-gray-900 truncate leading-4">{name}</div>
                     {username ? <div className="text-[9px] text-gray-500 truncate leading-4">{username}</div> : null}
@@ -203,7 +203,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
                   </div>
                 </Link>
                 <div className="flex-shrink-0">
-                  <FollowButton userId={id} size="sm" />
+                  <FollowButton targetUserId={id} size="sm" />
                 </div>
               </div>
 
@@ -212,7 +212,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
                 <div className="hidden lg:block absolute right-full top-0 mr-3 w-[260px] z-20">
                   <div className="bg-white border border-gray-200 rounded-2xl shadow-xl p-3">
                     <div className="flex items-center gap-3">
-                      <Avatar src={u?.avatar_url} alt={name} size="54px" />
+                      <Avatar src={u?.avatar_url || u?.profile_image} alt={name} size="54px" />
                       <div className="min-w-0 flex-1">
                         <div className="text-[12px] font-black text-gray-900 truncate">{name}</div>
                         {username ? <div className="text-[10px] text-gray-600 truncate">{username}</div> : null}
