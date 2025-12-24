@@ -117,15 +117,15 @@ export const Header = () => {
   };
   
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 h-[60px]">
-      <div className="container-main h-full flex items-center justify-between gap-3">
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 sm:h-[60px] py-2 sm:py-0">
+      <div className="container-main flex flex-wrap items-center gap-3 sm:h-full sm:flex-nowrap sm:justify-between">
         {/* Sol: Logo + Slogan */}
-        <div className="cursor-pointer flex items-center flex-shrink min-w-0" onClick={() => navigate('/')}>
+        <div className="order-1 cursor-pointer flex items-center flex-shrink min-w-0" onClick={() => navigate('/')}>
           <AnimatedSlogan />
         </div>
 
         {/* Orta: Geniş Arama Barı */}
-        <div className="relative flex-1 max-w-[520px]">
+        <div className="order-3 w-full sm:order-2 sm:w-auto relative sm:flex-1 sm:max-w-[520px]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -237,7 +237,7 @@ export const Header = () => {
         </div>
 
         {/* Sağ: Aksiyonlar */}
-        <div className="flex items-center gap-4 flex-shrink-0">
+        <div className="order-2 ml-auto sm:order-3 sm:ml-0 flex items-center gap-4 flex-shrink-0">
           {isAuthenticated ? (
             <>
               {/* Bildirimler */}
