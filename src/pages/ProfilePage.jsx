@@ -61,6 +61,11 @@ export const ProfilePage = () => {
   const [likedPosts, setLikedPosts] = useState([]);
   const [activities, setActivities] = useState([]);
   const [hasFast, setHasFast] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
   
   const isOwnProfile = currentUser && (
     userId === 'me' || 
@@ -340,10 +345,32 @@ export const ProfilePage = () => {
   };
   
   const handleReport = () => {
-    // TODO: Şikayet sistemi
-    console.log('Kullanıcı şikayet edildi:', userId);
-    alert('Şikayetiniz alındı, incelenecektir.');
     setShowMenu(false);
+    setReportReason('spam');
+    setReportDetails('');
+    setReportBusy(false);
+    setReportDone(false);
+    setReportModalOpen(true);
+  };
+
+  const submitReport = async () => {
+    const tid = String(user?.user_id || user?.id || userId || '').trim();
+    if (!tid) return;
+    setReportBusy(true);
+    try {
+      const r = await users.report(tid, reportReason, reportDetails);
+      if (r?.success) {
+        setReportDone(true);
+      } else {
+        // eslint-disable-next-line no-alert
+        alert(r?.error || 'Şikayet gönderilemedi.');
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-alert
+      alert(e?.message || 'Şikayet gönderilemedi.');
+    } finally {
+      setReportBusy(false);
+    }
   };
   
   if (!user) {
@@ -588,6 +615,43 @@ export const ProfilePage = () => {
             className="max-w-full max-h-[70vh] rounded-2xl object-contain bg-gray-50 border border-gray-200"
           />
         </div>
+      </Modal>
+
+      <Modal isOpen={reportModalOpen} onClose={() => setReportModalOpen(false)} title="Kullanıcıyı Şikayet Et">
+        {reportDone ? (
+          <div className="space-y-3">
+            <div className="text-lg font-black text-green-700">Bildiriminiz alındı.</div>
+            <div className="text-sm text-gray-700">İnceleme sonrası gerekli işlem yapılacaktır.</div>
+            <Button onClick={() => setReportModalOpen(false)}>Kapat</Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-sm font-black text-gray-900">Neden</div>
+            <select
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="spam">Spam</option>
+              <option value="harassment">Taciz / Hakaret</option>
+              <option value="scam">Dolandırıcılık</option>
+              <option value="impersonation">Kimliğe bürünme</option>
+              <option value="other">Diğer</option>
+            </select>
+            <div className="text-sm font-black text-gray-900">Not (opsiyonel)</div>
+            <textarea
+              value={reportDetails}
+              onChange={(e) => setReportDetails(e.target.value.slice(0, 200))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={4}
+              placeholder="En fazla 200 karakter"
+            />
+            <div className="text-xs text-gray-500">{200 - (reportDetails?.length || 0)} karakter kaldı</div>
+            <Button onClick={submitReport} disabled={!reportReason || reportBusy}>
+              Gönder
+            </Button>
+          </div>
+        )}
       </Modal>
       
       {/* Tabs */}

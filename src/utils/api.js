@@ -306,6 +306,12 @@ export const users = {
     apiCall(`/api/users/blocks/${targetId}`, {
       method: 'DELETE',
     }),
+
+  report: (userId, reason, details = '') =>
+    apiCall(`/api/users/${userId}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, details }),
+    }),
 };
 
 // ============================================

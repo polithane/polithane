@@ -912,6 +912,54 @@ async function reportPost(req, res, postId) {
   });
 }
 
+async function reportUser(req, res, userId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const tid = String(userId || '').trim();
+  if (!isSafeId(tid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  if (String(tid) === String(auth.id)) return res.status(400).json({ success: false, error: 'Kendinizi şikayet edemezsiniz.' });
+
+  const body = await readJsonBody(req);
+  const reason = String(body?.reason || '').trim();
+  const details = String(body?.details || '').trim();
+  if (!reason) return res.status(400).json({ success: false, error: 'Şikayet nedeni seçmelisiniz.' });
+  if (details.length > 200) return res.status(400).json({ success: false, error: 'Şikayet notu en fazla 200 karakter olabilir.' });
+  if (details) {
+    const analyzed = analyzeCommentContent(details);
+    if (analyzed?.flagged && (analyzed.reasons || []).some((r) => r === 'zararlı_kod' || r === 'sql')) {
+      return res.status(400).json({ success: false, error: 'Şikayet notu güvenlik filtresine takıldı. Lütfen metni sadeleştirip tekrar deneyin.' });
+    }
+  }
+
+  // Best-effort user context
+  let username = '';
+  let fullName = '';
+  try {
+    const rows = await supabaseRestGet('users', { select: 'id,username,full_name', id: `eq.${tid}`, limit: '1' }).catch(() => []);
+    const u = rows?.[0] || null;
+    username = String(u?.username || '').trim();
+    fullName = String(u?.full_name || '').trim();
+  } catch {
+    // ignore
+  }
+
+  await notifyAdminsAboutComment(req, {
+    type: 'user_report',
+    commentId: null,
+    postId: null,
+    actorId: auth.id,
+    title: 'Kullanıcı şikayeti',
+    message: `Kullanıcı: ${tid}${username ? ` (@${username})` : ''}${fullName ? `\nAd: ${fullName}` : ''}\nNeden: ${reason}${
+      details ? `\nNot: ${details}` : ''
+    }`,
+  }).catch(() => null);
+
+  return res.json({
+    success: true,
+    message: 'Bildiriminiz alındı. İnceleme sonrası gerekli işlem yapılacaktır.',
+  });
+}
+
 async function trackPostShare(req, res, postId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -6100,6 +6148,7 @@ export default async function handler(req, res) {
           if (id && tail === 'follow-stats' && req.method === 'GET') return await getFollowStats(req, res, id);
           if (id && tail === 'followers' && req.method === 'GET') return await getFollowers(req, res, id);
           if (id && tail === 'following' && req.method === 'GET') return await getFollowing(req, res, id);
+          if (id && tail === 'report' && req.method === 'POST') return await reportUser(req, res, id);
           if (id && !tail) return await getUserDetail(req, res, id); // Profile
       }
 
