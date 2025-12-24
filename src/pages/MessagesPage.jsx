@@ -5,7 +5,7 @@ import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { Modal } from '../components/common/Modal';
 import { formatTimeAgo } from '../utils/formatters';
-import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck, Plus, ArrowLeft } from 'lucide-react';
+import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck, Plus, ArrowLeft, Flag } from 'lucide-react';
 import { messages as messagesApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
@@ -23,6 +23,11 @@ export const MessagesPage = () => {
   const [tab, setTab] = useState('regular'); // regular | requests
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [convActionBusyId, setConvActionBusyId] = useState(null);
+  const [reportingConv, setReportingConv] = useState(null);
+  const [reportReason, setReportReason] = useState('spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportDone, setReportDone] = useState(false);
   const messagesEndRef = useRef(null);
   const fileRef = useRef(null);
   const messageInputRef = useRef(null);
@@ -488,6 +493,43 @@ export const MessagesPage = () => {
       setError(e?.message || 'İstek reddedilemedi.');
     }
   };
+
+  const deleteConversation = async (conv) => {
+    const pid = String(conv?.participant_id || '').trim();
+    if (!pid) return;
+    if (!window.confirm('Bu sohbeti silmek istiyor musunuz? Bu işlem sohbetin tüm mesajlarını veritabanından siler.')) return;
+    setConvActionBusyId(pid);
+    try {
+      await messagesApi.deleteConversation(pid);
+      setConversations((prev) => (prev || []).filter((c) => String(c?.participant_id) !== pid));
+      if (String(selectedConv?.participant_id || '') === pid) {
+        setSelectedConv(null);
+        setMessages([]);
+      }
+    } catch (e) {
+      setError(e?.message || 'Sohbet silinemedi.');
+    } finally {
+      setConvActionBusyId(null);
+    }
+  };
+
+  const reportConversation = async () => {
+    const pid = String(reportingConv?.participant_id || '').trim();
+    if (!pid) return;
+    setConvActionBusyId(pid);
+    try {
+      const r = await messagesApi.reportConversation(pid, { reason: reportReason, details: reportDetails });
+      if (r?.success) {
+        setReportDone(true);
+      } else {
+        setError(r?.error || 'Şikayet gönderilemedi.');
+      }
+    } catch (e) {
+      setError(e?.message || 'Şikayet gönderilemedi.');
+    } finally {
+      setConvActionBusyId(null);
+    }
+  };
   
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
@@ -612,6 +654,38 @@ export const MessagesPage = () => {
                           {conv.is_muted && (
                             <span className="text-xs text-gray-400 mt-1">🔇 Sessize alındı</span>
                           )}
+                        </div>
+
+                        {/* List actions: delete + report */}
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+                            title="Sohbeti sil"
+                            disabled={convActionBusyId === String(conv?.participant_id || '')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteConversation(conv);
+                            }}
+                          >
+                            <Trash2 className="w-6 h-6" />
+                          </button>
+                          <button
+                            type="button"
+                            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+                            title="Şikayet et"
+                            disabled={convActionBusyId === String(conv?.participant_id || '')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setError('');
+                              setReportingConv(conv);
+                              setReportReason('spam');
+                              setReportDetails('');
+                              setReportDone(false);
+                            }}
+                          >
+                            <Flag className="w-6 h-6" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -829,6 +903,49 @@ export const MessagesPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Conversation report modal */}
+      <Modal isOpen={!!reportingConv} onClose={() => setReportingConv(null)} title="Şikayet Et">
+        {reportDone ? (
+          <div className="space-y-3">
+            <div className="text-lg font-black text-green-700">Bildiriminiz alındı.</div>
+            <div className="text-sm text-gray-700">İnceleme sonrası gerekli işlem yapılacaktır.</div>
+            <Button
+              onClick={() => {
+                setReportingConv(null);
+              }}
+            >
+              Kapat
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-sm font-black text-gray-900">Neden</div>
+            <select
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="spam">Spam</option>
+              <option value="harassment">Taciz / Hakaret</option>
+              <option value="scam">Dolandırıcılık</option>
+              <option value="other">Diğer</option>
+            </select>
+            <div className="text-sm font-black text-gray-900">Not (opsiyonel)</div>
+            <textarea
+              value={reportDetails}
+              onChange={(e) => setReportDetails(e.target.value.slice(0, 200))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={4}
+              placeholder="En fazla 200 karakter"
+            />
+            <div className="text-xs text-gray-500">{200 - (reportDetails?.length || 0)} karakter kaldı</div>
+            <Button onClick={reportConversation} disabled={!reportReason || convActionBusyId === String(reportingConv?.participant_id || '')}>
+              Gönder
+            </Button>
+          </div>
+        )}
+      </Modal>
 
       {/* Compose modal */}
       <Modal isOpen={showCompose} onClose={() => setShowCompose(false)} title="Yeni Mesaj">

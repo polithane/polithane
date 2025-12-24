@@ -275,6 +275,44 @@ async function supabaseStorageUploadObject(bucket, objectPath, buffer, contentTy
   return true;
 }
 
+async function supabaseStorageDeleteObject(bucket, objectPath) {
+  const { supabaseUrl } = getSupabaseKeys();
+  const key = getSupabaseServiceRoleKey();
+  const safePath = String(objectPath || '').replace(/^\/+/, '');
+  if (!bucket || !safePath) return false;
+  const url = `${supabaseUrl}/storage/v1/object/${bucket}/${safePath}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+    },
+  });
+  if (!res.ok) {
+    await res.text().catch(() => '');
+    return false;
+  }
+  await res.arrayBuffer().catch(() => null);
+  return true;
+}
+
+function parseSupabasePublicObjectUrl(u) {
+  try {
+    const url = new URL(String(u || ''));
+    const p = url.pathname || '';
+    const marker = '/storage/v1/object/public/';
+    if (!p.includes(marker)) return null;
+    const after = p.split(marker)[1] || '';
+    const parts = after.split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+    const bucket = parts[0];
+    const objectPath = parts.slice(1).join('/');
+    return { bucket, objectPath };
+  } catch {
+    return null;
+  }
+}
+
 async function supabaseRestRequest(method, path, params, body, extraHeaders = {}) {
   const { supabaseUrl, key } = getSupabaseKeys();
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
@@ -1382,6 +1420,28 @@ async function deletePost(req, res, postId) {
   if (!post) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
   if (String(post.user_id) !== String(auth.id)) {
     return res.status(403).json({ success: false, error: 'Bu paylaşımı silemezsiniz.' });
+  }
+
+  // Best-effort: also delete uploaded media objects from storage
+  try {
+    const urls = [];
+    if (Array.isArray(post?.media_urls)) urls.push(...post.media_urls);
+    if (post?.thumbnail_url) urls.push(post.thumbnail_url);
+    const objs = (urls || [])
+      .map((u) => parseSupabasePublicObjectUrl(u))
+      .filter(Boolean)
+      // Only delete from uploads bucket (avoid shared assets like avatars/logos)
+      .filter((p) => p.bucket === 'uploads' && p.objectPath);
+    const seen = new Set();
+    for (const o of objs) {
+      const key = `${o.bucket}/${o.objectPath}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // eslint-disable-next-line no-await-in-loop
+      await supabaseStorageDeleteObject(o.bucket, o.objectPath).catch(() => null);
+    }
+  } catch {
+    // ignore
   }
 
   const updated = await supabaseRestPatch(
@@ -5105,6 +5165,57 @@ async function searchMessageUsers(req, res) {
   }
 }
 
+async function deleteConversation(req, res, otherId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const userId = auth.id;
+  const oid = String(otherId || '').trim();
+  if (!isSafeId(oid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+
+  // Hard delete conversation for both sides (requested).
+  // This deletes all messages between the two users.
+  try {
+    const q = {
+      or: `and(sender_id.eq.${userId},receiver_id.eq.${oid}),and(sender_id.eq.${oid},receiver_id.eq.${userId})`,
+    };
+    await supabaseRestDelete('messages', q).catch(() => null);
+  } catch {
+    // ignore
+  }
+  return res.json({ success: true });
+}
+
+async function reportConversation(req, res, otherId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const userId = auth.id;
+  const oid = String(otherId || '').trim();
+  if (!isSafeId(oid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+
+  const body = await readJsonBody(req);
+  const reason = String(body?.reason || '').trim();
+  const details = String(body?.details || '').trim();
+  if (!reason) return res.status(400).json({ success: false, error: 'Şikayet nedeni seçmelisiniz.' });
+  if (details.length > 200) return res.status(400).json({ success: false, error: 'Şikayet notu en fazla 200 karakter olabilir.' });
+  if (details) {
+    const analyzed = analyzeCommentContent(details);
+    if (analyzed?.flagged && (analyzed.reasons || []).some((r) => r === 'zararlı_kod' || r === 'sql')) {
+      return res.status(400).json({ success: false, error: 'Şikayet notu güvenlik filtresine takıldı. Lütfen metni sadeleştirip tekrar deneyin.' });
+    }
+  }
+
+  await notifyAdminsAboutComment(req, {
+    type: 'message_report',
+    commentId: null,
+    postId: null,
+    actorId: userId,
+    title: 'Mesaj şikayeti',
+    message: `Kişi: ${oid}\nNeden: ${reason}${details ? `\nNot: ${details}` : ''}`,
+  }).catch(() => null);
+
+  return res.json({ success: true, message: 'Bildiriminiz alındı. İnceleme sonrası gerekli işlem yapılacaktır.' });
+}
+
 async function sendMessage(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -6025,6 +6136,14 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/messages/requests/') && url.endsWith('/reject') && req.method === 'POST') {
         const otherId = url.split('/api/messages/requests/')[1].split('/reject')[0];
         return await rejectMessageRequest(req, res, otherId);
+      }
+      if (url.startsWith('/api/messages/conversations/') && req.method === 'DELETE') {
+        const otherId = url.split('/api/messages/conversations/')[1];
+        return await deleteConversation(req, res, otherId);
+      }
+      if (url.startsWith('/api/messages/conversations/') && url.endsWith('/report') && req.method === 'POST') {
+        const otherId = url.split('/api/messages/conversations/')[1].split('/report')[0];
+        return await reportConversation(req, res, otherId);
       }
       if (url.startsWith('/api/messages/') && req.method === 'GET') {
         const otherId = url.split('/api/messages/')[1];

@@ -494,7 +494,7 @@ export const CreatePolitPage = () => {
             {/* Fixed top identity + back */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <Avatar src={user?.avatar_url} size="46px" verified={isUiVerifiedUser(user)} className="border border-gray-200 flex-shrink-0" />
+                <Avatar src={user?.avatar_url || user?.profile_image} size="46px" verified={isUiVerifiedUser(user)} className="border border-gray-200 flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="font-black text-gray-900 truncate">{user?.full_name || 'Misafir'}</div>
                   <div className="text-xs text-gray-500 truncate">@{user?.username || '-'}</div>

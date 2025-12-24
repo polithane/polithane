@@ -95,7 +95,7 @@ export const CategoryFeedPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-8">
-        <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="hidden sm:flex items-center justify-between gap-3 mb-6">
           <div className="min-w-0">
             <div className="text-2xl sm:text-3xl font-black text-gray-900 break-words">{meta.title}</div>
             {meta.subtitle ? <div className="text-sm text-gray-600 mt-1">{meta.subtitle}</div> : null}

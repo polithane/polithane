@@ -342,6 +342,17 @@ export const messages = {
       body: JSON.stringify({ receiver_id, content, attachment }),
     }),
 
+  deleteConversation: (otherUserId) =>
+    apiCall(`/api/messages/conversations/${otherUserId}`, {
+      method: 'DELETE',
+    }),
+
+  reportConversation: (otherUserId, { reason, details } = {}) =>
+    apiCall(`/api/messages/conversations/${otherUserId}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, details }),
+    }),
+
   delete: (messageId) =>
     apiCall(`/api/messages/${messageId}`, {
       method: 'DELETE',
