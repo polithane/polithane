@@ -1128,6 +1128,10 @@ async function createPost(req, res) {
     const media_urls = Array.isArray(body.media_urls) ? body.media_urls : [];
     const content_type = String(body.content_type || (media_urls.length > 0 ? 'image' : 'text')).trim();
     const is_trending = typeof body?.is_trending === 'boolean' ? body.is_trending : undefined;
+    const media_duration =
+      body?.media_duration !== undefined && body?.media_duration !== null
+        ? Math.max(0, Number(body.media_duration) || 0)
+        : undefined;
 
     if (!content) return res.status(400).json({ success: false, error: 'İçerik boş olamaz.' });
     if (content.length > 5000) return res.status(400).json({ success: false, error: 'İçerik çok uzun.' });
@@ -1182,7 +1186,7 @@ async function createPost(req, res) {
       });
     }
 
-    // Try schema variants (content/content_text) and optional flags (is_trending)
+    // Try schema variants (content/content_text) and optional fields (is_trending, media_duration)
     let inserted;
     try {
       const payload = {
@@ -1193,6 +1197,7 @@ async function createPost(req, res) {
         category,
         agenda_tag,
         media_urls,
+        ...(Number.isFinite(media_duration) ? { media_duration } : {}),
         is_deleted: false,
         ...(typeof is_trending === 'boolean' ? { is_trending } : {}),
       };
@@ -1200,7 +1205,7 @@ async function createPost(req, res) {
     } catch (e) {
       const msg = String(e?.message || '');
       // Retry without unsupported fields (schema-agnostic)
-      if (msg.includes('is_trending')) {
+      if (msg.includes('is_trending') || msg.includes('media_duration')) {
         try {
           inserted = await supabaseRestInsert('posts', [{
             user_id: auth.id,
@@ -1226,12 +1231,13 @@ async function createPost(req, res) {
               category,
               agenda_tag,
               media_urls,
+              ...(Number.isFinite(media_duration) ? { media_duration } : {}),
               is_deleted: false,
               ...(typeof is_trending === 'boolean' ? { is_trending } : {}),
             }]);
           } catch (e2) {
             const msg2 = String(e2?.message || '');
-            if (msg2.includes('is_trending')) {
+            if (msg2.includes('is_trending') || msg2.includes('media_duration')) {
               inserted = await supabaseRestInsert('posts', [{
                 user_id: auth.id,
                 party_id,

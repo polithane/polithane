@@ -104,6 +104,7 @@ export const CreatePolitPage = () => {
   const [recordedUrl, setRecordedUrl] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
+  const [mediaDurationSec, setMediaDurationSec] = useState(0);
 
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -235,6 +236,46 @@ export const CreatePolitPage = () => {
   }, [contentType, files]);
 
   useEffect(() => {
+    let cancelled = false;
+    const f = files?.[0];
+    if (!f) {
+      setMediaDurationSec(0);
+      return;
+    }
+    if (contentType !== 'audio' && contentType !== 'video') {
+      setMediaDurationSec(0);
+      return;
+    }
+    const readDuration = () =>
+      new Promise((resolve) => {
+        try {
+          const url = URL.createObjectURL(f);
+          const el = document.createElement(contentType === 'audio' ? 'audio' : 'video');
+          el.preload = 'metadata';
+          el.onloadedmetadata = () => {
+            const d = Number(el.duration);
+            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+            resolve(Number.isFinite(d) ? d : 0);
+          };
+          el.onerror = () => {
+            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+            resolve(0);
+          };
+          el.src = url;
+        } catch {
+          resolve(0);
+        }
+      });
+    (async () => {
+      const d = await readDuration();
+      if (!cancelled) setMediaDurationSec(Math.max(0, Math.floor(d || 0)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [files, contentType]);
+
+  useEffect(() => {
     return () => {
       resetMedia();
     };
@@ -295,7 +336,19 @@ export const CreatePolitPage = () => {
     resetMedia();
     try {
       const constraints =
-        contentType === 'video' ? { video: { facingMode: 'user' }, audio: true } : { audio: true };
+        contentType === 'video'
+          ? {
+              video: {
+                facingMode: 'user',
+                // Try to keep mobile capture vertical and predictable.
+                // Not all browsers honor these, but it reduces "sideways" recordings on many devices.
+                width: { ideal: 720 },
+                height: { ideal: 1280 },
+                aspectRatio: { ideal: 9 / 16 },
+              },
+              audio: true,
+            }
+          : { audio: true };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
 
@@ -471,6 +524,7 @@ export const CreatePolitPage = () => {
         category: 'general',
         agenda_tag: agendaTag || null,
         media_urls,
+        ...(mediaDurationSec > 0 ? { media_duration: mediaDurationSec } : {}),
         ...(isFastMode ? { is_trending: true } : {}),
       };
 
@@ -488,6 +542,7 @@ export const CreatePolitPage = () => {
 
   const publishCross = async () => {
     if (!primaryPost) return;
+    if (offerBusy) return;
     setOfferBusy(true);
     try {
       const base = {
@@ -502,7 +557,11 @@ export const CreatePolitPage = () => {
         ...base,
         ...(isFastMode ? { is_trending: false } : { is_trending: true }),
       };
-      await postsApi.create(payload).catch(() => null);
+      const r = await postsApi.create(payload).catch(() => null);
+      const ok = !!(r?.success && r?.data?.id);
+      if (!ok) {
+        toast.error('Çapraz paylaşım oluşturulamadı. Lütfen tekrar deneyin.');
+      }
     } finally {
       setOfferBusy(false);
     }
@@ -514,6 +573,7 @@ export const CreatePolitPage = () => {
   };
 
   const finishYes = async () => {
+    if (offerBusy) return;
     await publishCross();
     if (isFastMode) navigate('/fast');
     else navigate(primaryPost?.id ? `/post/${primaryPost.id}` : '/');

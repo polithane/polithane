@@ -32,6 +32,7 @@ export const FastViewerPage = () => {
   const currentDuration = useMemo(() => {
     if (!current) return DEFAULT_DURATION_MS;
     if (current.content_type === 'video' && current.media_duration) return Math.max(2000, current.media_duration * 1000);
+    if (current.content_type === 'audio' && current.media_duration) return Math.max(3000, current.media_duration * 1000);
     return DEFAULT_DURATION_MS;
   }, [current]);
 
@@ -111,6 +112,15 @@ export const FastViewerPage = () => {
             alt=""
             className="max-h-full max-w-full object-contain"
           />
+        ) : current.content_type === 'audio' ? (
+          <div className="max-w-xl w-full">
+            <div className="bg-black/40 border border-white/15 rounded-2xl p-4">
+              <audio src={mediaUrl(current)} controls autoPlay className="w-full" />
+            </div>
+            {current.content_text ? (
+              <div className="mt-4 text-lg leading-relaxed whitespace-pre-wrap">{current.content_text}</div>
+            ) : null}
+          </div>
         ) : (
           <div className="max-w-xl w-full">
             <div className="text-lg leading-relaxed whitespace-pre-wrap">{current.content_text || current.content}</div>
