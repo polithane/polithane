@@ -6772,22 +6772,6 @@ async function deleteMessage(req, res, messageId) {
   const msg = rows?.[0];
   if (!msg) return res.status(404).json({ success: false, error: 'Mesaj bulunamadı' });
 
-  // Don't allow sender to delete their message after 15 minutes
-  try {
-    if (String(msg.sender_id) === String(userId)) {
-      const createdAt = new Date(msg.created_at || 0).getTime();
-      const ageMs = Date.now() - (Number.isFinite(createdAt) ? createdAt : 0);
-      if (ageMs > 15 * 60 * 1000) {
-        return res.status(403).json({
-          success: false,
-          error: 'Gönderdiğiniz mesaj 15 dakika sonra silinemez.',
-        });
-      }
-    }
-  } catch {
-    // ignore
-  }
-
   const patch = {};
   if (msg.sender_id === userId) patch.is_deleted_by_sender = true;
   if (msg.receiver_id === userId) patch.is_deleted_by_receiver = true;
