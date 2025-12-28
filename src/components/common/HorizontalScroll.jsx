@@ -7,6 +7,8 @@ export const HorizontalScroll = ({
   autoScroll = false, 
   scrollInterval = 5000,
   itemsPerView = { desktop: 5, tablet: 3, mobile: 2 },
+  manualScrollItems = null,
+  onAdvance = null,
   className = ''
 }) => {
   const scrollRef = useRef(null);
@@ -82,6 +84,11 @@ export const HorizontalScroll = ({
 
     const interval = setInterval(() => {
       if (scrollRef.current) {
+        try {
+          onAdvance?.({ reason: 'auto', direction: 'right', by: 1, screenSize });
+        } catch {
+          // ignore
+        }
         const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
         const itemWidth = clientWidth / currentItemsPerView;
         const gap = 12; // gap-3 = 12px
@@ -97,7 +104,7 @@ export const HorizontalScroll = ({
     }, scrollInterval);
 
     return () => clearInterval(interval);
-  }, [autoScroll, scrollInterval, currentItemsPerView]);
+  }, [autoScroll, scrollInterval, currentItemsPerView, onAdvance, screenSize]);
 
   const scroll = (direction) => {
     if (!scrollRef.current) return;
@@ -108,9 +115,20 @@ export const HorizontalScroll = ({
     const totalGapWidth = (currentItemsPerView - 1) * gap;
     const itemWidth = (containerWidth - totalGapWidth) / currentItemsPerView;
     const scrollAmount = itemWidth + gap;
+    const stepCount =
+      manualScrollItems && typeof manualScrollItems === 'object'
+        ? Number(manualScrollItems[screenSize] || 1)
+        : 1;
+    const by = Number.isFinite(stepCount) && stepCount > 0 ? stepCount : 1;
+
+    try {
+      onAdvance?.({ reason: 'manual', direction, by, screenSize });
+    } catch {
+      // ignore
+    }
     
     scrollRef.current.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      left: direction === 'left' ? -scrollAmount * by : scrollAmount * by,
       behavior: 'smooth'
     });
   };
@@ -146,10 +164,10 @@ export const HorizontalScroll = ({
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/25 backdrop-blur-sm border border-white/30 rounded-full p-2 shadow-lg hover:bg-white/40 transition-colors"
           aria-label="Önceki"
         >
-          <ChevronLeft className="w-6 h-6 text-gray-700" />
+          <ChevronLeft className="w-6 h-6 text-gray-800" />
         </button>
       )}
       
@@ -168,10 +186,10 @@ export const HorizontalScroll = ({
       {canScrollRight && (
         <button
           onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/25 backdrop-blur-sm border border-white/30 rounded-full p-2 shadow-lg hover:bg-white/40 transition-colors"
           aria-label="Sonraki"
         >
-          <ChevronRight className="w-6 h-6 text-gray-700" />
+          <ChevronRight className="w-6 h-6 text-gray-800" />
         </button>
       )}
     </div>

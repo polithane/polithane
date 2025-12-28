@@ -8,7 +8,7 @@ import { formatTimeAgo } from '../utils/formatters';
 import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck, Plus, ArrowLeft, Flag } from 'lucide-react';
 import { messages as messagesApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
+import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { apiCall } from '../utils/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
@@ -56,6 +56,23 @@ export const MessagesPage = () => {
     const s = String(pid ?? '').trim();
     return s || '';
   };
+  
+  const selectConversation = (conv, { focus = false } = {}) => {
+    try {
+      if (!conv) return;
+      const pid = getReceiverId(conv);
+      if (!pid) return;
+      focusOnSelectRef.current = !!focus;
+      setTab(String(conv?.message_type || '') === 'request' ? 'requests' : 'regular');
+      setSelectedConv(conv);
+      setError(null);
+      // Keep URL in sync so deep-link effect doesn't keep forcing another convo.
+      navigate(`/messages?to=${encodeURIComponent(pid)}${focus ? '&focus=1' : ''}`, { replace: true });
+    } catch (err) {
+      console.error('Error selecting conversation:', err);
+      setError('Konuşma açılamadı');
+    }
+  };
 
   // Hard guard: messages require authentication.
   useEffect(() => {
@@ -67,22 +84,6 @@ export const MessagesPage = () => {
       });
     }
   }, [authLoading, isAuthenticated, navigate, location.pathname, location.search]);
-
-  // Do not render messages UI until authenticated (prevents brief "guest access" flash).
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container-main py-10">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 text-sm font-semibold text-gray-700">
-            Yükleniyor…
-          </div>
-        </div>
-      </div>
-    );
-  }
-  if (!isAuthenticated) {
-    return null;
-  }
   
   const filteredConversations = useMemo(() => {
     const base = (conversations || []).filter((c) => (tab === 'requests' ? c.message_type === 'request' : c.message_type !== 'request'));
@@ -101,8 +102,14 @@ export const MessagesPage = () => {
   }, [conversations]);
   
   // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (behavior = 'smooth') => {
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    try {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    } catch {
+      el.scrollTop = el.scrollHeight;
+    }
   };
 
   const isNearBottom = () => {
@@ -112,7 +119,7 @@ export const MessagesPage = () => {
     return remaining < 140;
   };
 
-  const canDeleteMessage = (m) => {
+  const canDeleteMessage = () => {
     // Per product: sent messages shouldn't expose a delete action in the thread UI.
     return false;
   };
@@ -207,7 +214,6 @@ export const MessagesPage = () => {
       if (msgPollRef.current) clearInterval(msgPollRef.current);
       msgPollRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConv?.participant_id]);
 
   // Load conversations
@@ -254,12 +260,11 @@ export const MessagesPage = () => {
     // Optional: focus input when coming from profile/message shortcut
     focusOnSelectRef.current = qs.get('focus') === '1';
 
+    // If user already selected another convo manually, don't override unless URL matches selection.
+    if (selectedConv?.participant_id && String(selectedConv.participant_id) === targetId) return;
+
     const existing = (conversations || []).find((c) => String(c?.participant_id) === targetId);
-    if (existing) {
-      setTab('regular');
-      setSelectedConv(existing);
-      return;
-    }
+    if (existing) return selectConversation(existing, { focus: focusOnSelectRef.current });
 
     // If not in list yet, fetch user and create a temporary conversation object.
     (async () => {
@@ -277,12 +282,12 @@ export const MessagesPage = () => {
           message_type: 'regular',
           participant,
         };
-        setTab('regular');
-        setSelectedConv(stub);
+        selectConversation(stub, { focus: focusOnSelectRef.current });
       } catch {
         // ignore
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, conversations, user?.id]);
 
   // If requested via URL, focus message input after selecting the conversation.
@@ -548,6 +553,21 @@ export const MessagesPage = () => {
     }
   };
   
+  // IMPORTANT: keep all hooks above; return guards come last to avoid hook order violations.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="container-main py-10">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 text-sm font-semibold text-gray-700">
+            Yükleniyor…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return null;
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
       <div className="container-main py-8">
@@ -616,15 +636,7 @@ export const MessagesPage = () => {
                   return (
                     <div
                       key={conv.conversation_id}
-                      onClick={() => {
-                        try {
-                          setSelectedConv(conv);
-                          setError(null);
-                        } catch (err) {
-                          console.error('Error selecting conversation:', err);
-                          setError('Konuşma açılamadı');
-                        }
-                      }}
+                      onClick={() => selectConversation(conv)}
                       className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
                         selectedConv?.conversation_id === conv.conversation_id ? 'bg-blue-50' : ''
                       } ${conv.unread_count > 0 ? 'bg-blue-50/30' : ''}`}
@@ -727,13 +739,15 @@ export const MessagesPage = () => {
             {selectedConv ? (
               <>
                 {/* Header */}
-                <div className="p-4 border-b">
+                <div className="p-4 border-b bg-white sticky top-0 z-10">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedConv(null);
                         setMessages([]);
+                        // Clear deep-link param so it doesn't re-open a previous convo.
+                        navigate('/messages', { replace: true });
                       }}
                       className="md:hidden p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
                       title="Mesaj listesi"

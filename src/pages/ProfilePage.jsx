@@ -50,6 +50,8 @@ export const ProfilePage = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [followStats, setFollowStats] = useState({ followers_count: 0, following_count: 0 });
+  const [friendsFollowing, setFriendsFollowing] = useState([]);
+  const [friendsFollowingCount, setFriendsFollowingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [privacyBlocked, setPrivacyBlocked] = useState(false);
@@ -194,6 +196,8 @@ export const ProfilePage = () => {
         const normalizedProfile = normalizeUser(resolvedProfileData);
         setUser(normalizedProfile);
         setHasFast(false);
+        setFriendsFollowing([]);
+        setFriendsFollowingCount(0);
 
         // Load my blocked user ids (for UI state)
         try {
@@ -260,6 +264,22 @@ export const ProfilePage = () => {
           }
         } catch {
           // noop
+        }
+
+        // Small hint: "your friends follow this profile" (auth-only)
+        try {
+          const profileDbId = resolvedProfileData?.id ?? resolvedProfileData?.user_id ?? userId;
+          if (!isOwnProfile && currentUser?.id && profileDbId) {
+            const r = await apiCall(`/api/users/${encodeURIComponent(profileDbId)}/followed-by-friends?limit=3`, { method: 'GET' }).catch(() => null);
+            if (r?.success) {
+              const data = r?.data || {};
+              const list = Array.isArray(data?.friends) ? data.friends : [];
+              setFriendsFollowing(list);
+              setFriendsFollowingCount(Number(data?.count || list.length) || 0);
+            }
+          }
+        } catch {
+          // ignore
         }
 
         // Fast ring: only if there are active fasts (requires auth+follow when not self)
@@ -515,6 +535,36 @@ export const ProfilePage = () => {
                   <div className="text-sm text-gray-500">Polit Puan</div>
                 </div>
               </div>
+
+              {!isOwnProfile && friendsFollowingCount > 0 ? (
+                <div className="mt-3 flex items-center gap-2 text-xs text-gray-600">
+                  <div className="flex -space-x-2 flex-shrink-0">
+                    {(friendsFollowing || []).slice(0, 3).map((f) => (
+                      <Link
+                        key={String(f?.id || '')}
+                        to={getProfilePath(f || {})}
+                        className="rounded-full ring-2 ring-white hover:opacity-90"
+                        title={f?.full_name || ''}
+                      >
+                        <Avatar src={f?.avatar_url} size="20px" verified={isUiVerifiedUser(f)} />
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-semibold">
+                      {(friendsFollowing || [])
+                        .slice(0, 3)
+                        .map((f) => f?.full_name)
+                        .filter(Boolean)
+                        .join(', ')}
+                    </span>
+                    {friendsFollowingCount > Math.min((friendsFollowing || []).length, 3) ? (
+                      <span className="font-semibold"> ve {friendsFollowingCount - Math.min((friendsFollowing || []).length, 3)} kişi daha</span>
+                    ) : null}
+                    <span className="font-semibold"> takip ediyor</span>
+                  </div>
+                </div>
+              ) : null}
             </div>
             
             {/* Aksiyon Butonları */}

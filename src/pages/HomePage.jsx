@@ -27,7 +27,7 @@ export const HomePage = () => {
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
   const [homePostsPerRow, setHomePostsPerRow] = useState(2);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(5);
-  const [desktopVisible, setDesktopVisible] = useState({ hit: 5, mp: 5, org: 5, citizen: 5 });
+  const [desktopVisible, setDesktopVisible] = useState({ hit: 10, mp: 10, org: 10, citizen: 10 });
   const [loading, setLoading] = useState(true);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
@@ -70,24 +70,7 @@ export const HomePage = () => {
     return () => clearTimeout(t);
   }, [activeCategory]);
 
-  // Desktop: show 5 items first, then 5 more shortly after (best-effort).
-  useEffect(() => {
-    if (loading) {
-      setDesktopVisible({ hit: 5, mp: 5, org: 5, citizen: 5 });
-      return;
-    }
-    const t = setTimeout(() => {
-      setDesktopVisible((p) => ({ hit: p.hit + 5, mp: p.mp + 5, org: p.org + 5, citizen: p.citizen + 5 }));
-    }, 800);
-    return () => clearTimeout(t);
-  }, [loading]);
-
-  // As user scrolls and we load more posts, progressively reveal more cards.
-  useEffect(() => {
-    if (!hasUserScrolled) return;
-    setDesktopVisible((p) => ({ hit: p.hit + 5, mp: p.mp + 5, org: p.org + 5, citizen: p.citizen + 5 }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [postsOffset]);
+  // Desktop: initial 10 per category; then reveal progressively as carousel advances.
 
   useEffect(() => {
     // IMPORTANT:
@@ -553,6 +536,10 @@ export const HomePage = () => {
       featuredPosts: featured,
     };
   }, [posts]);
+
+  const mpPostsDesktop = useMemo(() => filterConsecutiveTextAudio(mpPosts, true), [mpPosts]);
+  const organizationPostsDesktop = useMemo(() => filterConsecutiveTextAudio(organizationPosts, true), [organizationPosts]);
+  const citizenPostsDesktop = useMemo(() => filterConsecutiveTextAudio(citizenPosts, true), [citizenPosts]);
   
   // TÜM kategori - Her kategoriden sırayla, round-robin tarzında
   const allPosts = (() => {
@@ -730,8 +717,18 @@ export const HomePage = () => {
                   autoScroll={true} 
                   scrollInterval={4000}
                   itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                  manualScrollItems={{ desktop: 5, tablet: 3, mobile: 2 }}
+                  onAdvance={({ screenSize, by }) => {
+                    if (screenSize !== 'desktop') return;
+                    const inc = Number(by || 0) || 0;
+                    if (inc <= 0) return;
+                    setDesktopVisible((p) => ({
+                      ...p,
+                      hit: Math.min((p.hit || 10) + inc, hitPosts.length),
+                    }));
+                  }}
                 >
-                  {hitPosts.slice(0, Math.max(5, desktopVisible.hit)).map(post => (
+                  {hitPosts.slice(0, Math.max(10, desktopVisible.hit)).map(post => (
                     <PostCardHorizontal 
                       key={post.post_id ?? post.id} 
                       post={post}
@@ -754,8 +751,18 @@ export const HomePage = () => {
                 autoScroll={true} 
                 scrollInterval={5000}
                 itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                manualScrollItems={{ desktop: 5, tablet: 3, mobile: 2 }}
+                onAdvance={({ screenSize, by }) => {
+                  if (screenSize !== 'desktop') return;
+                  const inc = Number(by || 0) || 0;
+                  if (inc <= 0) return;
+                  setDesktopVisible((p) => ({
+                    ...p,
+                    mp: Math.min((p.mp || 10) + inc, mpPostsDesktop.length),
+                  }));
+                }}
               >
-                {filterConsecutiveTextAudio(mpPosts, true).slice(0, Math.max(5, desktopVisible.mp)).map(post => (
+                {mpPostsDesktop.slice(0, Math.max(10, desktopVisible.mp)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}
@@ -778,8 +785,18 @@ export const HomePage = () => {
                 autoScroll={true} 
                 scrollInterval={5000}
                 itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                manualScrollItems={{ desktop: 5, tablet: 3, mobile: 2 }}
+                onAdvance={({ screenSize, by }) => {
+                  if (screenSize !== 'desktop') return;
+                  const inc = Number(by || 0) || 0;
+                  if (inc <= 0) return;
+                  setDesktopVisible((p) => ({
+                    ...p,
+                    org: Math.min((p.org || 10) + inc, organizationPostsDesktop.length),
+                  }));
+                }}
               >
-                {filterConsecutiveTextAudio(organizationPosts, true).slice(0, Math.max(5, desktopVisible.org)).map(post => (
+                {organizationPostsDesktop.slice(0, Math.max(10, desktopVisible.org)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}
@@ -801,8 +818,18 @@ export const HomePage = () => {
                 autoScroll={true} 
                 scrollInterval={5000}
                 itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
+                manualScrollItems={{ desktop: 5, tablet: 3, mobile: 2 }}
+                onAdvance={({ screenSize, by }) => {
+                  if (screenSize !== 'desktop') return;
+                  const inc = Number(by || 0) || 0;
+                  if (inc <= 0) return;
+                  setDesktopVisible((p) => ({
+                    ...p,
+                    citizen: Math.min((p.citizen || 10) + inc, citizenPostsDesktop.length),
+                  }));
+                }}
               >
-                {filterConsecutiveTextAudio(citizenPosts, true).slice(0, Math.max(5, desktopVisible.citizen)).map(post => (
+                {citizenPostsDesktop.slice(0, Math.max(10, desktopVisible.citizen)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}

@@ -2213,6 +2213,65 @@ async function getFollowing(req, res, targetId) {
   return res.json({ success: true, data: list });
 }
 
+async function getUserFollowedByFriends(req, res, targetId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+  const tid = String(targetId || '').trim();
+  const isValidId = /^\d+$/.test(tid) || /^[0-9a-fA-F-]{36}$/.test(tid);
+  if (!tid || !isValidId) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+
+  const lim = Math.min(parseInt(req?.query?.limit, 10) || 3, 10);
+
+  // 1) Get ids I follow (friends)
+  const myFollowingRows = await supabaseRestGet('follows', {
+    select: 'following_id',
+    follower_id: `eq.${auth.id}`,
+    limit: '500',
+  }).catch(() => []);
+  const myFollowingIds = Array.from(
+    new Set((myFollowingRows || []).map((r) => String(r?.following_id || '').trim()).filter(Boolean))
+  );
+  if (myFollowingIds.length === 0) {
+    return res.json({ success: true, data: { count: 0, friends: [] } });
+  }
+
+  // 2) Among those, who follows the target profile?
+  const followerRows = await supabaseRestGet('follows', {
+    select: 'follower_id',
+    following_id: `eq.${tid}`,
+    follower_id: `in.(${myFollowingIds.join(',')})`,
+    limit: '500',
+  }).catch(() => []);
+  const friendIds = Array.from(
+    new Set((followerRows || []).map((r) => String(r?.follower_id || '').trim()).filter(Boolean))
+  );
+  if (friendIds.length === 0) {
+    return res.json({ success: true, data: { count: 0, friends: [] } });
+  }
+
+  // 3) Fetch friend user objects (small payload)
+  const usersRows = await supabaseRestGet('users', {
+    select: 'id,username,full_name,avatar_url,profile_image,verification_badge,is_verified,is_active',
+    id: `in.(${friendIds.join(',')})`,
+    is_active: 'eq.true',
+    limit: String(Math.min(friendIds.length, 50)),
+  }).catch(() => []);
+
+  const friends = (usersRows || [])
+    .filter(Boolean)
+    .map((u) => ({
+      id: u.id,
+      username: u.username,
+      full_name: u.full_name,
+      avatar_url: u.avatar_url || u.profile_image || null,
+      verification_badge: u.verification_badge ?? u.is_verified ?? false,
+    }))
+    .slice(0, lim);
+
+  return res.json({ success: true, data: { count: friendIds.length, friends } });
+}
+
 async function getUserPosts(req, res, username) {
     const auth = verifyJwtFromRequest(req);
     // Resolve user id by username
@@ -7579,6 +7638,7 @@ export default async function handler(req, res) {
           if (id && tail === 'follow-stats' && req.method === 'GET') return await getFollowStats(req, res, id);
           if (id && tail === 'followers' && req.method === 'GET') return await getFollowers(req, res, id);
           if (id && tail === 'following' && req.method === 'GET') return await getFollowing(req, res, id);
+          if (id && tail === 'followed-by-friends' && req.method === 'GET') return await getUserFollowedByFriends(req, res, id);
           if (id && tail === 'report' && req.method === 'POST') return await reportUser(req, res, id);
           if (id && !tail) return await getUserDetail(req, res, id); // Profile
       }
