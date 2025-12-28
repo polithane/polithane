@@ -112,6 +112,7 @@ export const CreatePolitPage = () => {
 
   const [primaryPost, setPrimaryPost] = useState(null);
   const [offerBusy, setOfferBusy] = useState(false);
+  const [descTarget, setDescTarget] = useState('primary'); // primary | cross
 
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
@@ -681,6 +682,41 @@ export const CreatePolitPage = () => {
     }
   };
 
+  const publishCrossWithText = async () => {
+    if (!primaryPost) return;
+    if (!isFastMode) return; // only needed for Fast -> Polit flow
+    if (offerBusy) return;
+    if (publishLockRef.current) return;
+
+    const trimmed = String(text || '').trim();
+    if (trimmed.length < TEXT_MIN) return toast.error(`Metin en az ${TEXT_MIN} karakter olmalı.`);
+    if (trimmed.length > TEXT_MAX) return toast.error(`Metin en fazla ${TEXT_MAX} karakter olabilir.`);
+
+    publishLockRef.current = true;
+    setOfferBusy(true);
+    try {
+      const base = {
+        content: trimmed,
+        content_text: trimmed,
+        content_type: String(primaryPost?.content_type || contentType || 'text').trim(),
+        category: String(primaryPost?.category || 'general'),
+        agenda_tag: primaryPost?.agenda_tag ?? agendaTag ?? null,
+        media_urls: Array.isArray(primaryPost?.media_urls) ? primaryPost.media_urls : [],
+        ...(primaryPost?.media_duration ? { media_duration: primaryPost.media_duration } : {}),
+      };
+      const payload = { ...base, is_trending: false };
+      const r = await postsApi.create(payload).catch(() => null);
+      const id = r?.data?.id;
+      const ok = !!(r?.success && id);
+      if (!ok) return toast.error('Polit yayınlanamadı. Lütfen tekrar deneyin.');
+      toast.success('Polit yayınlandı.');
+      navigate(`/post/${encodeURIComponent(id)}`);
+    } finally {
+      setOfferBusy(false);
+      publishLockRef.current = false;
+    }
+  };
+
   const finishNo = () => {
     if (isFastMode) navigate('/fast');
     else navigate(primaryPost?.id ? `/post/${primaryPost.id}` : '/');
@@ -1056,7 +1092,10 @@ export const CreatePolitPage = () => {
                     <button
                       type="button"
                       disabled={!hasMedia}
-                      onClick={() => setStep('desc')}
+                      onClick={() => {
+                        setDescTarget('primary');
+                        setStep('desc');
+                      }}
                       className={['w-full py-4 rounded-2xl text-white font-black disabled:opacity-60', theme.btnClass].join(' ')}
                     >
                       Devam
@@ -1077,7 +1116,9 @@ export const CreatePolitPage = () => {
               {/* STEP: DESC */}
               {step === 'desc' ? (
                 <div className="space-y-3">
-                  <div className="text-lg font-black text-gray-900">Kısa bir başlık yada açıklama giriniz!</div>
+                  <div className="text-lg font-black text-gray-900">
+                    {descTarget === 'cross' ? 'Polit için kısa bir başlık yada açıklama giriniz!' : 'Kısa bir başlık yada açıklama giriniz!'}
+                  </div>
                   <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
@@ -1099,10 +1140,16 @@ export const CreatePolitPage = () => {
                   <button
                     type="button"
                     disabled={loading || !canSubmitText}
-                    onClick={publishPrimary}
+                    onClick={descTarget === 'cross' ? publishCrossWithText : publishPrimary}
                     className={['w-full py-4 rounded-2xl text-white font-black disabled:opacity-60', theme.btnClass].join(' ')}
                   >
-                    {loading ? 'Gönderiliyor…' : isFastMode ? 'Fast At' : 'Polit At'}
+                    {loading
+                      ? 'Gönderiliyor…'
+                      : descTarget === 'cross'
+                        ? 'Polit At'
+                        : isFastMode
+                          ? 'Fast At'
+                          : 'Polit At'}
                   </button>
                 </div>
               ) : null}
@@ -1125,7 +1172,16 @@ export const CreatePolitPage = () => {
                     <button
                       type="button"
                       disabled={offerBusy}
-                      onClick={finishYes}
+                      onClick={() => {
+                        // Requirement: If a Fast media post is being cross-published as Polit,
+                        // require a real description before creating the Polit.
+                        if (isFastMode && contentType !== 'text') {
+                          setDescTarget('cross');
+                          setStep('desc');
+                          return;
+                        }
+                        finishYes();
+                      }}
                       className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}
                     >
                       <div className="text-2xl">EVET</div>
