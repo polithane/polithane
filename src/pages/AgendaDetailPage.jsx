@@ -29,6 +29,15 @@ export const AgendaDetailPage = () => {
   // Some older mock data used `participant_count`; API doesn't guarantee it.
   const agendaParticipantCount = Number(agenda?.participant_count ?? 0);
   
+  // Detail pages should always start at top.
+  useEffect(() => {
+    try {
+      window.scrollTo(0, 0);
+    } catch {
+      // ignore
+    }
+  }, [agendaSlug]);
+
   useEffect(() => {
     (async () => {
       // Resolve agenda from admin list (by slug first, fallback to title)

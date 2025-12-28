@@ -29,9 +29,11 @@ export const MessagesPage = () => {
   const [reportDetails, setReportDetails] = useState('');
   const [reportDone, setReportDone] = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesAreaRef = useRef(null);
   const fileRef = useRef(null);
   const messageInputRef = useRef(null);
   const focusOnSelectRef = useRef(false);
+  const shouldAutoScrollRef = useRef(true);
   
   const [conversations, setConversations] = useState([]);
   const convPollRef = useRef(null);
@@ -102,6 +104,13 @@ export const MessagesPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const isNearBottom = () => {
+    const el = messagesAreaRef.current;
+    if (!el) return true;
+    const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+    return remaining < 140;
+  };
+
   const canDeleteMessage = (m) => {
     if (!m) return false;
     if (String(m.sender_id) !== String(user?.id || '')) return false;
@@ -113,12 +122,13 @@ export const MessagesPage = () => {
   const previewConversationText = (v) => {
     const s = String(v || '').trim();
     if (!s) return '';
-    if (s.startsWith('{') && s.endsWith('}')) {
+    if (s.startsWith('{')) {
       try {
         const obj = JSON.parse(s);
         if (obj && typeof obj === 'object' && obj.type === 'image') return 'Resim gönderildi.';
       } catch {
-        // ignore
+        // If it's a truncated JSON preview, still avoid showing raw payload.
+        if (s.includes('"type":"image"') || s.includes('"type": "image"')) return 'Resim gönderildi.';
       }
     }
     return s;
@@ -164,6 +174,7 @@ export const MessagesPage = () => {
     const tick = async () => {
       try {
         if (document?.hidden) return;
+        const wantAutoScroll = shouldAutoScrollRef.current || isNearBottom();
         const r = await messagesApi.getMessages(otherId);
         if (!r?.success) return;
         const next = Array.isArray(r.data) ? r.data : [];
@@ -185,6 +196,10 @@ export const MessagesPage = () => {
           merged.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
           return merged;
         });
+        if (wantAutoScroll) {
+          shouldAutoScrollRef.current = true;
+          setTimeout(scrollToBottom, 80);
+        }
       } catch {
         // ignore
       }
@@ -408,6 +423,7 @@ export const MessagesPage = () => {
       setNewMessage('');
       
       // Scroll to bottom after sending
+      shouldAutoScrollRef.current = true;
       setTimeout(scrollToBottom, 100);
     } catch (err) {
       console.error('Error sending message:', err);
@@ -746,7 +762,13 @@ export const MessagesPage = () => {
                 </div>
                 
                 {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                <div
+                  ref={messagesAreaRef}
+                  className="flex-1 overflow-y-auto p-4 bg-gray-50"
+                  onScroll={() => {
+                    shouldAutoScrollRef.current = isNearBottom();
+                  }}
+                >
                   {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
                       <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -824,22 +846,23 @@ export const MessagesPage = () => {
                                     </span>
                                   )}
                                   {isFromMe && (
-                                    <button
-                                      type="button"
-                                      className="inline-flex items-center gap-1 text-gray-400 hover:text-red-600"
-                                      title="Mesajı sil"
-                                      style={{ display: canDeleteMessage(message) ? undefined : 'none' }}
-                                      onClick={async () => {
-                                        try {
-                                          await messagesApi.delete(message.id);
-                                          setMessages((prev) => prev.filter((m) => m.id !== message.id));
-                                        } catch (e) {
-                                          setError(e?.message || 'Mesaj silinemedi');
-                                        }
-                                      }}
-                                    >
-                                      <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
-                                    </button>
+                                    canDeleteMessage(message) ? (
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1 text-gray-400 hover:text-red-600"
+                                        title="Mesajı sil"
+                                        onClick={async () => {
+                                          try {
+                                            await messagesApi.delete(message.id);
+                                            setMessages((prev) => prev.filter((m) => m.id !== message.id));
+                                          } catch (e) {
+                                            setError(e?.message || 'Mesaj silinemedi');
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
+                                      </button>
+                                    ) : null
                                   )}
                                 </div>
                               </div>
@@ -870,7 +893,9 @@ export const MessagesPage = () => {
                       type="text"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSendMessage();
+                      }}
                       placeholder="Mesajınızı yazın..."
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
                     />

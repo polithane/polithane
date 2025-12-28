@@ -77,6 +77,17 @@ export const PostDetailPage = () => {
     load();
   }, [postId]);
 
+  // Detail pages should start at top, except when opened via the "comment" shortcut.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search || '');
+    if (q.get('comment') === '1') return;
+    try {
+      window.scrollTo(0, 0);
+    } catch {
+      // ignore
+    }
+  }, [postId, location.search]);
+
   // Reset image selection when switching posts
   useEffect(() => {
     setActiveImageIdx(0);

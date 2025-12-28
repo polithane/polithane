@@ -28,6 +28,15 @@ export const PartyDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
+  // Detail pages should always start at top.
+  useEffect(() => {
+    try {
+      window.scrollTo(0, 0);
+    } catch {
+      // ignore
+    }
+  }, [partyId]);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);

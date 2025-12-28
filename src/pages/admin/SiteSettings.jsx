@@ -32,6 +32,7 @@ export const SiteSettings = () => {
     allowRegistration: true,
     allowComments: true,
     allowMessages: true,
+    homePostsPerRow: 2,
     // E-posta ayarları
     email_verification_enabled: 'true',
     email_service_provider: 'smtp',
@@ -74,6 +75,7 @@ export const SiteSettings = () => {
             allowRegistration: fromSettingBool(d.allow_registration, prev.allowRegistration),
             allowComments: fromSettingBool(d.allow_comments, prev.allowComments),
             allowMessages: fromSettingBool(d.allow_messages, prev.allowMessages),
+            homePostsPerRow: Math.max(1, Math.min(3, parseInt(String(d.home_posts_per_row ?? prev.homePostsPerRow), 10) || prev.homePostsPerRow)),
 
             email_verification_enabled: d.email_verification_enabled ?? prev.email_verification_enabled,
             email_service_provider: d.email_service_provider ?? prev.email_service_provider,
@@ -123,6 +125,7 @@ export const SiteSettings = () => {
           allow_registration: !!settings.allowRegistration,
           allow_comments: !!settings.allowComments,
           allow_messages: !!settings.allowMessages,
+          home_posts_per_row: Math.max(1, Math.min(3, Number(settings.homePostsPerRow) || 2)),
           social_links: settings.socialLinks || {},
           email_verification_enabled: settings.email_verification_enabled,
           email_service_provider: settings.email_service_provider,
@@ -174,6 +177,30 @@ export const SiteSettings = () => {
       </div>
       
       <div className="space-y-6">
+        {/* Home feed layout */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Globe className="w-5 h-5 text-primary-blue" />
+            Ana Sayfa Görünümü
+          </h3>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="font-semibold">Ana sayfada satır başına Polit</p>
+              <p className="text-sm text-gray-600">Mobilde bir satırda kaç Polit kartı görünsün?</p>
+            </div>
+            <select
+              value={String(settings.homePostsPerRow)}
+              onChange={(e) => handleChange('homePostsPerRow', parseInt(e.target.value, 10) || 2)}
+              className="px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+            >
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </div>
+        </div>
+
         {/* E-posta Ayarları */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">

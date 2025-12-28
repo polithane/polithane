@@ -25,6 +25,7 @@ export const HomePage = () => {
   const [users, setUsers] = useState([]);
   const [polifest, setPolifest] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
+  const [homePostsPerRow, setHomePostsPerRow] = useState(2);
   const [loading, setLoading] = useState(true);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
@@ -117,10 +118,11 @@ export const HomePage = () => {
       setLoading(true);
       try {
         // Partiler + postlar (paged) (tamamı DB - Vercel /api üzerinden)
-        const [partiesData, postsData, parliamentRes] = await Promise.all([
+        const [partiesData, postsData, parliamentRes, publicSiteRes] = await Promise.all([
           api.parties.getAll().catch(() => []),
           api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: 0, order: 'created_at.desc' }).catch(() => []),
           apiCall('/api/public/parliament', { method: 'GET' }).catch(() => null),
+          apiCall('/api/public/site', { method: 'GET' }).catch(() => null),
         ]);
 
         // Partiler (DB)
@@ -141,6 +143,15 @@ export const HomePage = () => {
           );
         } else {
           setParliamentDistribution(currentParliamentDistribution);
+        }
+
+        // Home layout settings
+        const hpr = publicSiteRes?.data?.homePostsPerRow;
+        if (hpr !== undefined && hpr !== null) {
+          const n = Math.max(1, Math.min(3, parseInt(String(hpr), 10) || 2));
+          setHomePostsPerRow(n);
+        } else {
+          setHomePostsPerRow(2);
         }
 
         const partyMap = new Map((partiesData || []).map((p) => [p.id, p]));
@@ -546,8 +557,13 @@ export const HomePage = () => {
                       {activeTab.id === 'all' ? 'TÜM İÇERİKLER' : `${activeTab.name.toUpperCase()} GÜNDEMİ`}
                     </h2>
                   </div>
-                  {/* Tek Kolon Layout - Dikey Scroll (X/Twitter gibi) */}
-                  <div className="flex flex-col gap-3">
+                  {/* Mobil grid (admin ayarlı): satır başına Polit sayısı */}
+                  <div
+                    className={[
+                      'grid gap-3',
+                      homePostsPerRow >= 3 ? 'grid-cols-3' : homePostsPerRow === 2 ? 'grid-cols-2' : 'grid-cols-1',
+                    ].join(' ')}
+                  >
                     {activeTab.posts.slice(0, 20).map(post => (
                       <PostCardHorizontal 
                         key={post.post_id ?? post.id} 

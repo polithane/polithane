@@ -30,28 +30,28 @@ export const AgendaBar = ({ agendas = [] }) => {
     let fireIcon = null;
     if (index === 0) {
       // 1. en sıcak - büyük ateş - ÇOK HIZLI yanıp sönme (0.3s - çok hızlı flash)
-      fireIcon = <Flame className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" fill="currentColor" style={{animation: 'pulse 0.3s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
+      fireIcon = <Flame className="w-5 h-5 text-red-600" fill="currentColor" style={{animation: 'pulse 0.3s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     } else if (index === 1) {
       // 2. orta sıcak - orta ateş - ORTA HIZLI (0.6s - orta hız flash)
-      fireIcon = <Flame className="w-6 h-6 sm:w-5 sm:h-5 text-orange-500" fill="currentColor" style={{animation: 'pulse 0.6s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
+      fireIcon = <Flame className="w-5 h-5 text-orange-500" fill="currentColor" style={{animation: 'pulse 0.6s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     } else if (index === 2) {
       // 3. hafif sıcak - küçük ateş - YAVAŞ (1s - yavaş flash)
-      fireIcon = <Flame className="w-6 h-6 sm:w-5 sm:h-5 text-yellow-500" fill="currentColor" style={{animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
+      fireIcon = <Flame className="w-5 h-5 text-yellow-500" fill="currentColor" style={{animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     }
     
     return (
       <button
         key={getAgendaId(agenda)}
         onClick={() => navigate(`/agenda/${getAgendaSlug(agenda)}`)}
-        className="group flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-1 min-w-0 h-[36px]"
+        className="group flex items-center gap-2 px-2.5 py-1 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-1 min-w-0 h-[28px]"
       >
         {fireIcon && <span className="flex-shrink-0">{fireIcon}</span>}
-        <span className="text-xs font-medium truncate text-left flex-1">
+        <span className="text-[11px] font-semibold truncate text-left flex-1">
           {getAgendaTitle(agenda)}
         </span>
         <span
           className={[
-            'text-[10px] px-1.5 py-0.5 rounded-full font-black transition-colors flex-shrink-0',
+            'text-[9px] px-1.5 py-0.5 rounded-full font-black transition-colors flex-shrink-0',
             // Always high-contrast
             'bg-gray-900 text-white',
             // When hovering the agenda button, invert for contrast on blue
@@ -70,7 +70,7 @@ export const AgendaBar = ({ agendas = [] }) => {
   const AdSpace = () => (
     <div className="flex-1 min-w-[180px] max-w-[220px]">
       <div
-        className="h-[36px] px-3 py-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center"
+        className="h-[28px] px-3 py-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center"
         onClick={() => window.open('https://yusufbank.com', '_blank')}
       >
         <div className="text-center">
@@ -84,7 +84,7 @@ export const AgendaBar = ({ agendas = [] }) => {
   const AllAgendasButton = () => (
     <button
       onClick={() => navigate('/agendas')}
-      className="flex items-center justify-center px-4 py-1.5 bg-primary-blue hover:bg-[#0088bb] text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0 font-bold text-xs h-[36px]"
+      className="flex items-center justify-center px-4 py-1 bg-primary-blue hover:bg-[#0088bb] text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0 font-bold text-[11px] h-[28px]"
     >
       TÜM GÜNDEME BAK
     </button>
@@ -93,23 +93,23 @@ export const AgendaBar = ({ agendas = [] }) => {
   return (
     <div className="mb-4">
       {/* MOBİL İÇİN: Compact ve Sticky - 3 gündem başlangıç */}
-      <div className="md:hidden sticky top-0 z-20 bg-gray-50 pb-3 -mx-4 px-4 pt-2">
+      <div className="md:hidden sticky top-0 z-20 bg-gray-50 pb-2 -mx-4 px-4 pt-1">
         
         {/* Gündem Pills - İlk 3 Gündem + Reklam */}
-        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-3">
+        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-2">
           <div className="grid grid-flow-col auto-cols-max gap-2">
           {/* İlk 3 Gündem */}
           {visibleAgendas.slice(0, 3).map((agenda, index) => (
             <button
               key={getAgendaId(agenda)}
               onClick={() => navigate(`/agenda/${getAgendaSlug(agenda)}`)}
-              className="group flex-shrink-0 px-3 py-1.5 bg-white border-2 border-primary-blue text-primary-blue rounded-full text-xs font-semibold shadow-sm whitespace-nowrap flex items-center gap-1 transition-colors hover:bg-primary-blue hover:text-white"
+              className="group flex-shrink-0 px-2.5 py-1 bg-white border-2 border-primary-blue text-primary-blue rounded-full text-[11px] font-semibold shadow-sm whitespace-nowrap flex items-center gap-1 transition-colors hover:bg-primary-blue hover:text-white"
             >
               <Flame 
                 className={
-                  index === 0 ? "w-5 h-5 text-red-600" : 
-                  index === 1 ? "w-5 h-5 text-orange-500" : 
-                  "w-5 h-5 text-yellow-500"
+                  index === 0 ? "w-4 h-4 text-red-600" : 
+                  index === 1 ? "w-4 h-4 text-orange-500" : 
+                  "w-4 h-4 text-yellow-500"
                 } 
                 fill="currentColor"
                 style={{
@@ -117,7 +117,7 @@ export const AgendaBar = ({ agendas = [] }) => {
                 }}
               />
               <span className="truncate max-w-[140px]">{getAgendaTitle(agenda)}</span>
-              <span className="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded-full font-black transition-colors group-hover:bg-white group-hover:text-primary-blue hover:bg-black hover:text-white">
+              <span className="text-[9px] bg-gray-900 text-white px-1.5 py-0.5 rounded-full font-black transition-colors group-hover:bg-white group-hover:text-primary-blue hover:bg-black hover:text-white">
                 {formatPolitScore(getAgendaScore(agenda))}
               </span>
             </button>
@@ -126,7 +126,7 @@ export const AgendaBar = ({ agendas = [] }) => {
           {/* 4. Pozisyon - REKLAM (MOBİL) */}
           <button
             onClick={() => window.open('https://yusufbank.com', '_blank')}
-            className="flex-shrink-0 px-4 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-full text-xs font-bold shadow-md whitespace-nowrap"
+            className="flex-shrink-0 px-4 py-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-full text-[11px] font-bold shadow-md whitespace-nowrap"
           >
             🏦 YusufBANK
           </button>

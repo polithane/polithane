@@ -73,6 +73,15 @@ export const ProfilePage = () => {
     normalizeUsername(username || '') === normalizeUsername(currentUser.username || '')
   );
 
+  // Detail pages should always start at top (unless explicitly deep-linked to a section).
+  useEffect(() => {
+    try {
+      window.scrollTo(0, 0);
+    } catch {
+      // ignore
+    }
+  }, [userId, username]);
+
   const canShowMessageButton = useMemo(() => {
     if (isOwnProfile) return false;
     if (!user) return false;
@@ -224,7 +233,8 @@ export const ProfilePage = () => {
             const dbPosts = await posts.getAll({
               user_id: profileDbId,
               limit: 50,
-              order: 'polit_score.desc',
+              // Profile "Politler" list is time-based: newest on top.
+              order: 'created_at.desc',
             });
             setUserPosts((dbPosts || []).map(mapDbPostToUi).filter(Boolean));
           } else {

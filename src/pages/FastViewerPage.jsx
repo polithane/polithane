@@ -95,7 +95,7 @@ export const FastViewerPage = () => {
           </div>
         </div>
         <button onClick={closeToList} className="p-3 rounded-full bg-black/45 hover:bg-black/60">
-          <X className="w-10 h-10" />
+          <X className="w-14 h-14" />
         </button>
       </div>
 

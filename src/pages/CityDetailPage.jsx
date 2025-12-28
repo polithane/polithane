@@ -19,6 +19,15 @@ export const CityDetailPage = () => {
   const [districtFilter, setDistrictFilter] = useState(''); // only for district_* tabs
   const [cityData, setCityData] = useState(null);
   
+  // Detail pages should always start at top.
+  useEffect(() => {
+    try {
+      window.scrollTo(0, 0);
+    } catch {
+      // ignore
+    }
+  }, [cityCode]);
+
   useEffect(() => {
     const load = async () => {
       const cityName = CITY_CODES[cityCode] || cityCode;

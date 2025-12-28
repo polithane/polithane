@@ -994,63 +994,68 @@ async function trackPostShare(req, res, postId) {
 }
 
 async function toggleCommentLike(req, res, commentId) {
-  const auth = verifyJwtFromRequest(req);
-  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
-  const cid = String(commentId || '').trim();
-  if (!isSafeId(cid)) return res.status(400).json({ success: false, error: 'Geçersiz yorum.' });
-
-  // Try to use likes table with comment_id if available
-  let supportsCommentId = true;
   try {
-    await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${cid}`, user_id: `eq.${auth.id}`, limit: '1' });
-  } catch (e) {
-    const msg = String(e?.message || '');
-    if (msg.includes('comment_id')) supportsCommentId = false;
-  }
+    const auth = verifyJwtFromRequest(req);
+    if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const cid = String(commentId || '').trim();
+    if (!isSafeId(cid)) return res.status(400).json({ success: false, error: 'Geçersiz yorum.' });
 
-  const commentRows = await supabaseRestGet('comments', { select: '*', id: `eq.${cid}`, limit: '1' }).catch(() => []);
-  const c = commentRows?.[0];
-  if (!c) return res.status(404).json({ success: false, error: 'Yorum bulunamadı.' });
-
-  if (supportsCommentId) {
+    // Try to use likes table with comment_id if available
+    let supportsCommentId = true;
     try {
-      const existing = await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${cid}`, user_id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
-      if (existing && existing.length > 0) {
-        await supabaseRestDelete('likes', { comment_id: `eq.${cid}`, user_id: `eq.${auth.id}` }).catch(() => null);
-        const next = Math.max(0, Number(c.like_count || 0) - 1);
-        await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: next }).catch(() => null);
-        return res.json({ success: true, action: 'unliked', like_count: next });
-      }
-      await supabaseRestInsert('likes', [{ comment_id: cid, user_id: auth.id }]).catch(() => {
-        // Insert can fail due to schema constraints (e.g. post_id NOT NULL) even if comment_id exists.
-        throw new Error('LIKES_SCHEMA_UNSUPPORTED');
-      });
-      const next = Number(c.like_count || 0) + 1;
-      await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: next }).catch(() => null);
-      return res.json({ success: true, action: 'liked', like_count: next });
+      await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${cid}`, user_id: `eq.${auth.id}`, limit: '1' });
     } catch (e) {
       const msg = String(e?.message || '');
-      if (msg.includes('comment_id') || msg.includes('post_id') || msg.includes('LIKES_SCHEMA_UNSUPPORTED')) {
-        supportsCommentId = false;
-      } else {
-        // If anything unexpected happens, fallback instead of 500.
-        supportsCommentId = false;
+      if (msg.includes('comment_id')) supportsCommentId = false;
+    }
+
+    const commentRows = await supabaseRestGet('comments', { select: '*', id: `eq.${cid}`, limit: '1' }).catch(() => []);
+    const c = commentRows?.[0];
+    if (!c) return res.status(404).json({ success: false, error: 'Yorum bulunamadı.' });
+
+    if (supportsCommentId) {
+      try {
+        const existing = await supabaseRestGet('likes', { select: 'id', comment_id: `eq.${cid}`, user_id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+        if (existing && existing.length > 0) {
+          await supabaseRestDelete('likes', { comment_id: `eq.${cid}`, user_id: `eq.${auth.id}` }).catch(() => null);
+          const next = Math.max(0, Number(c.like_count || 0) - 1);
+          await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: next }).catch(() => null);
+          return res.json({ success: true, action: 'unliked', like_count: next });
+        }
+        await supabaseRestInsert('likes', [{ comment_id: cid, user_id: auth.id }]).catch(() => {
+          // Insert can fail due to schema constraints (e.g. post_id NOT NULL) even if comment_id exists.
+          throw new Error('LIKES_SCHEMA_UNSUPPORTED');
+        });
+        const next = Number(c.like_count || 0) + 1;
+        await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: next }).catch(() => null);
+        return res.json({ success: true, action: 'liked', like_count: next });
+      } catch (e) {
+        const msg = String(e?.message || '');
+        if (msg.includes('comment_id') || msg.includes('post_id') || msg.includes('LIKES_SCHEMA_UNSUPPORTED')) {
+          supportsCommentId = false;
+        } else {
+          // If anything unexpected happens, fallback instead of 500.
+          supportsCommentId = false;
+        }
       }
     }
+
+    // Fallback: track liked comment ids in user.metadata (requires users.metadata)
+    const users = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+    const me = users?.[0] || null;
+    const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
+    const liked = Array.isArray(meta.liked_comment_ids) ? meta.liked_comment_ids.map(String) : [];
+    const has = liked.includes(String(cid));
+    const nextLiked = has ? liked.filter((x) => x !== String(cid)) : [String(cid), ...liked].slice(0, 5000);
+    const nextCount = Math.max(0, Number(c.like_count || 0) + (has ? -1 : 1));
+
+    await safeUserPatch(auth.id, { metadata: { ...meta, liked_comment_ids: nextLiked } }).catch(() => null);
+    await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: nextCount }).catch(() => null);
+    return res.json({ success: true, action: has ? 'unliked' : 'liked', like_count: nextCount });
+  } catch (e) {
+    // Prevent Vercel from returning a non-JSON 500 (so client doesn't show generic "Sunucu hatası").
+    return res.status(500).json({ success: false, error: 'Beğeni işlemi şu an yapılamıyor. Lütfen tekrar deneyin.' });
   }
-
-  // Fallback: track liked comment ids in user.metadata (requires users.metadata)
-  const users = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
-  const me = users?.[0] || null;
-  const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
-  const liked = Array.isArray(meta.liked_comment_ids) ? meta.liked_comment_ids.map(String) : [];
-  const has = liked.includes(String(cid));
-  const nextLiked = has ? liked.filter((x) => x !== String(cid)) : [String(cid), ...liked].slice(0, 5000);
-  const nextCount = Math.max(0, Number(c.like_count || 0) + (has ? -1 : 1));
-
-  await safeUserPatch(auth.id, { metadata: { ...meta, liked_comment_ids: nextLiked } }).catch(() => null);
-  await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: nextCount }).catch(() => null);
-  return res.json({ success: true, action: has ? 'unliked' : 'liked', like_count: nextCount });
 }
 
 async function adminListPendingComments(req, res) {
@@ -4954,12 +4959,13 @@ async function getConversations(req, res) {
   const conversationPreview = (content) => {
     const s = String(content || '').trim();
     if (!s) return '';
-    if (s.startsWith('{') && s.endsWith('}')) {
+    if (s.startsWith('{')) {
       try {
         const obj = JSON.parse(s);
         if (obj && typeof obj === 'object' && obj.type === 'image') return 'Resim gönderildi.';
       } catch {
-        // ignore
+        // If it's a truncated JSON preview, still avoid showing raw payload.
+        if (s.includes('"type":"image"') || s.includes('"type": "image"')) return 'Resim gönderildi.';
       }
     }
     return s;
@@ -5868,6 +5874,10 @@ async function updateSiteSettings(req, res) {
     Prefer: 'return=representation,resolution=merge-duplicates',
   });
 
+  // Invalidate public cache so changes take effect immediately.
+  publicSiteCache = null;
+  publicSiteCacheAt = 0;
+
   return res.json({ success: true, data: { updated: rows.length } });
 }
 
@@ -5958,6 +5968,8 @@ async function getPublicSite(req, res) {
     allowComments: String(map.allow_comments || '').trim() !== 'false',
     allowMessages: String(map.allow_messages || '').trim() !== 'false',
     socialLinks: socialObj && typeof socialObj === 'object' ? socialObj : {},
+    // Home feed layout (admin-controlled)
+    homePostsPerRow: Math.max(1, Math.min(3, parseInt(String(map.home_posts_per_row || '2'), 10) || 2)),
   };
 
   publicSiteCache = out;

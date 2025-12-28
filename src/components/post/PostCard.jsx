@@ -306,7 +306,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
         <div className="flex items-center gap-6">
           <button
             type="button"
-            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-sm"
+            className="flex items-center gap-1.5 text-primary-blue hover:text-blue-700 text-base"
             onClick={(e) => {
               e.stopPropagation();
               if (!postId) return;
@@ -314,21 +314,21 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             }}
             title="Detayı aç"
           >
-            <Eye className="w-5 h-5 sm:w-4 sm:h-4" />
-            <span className="text-sm">{formatNumber(post.view_count)}</span>
+            <Eye className="w-6 h-6" />
+            <span className="text-base font-bold">{formatNumber(post.view_count)}</span>
           </button>
           <button
             type="button"
-            className={`flex items-center gap-1 text-sm ${isLiked ? 'text-red-600' : 'text-gray-600 hover:text-red-500'}`}
+            className="flex items-center gap-1.5 text-red-600 hover:text-red-700 text-base"
             onClick={handleToggleLike}
             title={isLiked ? 'Beğeniyi geri al' : 'Beğen'}
           >
-            <Heart className="w-5 h-5 sm:w-4 sm:h-4" fill={isLiked ? 'currentColor' : 'none'} />
-            <span className="text-sm">{formatNumber(likeCount)}</span>
+            <Heart className="w-6 h-6" fill={isLiked ? 'currentColor' : 'none'} />
+            <span className="text-base font-bold text-gray-800">{formatNumber(likeCount)}</span>
           </button>
           <button
             type="button"
-            className="flex items-center gap-1 text-gray-600 hover:text-primary-blue text-sm"
+            className="flex items-center gap-1.5 text-amber-600 hover:text-amber-700 text-base"
             onClick={(e) => {
               e.stopPropagation();
               if (!postId) return;
@@ -336,13 +336,13 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             }}
             title="Yorum yap"
           >
-            <MessageCircle className="w-5 h-5 sm:w-4 sm:h-4" />
-            <span className="text-sm">{formatNumber(post.comment_count)}</span>
+            <MessageCircle className="w-6 h-6" />
+            <span className="text-base font-bold text-gray-800">{formatNumber(post.comment_count)}</span>
           </button>
         </div>
         <button
           type="button"
-          className="text-gray-600 hover:text-primary-blue"
+          className="text-emerald-600 hover:text-emerald-700"
           onClick={(e) => {
             e.stopPropagation();
             setShareCopied(false);
@@ -359,7 +359,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           }}
           title="Paylaş"
         >
-          <Share2 className="w-5 h-5 sm:w-4 sm:h-4" />
+          <Share2 className="w-6 h-6" />
         </button>
       </div>
 
