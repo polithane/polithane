@@ -7,6 +7,16 @@ export const FastPage = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const FAST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+  const filterActiveFastUsers = (list) => {
+    const now = Date.now();
+    return (Array.isArray(list) ? list : []).filter((x) => {
+      const t = new Date(x?.latest_created_at || 0).getTime();
+      if (!Number.isFinite(t) || t <= 0) return false;
+      return now - t < FAST_MAX_AGE_MS;
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -15,7 +25,7 @@ export const FastPage = () => {
       try {
         const r = await apiCall('/api/fast?limit=80').catch(() => null);
         const list = r?.data || [];
-        if (!cancelled) setItems(Array.isArray(list) ? list : []);
+        if (!cancelled) setItems(filterActiveFastUsers(list));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -33,7 +43,7 @@ export const FastPage = () => {
         if (document?.hidden) return;
         const r = await apiCall('/api/fast?limit=80').catch(() => null);
         const list = r?.data || [];
-        if (!cancelled) setItems(Array.isArray(list) ? list : []);
+        if (!cancelled) setItems(filterActiveFastUsers(list));
       } catch {
         // ignore (best-effort)
       }

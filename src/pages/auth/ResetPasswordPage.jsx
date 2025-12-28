@@ -89,11 +89,11 @@ export const ResetPasswordPage = () => {
             >
               {!logoFailed ? (
                 <img
-                  src="/logo.png"
+                  src="/logo.svg"
                   alt="Polithane"
                   width={96}
                   height={96}
-                  className="w-24 h-24 object-contain drop-shadow-lg"
+                  className="w-auto h-24 object-contain drop-shadow-lg"
                   onError={() => setLogoFailed(true)}
                 />
               ) : (

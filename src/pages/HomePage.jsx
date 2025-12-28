@@ -42,6 +42,16 @@ export const HomePage = () => {
   // Keep initial payload small for mobile performance.
   // Social-style batching: small pages, no background loading until user scrolls.
   const POSTS_PAGE_SIZE = 20;
+  const FAST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+  const filterActiveFastUsers = (list) => {
+    const now = Date.now();
+    return (Array.isArray(list) ? list : []).filter((x) => {
+      const t = new Date(x?.latest_created_at || 0).getTime();
+      if (!Number.isFinite(t) || t <= 0) return false;
+      return now - t < FAST_MAX_AGE_MS;
+    });
+  };
 
   useEffect(() => {
     const onScroll = () => {
@@ -56,6 +66,8 @@ export const HomePage = () => {
   // Mobile: render posts in small batches (5 by 5)
   useEffect(() => {
     setMobileVisibleCount(5);
+    const t = setTimeout(() => setMobileVisibleCount(10), 800);
+    return () => clearTimeout(t);
   }, [activeCategory]);
 
   // Desktop: show 5 items first, then 5 more shortly after (best-effort).
@@ -324,7 +336,7 @@ export const HomePage = () => {
           if (isAuthenticated) {
             const r = await apiCall('/api/fast?limit=24').catch(() => null);
             const list = r?.data || [];
-            setPolifest(Array.isArray(list) ? list : []);
+            setPolifest(filterActiveFastUsers(list));
           } else {
             setPolifest([]);
           }
@@ -361,7 +373,7 @@ export const HomePage = () => {
         }
         const r = await apiCall('/api/fast?limit=24').catch(() => null);
         const list = r?.data || [];
-        if (!cancelled) setPolifest(Array.isArray(list) ? list : []);
+        if (!cancelled) setPolifest(filterActiveFastUsers(list));
       } catch {
         if (!cancelled) setPolifest([]);
       }
@@ -380,12 +392,13 @@ export const HomePage = () => {
         if (document?.hidden) return;
         const r = await apiCall('/api/fast?limit=24').catch(() => null);
         const list = r?.data || [];
-        if (!cancelled) setPolifest(Array.isArray(list) ? list : []);
+        if (!cancelled) setPolifest(filterActiveFastUsers(list));
       } catch {
         // ignore
       }
     };
     // refresh fairly often (cheap endpoint; keeps 24h expiry accurate)
+    tick();
     const t = setInterval(tick, 60_000);
     return () => {
       cancelled = true;
