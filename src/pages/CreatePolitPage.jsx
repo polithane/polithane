@@ -108,6 +108,7 @@ export const CreatePolitPage = () => {
 
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const publishLockRef = useRef(false);
 
   const [primaryPost, setPrimaryPost] = useState(null);
   const [offerBusy, setOfferBusy] = useState(false);
@@ -475,6 +476,8 @@ export const CreatePolitPage = () => {
   };
 
   const publishPrimary = async () => {
+    // Hard guard against double-click / double-submit (React state updates are async).
+    if (publishLockRef.current) return;
     if (loading) return;
     if (!isAuthenticated) {
       toast.error('Paylaşım yapmak için giriş yapmalısınız.');
@@ -510,6 +513,7 @@ export const CreatePolitPage = () => {
     if (contentType === 'audio' && files.some((f) => !String(f.type || '').startsWith('audio/'))) return toast.error('Sadece ses dosyası.');
     if (contentType === 'image' && files.some((f) => !String(f.type || '').startsWith('image/'))) return toast.error('Sadece resim dosyası.');
 
+    publishLockRef.current = true;
     setLoading(true);
     try {
       let media_urls = [];
@@ -537,12 +541,15 @@ export const CreatePolitPage = () => {
       toast.error(String(e?.message || 'Paylaşım oluşturulurken hata oluştu.'));
     } finally {
       setLoading(false);
+      publishLockRef.current = false;
     }
   };
 
   const publishCross = async () => {
     if (!primaryPost) return;
     if (offerBusy) return;
+    if (publishLockRef.current) return;
+    publishLockRef.current = true;
     setOfferBusy(true);
     try {
       const base = {
@@ -564,6 +571,7 @@ export const CreatePolitPage = () => {
       }
     } finally {
       setOfferBusy(false);
+      publishLockRef.current = false;
     }
   };
 

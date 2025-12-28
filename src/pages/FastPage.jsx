@@ -25,6 +25,27 @@ export const FastPage = () => {
     };
   }, []);
 
+  // Keep Fast list fresh so 24h expiry is reflected without a hard refresh.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        if (document?.hidden) return;
+        const r = await apiCall('/api/fast?limit=80').catch(() => null);
+        const list = r?.data || [];
+        if (!cancelled) setItems(Array.isArray(list) ? list : []);
+      } catch {
+        // ignore (best-effort)
+      }
+    };
+    tick();
+    const t = setInterval(tick, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-red-50">
       <div className="container-main py-6">
