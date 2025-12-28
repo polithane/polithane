@@ -6775,9 +6775,40 @@ async function deleteConversation(req, res, otherId) {
   // Hard delete conversation for both sides (requested).
   // This deletes all messages between the two users.
   try {
-    const q = {
-      or: `and(sender_id.eq.${userId},receiver_id.eq.${oid}),and(sender_id.eq.${oid},receiver_id.eq.${userId})`,
-    };
+    const q = { or: `and(sender_id.eq.${userId},receiver_id.eq.${oid}),and(sender_id.eq.${oid},receiver_id.eq.${userId})` };
+
+    // Best-effort: delete message media objects from storage as well.
+    try {
+      const rows = await supabaseRestGet('messages', { select: 'id,content', ...q, limit: '500' }).catch(() => []);
+      const urls = [];
+      for (const m of rows || []) {
+        const s = String(m?.content || '').trim();
+        if (!s) continue;
+        try {
+          if (s.startsWith('{')) {
+            const obj = JSON.parse(s);
+            if (obj && typeof obj === 'object' && obj.type === 'image' && obj.url) urls.push(String(obj.url));
+          }
+        } catch {
+          // ignore
+        }
+      }
+      const objs = urls
+        .map((u) => parseSupabasePublicObjectUrl(u))
+        .filter(Boolean)
+        .filter((p) => p.bucket === 'uploads' && p.objectPath && p.objectPath.startsWith('messages/'));
+      const seen = new Set();
+      for (const o of objs) {
+        const key = `${o.bucket}/${o.objectPath}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        // eslint-disable-next-line no-await-in-loop
+        await supabaseStorageDeleteObject(o.bucket, o.objectPath).catch(() => null);
+      }
+    } catch {
+      // ignore
+    }
+
     await supabaseRestDelete('messages', q).catch(() => null);
   } catch {
     // ignore
