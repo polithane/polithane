@@ -80,11 +80,13 @@ import { CookiePolicyPage } from './pages/CookiePolicyPage';
 import { ParliamentInfoPage } from './pages/ParliamentInfoPage';
 import { PartiesDirectoryPage } from './pages/PartiesDirectoryPage';
 import { SiteHeadManager } from './components/system/SiteHeadManager';
+import { ScrollToTop } from './components/system/ScrollToTop';
 
 function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <SiteHeadManager />
+      <ScrollToTop />
       <Routes>
         {/* Public Routes */}
         <Route
