@@ -23,6 +23,7 @@ export const PostDetailPage = () => {
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [commentError, setCommentError] = useState('');
+  const [commentNotice, setCommentNotice] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentEditSubmittingId, setCommentEditSubmittingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -287,6 +288,7 @@ export const PostDetailPage = () => {
     }
     try {
       setCommentError('');
+      setCommentNotice('');
       setCommentSubmitting(true);
       const r = await postsApi.addComment(uiPost.post_id, text);
       setNewComment('');
@@ -294,7 +296,7 @@ export const PostDetailPage = () => {
       const c = await postsApi.getComments(uiPost.post_id).catch(() => null);
       const rows = c?.data?.data || c?.data || c || [];
       setComments(Array.isArray(rows) ? rows : []);
-      if (r?.message) setCommentError(String(r.message));
+      if (r?.message) setCommentNotice(String(r.message));
     } catch (e) {
       console.error(e);
       setCommentError(e?.message || 'Yorum gönderilemedi.');
@@ -598,10 +600,15 @@ export const PostDetailPage = () => {
                     <div className="text-xs text-gray-500">
                       {300 - (newComment?.length || 0)} karakter kaldı • {myCommentCount}/3 yorum
                     </div>
-                    <Button className="mt-0" onClick={handleAddComment}>
+                    <Button
+                      className="mt-0"
+                      onClick={handleAddComment}
+                      disabled={commentSubmitting || !newComment.trim()}
+                    >
                       {commentSubmitting ? 'Kaydediliyor…' : 'Gönder'}
                     </Button>
                   </div>
+                  {commentNotice && <div className="mt-2 text-sm text-gray-700 font-semibold">{commentNotice}</div>}
                   {commentError && <div className="mt-2 text-sm text-red-600 font-semibold">{commentError}</div>}
                 </div>
               </div>
@@ -664,14 +671,16 @@ export const PostDetailPage = () => {
                               if (!text) return;
                               try {
                                 setCommentError('');
+                                setCommentNotice('');
                                 const id = comment.id || comment.comment_id;
                                 setCommentEditSubmittingId(id);
-                                await postsApi.updateComment(id, text);
+                                const r = await postsApi.updateComment(id, text);
                                 setEditingId(null);
                                 setEditingText('');
                                 const c = await postsApi.getComments(uiPost.post_id).catch(() => null);
                                 const rows = c?.data?.data || c?.data || c || [];
                                 setComments(Array.isArray(rows) ? rows : []);
+                                if (r?.message) setCommentNotice(String(r.message));
                               } catch (e) {
                                 setCommentError(e?.message || 'Yorum güncellenemedi.');
                               } finally {

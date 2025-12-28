@@ -314,8 +314,8 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             }}
             title="Detayı aç"
           >
-            <Eye className="w-6 h-6" />
-            <span className="text-base font-bold">{formatNumber(post.view_count)}</span>
+            <Eye className="w-7 h-7" />
+            <span className="text-base font-bold text-gray-800">{formatNumber(post.view_count)}</span>
           </button>
           <button
             type="button"
@@ -323,7 +323,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             onClick={handleToggleLike}
             title={isLiked ? 'Beğeniyi geri al' : 'Beğen'}
           >
-            <Heart className="w-6 h-6" fill={isLiked ? 'currentColor' : 'none'} />
+            <Heart className="w-7 h-7" fill={isLiked ? 'currentColor' : 'none'} />
             <span className="text-base font-bold text-gray-800">{formatNumber(likeCount)}</span>
           </button>
           <button
@@ -336,7 +336,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
             }}
             title="Yorum yap"
           >
-            <MessageCircle className="w-6 h-6" />
+            <MessageCircle className="w-7 h-7" />
             <span className="text-base font-bold text-gray-800">{formatNumber(post.comment_count)}</span>
           </button>
         </div>
@@ -359,7 +359,7 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           }}
           title="Paylaş"
         >
-          <Share2 className="w-6 h-6" />
+          <Share2 className="w-7 h-7" />
         </button>
       </div>
 
