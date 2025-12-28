@@ -84,15 +84,15 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange, iconOnly = f
   
   const iconSizes = {
     // Mobile-first: keep icons readable (no "dot" icons)
-    sm: 'w-5 h-5 sm:w-4 sm:h-4',
-    md: 'w-6 h-6 sm:w-5 sm:h-5',
-    lg: 'w-7 h-7 sm:w-6 sm:h-6'
+    sm: 'w-4 h-4',
+    md: 'w-5 h-5',
+    lg: 'w-6 h-6'
   };
 
   const iconOnlyPad = {
-    sm: 'p-1.5',
-    md: 'p-2',
-    lg: 'p-2.5',
+    sm: 'p-1',
+    md: 'p-1.5',
+    lg: 'p-2',
   };
   
   // Takipten çık onay popup'ı
