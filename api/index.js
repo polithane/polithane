@@ -6798,16 +6798,36 @@ async function deleteConversation(req, res, otherId) {
   const oid = String(otherId || '').trim();
   if (!isSafeId(oid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
 
-  // Hard delete conversation for both sides (requested).
-  // This deletes all messages between the two users.
+  // Correct behavior:
+  // - If one side "deletes chat", only hide it for that side (soft-delete per user).
+  // - Only when BOTH sides deleted the same message, hard-delete it and cleanup any message media.
   try {
-    const q = { or: `and(sender_id.eq.${userId},receiver_id.eq.${oid}),and(sender_id.eq.${oid},receiver_id.eq.${userId})` };
+    // 1) Soft-delete for current user (both directions).
+    await supabaseRestPatch(
+      'messages',
+      { sender_id: `eq.${userId}`, receiver_id: `eq.${oid}` },
+      { is_deleted_by_sender: true }
+    ).catch(() => null);
 
-    // Best-effort: delete message media objects from storage as well.
+    await supabaseRestPatch(
+      'messages',
+      { receiver_id: `eq.${userId}`, sender_id: `eq.${oid}` },
+      { is_deleted_by_receiver: true }
+    ).catch(() => null);
+
+    // 2) Cleanup messages that are deleted by BOTH sides.
+    const bothDeleted = await supabaseRestGet('messages', {
+      select: 'id,content',
+      or: `and(sender_id.eq.${userId},receiver_id.eq.${oid}),and(sender_id.eq.${oid},receiver_id.eq.${userId})`,
+      is_deleted_by_sender: 'eq.true',
+      is_deleted_by_receiver: 'eq.true',
+      limit: '500',
+    }).catch(() => []);
+
+    // 2a) Storage cleanup for attachments (only after both sides deleted).
     try {
-      const rows = await supabaseRestGet('messages', { select: 'id,content', ...q, limit: '500' }).catch(() => []);
       const urls = [];
-      for (const m of rows || []) {
+      for (const m of bothDeleted || []) {
         const s = String(m?.content || '').trim();
         if (!s) continue;
         try {
@@ -6835,7 +6855,11 @@ async function deleteConversation(req, res, otherId) {
       // ignore
     }
 
-    await supabaseRestDelete('messages', q).catch(() => null);
+    // 2b) Hard-delete DB rows that are deleted for both sides.
+    const ids = (bothDeleted || []).map((m) => String(m?.id || '')).filter(Boolean);
+    if (ids.length > 0) {
+      await supabaseRestDelete('messages', { id: `in.(${ids.join(',')})` }).catch(() => null);
+    }
   } catch {
     // ignore
   }
@@ -7042,8 +7066,36 @@ async function deleteMessage(req, res, messageId) {
   if (msg.receiver_id === userId) patch.is_deleted_by_receiver = true;
   if (Object.keys(patch).length === 0) return res.status(403).json({ success: false, error: 'Forbidden' });
 
-  const updated = await supabaseRestPatch('messages', { id: `eq.${mid}` }, patch);
-  res.json({ success: true, data: updated?.[0] || null });
+  const updated = await supabaseRestPatch('messages', { id: `eq.${mid}` }, patch).catch(() => []);
+  const row = updated?.[0] || null;
+
+  // If BOTH sides deleted, hard-delete row + delete attachment from storage (best-effort)
+  try {
+    const isBoth = (row?.is_deleted_by_sender === true || msg?.is_deleted_by_sender === true) &&
+      (row?.is_deleted_by_receiver === true || msg?.is_deleted_by_receiver === true);
+    if (isBoth) {
+      try {
+        const s = String(row?.content ?? msg?.content ?? '').trim();
+        if (s.startsWith('{')) {
+          const obj = JSON.parse(s);
+          if (obj && typeof obj === 'object' && obj.type === 'image' && obj.url) {
+            const parsed = parseSupabasePublicObjectUrl(String(obj.url));
+            if (parsed?.bucket === 'uploads' && parsed?.objectPath && parsed.objectPath.startsWith('messages/')) {
+              await supabaseStorageDeleteObject(parsed.bucket, parsed.objectPath).catch(() => null);
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      await supabaseRestDelete('messages', { id: `eq.${mid}` }).catch(() => null);
+      return res.json({ success: true, data: null, hard_deleted: true });
+    }
+  } catch {
+    // ignore
+  }
+
+  res.json({ success: true, data: row });
 }
 
 // -----------------------
