@@ -709,7 +709,7 @@ export const CreatePolitPage = () => {
   }, [text]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
       <div className="container-main py-6">
         <div className="max-w-xl mx-auto">
           <div className={['bg-white rounded-3xl border-2 overflow-hidden', theme.borderClass].join(' ')}>
@@ -754,7 +754,7 @@ export const CreatePolitPage = () => {
                             <img
                               src={src}
                               alt={label}
-                              className="w-[120px] h-[120px] object-contain"
+                              className="w-[104px] h-[104px] sm:w-[120px] sm:h-[120px] object-contain"
                               loading="eager"
                               fetchpriority="high"
                               onError={() => {
@@ -875,13 +875,27 @@ export const CreatePolitPage = () => {
                   ) : contentType === 'image' ? (
                     <div className="rounded-2xl border border-gray-200 bg-white p-4">
                       {imagePreviews.length > 0 ? (
-                        <div className="flex gap-2 overflow-x-auto pb-1">
-                          {imagePreviews.map((u) => (
-                            <img key={u} src={u} alt="" className="w-24 h-24 rounded-xl object-cover border border-gray-200" />
-                          ))}
+                        <div className="space-y-3">
+                          {/* Main preview (large, button-sized feel) */}
+                          <div className="rounded-3xl border border-gray-200 bg-gray-50 overflow-hidden">
+                            <img
+                              src={imagePreviews[0]}
+                              alt="Seçilen resim"
+                              className="w-full aspect-square object-cover"
+                            />
+                          </div>
+
+                          {/* Extra thumbnails */}
+                          {imagePreviews.length > 1 ? (
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {imagePreviews.slice(1).map((u) => (
+                                <img key={u} src={u} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-600">Resim önizleme burada.</div>
+                        <div className="text-sm text-gray-600">Resim önizleme burada görünecek.</div>
                       )}
                     </div>
                   ) : null}
