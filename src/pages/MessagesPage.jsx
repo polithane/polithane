@@ -601,7 +601,7 @@ export const MessagesPage = () => {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="bg-gray-50 pb-24 lg:pb-0 h-[100dvh] overflow-hidden">
+    <div className="bg-gray-50 h-[calc(100dvh-96px)] lg:h-[100dvh] overflow-hidden">
       <div className="container-main py-4 md:py-6 h-full flex flex-col min-h-0">
         <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0 overflow-hidden">
           {/* Konuşma Listesi */}
