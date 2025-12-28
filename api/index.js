@@ -3512,16 +3512,32 @@ async function storageCreateSignedUpload(req, res) {
   }
 
   // Allow common media types
+  // NOTE: Mobile (esp. iOS) may upload videos as `video/quicktime` (MOV).
+  // Also some phones produce `image/heic` / `image/heif`, which most browsers cannot render reliably.
+  // We reject HEIC/HEIF with a clear message (ask user to convert to JPG/PNG) instead of "unknown error".
+  if (contentType === 'image/heic' || contentType === 'image/heif') {
+    return res.status(400).json({
+      success: false,
+      error: 'HEIC/HEIF resim formatı şu an desteklenmiyor. Lütfen resmi JPG veya PNG olarak yükleyin.',
+    });
+  }
+
   const allowedTypes = new Set([
     'image/jpeg',
     'image/png',
     'image/webp',
     'video/webm',
+    'video/mp4',
+    'video/quicktime',
     'audio/webm',
     'audio/mpeg',
-    'video/mp4',
   ]);
-  if (!allowedTypes.has(contentType)) return res.status(400).json({ success: false, error: 'Desteklenmeyen dosya türü.' });
+  if (!allowedTypes.has(contentType)) {
+    return res.status(400).json({
+      success: false,
+      error: `Desteklenmeyen dosya türü: ${contentType || 'bilinmiyor'}.`,
+    });
+  }
 
   // Ensure service role exists (needed to sign upload)
   try {
@@ -3550,6 +3566,8 @@ async function storageCreateSignedUpload(req, res) {
         ? 'webp'
         : contentType === 'image/jpeg'
           ? 'jpg'
+          : contentType === 'video/quicktime'
+            ? 'mov'
           : contentType === 'video/mp4'
             ? 'mp4'
             : contentType === 'video/webm'
