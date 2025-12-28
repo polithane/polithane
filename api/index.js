@@ -1034,6 +1034,20 @@ async function trackPostShare(req, res, postId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
+  // Block checks (either direction) between sharer and post owner
+  try {
+    const rows = await supabaseRestGet('posts', { select: 'id,user_id,is_deleted', id: `eq.${postId}`, limit: '1' }).catch(() => []);
+    const p = rows?.[0] || null;
+    if (!p || p.is_deleted === true) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
+    const ownerId = p.user_id || null;
+    if (ownerId) {
+      const blocked = await isBlockedBetween(auth.id, ownerId).catch(() => false);
+      if (blocked) return res.status(403).json({ success: false, error: 'Bu kullanıcıyla etkileşemezsiniz (engelleme mevcut).' });
+    }
+  } catch {
+    // ignore
+  }
+
   // Best-effort increment share_count
   try {
     const rows = await supabaseRestGet('posts', { select: 'id,user_id,share_count', id: `eq.${postId}`, limit: '1' }).catch(() => []);
@@ -1249,6 +1263,18 @@ async function togglePostLike(req, res, postId) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
     const userId = auth.id;
+
+    // Block checks (either direction) between liker and post owner
+    try {
+      const postRows = await supabaseRestGet('posts', { select: 'id,user_id,is_deleted', id: `eq.${postId}`, limit: '1' }).catch(() => []);
+      const ownerId = postRows?.[0]?.user_id ?? null;
+      if (!ownerId || postRows?.[0]?.is_deleted === true) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
+      const blocked = await isBlockedBetween(auth.id, ownerId);
+      if (blocked) return res.status(403).json({ success: false, error: 'Bu kullanıcıyla etkileşemezsiniz (engelleme mevcut).' });
+    } catch {
+      // ignore (best-effort)
+    }
+
     const existing = await supabaseRestGet('likes', { select: 'id', post_id: `eq.${postId}`, user_id: `eq.${userId}`, limit: '1' }).catch(() => []);
     if (existing && existing.length > 0) {
         await supabaseRestDelete('likes', { post_id: `eq.${postId}`, user_id: `eq.${userId}` });
