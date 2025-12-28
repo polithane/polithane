@@ -62,7 +62,8 @@ export const BlockUserModal = ({ isOpen, onClose, user, onConfirm }) => {
           </button>
           <button
             onClick={() => {
-              onConfirm(user.user_id);
+              const uid = user.user_id || user.id;
+              onConfirm(uid);
               onClose();
             }}
             className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"

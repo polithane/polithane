@@ -305,7 +305,8 @@ export const users = {
   block: (targetId) =>
     apiCall('/api/users/blocks', {
       method: 'POST',
-      body: JSON.stringify({ target_id: targetId }),
+      // Backend expects `user_id` (not `target_id`)
+      body: JSON.stringify({ user_id: targetId }),
     }),
   unblock: (targetId) =>
     apiCall(`/api/users/blocks/${targetId}`, {

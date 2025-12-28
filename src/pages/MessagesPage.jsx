@@ -66,8 +66,6 @@ export const MessagesPage = () => {
       setTab(String(conv?.message_type || '') === 'request' ? 'requests' : 'regular');
       setSelectedConv(conv);
       setError(null);
-      // Keep URL in sync so deep-link effect doesn't keep forcing another convo.
-      navigate(`/messages?to=${encodeURIComponent(pid)}${focus ? '&focus=1' : ''}`, { replace: true });
     } catch (err) {
       console.error('Error selecting conversation:', err);
       setError('Konuşma açılamadı');
@@ -264,7 +262,12 @@ export const MessagesPage = () => {
     if (selectedConv?.participant_id && String(selectedConv.participant_id) === targetId) return;
 
     const existing = (conversations || []).find((c) => String(c?.participant_id) === targetId);
-    if (existing) return selectConversation(existing, { focus: focusOnSelectRef.current });
+    if (existing) {
+      selectConversation(existing, { focus: focusOnSelectRef.current });
+      // Consume the deep-link so revisiting /messages doesn't auto-open the last chat.
+      navigate('/messages', { replace: true });
+      return;
+    }
 
     // If not in list yet, fetch user and create a temporary conversation object.
     (async () => {
@@ -283,6 +286,7 @@ export const MessagesPage = () => {
           participant,
         };
         selectConversation(stub, { focus: focusOnSelectRef.current });
+        navigate('/messages', { replace: true });
       } catch {
         // ignore
       }
@@ -569,9 +573,9 @@ export const MessagesPage = () => {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
-      <div className="container-main py-8">
-        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[calc(100dvh-220px)] md:h-[calc(100dvh-190px)] lg:h-[calc(100dvh-160px)] min-h-[520px] min-h-0">
+    <div className="bg-gray-50 pb-24 lg:pb-0 h-[100dvh] overflow-hidden">
+      <div className="container-main py-4 md:py-6 h-full flex flex-col min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0 overflow-hidden">
           {/* Konuşma Listesi */}
           <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col ${selectedConv ? 'hidden md:flex' : ''}`}>
             <div className="p-4 border-b">
@@ -735,7 +739,7 @@ export const MessagesPage = () => {
           </div>
           
           {/* Mesaj Thread */}
-          <div className={`bg-white rounded-xl border border-gray-200 flex flex-col min-h-0 ${selectedConv ? '' : 'hidden md:flex'}`}>
+          <div className={`bg-white rounded-xl border border-gray-200 flex flex-col min-h-0 overflow-hidden ${selectedConv ? '' : 'hidden md:flex'}`}>
             {selectedConv ? (
               <>
                 {/* Header */}
