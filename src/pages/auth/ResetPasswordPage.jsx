@@ -89,9 +89,11 @@ export const ResetPasswordPage = () => {
             >
               {!logoFailed ? (
                 <img
-                  src="/logo.png"
+                  src="/logo-mark.svg"
                   alt="Polithane"
-                  className="w-24 h-auto object-contain drop-shadow-lg"
+                  width={96}
+                  height={96}
+                  className="w-24 h-24 object-contain drop-shadow-lg"
                   onError={() => setLogoFailed(true)}
                 />
               ) : (
@@ -144,9 +146,11 @@ export const ResetPasswordPage = () => {
           >
             {!logoFailed ? (
               <img
-                  src="/logo.png"
+                src="/logo-mark.svg"
                 alt="Polithane"
-                  className="w-24 h-auto object-contain drop-shadow-lg"
+                width={96}
+                height={96}
+                className="w-24 h-24 object-contain drop-shadow-lg"
                 onError={() => setLogoFailed(true)}
               />
             ) : (

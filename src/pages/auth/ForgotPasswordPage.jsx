@@ -46,9 +46,11 @@ export const ForgotPasswordPage = () => {
             >
               {!logoFailed && (
                 <img 
-                  src="/logo.png" 
-                alt="Polithane" 
-                className="w-24 h-auto object-contain drop-shadow-lg"
+                  src="/logo-mark.svg" 
+                  alt="Polithane" 
+                  width={96}
+                  height={96}
+                  className="w-24 h-24 object-contain drop-shadow-lg"
                   onError={() => setLogoFailed(true)}
                 />
               )}
@@ -108,9 +110,11 @@ export const ForgotPasswordPage = () => {
           >
             {!logoFailed && (
               <img 
-                src="/favicon.ico" 
-              alt="Polithane" 
-              className="w-20 h-20 object-contain drop-shadow-lg"
+                src="/logo-mark.svg" 
+                alt="Polithane" 
+                width={80}
+                height={80}
+                className="w-20 h-20 object-contain drop-shadow-lg"
                 onError={() => setLogoFailed(true)}
               />
             )}
