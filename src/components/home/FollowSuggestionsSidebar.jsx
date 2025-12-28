@@ -71,14 +71,15 @@ export const FollowSuggestionsSidebar = ({ limit = 8, onCollapse }) => {
       if (!tid) return;
       if (socialById[tid]?.friends_loaded) return;
       try {
-        const res = await apiCall(`/api/users/${encodeURIComponent(tid)}/followers?limit=200`).catch(() => null);
-        const followers = Array.isArray(res?.data) ? res.data : [];
-        const friends = (followers || []).filter((f) => myFollowingIds.has(safeId(f)));
+        // Lightweight endpoint (server computes which of my friends follows the target)
+        const res = await apiCall(`/api/users/${encodeURIComponent(tid)}/followed-by-friends?limit=3`).catch(() => null);
+        const data = res?.data || {};
+        const friends = Array.isArray(data?.friends) ? data.friends : [];
         const names = friends
           .slice(0, 2)
           .map((f) => getDisplayName(f))
           .filter(Boolean);
-        const count = friends.length;
+        const count = Number(data?.count || friends.length) || 0;
         if (!cancelled) {
           setSocialById((prev) => ({
             ...(prev || {}),
