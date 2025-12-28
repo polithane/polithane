@@ -198,7 +198,7 @@ export const MessagesPage = () => {
   useEffect(() => {
     if (!selectedConv?.participant_id) return;
     if (msgPollRef.current) clearInterval(msgPollRef.current);
-    const otherId = String(getReceiverId(selectedConv));
+    const otherId = String(selectedConv?.participant_id || '').trim();
     if (!otherId) return undefined;
     const tick = async () => {
       try {
@@ -227,7 +227,7 @@ export const MessagesPage = () => {
         });
         if (wantAutoScroll) {
           shouldAutoScrollRef.current = true;
-          setTimeout(scrollToBottom, 80);
+          setTimeout(() => scrollToBottom('auto'), 40);
         }
       } catch {
         // ignore
