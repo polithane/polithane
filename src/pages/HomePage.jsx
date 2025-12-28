@@ -27,6 +27,7 @@ export const HomePage = () => {
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
   const [homePostsPerRow, setHomePostsPerRow] = useState(2);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(5);
+  const [desktopVisible, setDesktopVisible] = useState({ hit: 5, mp: 5, org: 5, citizen: 5 });
   const [loading, setLoading] = useState(true);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
@@ -57,6 +58,25 @@ export const HomePage = () => {
     setMobileVisibleCount(5);
   }, [activeCategory]);
 
+  // Desktop: show 5 items first, then 5 more shortly after (best-effort).
+  useEffect(() => {
+    if (loading) {
+      setDesktopVisible({ hit: 5, mp: 5, org: 5, citizen: 5 });
+      return;
+    }
+    const t = setTimeout(() => {
+      setDesktopVisible((p) => ({ hit: p.hit + 5, mp: p.mp + 5, org: p.org + 5, citizen: p.citizen + 5 }));
+    }, 800);
+    return () => clearTimeout(t);
+  }, [loading]);
+
+  // As user scrolls and we load more posts, progressively reveal more cards.
+  useEffect(() => {
+    if (!hasUserScrolled) return;
+    setDesktopVisible((p) => ({ hit: p.hit + 5, mp: p.mp + 5, org: p.org + 5, citizen: p.citizen + 5 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postsOffset]);
+
   useEffect(() => {
     if (!mobileSentinelRef.current) return;
     if (mobileObserverRef.current) mobileObserverRef.current.disconnect();
@@ -64,6 +84,7 @@ export const HomePage = () => {
       (entries) => {
         const e = entries[0];
         if (!e?.isIntersecting) return;
+        if (!hasUserScrolledRef.current) return;
         setMobileVisibleCount((prev) => Math.min(prev + 5, 500));
       },
       { root: null, rootMargin: '180px', threshold: 0.01 }
@@ -690,7 +711,7 @@ export const HomePage = () => {
                   scrollInterval={4000}
                   itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
                 >
-                  {hitPosts.map(post => (
+                  {hitPosts.slice(0, Math.max(5, desktopVisible.hit)).map(post => (
                     <PostCardHorizontal 
                       key={post.post_id ?? post.id} 
                       post={post}
@@ -714,7 +735,7 @@ export const HomePage = () => {
                 scrollInterval={5000}
                 itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
               >
-                {filterConsecutiveTextAudio(mpPosts, true).map(post => (
+                {filterConsecutiveTextAudio(mpPosts, true).slice(0, Math.max(5, desktopVisible.mp)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}
@@ -738,7 +759,7 @@ export const HomePage = () => {
                 scrollInterval={5000}
                 itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
               >
-                {filterConsecutiveTextAudio(organizationPosts, true).map(post => (
+                {filterConsecutiveTextAudio(organizationPosts, true).slice(0, Math.max(5, desktopVisible.org)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}
@@ -761,7 +782,7 @@ export const HomePage = () => {
                 scrollInterval={5000}
                 itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
               >
-                {filterConsecutiveTextAudio(citizenPosts, true).map(post => (
+                {filterConsecutiveTextAudio(citizenPosts, true).slice(0, Math.max(5, desktopVisible.citizen)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}
