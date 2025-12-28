@@ -3,10 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
-import { Avatar } from '../components/ui/Avatar';
-import { formatPolitScore } from '../utils/format';
+import { Avatar } from '../components/common/Avatar';
+import { formatPolitScore } from '../utils/formatters';
 import { getProfilePath } from '../utils/paths';
-import { isUiVerifiedUser } from '../utils/verification';
+import { isUiVerifiedUser } from '../utils/titleHelpers';
 
 export const HitFeedPage = () => {
   const navigate = useNavigate();

@@ -1,70 +1,50 @@
-import { useState } from 'react';
-import { Plus, Edit, Trash2, ToggleLeft, ToggleRight, Link as LinkIcon, CheckCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2, ToggleLeft, ToggleRight, Link as LinkIcon } from 'lucide-react';
+import { admin as adminApi } from '../../utils/api';
 
 export const SourceManagement = () => {
-  const [sources, setSources] = useState([
-    {
-      id: 1,
-      name: 'Sözcü',
-      type: 'news',
-      url: 'https://www.sozcu.com.tr',
-      rss_feed: 'https://www.sozcu.com.tr/feed',
-      enabled: true,
-      priority: 'high',
-      items_collected: 1247,
-      last_fetch: '10 dakika önce',
-    },
-    {
-      id: 2,
-      name: 'Cumhuriyet',
-      type: 'news',
-      url: 'https://www.cumhuriyet.com.tr',
-      rss_feed: 'https://www.cumhuriyet.com.tr/rss',
-      enabled: true,
-      priority: 'high',
-      items_collected: 1089,
-      last_fetch: '15 dakika önce',
-    },
-    {
-      id: 3,
-      name: 'Recep Tayyip Erdoğan',
-      type: 'politician_twitter',
-      url: 'https://twitter.com/RTErdogan',
-      rss_feed: null,
-      enabled: true,
-      priority: 'high',
-      items_collected: 423,
-      last_fetch: '5 dakika önce',
-    },
-    {
-      id: 4,
-      name: 'Kemal Kılıçdaroğlu',
-      type: 'politician_twitter',
-      url: 'https://twitter.com/kilicdarogluk',
-      rss_feed: null,
-      enabled: true,
-      priority: 'high',
-      items_collected: 367,
-      last_fetch: '7 dakika önce',
-    },
-    {
-      id: 5,
-      name: 'T24',
-      type: 'news',
-      url: 'https://t24.com.tr',
-      rss_feed: 'https://t24.com.tr/rss',
-      enabled: false,
-      priority: 'medium',
-      items_collected: 845,
-      last_fetch: '2 saat önce',
-    },
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
+  const [sources, setSources] = useState([]);
 
-  const toggleSource = (id) => {
-    setSources(sources.map(source => 
-      source.id === id ? { ...source, enabled: !source.enabled } : source
-    ));
+  const [draft, setDraft] = useState({
+    name: '',
+    type: 'news',
+    url: '',
+    rss_feed: '',
+    enabled: true,
+    priority: 'medium',
+  });
+  const [creating, setCreating] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const r = await adminApi.getSources().catch(() => null);
+      if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
+      if (!r?.success) throw new Error(r?.error || 'Kaynaklar yüklenemedi.');
+      setSources(Array.isArray(r.data) ? r.data : []);
+    } catch (e) {
+      setError(String(e?.message || 'Kaynaklar yüklenemedi.'));
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stats = useMemo(() => {
+    const active = sources.filter((s) => s.enabled).length;
+    const news = sources.filter((s) => String(s.type) === 'news').length;
+    const pol = sources.filter((s) => String(s.type || '').includes('politician')).length;
+    const totalItems = sources.reduce((acc, s) => acc + (Number(s.items_collected || 0) || 0), 0);
+    return { active, news, pol, totalItems };
+  }, [sources]);
 
   const getTypeBadge = (type) => {
     const badges = {
@@ -72,13 +52,10 @@ export const SourceManagement = () => {
       politician_twitter: { color: 'bg-purple-100 text-purple-700', text: 'Siyasetçi Twitter' },
       politician_instagram: { color: 'bg-pink-100 text-pink-700', text: 'Siyasetçi Instagram' },
       media_twitter: { color: 'bg-cyan-100 text-cyan-700', text: 'Medya Twitter' },
+      other: { color: 'bg-gray-100 text-gray-700', text: 'Diğer' },
     };
-    const badge = badges[type] || { color: 'bg-gray-100 text-gray-700', text: 'Diğer' };
-    return (
-      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
-        {badge.text}
-      </span>
-    );
+    const badge = badges[type] || badges.other;
+    return <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>{badge.text}</span>;
   };
 
   const getPriorityBadge = (priority) => {
@@ -87,29 +64,78 @@ export const SourceManagement = () => {
       medium: { color: 'bg-yellow-100 text-yellow-700', text: 'Orta' },
       low: { color: 'bg-gray-100 text-gray-700', text: 'Düşük' },
     };
-    const badge = badges[priority];
-    return (
-      <span className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${badge.color}`}>
-        {badge.text}
-      </span>
-    );
+    const badge = badges[priority] || badges.medium;
+    return <span className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${badge.color}`}>{badge.text}</span>;
+  };
+
+  const toggleSource = async (source) => {
+    const id = String(source?.id || '');
+    if (!id) return;
+    const next = !(source?.enabled !== false);
+    setSources((prev) => prev.map((x) => (String(x.id) === id ? { ...x, enabled: next } : x)));
+    const r = await adminApi.updateSource(id, { enabled: next }).catch(() => null);
+    if (!r?.success) await load();
+  };
+
+  const createSource = async () => {
+    if (creating) return;
+    setCreating(true);
+    setError('');
+    try {
+      const payload = {
+        ...draft,
+        rss_feed: draft.rss_feed ? String(draft.rss_feed).trim() : null,
+      };
+      const r = await adminApi.createSource(payload).catch(() => null);
+      if (!r?.success) {
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
+        throw new Error(r?.error || 'Kaynak eklenemedi.');
+      }
+      setDraft({ name: '', type: draft.type || 'news', url: '', rss_feed: '', enabled: true, priority: 'medium' });
+      await load();
+    } catch (e) {
+      setError(String(e?.message || 'Kaynak eklenemedi.'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const deleteSource = async (source) => {
+    const id = String(source?.id || '');
+    if (!id) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Bu kaynak silinsin mi?')) return;
+    const r = await adminApi.deleteSource(id).catch(() => null);
+    if (!r?.success) {
+      setError(r?.error || 'Silinemedi.');
+      return;
+    }
+    await load();
   };
 
   return (
     <div className="p-8">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Kaynak Yönetimi</h1>
-          <p className="text-gray-600">İçerik kaynaklarını yönetin ve ekleyin</p>
+          <p className="text-gray-600">İçerik kaynaklarını DB’den yönetin (mock yok)</p>
         </div>
-        <button className="flex items-center gap-2 px-6 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold">
-          <Plus className="w-5 h-5" />
-          Yeni Kaynak Ekle
+        <button type="button" onClick={load} className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 font-black">
+          Yenile
         </button>
       </div>
 
-      {/* Stats */}
+      {error ? <div className="mb-4 text-sm text-red-600 font-semibold">{error}</div> : null}
+      {loading ? <div className="mb-4 text-sm text-gray-600">Yükleniyor…</div> : null}
+
+      {schemaSql ? (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="font-black text-amber-900">DB tablosu eksik: `admin_sources`</div>
+          <div className="text-sm text-amber-900 mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+          <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="text-sm text-gray-500 mb-1">Toplam Kaynak</div>
@@ -117,35 +143,46 @@ export const SourceManagement = () => {
         </div>
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="text-sm text-green-600 mb-1">Aktif Kaynak</div>
-          <div className="text-2xl font-black text-green-700">{sources.filter(s => s.enabled).length}</div>
+          <div className="text-2xl font-black text-green-700">{stats.active}</div>
         </div>
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
           <div className="text-sm text-blue-600 mb-1">Haber Kaynağı</div>
-          <div className="text-2xl font-black text-blue-700">{sources.filter(s => s.type === 'news').length}</div>
+          <div className="text-2xl font-black text-blue-700">{stats.news}</div>
         </div>
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
           <div className="text-sm text-purple-600 mb-1">Siyasetçi</div>
-          <div className="text-2xl font-black text-purple-700">{sources.filter(s => s.type.includes('politician')).length}</div>
+          <div className="text-2xl font-black text-purple-700">{stats.pol}</div>
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6">
-        <button className="px-4 py-2 bg-primary-blue text-white rounded-lg font-semibold">
-          Tümü ({sources.length})
-        </button>
-        <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
-          Haber Siteleri
-        </button>
-        <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
-          Siyasetçiler
-        </button>
-        <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
-          Medya Mensupları
-        </button>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Plus className="w-6 h-6 text-primary-blue" />
+          <div className="text-lg font-black text-gray-900">Yeni Kaynak</div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} placeholder="Kaynak Adı" className="px-4 py-3 border border-gray-300 rounded-lg" />
+          <input value={draft.url} onChange={(e) => setDraft((p) => ({ ...p, url: e.target.value }))} placeholder="Bağlantı" className="px-4 py-3 border border-gray-300 rounded-lg" />
+          <input value={draft.rss_feed} onChange={(e) => setDraft((p) => ({ ...p, rss_feed: e.target.value }))} placeholder="RSS (opsiyonel)" className="px-4 py-3 border border-gray-300 rounded-lg" />
+          <select value={draft.type} onChange={(e) => setDraft((p) => ({ ...p, type: e.target.value }))} className="px-4 py-3 border border-gray-300 rounded-lg bg-white">
+            <option value="news">news</option>
+            <option value="politician_twitter">politician_twitter</option>
+            <option value="politician_instagram">politician_instagram</option>
+            <option value="media_twitter">media_twitter</option>
+            <option value="other">other</option>
+          </select>
+          <select value={draft.priority} onChange={(e) => setDraft((p) => ({ ...p, priority: e.target.value }))} className="px-4 py-3 border border-gray-300 rounded-lg bg-white">
+            <option value="high">high</option>
+            <option value="medium">medium</option>
+            <option value="low">low</option>
+          </select>
+          <button type="button" onClick={createSource} disabled={creating} className="px-6 py-3 bg-primary-blue text-white rounded-lg hover:bg-blue-600 font-black disabled:opacity-60">
+            {creating ? 'Ekleniyor…' : 'Ekle'}
+          </button>
+        </div>
+        <div className="mt-3 text-xs text-gray-500">Toplanan içerik / son çekme alanları scraper tarafından güncellenecek.</div>
       </div>
 
-      {/* Sources List */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -157,7 +194,7 @@ export const SourceManagement = () => {
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Toplanan</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Son Çekme</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Durum</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">İşlemler</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">İşlem</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -175,51 +212,32 @@ export const SourceManagement = () => {
                 </td>
                 <td className="px-6 py-4">{getPriorityBadge(source.priority)}</td>
                 <td className="px-6 py-4">
-                  <span className="text-sm font-semibold text-gray-700">{source.items_collected}</span>
+                  <span className="text-sm font-semibold text-gray-700">{Number(source.items_collected || 0).toLocaleString('tr-TR')}</span>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="text-sm text-gray-500">{source.last_fetch}</span>
+                  <span className="text-sm text-gray-500">{source.last_fetch_at ? String(source.last_fetch_at).slice(0, 19) : '—'}</span>
                 </td>
                 <td className="px-6 py-4">
-                  <button onClick={() => toggleSource(source.id)} className={source.enabled ? 'text-green-500' : 'text-gray-400'}>
+                  <button type="button" onClick={() => toggleSource(source)} className={source.enabled ? 'text-green-500' : 'text-gray-400'} title="Aç/Kapat">
                     {source.enabled ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7" />}
                   </button>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <button className="p-2 hover:bg-blue-50 rounded-lg transition-colors">
-                      <Edit className="w-6 h-6 sm:w-5 sm:h-5 text-primary-blue" />
-                    </button>
-                    <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
-                    </button>
-                  </div>
+                  <button type="button" onClick={() => deleteSource(source)} className="p-2 hover:bg-red-50 rounded-lg transition-colors" title="Sil">
+                    <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
+                  </button>
                 </td>
               </tr>
             ))}
+            {sources.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-10 text-center text-sm text-gray-600">
+                  Henüz kaynak yok.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
-      </div>
-
-      {/* Hızlı Kaynak Ekle */}
-      <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Hızlı Kaynak Ekle</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <input type="text" placeholder="Kaynak Adı" className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none" />
-          <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none">
-            <option>Kaynak Türü</option>
-            <option value="news">Haber Sitesi</option>
-            <option value="politician_twitter">Siyasetçi Twitter</option>
-            <option value="politician_instagram">Siyasetçi Instagram</option>
-            <option value="media_twitter">Medya Twitter</option>
-          </select>
-          <input type="url" placeholder="Bağlantı" className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none" />
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold">
-            Kaynak Ekle
-          </button>
-        </div>
       </div>
     </div>
   );

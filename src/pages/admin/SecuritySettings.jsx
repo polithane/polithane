@@ -1,9 +1,11 @@
-import { Shield, Lock, Eye, AlertTriangle, CheckCircle, Key, Smartphone } from 'lucide-react';
+import { Shield, Lock, AlertTriangle, CheckCircle, Key, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import api from '../../utils/api';
 
 export const SecuritySettings = () => {
   const [loading, setLoading] = useState(true);
+  const [envPresent, setEnvPresent] = useState(null);
+  const [dbCounts, setDbCounts] = useState(null);
   const [settings, setSettings] = useState({
     admin_mfa_enabled: 'false',
     admin_mfa_require_new_device: 'false',
@@ -12,10 +14,14 @@ export const SecuritySettings = () => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.admin.getSettings();
-        if (res?.success && res?.data && typeof res.data === 'object') {
-          setSettings((prev) => ({ ...prev, ...res.data }));
-        }
+        const [res, env, dbo] = await Promise.all([
+          api.admin.getSettings().catch(() => null),
+          api.admin.envCheck().catch(() => null),
+          api.admin.getDbOverview().catch(() => null),
+        ]);
+        if (res?.success && res?.data && typeof res.data === 'object') setSettings((prev) => ({ ...prev, ...res.data }));
+        if (env?.success) setEnvPresent(env?.data?.present || null);
+        if (dbo?.success) setDbCounts(dbo?.data?.counts || null);
       } catch (e) {
         console.error(e);
       } finally {
@@ -23,6 +29,18 @@ export const SecuritySettings = () => {
       }
     })();
   }, []);
+
+  const score = (() => {
+    const p = envPresent || {};
+    const checks = [
+      !!p.JWT_SECRET,
+      !!p.SUPABASE_URL && !!p.SUPABASE_KEY_OK,
+      !!p.PUBLIC_APP_URL || !!p.APP_URL,
+      !!p.SMTP_OK || !!p.MAIL_RELAY_OK,
+    ];
+    const ok = checks.filter(Boolean).length;
+    return Math.round((ok / checks.length) * 100);
+  })();
 
   const toggle = async (key) => {
     const nextValue = String(settings[key]) === 'true' ? 'false' : 'true';
@@ -99,15 +117,15 @@ export const SecuritySettings = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-black mb-2">Güvenlik Skoru</h2>
-            <p className="text-green-100 mb-4">Platformunuz güvenli durumda</p>
+            <p className="text-green-100 mb-4">Mevcut yapılandırma (env + temel kontroller)</p>
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5" />
-              <span className="font-semibold">Tüm güvenlik kontrolleri aktif</span>
+              <span className="font-semibold">JWT / Supabase / App URL / Mail durumu</span>
             </div>
           </div>
           <div className="text-center">
             <div className="w-32 h-32 bg-white/20 rounded-full flex items-center justify-center mb-2">
-              <div className="text-6xl font-black">95</div>
+              <div className="text-6xl font-black">{Number.isFinite(score) ? score : '—'}</div>
             </div>
             <div className="text-sm opacity-90">/ 100</div>
           </div>
@@ -124,7 +142,7 @@ export const SecuritySettings = () => {
               </div>
               <div>
                 <h3 className="font-bold text-gray-900">SSL/TLS Sertifikası</h3>
-                <p className="text-sm text-gray-600">HTTPS şifreleme</p>
+                <p className="text-sm text-gray-600">Vercel/edge tarafından yönetilir</p>
               </div>
             </div>
             <span className="text-green-600 font-semibold text-sm">Aktif</span>
@@ -132,11 +150,11 @@ export const SecuritySettings = () => {
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Sertifika Türü:</span>
-              <span className="text-sm font-semibold text-gray-900">Let’s Encrypt</span>
+              <span className="text-sm font-semibold text-gray-900">Edge Managed</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Geçerlilik:</span>
-              <span className="text-sm font-semibold text-gray-900">15 Mayıs 2024</span>
+              <span className="text-sm font-semibold text-gray-900">Panelden takip edilir</span>
             </div>
           </div>
         </div>
@@ -149,19 +167,19 @@ export const SecuritySettings = () => {
               </div>
               <div>
                 <h3 className="font-bold text-gray-900">DDoS Koruması</h3>
-                <p className="text-sm text-gray-600">Cloudflare (Pro)</p>
+                <p className="text-sm text-gray-600">Vercel/edge temel korumalar</p>
               </div>
             </div>
             <span className="text-green-600 font-semibold text-sm">Aktif</span>
           </div>
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Engellenen Saldırı:</span>
-              <span className="text-sm font-semibold text-gray-900">247 (Bu Ay)</span>
+              <span className="text-sm text-gray-600">Not:</span>
+              <span className="text-sm font-semibold text-gray-900">Detaylı sayaç/log bu sürümde yok</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Koruma Seviyesi:</span>
-              <span className="text-sm font-semibold text-primary-blue">Yüksek</span>
+              <span className="text-sm font-semibold text-primary-blue">Edge default</span>
             </div>
           </div>
         </div>
@@ -182,11 +200,11 @@ export const SecuritySettings = () => {
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Hız Sınırı:</span>
-              <span className="text-sm font-semibold text-gray-900">100 istek/dk</span>
+              <span className="text-sm font-semibold text-gray-900">Endpoint bazlı (best-effort)</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Token Süresi:</span>
-              <span className="text-sm font-semibold text-gray-900">24 saat</span>
+              <span className="text-sm font-semibold text-gray-900">7 gün</span>
             </div>
           </div>
         </div>
@@ -207,11 +225,11 @@ export const SecuritySettings = () => {
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Engellenen IP:</span>
-              <span className="text-sm font-semibold text-gray-900">1,423</span>
+              <span className="text-sm font-semibold text-gray-900">—</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Kara Liste:</span>
-              <span className="text-sm font-semibold text-gray-900">89 IP</span>
+              <span className="text-sm font-semibold text-gray-900">—</span>
             </div>
           </div>
         </div>
@@ -223,31 +241,15 @@ export const SecuritySettings = () => {
           <h3 className="text-lg font-bold text-gray-900">Son Güvenlik Olayları</h3>
         </div>
         <div className="p-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="font-semibold text-gray-900 text-sm">Başarısız Giriş Denemesi</div>
-                <div className="text-xs text-gray-600">IP: 192.168.1.45 - 15 kez yanlış şifre</div>
+          <div className="text-sm text-gray-600">
+            Bu sürümde güvenlik olayları için ayrı bir log tablosu tutulmuyor. Detaylı izleme (WAF log, audit log, rate-limit metrikleri)
+            “Mode 1+” aşamasında eklenebilir.
+            {dbCounts && typeof dbCounts.users === 'number' ? (
+              <div className="mt-3 text-xs text-gray-500">
+                DB hızlı özet: users={dbCounts.users.toLocaleString('tr-TR')}, posts=
+                {typeof dbCounts.posts === 'number' ? dbCounts.posts.toLocaleString('tr-TR') : '—'}
               </div>
-              <span className="text-xs text-gray-500">5 dk önce</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
-              <Eye className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="font-semibold text-gray-900 text-sm">Şüpheli API İsteği</div>
-                <div className="text-xs text-gray-600">Hız sınırı aşımı tespit edildi</div>
-              </div>
-              <span className="text-xs text-gray-500">12 dk önce</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="font-semibold text-gray-900 text-sm">DDoS Saldırısı Engellendi</div>
-                <div className="text-xs text-gray-600">1,247 zararlı istek filtrelendi</div>
-              </div>
-              <span className="text-xs text-gray-500">1 saat önce</span>
-            </div>
+            ) : null}
           </div>
         </div>
       </div>

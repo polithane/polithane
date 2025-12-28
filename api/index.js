@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 // Vercel Monolith API - Last Updated: Now
 // --- CONFIG & HELPERS ---
@@ -2325,6 +2326,12 @@ async function adminSchemaCheck(req, res) {
   // Admin panel tables (no-mock requirement)
   await check('admin_notification_rules', ['id', 'name', 'description', 'trigger', 'enabled', 'channels', 'priority', 'created_at', 'updated_at']);
   await check('admin_notification_channels', ['id', 'in_app_enabled', 'push_enabled', 'email_enabled', 'sms_enabled', 'updated_at']);
+  await check('admin_ads', ['id', 'title', 'position', 'status', 'target_url', 'clicks', 'impressions', 'created_at', 'updated_at']);
+  await check('admin_workflows', ['id', 'name', 'status', 'last_run_at', 'success_count', 'fail_count', 'created_at', 'updated_at']);
+  await check('admin_revenue_entries', ['id', 'occurred_at', 'amount_cents', 'currency', 'category', 'plan_name', 'payment_method', 'status', 'note', 'created_at']);
+  await check('admin_api_keys', ['id', 'name', 'key_hash', 'key_prefix', 'status', 'created_at', 'last_used_at', 'requests_count']);
+  await check('admin_sources', ['id', 'name', 'type', 'url', 'rss_feed', 'enabled', 'priority', 'items_collected', 'last_fetch_at', 'created_at', 'updated_at']);
+  await check('admin_email_templates', ['id', 'name', 'type', 'subject', 'content_html', 'is_active', 'usage_count', 'updated_at', 'created_at']);
 
   const ok = missingTables.length === 0 && Object.keys(missingColumns).length === 0;
   return res.json({
@@ -3708,6 +3715,102 @@ values (1)
 on conflict (id) do nothing;
 `;
 
+const SQL_ADMIN_ADS = `
+create table if not exists public.admin_ads (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  position text not null,
+  status text not null default 'paused',
+  target_url text not null default '',
+  clicks bigint not null default 0,
+  impressions bigint not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists admin_ads_position_idx on public.admin_ads (position);
+create index if not exists admin_ads_status_idx on public.admin_ads (status);
+`;
+
+const SQL_ADMIN_WORKFLOWS = `
+create table if not exists public.admin_workflows (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  status text not null default 'paused',
+  last_run_at timestamptz,
+  success_count bigint not null default 0,
+  fail_count bigint not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists admin_workflows_status_idx on public.admin_workflows (status);
+`;
+
+const SQL_ADMIN_REVENUE_ENTRIES = `
+create table if not exists public.admin_revenue_entries (
+  id uuid primary key default gen_random_uuid(),
+  occurred_at timestamptz not null default now(),
+  amount_cents bigint not null default 0,
+  currency text not null default 'TRY',
+  category text not null default 'other', -- subscription | ads | other
+  plan_name text not null default '',
+  payment_method text not null default '', -- card | transfer | other
+  status text not null default 'completed', -- completed | pending | failed
+  note text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_revenue_entries_occurred_at_idx on public.admin_revenue_entries (occurred_at desc);
+create index if not exists admin_revenue_entries_category_idx on public.admin_revenue_entries (category);
+create index if not exists admin_revenue_entries_status_idx on public.admin_revenue_entries (status);
+`;
+
+const SQL_ADMIN_API_KEYS = `
+create table if not exists public.admin_api_keys (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  key_hash text not null,
+  key_prefix text not null,
+  status text not null default 'active',
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz,
+  requests_count bigint not null default 0
+);
+create index if not exists admin_api_keys_status_idx on public.admin_api_keys (status);
+`;
+
+const SQL_ADMIN_SOURCES = `
+create table if not exists public.admin_sources (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type text not null default 'news', -- news | politician_twitter | politician_instagram | media_twitter | other
+  url text not null,
+  rss_feed text,
+  enabled boolean not null default true,
+  priority text not null default 'medium', -- high | medium | low
+  items_collected bigint not null default 0,
+  last_fetch_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists admin_sources_enabled_idx on public.admin_sources (enabled);
+create index if not exists admin_sources_type_idx on public.admin_sources (type);
+`;
+
+const SQL_ADMIN_EMAIL_TEMPLATES = `
+create table if not exists public.admin_email_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type text not null default 'other', -- welcome | password_reset | email_verification | weekly_digest | other
+  subject text not null default '',
+  content_html text not null default '',
+  is_active boolean not null default true,
+  usage_count bigint not null default 0,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_email_templates_type_idx on public.admin_email_templates (type);
+create index if not exists admin_email_templates_active_idx on public.admin_email_templates (is_active);
+`;
+
 async function adminGetAnalytics(req, res) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
@@ -3757,6 +3860,470 @@ async function adminGetAnalytics(req, res) {
       topAgendas,
     },
   });
+}
+
+async function adminGetAds(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  try {
+    const rows = await supabaseRestGet('admin_ads', { select: '*', order: 'created_at.desc', limit: '200' });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_ADS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Reklamlar yüklenemedi.') });
+  }
+}
+
+async function adminCreateAd(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const title = String(body?.title || '').trim();
+  const position = String(body?.position || '').trim();
+  const status = String(body?.status || 'paused').trim() || 'paused';
+  const target_url = String(body?.target_url || '').trim();
+  if (!title) return res.status(400).json({ success: false, error: 'Başlık gerekli.' });
+  if (!position) return res.status(400).json({ success: false, error: 'Pozisyon gerekli.' });
+  const payload = { title, position, status, target_url };
+  try {
+    const inserted = await supabaseRestInsert('admin_ads', [payload]);
+    return res.json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_ADS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Reklam oluşturulamadı.') });
+  }
+}
+
+async function adminUpdateAd(req, res, adId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(adId)) return res.status(400).json({ success: false, error: 'Geçersiz reklam.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (body?.title !== undefined) patch.title = String(body.title || '').trim();
+  if (body?.position !== undefined) patch.position = String(body.position || '').trim();
+  if (body?.status !== undefined) patch.status = String(body.status || '').trim();
+  if (body?.target_url !== undefined) patch.target_url = String(body.target_url || '').trim();
+  if (body?.clicks !== undefined) patch.clicks = Math.max(0, parseInt(String(body.clicks || 0), 10) || 0);
+  if (body?.impressions !== undefined) patch.impressions = Math.max(0, parseInt(String(body.impressions || 0), 10) || 0);
+  patch.updated_at = new Date().toISOString();
+  try {
+    const updated = await supabaseRestPatch('admin_ads', { id: `eq.${adId}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_ADS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Reklam güncellenemedi.') });
+  }
+}
+
+async function adminDeleteAd(req, res, adId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(adId)) return res.status(400).json({ success: false, error: 'Geçersiz reklam.' });
+  try {
+    await supabaseRestDelete('admin_ads', { id: `eq.${adId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_ADS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Reklam silinemedi.') });
+  }
+}
+
+async function adminGetWorkflows(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  try {
+    const rows = await supabaseRestGet('admin_workflows', { select: '*', order: 'created_at.desc', limit: '200' });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_WORKFLOWS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'İş akışları yüklenemedi.') });
+  }
+}
+
+async function adminCreateWorkflow(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const name = String(body?.name || '').trim();
+  const status = String(body?.status || 'paused').trim() || 'paused';
+  if (!name) return res.status(400).json({ success: false, error: 'İş akışı adı gerekli.' });
+  try {
+    const inserted = await supabaseRestInsert('admin_workflows', [{ name, status }]);
+    return res.json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_WORKFLOWS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'İş akışı oluşturulamadı.') });
+  }
+}
+
+async function adminUpdateWorkflow(req, res, workflowId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(workflowId)) return res.status(400).json({ success: false, error: 'Geçersiz iş akışı.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (body?.name !== undefined) patch.name = String(body.name || '').trim();
+  if (body?.status !== undefined) patch.status = String(body.status || '').trim();
+  if (body?.last_run_at !== undefined) patch.last_run_at = body.last_run_at ? String(body.last_run_at) : null;
+  if (body?.success_count !== undefined) patch.success_count = Math.max(0, parseInt(String(body.success_count || 0), 10) || 0);
+  if (body?.fail_count !== undefined) patch.fail_count = Math.max(0, parseInt(String(body.fail_count || 0), 10) || 0);
+  patch.updated_at = new Date().toISOString();
+  try {
+    const updated = await supabaseRestPatch('admin_workflows', { id: `eq.${workflowId}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_WORKFLOWS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'İş akışı güncellenemedi.') });
+  }
+}
+
+async function adminDeleteWorkflow(req, res, workflowId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(workflowId)) return res.status(400).json({ success: false, error: 'Geçersiz iş akışı.' });
+  try {
+    await supabaseRestDelete('admin_workflows', { id: `eq.${workflowId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_WORKFLOWS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'İş akışı silinemedi.') });
+  }
+}
+
+async function adminGetRevenueEntries(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const limit = Math.min(500, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
+  try {
+    const rows = await supabaseRestGet('admin_revenue_entries', { select: '*', order: 'occurred_at.desc', limit: String(limit) });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_REVENUE_ENTRIES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Gelir kayıtları yüklenemedi.') });
+  }
+}
+
+async function adminCreateRevenueEntry(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const amount_cents = Math.max(0, parseInt(String(body?.amount_cents || 0), 10) || 0);
+  const currency = String(body?.currency || 'TRY').trim() || 'TRY';
+  const category = String(body?.category || 'other').trim() || 'other';
+  const plan_name = String(body?.plan_name || '').trim();
+  const payment_method = String(body?.payment_method || '').trim();
+  const status = String(body?.status || 'completed').trim() || 'completed';
+  const note = String(body?.note || '').trim();
+  const occurred_at = body?.occurred_at ? String(body.occurred_at) : new Date().toISOString();
+  if (amount_cents <= 0) return res.status(400).json({ success: false, error: 'Tutar gerekli.' });
+  const payload = { amount_cents, currency, category, plan_name, payment_method, status, note, occurred_at };
+  try {
+    const inserted = await supabaseRestInsert('admin_revenue_entries', [payload]);
+    return res.json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_REVENUE_ENTRIES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Gelir kaydı eklenemedi.') });
+  }
+}
+
+async function adminDeleteRevenueEntry(req, res, entryId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(entryId)) return res.status(400).json({ success: false, error: 'Geçersiz kayıt.' });
+  try {
+    await supabaseRestDelete('admin_revenue_entries', { id: `eq.${entryId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_REVENUE_ENTRIES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Silinemedi.') });
+  }
+}
+
+async function adminGetRevenueSummary(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  try {
+    const rows = await supabaseRestGet('admin_revenue_entries', { select: '*', order: 'occurred_at.desc', limit: '5000' });
+    const list = Array.isArray(rows) ? rows : [];
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const month = list.filter((r) => String(r?.status || '') === 'completed' && String(r?.occurred_at || '') >= monthStart);
+    const sumCents = (arr) => arr.reduce((acc, r) => acc + (Number(r?.amount_cents || 0) || 0), 0);
+    const by = (key) => {
+      const m = new Map();
+      for (const r of month) {
+        const k = String(r?.[key] || '').trim() || '—';
+        m.set(k, (m.get(k) || 0) + (Number(r?.amount_cents || 0) || 0));
+      }
+      return Array.from(m.entries()).map(([k, v]) => ({ key: k, amount_cents: v }));
+    };
+    return res.json({
+      success: true,
+      data: {
+        monthStart,
+        currency: 'TRY',
+        monthTotalCents: sumCents(month),
+        byCategory: by('category'),
+        byPlan: by('plan_name'),
+        byPaymentMethod: by('payment_method'),
+      },
+    });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: null, schemaMissing: true, requiredSql: SQL_ADMIN_REVENUE_ENTRIES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Özet alınamadı.') });
+  }
+}
+
+async function adminGetApiKeys(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  try {
+    const rows = await supabaseRestGet('admin_api_keys', {
+      select: 'id,name,key_prefix,status,created_at,last_used_at,requests_count',
+      order: 'created_at.desc',
+      limit: '200',
+    });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_API_KEYS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'API anahtarları yüklenemedi.') });
+  }
+}
+
+async function adminCreateApiKey(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const name = String(body?.name || '').trim();
+  if (!name || name.length < 2) return res.status(400).json({ success: false, error: 'Anahtar adı gerekli.' });
+
+  const secret = crypto.randomBytes(32).toString('hex');
+  const key_hash = crypto.createHash('sha256').update(secret).digest('hex');
+  const key_prefix = secret.slice(0, 10);
+  try {
+    const inserted = await supabaseRestInsert('admin_api_keys', [{ name, key_hash, key_prefix, status: 'active' }]);
+    const row = inserted?.[0] || null;
+    return res.json({ success: true, data: row, secret });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_API_KEYS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'API anahtarı oluşturulamadı.') });
+  }
+}
+
+async function adminUpdateApiKey(req, res, keyId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(keyId)) return res.status(400).json({ success: false, error: 'Geçersiz anahtar.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (body?.name !== undefined) patch.name = String(body.name || '').trim();
+  if (body?.status !== undefined) patch.status = String(body.status || '').trim();
+  try {
+    const updated = await supabaseRestPatch('admin_api_keys', { id: `eq.${keyId}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_API_KEYS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Güncellenemedi.') });
+  }
+}
+
+async function adminDeleteApiKey(req, res, keyId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(keyId)) return res.status(400).json({ success: false, error: 'Geçersiz anahtar.' });
+  try {
+    await supabaseRestDelete('admin_api_keys', { id: `eq.${keyId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_API_KEYS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Silinemedi.') });
+  }
+}
+
+async function adminGetSources(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  try {
+    const rows = await supabaseRestGet('admin_sources', { select: '*', order: 'created_at.desc', limit: '500' });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_SOURCES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Kaynaklar yüklenemedi.') });
+  }
+}
+
+async function adminCreateSource(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const name = String(body?.name || '').trim();
+  const type = String(body?.type || 'news').trim() || 'news';
+  const url = String(body?.url || '').trim();
+  const rss_feed = body?.rss_feed ? String(body.rss_feed).trim() : null;
+  const enabled = body?.enabled !== false;
+  const priority = String(body?.priority || 'medium').trim() || 'medium';
+  if (!name) return res.status(400).json({ success: false, error: 'Kaynak adı gerekli.' });
+  if (!url) return res.status(400).json({ success: false, error: 'URL gerekli.' });
+  const payload = { name, type, url, rss_feed, enabled: !!enabled, priority };
+  try {
+    const inserted = await supabaseRestInsert('admin_sources', [payload]);
+    return res.json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_SOURCES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Kaynak eklenemedi.') });
+  }
+}
+
+async function adminUpdateSource(req, res, sourceId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(sourceId)) return res.status(400).json({ success: false, error: 'Geçersiz kaynak.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (body?.name !== undefined) patch.name = String(body.name || '').trim();
+  if (body?.type !== undefined) patch.type = String(body.type || '').trim();
+  if (body?.url !== undefined) patch.url = String(body.url || '').trim();
+  if (body?.rss_feed !== undefined) patch.rss_feed = body.rss_feed ? String(body.rss_feed).trim() : null;
+  if (body?.enabled !== undefined) patch.enabled = !!body.enabled;
+  if (body?.priority !== undefined) patch.priority = String(body.priority || '').trim();
+  if (body?.items_collected !== undefined) patch.items_collected = Math.max(0, parseInt(String(body.items_collected || 0), 10) || 0);
+  if (body?.last_fetch_at !== undefined) patch.last_fetch_at = body.last_fetch_at ? String(body.last_fetch_at) : null;
+  patch.updated_at = new Date().toISOString();
+  try {
+    const updated = await supabaseRestPatch('admin_sources', { id: `eq.${sourceId}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_SOURCES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Kaynak güncellenemedi.') });
+  }
+}
+
+async function adminDeleteSource(req, res, sourceId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(sourceId)) return res.status(400).json({ success: false, error: 'Geçersiz kaynak.' });
+  try {
+    await supabaseRestDelete('admin_sources', { id: `eq.${sourceId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_SOURCES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Kaynak silinemedi.') });
+  }
+}
+
+async function adminGetEmailTemplates(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  try {
+    const rows = await supabaseRestGet('admin_email_templates', { select: '*', order: 'updated_at.desc', limit: '200' });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_EMAIL_TEMPLATES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Şablonlar yüklenemedi.') });
+  }
+}
+
+async function adminCreateEmailTemplate(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const name = String(body?.name || '').trim();
+  const type = String(body?.type || 'other').trim() || 'other';
+  const subject = String(body?.subject || '').trim();
+  const content_html = String(body?.content_html || '').trim();
+  const is_active = body?.is_active !== false;
+  if (!name) return res.status(400).json({ success: false, error: 'Şablon adı gerekli.' });
+  const payload = { name, type, subject, content_html, is_active: !!is_active, updated_at: new Date().toISOString() };
+  try {
+    const inserted = await supabaseRestInsert('admin_email_templates', [payload]);
+    return res.json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_EMAIL_TEMPLATES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Şablon oluşturulamadı.') });
+  }
+}
+
+async function adminUpdateEmailTemplate(req, res, templateId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(templateId)) return res.status(400).json({ success: false, error: 'Geçersiz şablon.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (body?.name !== undefined) patch.name = String(body.name || '').trim();
+  if (body?.type !== undefined) patch.type = String(body.type || '').trim();
+  if (body?.subject !== undefined) patch.subject = String(body.subject || '').trim();
+  if (body?.content_html !== undefined) patch.content_html = String(body.content_html || '').trim();
+  if (body?.is_active !== undefined) patch.is_active = !!body.is_active;
+  patch.updated_at = new Date().toISOString();
+  try {
+    const updated = await supabaseRestPatch('admin_email_templates', { id: `eq.${templateId}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_EMAIL_TEMPLATES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Şablon güncellenemedi.') });
+  }
+}
+
+async function adminDeleteEmailTemplate(req, res, templateId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(templateId)) return res.status(400).json({ success: false, error: 'Geçersiz şablon.' });
+  try {
+    await supabaseRestDelete('admin_email_templates', { id: `eq.${templateId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_EMAIL_TEMPLATES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Şablon silinemedi.') });
+  }
 }
 
 async function adminGetNotificationRules(req, res) {
@@ -3893,6 +4460,43 @@ async function adminUpdateNotificationChannels(req, res) {
     }
     return res.status(500).json({ success: false, error: String(e?.message || 'Ayarlar güncellenemedi.') });
   }
+}
+
+async function adminGetDbOverview(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  const tables = [
+    'users',
+    'posts',
+    'comments',
+    'notifications',
+    'messages',
+    'agendas',
+    'parties',
+    'follows',
+    'likes',
+    'admin_notification_rules',
+    'admin_notification_channels',
+  ];
+
+  const counts = {};
+  for (const t of tables) {
+    // eslint-disable-next-line no-await-in-loop
+    const n = await supabaseCount(t, { select: 'id' }).catch(() => null);
+    counts[t] = typeof n === 'number' ? n : null;
+  }
+
+  // best-effort "last activity"
+  let lastPostAt = null;
+  try {
+    const rows = await supabaseRestGet('posts', { select: 'created_at', is_deleted: 'eq.false', order: 'created_at.desc', limit: '1' });
+    lastPostAt = rows?.[0]?.created_at || null;
+  } catch {
+    lastPostAt = null;
+  }
+
+  return res.json({ success: true, data: { counts, lastPostAt } });
 }
 
 async function adminSeedDemoContent(req, res) {
@@ -6619,6 +7223,20 @@ export default async function handler(req, res) {
       if (url === '/api/admin/notification-rules' && req.method === 'POST') return await adminCreateNotificationRule(req, res);
       if (url === '/api/admin/notification-channels' && req.method === 'GET') return await adminGetNotificationChannels(req, res);
       if (url === '/api/admin/notification-channels' && req.method === 'PUT') return await adminUpdateNotificationChannels(req, res);
+      if (url === '/api/admin/db/overview' && req.method === 'GET') return await adminGetDbOverview(req, res);
+      if (url === '/api/admin/ads' && req.method === 'GET') return await adminGetAds(req, res);
+      if (url === '/api/admin/ads' && req.method === 'POST') return await adminCreateAd(req, res);
+      if (url === '/api/admin/workflows' && req.method === 'GET') return await adminGetWorkflows(req, res);
+      if (url === '/api/admin/workflows' && req.method === 'POST') return await adminCreateWorkflow(req, res);
+      if (url === '/api/admin/revenue/entries' && req.method === 'GET') return await adminGetRevenueEntries(req, res);
+      if (url === '/api/admin/revenue/entries' && req.method === 'POST') return await adminCreateRevenueEntry(req, res);
+      if (url === '/api/admin/revenue/summary' && req.method === 'GET') return await adminGetRevenueSummary(req, res);
+      if (url === '/api/admin/api-keys' && req.method === 'GET') return await adminGetApiKeys(req, res);
+      if (url === '/api/admin/api-keys' && req.method === 'POST') return await adminCreateApiKey(req, res);
+      if (url === '/api/admin/sources' && req.method === 'GET') return await adminGetSources(req, res);
+      if (url === '/api/admin/sources' && req.method === 'POST') return await adminCreateSource(req, res);
+      if (url === '/api/admin/email-templates' && req.method === 'GET') return await adminGetEmailTemplates(req, res);
+      if (url === '/api/admin/email-templates' && req.method === 'POST') return await adminCreateEmailTemplate(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
       if (url === '/api/admin/users/duplicates' && req.method === 'GET') return await adminFindDuplicateUsers(req, res);
       if (url === '/api/admin/users/dedupe' && req.method === 'POST') return await adminDedupeUsers(req, res);
@@ -6637,6 +7255,50 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/admin/notification-rules/') && req.method === 'DELETE') {
         const ruleId = url.split('/api/admin/notification-rules/')[1];
         return await adminDeleteNotificationRule(req, res, ruleId);
+      }
+      if (url.startsWith('/api/admin/ads/') && req.method === 'PUT') {
+        const adId = url.split('/api/admin/ads/')[1];
+        return await adminUpdateAd(req, res, adId);
+      }
+      if (url.startsWith('/api/admin/ads/') && req.method === 'DELETE') {
+        const adId = url.split('/api/admin/ads/')[1];
+        return await adminDeleteAd(req, res, adId);
+      }
+      if (url.startsWith('/api/admin/workflows/') && req.method === 'PUT') {
+        const workflowId = url.split('/api/admin/workflows/')[1];
+        return await adminUpdateWorkflow(req, res, workflowId);
+      }
+      if (url.startsWith('/api/admin/workflows/') && req.method === 'DELETE') {
+        const workflowId = url.split('/api/admin/workflows/')[1];
+        return await adminDeleteWorkflow(req, res, workflowId);
+      }
+      if (url.startsWith('/api/admin/revenue/entries/') && req.method === 'DELETE') {
+        const entryId = url.split('/api/admin/revenue/entries/')[1];
+        return await adminDeleteRevenueEntry(req, res, entryId);
+      }
+      if (url.startsWith('/api/admin/api-keys/') && req.method === 'PUT') {
+        const keyId = url.split('/api/admin/api-keys/')[1];
+        return await adminUpdateApiKey(req, res, keyId);
+      }
+      if (url.startsWith('/api/admin/api-keys/') && req.method === 'DELETE') {
+        const keyId = url.split('/api/admin/api-keys/')[1];
+        return await adminDeleteApiKey(req, res, keyId);
+      }
+      if (url.startsWith('/api/admin/sources/') && req.method === 'PUT') {
+        const sourceId = url.split('/api/admin/sources/')[1];
+        return await adminUpdateSource(req, res, sourceId);
+      }
+      if (url.startsWith('/api/admin/sources/') && req.method === 'DELETE') {
+        const sourceId = url.split('/api/admin/sources/')[1];
+        return await adminDeleteSource(req, res, sourceId);
+      }
+      if (url.startsWith('/api/admin/email-templates/') && req.method === 'PUT') {
+        const templateId = url.split('/api/admin/email-templates/')[1];
+        return await adminUpdateEmailTemplate(req, res, templateId);
+      }
+      if (url.startsWith('/api/admin/email-templates/') && req.method === 'DELETE') {
+        const templateId = url.split('/api/admin/email-templates/')[1];
+        return await adminDeleteEmailTemplate(req, res, templateId);
       }
       if (url.startsWith('/api/admin/parties/') && req.method === 'GET') {
         const rest = url.split('/api/admin/parties/')[1] || '';

@@ -64,8 +64,10 @@ export const NotificationRules = () => {
 
   const toggleRule = (id) => {
     const rid = String(id || '');
-    setRules((prev) => prev.map((r) => (String(r.id) === rid ? { ...r, enabled: !r.enabled } : r)));
-    adminApi.updateNotificationRule(rid, { enabled: !rules.find((r) => String(r.id) === rid)?.enabled }).catch(() => loadAll());
+    const cur = rules.find((r) => String(r.id) === rid);
+    const nextEnabled = !(cur?.enabled !== false);
+    setRules((prev) => prev.map((r) => (String(r.id) === rid ? { ...r, enabled: nextEnabled } : r)));
+    adminApi.updateNotificationRule(rid, { enabled: nextEnabled }).catch(() => loadAll());
   };
 
   const getPriorityBadge = (priority) => {

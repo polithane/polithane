@@ -1,172 +1,155 @@
-import { Database, HardDrive, Activity, RefreshCw, Download, Archive } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Database, Activity, RefreshCw } from 'lucide-react';
+import { admin as adminApi } from '../../utils/api';
+import { formatDate } from '../../utils/formatters';
 
 export const DatabaseManagement = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [overview, setOverview] = useState(null);
+  const [schema, setSchema] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [rOv, rSchema] = await Promise.all([
+          adminApi.getDbOverview().catch(() => null),
+          adminApi.schemaCheck().catch(() => null),
+        ]);
+        if (!rOv?.success) throw new Error(rOv?.error || 'DB özeti yüklenemedi.');
+        if (!cancelled) {
+          setOverview(rOv.data || null);
+          setSchema(rSchema?.success ? rSchema.data : null);
+        }
+      } catch (e) {
+        if (!cancelled) setError(String(e?.message || 'DB özeti yüklenemedi.'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const tableRows = useMemo(() => {
+    const counts = overview?.counts || {};
+    const items = [
+      'users',
+      'posts',
+      'comments',
+      'notifications',
+      'messages',
+      'agendas',
+      'parties',
+      'follows',
+      'likes',
+      'admin_notification_rules',
+      'admin_notification_channels',
+    ];
+    return items.map((t) => ({
+      table: t,
+      count: typeof counts[t] === 'number' ? counts[t] : null,
+    }));
+  }, [overview]);
+
+  const totalRecords = useMemo(() => {
+    return tableRows.reduce((acc, r) => acc + (typeof r.count === 'number' ? r.count : 0), 0);
+  }, [tableRows]);
+
   return (
     <div className="p-8">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Veritabanı Yönetimi</h1>
-        <p className="text-gray-600">Veritabanı performansını izleyin ve optimize edin</p>
+        <p className="text-gray-600">Supabase Postgres özet görünümü (mock yok)</p>
       </div>
 
-      {/* Database Health */}
+      {error ? <div className="mb-4 text-sm text-red-600 font-semibold">{error}</div> : null}
+      {loading ? <div className="mb-4 text-sm text-gray-600">Yükleniyor…</div> : null}
+
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm text-green-600">Veritabanı Durumu</div>
             <Activity className="w-5 h-5 text-green-600" />
           </div>
-          <div className="text-2xl font-black text-green-700">Sağlıklı</div>
-          <div className="text-xs text-green-600 mt-1">100% Çalışma Süresi</div>
+          <div className="text-2xl font-black text-green-700">{schema?.ok === false ? 'Kontrol Gerekiyor' : 'Çalışıyor'}</div>
+          <div className="text-xs text-green-600 mt-1">Schema kontrolü: {schema ? (schema.ok ? 'OK' : 'Eksik var') : '—'}</div>
         </div>
-        <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm text-blue-600">Toplam Boyut</div>
-            <HardDrive className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className="text-2xl font-black text-blue-700">12.4 GB</div>
-          <div className="text-xs text-blue-600 mt-1">/ 50 GB</div>
-        </div>
+
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm text-purple-600">Toplam Kayıt</div>
             <Database className="w-5 h-5 text-purple-600" />
           </div>
-          <div className="text-2xl font-black text-purple-700">1.2M</div>
-          <div className="text-xs text-purple-600 mt-1">Tüm tablolar</div>
+          <div className="text-2xl font-black text-purple-700">{totalRecords.toLocaleString('tr-TR')}</div>
+          <div className="text-xs text-purple-600 mt-1">Sayım: seçili tablolar</div>
         </div>
+
         <div className="bg-orange-50 rounded-xl border border-orange-200 p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm text-orange-600">Bağlantı Havuzu</div>
+            <div className="text-sm text-orange-600">Son Polit</div>
             <Activity className="w-5 h-5 text-orange-600" />
           </div>
-          <div className="text-2xl font-black text-orange-700">23/100</div>
-          <div className="text-xs text-orange-600 mt-1">Aktif bağlantı</div>
+          <div className="text-2xl font-black text-orange-700">{overview?.lastPostAt ? formatDate(overview.lastPostAt) : '—'}</div>
+          <div className="text-xs text-orange-600 mt-1">created_at (posts)</div>
+        </div>
+
+        <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm text-blue-600">Operasyon</div>
+            <RefreshCw className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="text-2xl font-black text-blue-700">Supabase</div>
+          <div className="text-xs text-blue-600 mt-1">Backup/optimizasyon panelden</div>
         </div>
       </div>
 
-      {/* Database Info */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Veritabanı Bilgileri</h3>
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Tür:</span>
-              <span className="text-sm font-semibold text-gray-900">PostgreSQL 15</span>
-            </div>
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Host:</span>
-              <span className="text-sm font-semibold text-gray-900">Supabase (Yönetilen)</span>
-            </div>
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Bölge:</span>
-              <span className="text-sm font-semibold text-gray-900">eu-central-1 (Frankfurt)</span>
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Son Yedekleme:</span>
-              <span className="text-sm font-semibold text-gray-900">2 saat önce</span>
-            </div>
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Otomatik Yedekleme:</span>
-              <span className="text-sm font-semibold text-green-600">Aktif (Günlük)</span>
-            </div>
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Yedek Saklama:</span>
-              <span className="text-sm font-semibold text-gray-900">30 gün</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tables Overview */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-900">Tablo İstatistikleri</h3>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 font-black inline-flex items-center gap-2"
+          >
+            <RefreshCw className="w-5 h-5" />
+            Yenile
+          </button>
         </div>
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Tablo Adı</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Kayıt Sayısı</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Boyut</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Son Güncelleme</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            <tr className="hover:bg-gray-50">
-              <td className="px-6 py-4"><span className="font-mono text-sm text-gray-900">users</span></td>
-              <td className="px-6 py-4"><span className="text-sm font-semibold text-gray-900">124,567</span></td>
-              <td className="px-6 py-4"><span className="text-sm text-gray-700">2.4 GB</span></td>
-              <td className="px-6 py-4"><span className="text-sm text-gray-500">5 dk önce</span></td>
-            </tr>
-            <tr className="hover:bg-gray-50">
-              <td className="px-6 py-4"><span className="font-mono text-sm text-gray-900">posts</span></td>
-              <td className="px-6 py-4"><span className="text-sm font-semibold text-gray-900">456,789</span></td>
-              <td className="px-6 py-4"><span className="text-sm text-gray-700">5.8 GB</span></td>
-              <td className="px-6 py-4"><span className="text-sm text-gray-500">1 dk önce</span></td>
-            </tr>
-            <tr className="hover:bg-gray-50">
-              <td className="px-6 py-4"><span className="font-mono text-sm text-gray-900">comments</span></td>
-              <td className="px-6 py-4"><span className="text-sm font-semibold text-gray-900">789,123</span></td>
-              <td className="px-6 py-4"><span className="text-sm text-gray-700">3.2 GB</span></td>
-              <td className="px-6 py-4"><span className="text-sm text-gray-500">2 dk önce</span></td>
-            </tr>
-            <tr className="hover:bg-gray-50">
-              <td className="px-6 py-4"><span className="font-mono text-sm text-gray-900">notifications</span></td>
-              <td className="px-6 py-4"><span className="text-sm font-semibold text-gray-900">234,456</span></td>
-              <td className="px-6 py-4"><span className="text-sm text-gray-700">890 MB</span></td>
-              <td className="px-6 py-4"><span className="text-sm text-gray-500">30 sn önce</span></td>
-            </tr>
+            {tableRows.map((r) => (
+              <tr key={r.table} className="hover:bg-gray-50">
+                <td className="px-6 py-4">
+                  <span className="font-mono text-sm text-gray-900">{r.table}</span>
+                </td>
+                <td className="px-6 py-4">
+                  <span className="text-sm font-semibold text-gray-900">
+                    {typeof r.count === 'number' ? r.count.toLocaleString('tr-TR') : '—'}
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
 
-      {/* Actions */}
-      <div className="grid grid-cols-3 gap-4">
-        <button className="flex items-center justify-center gap-3 px-6 py-4 bg-primary-blue text-white rounded-xl hover:bg-blue-600 transition-colors font-semibold">
-          <Download className="w-5 h-5" />
-          Manuel Yedekleme Al
-        </button>
-        <button className="flex items-center justify-center gap-3 px-6 py-4 bg-purple-500 text-white rounded-xl hover:bg-purple-600 transition-colors font-semibold">
-          <RefreshCw className="w-5 h-5" />
-          Veritabanını Optimize Et
-        </button>
-        <button className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors font-semibold">
-          <Archive className="w-5 h-5" />
-          Eski Verileri Arşivle
-        </button>
-      </div>
-
-      {/* Query Performance */}
-      <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Yavaş Sorgular (Son 1 Saat)</h3>
-        <div className="space-y-3">
-          <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
-            <Activity className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-mono text-xs text-gray-700 mb-1">SELECT * FROM posts WHERE...</div>
-              <div className="flex items-center gap-4 text-xs text-gray-600">
-                <span>Süre: 2.4s</span>
-                <span>Çağrı: 247</span>
-                <span>Son: 5 dk önce</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
-            <Activity className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-mono text-xs text-gray-700 mb-1">SELECT COUNT(*) FROM users JOIN...</div>
-              <div className="flex items-center gap-4 text-xs text-gray-600">
-                <span>Süre: 1.8s</span>
-                <span>Çağrı: 89</span>
-                <span>Son: 12 dk önce</span>
-              </div>
-            </div>
-          </div>
+      {schema?.ok === false ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-900">
+          <div className="font-black">Schema kontrolünde eksikler var</div>
+          <div className="text-sm mt-1">Eksik tablolar/sütunlar için `Admin → Veritabanı Yönetimi → Schema Check` ekranını kullanın.</div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 };

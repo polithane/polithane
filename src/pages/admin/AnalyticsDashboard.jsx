@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TrendingUp, Users, FileText, Eye } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
-import { formatPolitScore } from '../../utils/format';
+import { formatPolitScore } from '../../utils/formatters';
 
 export const AnalyticsDashboard = () => {
   const [dateRange, setDateRange] = useState('7days');

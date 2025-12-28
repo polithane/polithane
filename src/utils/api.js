@@ -375,6 +375,43 @@ export const messages = {
 // ============================================
 export const admin = {
   getStats: () => apiCall('/api/admin/stats'),
+  envCheck: () => apiCall('/api/admin/env-check'),
+  schemaCheck: () => apiCall('/api/admin/schema-check'),
+  getDbOverview: () => apiCall('/api/admin/db/overview'),
+  getAds: () => apiCall('/api/admin/ads'),
+  createAd: (data) => apiCall('/api/admin/ads', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateAd: (adId, data) => apiCall(`/api/admin/ads/${adId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteAd: (adId) => apiCall(`/api/admin/ads/${adId}`, { method: 'DELETE' }),
+
+  getWorkflows: () => apiCall('/api/admin/workflows'),
+  createWorkflow: (data) => apiCall('/api/admin/workflows', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateWorkflow: (workflowId, data) =>
+    apiCall(`/api/admin/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteWorkflow: (workflowId) => apiCall(`/api/admin/workflows/${workflowId}`, { method: 'DELETE' }),
+
+  getRevenueSummary: () => apiCall('/api/admin/revenue/summary'),
+  getRevenueEntries: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/revenue/entries${query ? `?${query}` : ''}`);
+  },
+  createRevenueEntry: (data) => apiCall('/api/admin/revenue/entries', { method: 'POST', body: JSON.stringify(data || {}) }),
+  deleteRevenueEntry: (entryId) => apiCall(`/api/admin/revenue/entries/${entryId}`, { method: 'DELETE' }),
+
+  getApiKeys: () => apiCall('/api/admin/api-keys'),
+  createApiKey: (data) => apiCall('/api/admin/api-keys', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateApiKey: (keyId, data) => apiCall(`/api/admin/api-keys/${keyId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteApiKey: (keyId) => apiCall(`/api/admin/api-keys/${keyId}`, { method: 'DELETE' }),
+
+  getSources: () => apiCall('/api/admin/sources'),
+  createSource: (data) => apiCall('/api/admin/sources', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateSource: (sourceId, data) => apiCall(`/api/admin/sources/${sourceId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteSource: (sourceId) => apiCall(`/api/admin/sources/${sourceId}`, { method: 'DELETE' }),
+
+  getEmailTemplates: () => apiCall('/api/admin/email-templates'),
+  createEmailTemplate: (data) => apiCall('/api/admin/email-templates', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateEmailTemplate: (templateId, data) =>
+    apiCall(`/api/admin/email-templates/${templateId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteEmailTemplate: (templateId) => apiCall(`/api/admin/email-templates/${templateId}`, { method: 'DELETE' }),
 
   getAnalytics: (params = {}) => {
     const query = new URLSearchParams(params).toString();

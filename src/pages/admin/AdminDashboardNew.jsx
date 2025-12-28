@@ -20,9 +20,7 @@ export const AdminDashboardNew = () => {
   });
   
   const [recentUsers, setRecentUsers] = useState([]);
-  const [recentPosts, setRecentPosts] = useState([]);
   const [topPosts, setTopPosts] = useState([]);
-  const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -52,49 +50,17 @@ export const AdminDashboardNew = () => {
     };
     load();
   }, []);
-
-  const seedDemo = async () => {
-    setSeeding(true);
-    try {
-      const r = await adminApi.seedDemo({ posts: 200, fast: 50 }).catch(() => null);
-      if (!r?.success) throw new Error(r?.error || 'Demo içerik oluşturma başarısız.');
-      const s = await adminApi.getStats().catch(() => null);
-      if (s?.success) {
-        setStats((prev) => ({
-          ...prev,
-          totalUsers: s.data?.totalUsers ?? prev.totalUsers,
-          totalPosts: s.data?.totalPosts ?? prev.totalPosts,
-          totalViews: s.data?.totalViews ?? prev.totalViews,
-          totalLikes: s.data?.totalLikes ?? prev.totalLikes,
-          totalComments: s.data?.totalComments ?? prev.totalComments,
-          totalShares: s.data?.totalShares ?? prev.totalShares,
-          totalPolitScore: s.data?.totalPolitScore ?? prev.totalPolitScore,
-          activeUsers24h: s.data?.activeUsers24h ?? prev.activeUsers24h,
-          newUsersToday: s.data?.newUsersToday ?? prev.newUsersToday,
-          newPostsToday: s.data?.newPostsToday ?? prev.newPostsToday,
-          avgPolitScore: s.data?.avgPolitScore ?? prev.avgPolitScore,
-        }));
-        setRecentUsers(Array.isArray(s.data?.recentUsers) ? s.data.recentUsers : []);
-        setTopPosts(Array.isArray(s.data?.topPosts) ? s.data.topPosts : []);
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-alert
-      alert(String(e?.message || e || 'Demo içerik oluşturma başarısız.'));
-    } finally {
-      setSeeding(false);
-    }
-  };
   
   // NOTE: Avoid dynamic Tailwind classes like `bg-${color}-100` in production builds.
   const statCards = [
-    { label: 'Toplam Kullanıcı', value: stats.totalUsers.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-blue-100', iconText: 'text-blue-600', change: '+12%', link: '/admin/users' },
-    { label: 'Toplam Paylaşım', value: stats.totalPosts.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-green-100', iconText: 'text-green-600', change: '+8%', link: '/admin/posts' },
-    { label: 'Toplam Görüntülenme', value: stats.totalViews.toLocaleString('tr-TR'), icon: Eye, iconBg: 'bg-purple-100', iconText: 'text-purple-600', change: '+25%' },
-    { label: 'Toplam Polit Puan', value: `${(stats.totalPolitScore / 1000000).toFixed(1)}M`, icon: TrendingUp, iconBg: 'bg-orange-100', iconText: 'text-orange-600', change: '+15%', link: '/admin/algorithm' },
-    { label: 'Bugün Yeni Kullanıcı', value: stats.newUsersToday.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-green-100', iconText: 'text-green-600', change: '+5%' },
-    { label: 'Bugün Yeni Paylaşım', value: stats.newPostsToday.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-blue-100', iconText: 'text-blue-600', change: '+10%' },
-    { label: 'Aktif Kullanıcı (24s)', value: stats.activeUsers24h.toLocaleString('tr-TR'), icon: Activity, iconBg: 'bg-red-100', iconText: 'text-red-600', change: '+18%' },
-    { label: 'Ort. Polit Puan', value: stats.avgPolitScore.toLocaleString('tr-TR'), icon: TrendingUp, iconBg: 'bg-yellow-100', iconText: 'text-yellow-600', change: '+3%' },
+    { label: 'Toplam Kullanıcı', value: stats.totalUsers.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-blue-100', iconText: 'text-blue-600', link: '/admin/users' },
+    { label: 'Toplam Paylaşım', value: stats.totalPosts.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-green-100', iconText: 'text-green-600', link: '/admin/posts' },
+    { label: 'Toplam Görüntülenme', value: stats.totalViews.toLocaleString('tr-TR'), icon: Eye, iconBg: 'bg-purple-100', iconText: 'text-purple-600' },
+    { label: 'Toplam Polit Puan', value: `${(stats.totalPolitScore / 1000000).toFixed(1)}M`, icon: TrendingUp, iconBg: 'bg-orange-100', iconText: 'text-orange-600', link: '/admin/algorithm' },
+    { label: 'Bugün Yeni Kullanıcı', value: stats.newUsersToday.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-green-100', iconText: 'text-green-600' },
+    { label: 'Bugün Yeni Paylaşım', value: stats.newPostsToday.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-blue-100', iconText: 'text-blue-600' },
+    { label: 'Aktif Kullanıcı (24s)', value: stats.activeUsers24h.toLocaleString('tr-TR'), icon: Activity, iconBg: 'bg-red-100', iconText: 'text-red-600' },
+    { label: 'Ort. Polit Puan', value: stats.avgPolitScore.toLocaleString('tr-TR'), icon: TrendingUp, iconBg: 'bg-yellow-100', iconText: 'text-yellow-600' },
   ];
   
   return (
@@ -104,15 +70,6 @@ export const AdminDashboardNew = () => {
           <h1 className="text-3xl font-black text-gray-900 mb-2">Genel Bakış</h1>
           <p className="text-gray-600">Platform yönetim merkezi - Tüm istatistikler</p>
         </div>
-        <button
-          type="button"
-          onClick={seedDemo}
-          disabled={seeding}
-          className="px-4 py-2 rounded-xl bg-gray-900 text-white font-black hover:bg-black disabled:opacity-60"
-          title="DB'ye demo içerik ekler (200 Polit + 50 Fast)"
-        >
-          {seeding ? 'Demo içerik ekleniyor…' : 'Demo içerik oluştur'}
-        </button>
       </div>
       
       {/* Stats Grid */}
@@ -127,9 +84,6 @@ export const AdminDashboardNew = () => {
               <div className={`p-3 rounded-lg ${stat.iconBg}`}>
                 <stat.icon className={`w-6 h-6 ${stat.iconText}`} />
               </div>
-              <span className={`text-sm font-semibold ${stat.change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
-                {stat.change}
-              </span>
             </div>
             <div className="text-3xl font-black text-gray-900 mb-1">{stat.value}</div>
             <div className="text-sm text-gray-600">{stat.label}</div>
