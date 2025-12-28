@@ -2420,6 +2420,8 @@ async function adminSchemaCheck(req, res) {
   await check('admin_api_keys', ['id', 'name', 'key_hash', 'key_prefix', 'status', 'created_at', 'last_used_at', 'requests_count']);
   await check('admin_sources', ['id', 'name', 'type', 'url', 'rss_feed', 'enabled', 'priority', 'items_collected', 'last_fetch_at', 'created_at', 'updated_at']);
   await check('admin_email_templates', ['id', 'name', 'type', 'subject', 'content_html', 'is_active', 'usage_count', 'updated_at', 'created_at']);
+  await check('admin_payment_plans', ['id', 'name', 'period', 'price_cents', 'currency', 'is_active', 'created_at', 'updated_at']);
+  await check('admin_payment_transactions', ['id', 'occurred_at', 'user_id', 'user_email', 'plan_name', 'amount_cents', 'currency', 'payment_method', 'status', 'provider', 'provider_ref', 'note', 'created_at']);
 
   const ok = missingTables.length === 0 && Object.keys(missingColumns).length === 0;
   return res.json({
@@ -3899,6 +3901,40 @@ create index if not exists admin_email_templates_type_idx on public.admin_email_
 create index if not exists admin_email_templates_active_idx on public.admin_email_templates (is_active);
 `;
 
+const SQL_ADMIN_PAYMENT_PLANS = `
+create table if not exists public.admin_payment_plans (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  period text not null default 'monthly', -- monthly | yearly | one_time
+  price_cents bigint not null default 0,
+  currency text not null default 'TRY',
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists admin_payment_plans_active_idx on public.admin_payment_plans (is_active);
+`;
+
+const SQL_ADMIN_PAYMENT_TRANSACTIONS = `
+create table if not exists public.admin_payment_transactions (
+  id uuid primary key default gen_random_uuid(),
+  occurred_at timestamptz not null default now(),
+  user_id uuid,
+  user_email text not null default '',
+  plan_name text not null default '',
+  amount_cents bigint not null default 0,
+  currency text not null default 'TRY',
+  payment_method text not null default 'card', -- card | transfer | other
+  status text not null default 'completed', -- completed | pending | failed
+  provider text not null default '', -- iyzico/stripe/etc (optional)
+  provider_ref text not null default '',
+  note text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_payment_transactions_occurred_at_idx on public.admin_payment_transactions (occurred_at desc);
+create index if not exists admin_payment_transactions_status_idx on public.admin_payment_transactions (status);
+`;
+
 async function adminGetAnalytics(req, res) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
@@ -4411,6 +4447,150 @@ async function adminDeleteEmailTemplate(req, res, templateId) {
       return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_EMAIL_TEMPLATES.trim() });
     }
     return res.status(500).json({ success: false, error: String(e?.message || 'Şablon silinemedi.') });
+  }
+}
+
+async function adminGetPaymentPlans(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  try {
+    const rows = await supabaseRestGet('admin_payment_plans', { select: '*', order: 'created_at.desc', limit: '200' });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_PAYMENT_PLANS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Planlar yüklenemedi.') });
+  }
+}
+
+async function adminCreatePaymentPlan(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const name = String(body?.name || '').trim();
+  const period = String(body?.period || 'monthly').trim() || 'monthly';
+  const price_cents = Math.max(0, parseInt(String(body?.price_cents || 0), 10) || 0);
+  const currency = String(body?.currency || 'TRY').trim() || 'TRY';
+  const is_active = body?.is_active !== false;
+  if (!name) return res.status(400).json({ success: false, error: 'Plan adı gerekli.' });
+  const payload = { name, period, price_cents, currency, is_active: !!is_active, updated_at: new Date().toISOString() };
+  try {
+    const inserted = await supabaseRestInsert('admin_payment_plans', [payload]);
+    return res.json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_PAYMENT_PLANS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Plan oluşturulamadı.') });
+  }
+}
+
+async function adminUpdatePaymentPlan(req, res, planId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(planId)) return res.status(400).json({ success: false, error: 'Geçersiz plan.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (body?.name !== undefined) patch.name = String(body.name || '').trim();
+  if (body?.period !== undefined) patch.period = String(body.period || '').trim();
+  if (body?.price_cents !== undefined) patch.price_cents = Math.max(0, parseInt(String(body.price_cents || 0), 10) || 0);
+  if (body?.currency !== undefined) patch.currency = String(body.currency || '').trim();
+  if (body?.is_active !== undefined) patch.is_active = !!body.is_active;
+  patch.updated_at = new Date().toISOString();
+  try {
+    const updated = await supabaseRestPatch('admin_payment_plans', { id: `eq.${planId}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_PAYMENT_PLANS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Plan güncellenemedi.') });
+  }
+}
+
+async function adminDeletePaymentPlan(req, res, planId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(planId)) return res.status(400).json({ success: false, error: 'Geçersiz plan.' });
+  try {
+    await supabaseRestDelete('admin_payment_plans', { id: `eq.${planId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_PAYMENT_PLANS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Plan silinemedi.') });
+  }
+}
+
+async function adminGetPaymentTransactions(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const limit = Math.min(200, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
+  try {
+    const rows = await supabaseRestGet('admin_payment_transactions', { select: '*', order: 'occurred_at.desc', limit: String(limit) });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_PAYMENT_TRANSACTIONS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'İşlemler yüklenemedi.') });
+  }
+}
+
+async function adminCreatePaymentTransaction(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const occurred_at = body?.occurred_at ? String(body.occurred_at) : new Date().toISOString();
+  const user_id = body?.user_id ? String(body.user_id).trim() : null;
+  const user_email = String(body?.user_email || '').trim();
+  const plan_name = String(body?.plan_name || '').trim();
+  const amount_cents = Math.max(0, parseInt(String(body?.amount_cents || 0), 10) || 0);
+  const currency = String(body?.currency || 'TRY').trim() || 'TRY';
+  const payment_method = String(body?.payment_method || 'card').trim() || 'card';
+  const status = String(body?.status || 'completed').trim() || 'completed';
+  const provider = String(body?.provider || '').trim();
+  const provider_ref = String(body?.provider_ref || '').trim();
+  const note = String(body?.note || '').trim();
+  if (amount_cents <= 0) return res.status(400).json({ success: false, error: 'Tutar gerekli.' });
+  const payload = {
+    occurred_at,
+    user_id: user_id && isSafeId(user_id) ? user_id : null,
+    user_email,
+    plan_name,
+    amount_cents,
+    currency,
+    payment_method,
+    status,
+    provider,
+    provider_ref,
+    note,
+  };
+  try {
+    const inserted = await supabaseRestInsert('admin_payment_transactions', [payload]);
+    return res.json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_PAYMENT_TRANSACTIONS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'İşlem eklenemedi.') });
+  }
+}
+
+async function adminDeletePaymentTransaction(req, res, txId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(txId)) return res.status(400).json({ success: false, error: 'Geçersiz işlem.' });
+  try {
+    await supabaseRestDelete('admin_payment_transactions', { id: `eq.${txId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_PAYMENT_TRANSACTIONS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Silinemedi.') });
   }
 }
 
@@ -7341,6 +7521,10 @@ export default async function handler(req, res) {
       if (url === '/api/admin/sources' && req.method === 'POST') return await adminCreateSource(req, res);
       if (url === '/api/admin/email-templates' && req.method === 'GET') return await adminGetEmailTemplates(req, res);
       if (url === '/api/admin/email-templates' && req.method === 'POST') return await adminCreateEmailTemplate(req, res);
+      if (url === '/api/admin/payments/plans' && req.method === 'GET') return await adminGetPaymentPlans(req, res);
+      if (url === '/api/admin/payments/plans' && req.method === 'POST') return await adminCreatePaymentPlan(req, res);
+      if (url === '/api/admin/payments/transactions' && req.method === 'GET') return await adminGetPaymentTransactions(req, res);
+      if (url === '/api/admin/payments/transactions' && req.method === 'POST') return await adminCreatePaymentTransaction(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
       if (url === '/api/admin/users/duplicates' && req.method === 'GET') return await adminFindDuplicateUsers(req, res);
       if (url === '/api/admin/users/dedupe' && req.method === 'POST') return await adminDedupeUsers(req, res);
@@ -7406,6 +7590,18 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/admin/email-templates/') && req.method === 'DELETE') {
         const templateId = url.split('/api/admin/email-templates/')[1];
         return await adminDeleteEmailTemplate(req, res, templateId);
+      }
+      if (url.startsWith('/api/admin/payments/plans/') && req.method === 'PUT') {
+        const planId = url.split('/api/admin/payments/plans/')[1];
+        return await adminUpdatePaymentPlan(req, res, planId);
+      }
+      if (url.startsWith('/api/admin/payments/plans/') && req.method === 'DELETE') {
+        const planId = url.split('/api/admin/payments/plans/')[1];
+        return await adminDeletePaymentPlan(req, res, planId);
+      }
+      if (url.startsWith('/api/admin/payments/transactions/') && req.method === 'DELETE') {
+        const txId = url.split('/api/admin/payments/transactions/')[1];
+        return await adminDeletePaymentTransaction(req, res, txId);
       }
       if (url.startsWith('/api/admin/parties/') && req.method === 'GET') {
         const rest = url.split('/api/admin/parties/')[1] || '';

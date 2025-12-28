@@ -426,6 +426,20 @@ export const admin = {
   },
   storageDelete: (payload) => apiCall('/api/admin/storage/delete', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
+  getPaymentPlans: () => apiCall('/api/admin/payments/plans'),
+  createPaymentPlan: (data) => apiCall('/api/admin/payments/plans', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updatePaymentPlan: (planId, data) =>
+    apiCall(`/api/admin/payments/plans/${planId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deletePaymentPlan: (planId) => apiCall(`/api/admin/payments/plans/${planId}`, { method: 'DELETE' }),
+
+  getPaymentTransactions: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/payments/transactions${query ? `?${query}` : ''}`);
+  },
+  createPaymentTransaction: (data) =>
+    apiCall('/api/admin/payments/transactions', { method: 'POST', body: JSON.stringify(data || {}) }),
+  deletePaymentTransaction: (txId) => apiCall(`/api/admin/payments/transactions/${txId}`, { method: 'DELETE' }),
+
   getAnalytics: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return apiCall(`/api/admin/analytics${query ? `?${query}` : ''}`);
