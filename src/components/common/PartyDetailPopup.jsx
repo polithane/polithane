@@ -37,12 +37,13 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
       />
       
       <div 
-        className="fixed z-50 bg-white rounded-lg shadow-2xl border-2 border-gray-200 p-4 w-80 animate-fadeIn"
+        className="fixed z-50 bg-white rounded-lg shadow-2xl border-2 p-3 w-72 animate-fadeIn"
         style={{
-          left: position?.x ? `${Math.min(position.x, window.innerWidth - 340)}px` : '50%',
+          left: position?.x ? `${Math.min(position.x, window.innerWidth - 320)}px` : '50%',
           top: position?.y ? `${position.y + 10}px` : '50%',
           transform: !position?.x ? 'translate(-50%, -50%)' : 'none',
-          pointerEvents: 'auto'
+          pointerEvents: 'auto',
+          borderColor: String(party?.party_color || '').trim() || '#111827',
         }}
         onClick={(e) => e.stopPropagation()}
         onMouseEnter={onMouseEnter}
@@ -79,12 +80,12 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
               <button
                 key={it.key}
                 onClick={(e) => handleNavigation(it.to, e)}
-                className="w-full flex items-center gap-2.5 py-2 px-3 bg-white hover:bg-gray-50 transition-colors border-t border-gray-200 first:border-t-0"
+                className="w-full flex items-center gap-2.5 py-1.5 px-2 bg-white hover:bg-gray-50 transition-colors border-t border-gray-200 first:border-t-0"
               >
-                <span className="w-7 h-7 rounded-md bg-gray-900 text-white flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-4 h-4" />
+                <span className="w-6 h-6 rounded-md bg-gray-900 text-white flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-3.5 h-3.5" />
                 </span>
-                <span className="text-[13px] font-bold text-gray-800 flex-1 text-left leading-tight">{it.label}</span>
+                <span className="text-[12px] font-bold text-gray-800 flex-1 text-left leading-tight">{it.label}</span>
                 <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
               </button>
             );
@@ -93,7 +94,7 @@ export const PartyDetailPopup = ({ party, onClose, position, onMouseEnter, onMou
         
         <button
           onClick={(e) => handleNavigation(`/party/${party.party_id}`, e)}
-          className="w-full mt-4 bg-primary-blue hover:bg-[#0088bb] text-white font-bold py-2 px-4 rounded-lg transition-colors"
+          className="w-full mt-3 bg-primary-blue hover:bg-[#0088bb] text-white font-bold py-2 px-4 rounded-lg transition-colors"
         >
           Parti Profili
         </button>
