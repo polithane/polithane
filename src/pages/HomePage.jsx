@@ -98,17 +98,12 @@ export const HomePage = () => {
     if (!el) return undefined;
 
     if (mobileObserverRef.current) mobileObserverRef.current.disconnect();
-    const maxLen = Math.max(0, Number(activeTab?.posts?.length || 0) || 0);
     mobileObserverRef.current = new IntersectionObserver(
       (entries) => {
         const e = entries?.[0];
         if (!e?.isIntersecting) return;
         if (!hasUserScrolledRef.current) return;
-        setMobileVisibleCount((prev) => {
-          const next = prev + 5;
-          // Clamp to available items to avoid useless state churn / flicker
-          return Math.min(next, maxLen || next);
-        });
+        setMobileVisibleCount((prev) => Math.min(prev + 5, 500));
       },
       { root: null, rootMargin: '180px', threshold: 0.01 }
     );
@@ -116,7 +111,7 @@ export const HomePage = () => {
     return () => {
       mobileObserverRef.current?.disconnect();
     };
-  }, [loading, activeCategory, hasUserScrolled, activeTab?.posts?.length]);
+  }, [loading, activeCategory]);
 
   const computeHitPosts = (input = [], limit = 30) => {
     const now = Date.now();
