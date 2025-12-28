@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, Bell, MessageCircle, LogIn, Settings, User, Shield, LogOut, ChevronDown, X, CheckCheck, Trash2 } from 'lucide-react';
+import { Search, Bell, LogIn, Settings, User, Shield, LogOut, ChevronDown, X, CheckCheck, Trash2 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
@@ -394,15 +394,6 @@ export const Header = () => {
                     >
                       <Settings className="w-5 h-5 text-gray-600" />
                       <span className="text-sm font-semibold text-gray-700">Ayarlar</span>
-                    </Link>
-                    
-                    <Link
-                      to="/messages"
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <MessageCircle className="w-5 h-5 text-gray-600" />
-                      <span className="text-sm font-semibold text-gray-700">Mesajlar</span>
                     </Link>
                     
                     {/* Admin Panel Link (Sadece Admin'e görünür) */}
