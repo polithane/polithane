@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
 import { Avatar } from '../components/common/Avatar';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
+import { supabase } from '../services/supabase';
 
 export const CreatePolitPage = () => {
   const navigate = useNavigate();
@@ -355,26 +356,31 @@ export const CreatePolitPage = () => {
     });
 
   const uploadOne = async (file) => {
-    // IMPORTANT: We upload as base64 to serverless; keep conservative limits to avoid request size limits.
-    const maxMb = contentType === 'video' ? 25 : contentType === 'audio' ? 15 : 10;
-    if (file.size > maxMb * 1024 * 1024) {
-      throw new Error(`Dosya çok büyük. Şimdilik maksimum ${maxMb}MB yükleyebilirsiniz.`);
-    }
-    const dataUrl = await fileToDataUrl(file);
-    const r = await apiCall('/api/storage/upload', {
+    // IMPORTANT:
+    // - Base64 uploads hit Vercel request-body limits quickly (esp. video).
+    // - Use signed upload so the file goes directly to Supabase Storage.
+    const ct = String(file?.type || '').trim();
+    if (!ct) throw new Error('Dosya türü bulunamadı.');
+
+    const sign = await apiCall('/api/storage/sign-upload', {
       method: 'POST',
       body: JSON.stringify({
         bucket: 'uploads',
         folder: 'posts',
-        dataUrl,
-        contentType: file.type || '',
+        contentType: ct,
       }),
     });
-    if (!r?.success) throw new Error(r?.error || 'Medya yüklenemedi.');
-    return r.data.publicUrl;
+    if (!sign?.success) throw new Error(sign?.error || 'Yükleme hazırlığı başarısız.');
+    const { bucket, path, token, publicUrl } = sign?.data || {};
+    if (!bucket || !path || !token || !publicUrl) throw new Error('Yükleme anahtarı alınamadı.');
+
+    const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, { contentType: ct });
+    if (error) throw new Error(String(error?.message || 'Medya yüklenemedi.'));
+    return String(publicUrl);
   };
 
   const publishPrimary = async () => {
+    if (loading) return;
     if (!isAuthenticated) {
       toast.error('Paylaşım yapmak için giriş yapmalısınız.');
       navigate('/login-new');

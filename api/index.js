@@ -3353,6 +3353,116 @@ async function storageUploadMedia(req, res) {
   return res.json({ success: true, data: { publicUrl, bucket, path: objectPath } });
 }
 
+async function storageCreateSignedUpload(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const ip = getClientIp(req);
+  const rl = rateLimit(`signupload:${auth.id}:${ip}`, { windowMs: 60_000, max: 40 });
+  if (!rl.ok) {
+    return res.status(429).json({ success: false, error: 'Çok fazla istek. Lütfen 1 dakika sonra tekrar deneyin.' });
+  }
+
+  const body = await readJsonBody(req);
+  const bucket = String(body?.bucket || 'uploads').trim();
+  const folder = String(body?.folder || 'posts').trim();
+  const contentType = String(body?.contentType || '').trim();
+
+  const allowedBuckets = new Set(['uploads', 'politfest']);
+  if (!allowedBuckets.has(bucket)) return res.status(400).json({ success: false, error: 'Geçersiz bucket.' });
+
+  const allowedFolders = new Set(['posts', 'avatars', 'politfest', 'messages']);
+  if (!allowedFolders.has(folder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+
+  // Approval gate: pending accounts can browse/login but cannot upload post media yet.
+  // (We still allow avatar uploads.)
+  if (folder === 'posts' || folder === 'politfest') {
+    const urows = await supabaseRestGet('users', {
+      select: 'id,user_type,is_verified,is_admin',
+      id: `eq.${auth.id}`,
+      limit: '1',
+    }).catch(() => []);
+    const u = urows?.[0] || null;
+    const ut = String(u?.user_type || 'citizen');
+    const pending = !u?.is_admin && ut !== 'citizen' && !u?.is_verified;
+    if (pending) {
+      return res.status(403).json({
+        success: false,
+        error: 'Üyeliğiniz onaylanana kadar medya yükleyemezsiniz. Onay geldikten sonra Polit Atabilirsiniz.',
+      });
+    }
+  }
+
+  // Allow common media types
+  const allowedTypes = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'video/webm',
+    'audio/webm',
+    'audio/mpeg',
+    'video/mp4',
+  ]);
+  if (!allowedTypes.has(contentType)) return res.status(400).json({ success: false, error: 'Desteklenmeyen dosya türü.' });
+
+  // Ensure service role exists (needed to sign upload)
+  try {
+    getSupabaseServiceRoleKey();
+  } catch {
+    return res.status(500).json({
+      success: false,
+      error:
+        'Medya yüklenemedi: sunucu depolama anahtarı eksik. Vercel ortamında SUPABASE_SERVICE_ROLE_KEY tanımlı olmalı.',
+    });
+  }
+
+  // Ensure bucket exists (public for uploads)
+  try {
+    const list = await supabaseStorageRequest('GET', 'bucket', undefined).catch(() => []);
+    const exists = Array.isArray(list) && list.some((b) => b?.name === bucket);
+    if (!exists) await supabaseStorageRequest('POST', 'bucket', { name: bucket, public: true });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Depolama bucket oluşturulamadı. Lütfen ayarları kontrol edin.' });
+  }
+
+  const ext =
+    contentType === 'image/png'
+      ? 'png'
+      : contentType === 'image/webp'
+        ? 'webp'
+        : contentType === 'image/jpeg'
+          ? 'jpg'
+          : contentType === 'video/mp4'
+            ? 'mp4'
+            : contentType === 'video/webm'
+              ? 'webm'
+              : contentType === 'audio/mpeg'
+                ? 'mp3'
+                : 'webm';
+
+  const objectPath = `${folder}/${auth.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+  try {
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(objectPath);
+    if (error || !data?.token) {
+      return res.status(500).json({ success: false, error: String(error?.message || 'Signed upload oluşturulamadı.') });
+    }
+    const publicUrl = `${String(process.env.SUPABASE_URL || '').replace(/\/+$/, '')}/storage/v1/object/public/${bucket}/${objectPath}`;
+    return res.json({
+      success: true,
+      data: {
+        bucket,
+        path: objectPath,
+        token: data.token,
+        signedUrl: data.signedUrl,
+        publicUrl,
+      },
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: String(e?.message || 'Signed upload oluşturulamadı.') });
+  }
+}
+
 async function usersUploadAvatar(req, res) {
   const auth = requireAuth(req, res);
   if (!auth) return;
@@ -6152,6 +6262,7 @@ export default async function handler(req, res) {
       if (url === '/api/users/me/avatar' && req.method === 'POST') return await usersUploadAvatar(req, res);
       if (url === '/api/storage/ensure-bucket' && req.method === 'POST') return await storageEnsureBucket(req, res);
       if (url === '/api/storage/upload' && req.method === 'POST') return await storageUploadMedia(req, res);
+      if (url === '/api/storage/sign-upload' && req.method === 'POST') return await storageCreateSignedUpload(req, res);
       if (url === '/api/users/blocks' && req.method === 'GET') return await usersGetBlocks(req, res);
       if (url === '/api/users/blocks' && req.method === 'POST') return await usersBlock(req, res);
       if (url.startsWith('/api/users/blocks/') && req.method === 'DELETE') {
