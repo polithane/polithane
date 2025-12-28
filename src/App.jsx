@@ -79,10 +79,12 @@ import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { CookiePolicyPage } from './pages/CookiePolicyPage';
 import { ParliamentInfoPage } from './pages/ParliamentInfoPage';
 import { PartiesDirectoryPage } from './pages/PartiesDirectoryPage';
+import { SiteHeadManager } from './components/system/SiteHeadManager';
 
 function App() {
   return (
     <div className="min-h-screen flex flex-col">
+      <SiteHeadManager />
       <Routes>
         {/* Public Routes */}
         <Route

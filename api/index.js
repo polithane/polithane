@@ -6955,6 +6955,22 @@ async function getPublicSite(req, res) {
     socialLinks: socialObj && typeof socialObj === 'object' ? socialObj : {},
     // Home feed layout (admin-controlled)
     homePostsPerRow: Math.max(1, Math.min(3, parseInt(String(map.home_posts_per_row || '2'), 10) || 2)),
+    // Public SEO settings (admin-controlled)
+    seo: {
+      metaTitle: String(map.seo_metaTitle || '').trim(),
+      metaDescription: String(map.seo_metaDescription || '').trim(),
+      metaKeywords: String(map.seo_metaKeywords || '').trim(),
+      ogTitle: String(map.seo_ogTitle || '').trim(),
+      ogDescription: String(map.seo_ogDescription || '').trim(),
+      ogImage: String(map.seo_ogImage || '').trim(),
+      twitterCard: String(map.seo_twitterCard || '').trim(),
+      twitterSite: String(map.seo_twitterSite || '').trim(),
+      favicon: String(map.seo_favicon || '').trim(),
+      robots: String(map.seo_robots || '').trim(),
+      canonicalURL: String(map.seo_canonicalURL || '').trim(),
+      googleAnalyticsID: String(map.seo_googleAnalyticsID || '').trim(),
+      googleAdsenseID: String(map.seo_googleAdsenseID || '').trim(),
+    },
   };
 
   publicSiteCache = out;
