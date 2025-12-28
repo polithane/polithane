@@ -375,6 +375,19 @@ async function supabaseInsertNotifications(rows) {
 async function getPosts(req, res) {
     const { limit = '50', offset = '0', party_id, user_id, user_ids, category, agenda_tag, is_trending, order = 'created_at.desc' } = req.query;
     const auth = verifyJwtFromRequest(req);
+    // Best-effort user block filtering:
+    // - Hide posts from users I blocked
+    // - Hide posts from users who blocked me (using embedded user.metadata when available)
+    let myBlockedSet = new Set();
+    try {
+      if (auth?.id) {
+        const meRows = await supabaseRestGet('users', { select: 'metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+        const meta = meRows?.[0]?.metadata && typeof meRows[0].metadata === 'object' ? meRows[0].metadata : {};
+        myBlockedSet = new Set(parseUserIdsFromMetadata(meta).map(String));
+      }
+    } catch {
+      myBlockedSet = new Set();
+    }
     const params = {
         // Keep selects schema-agnostic: embed with *
         select: '*,user:users(*),party:parties(*)',
@@ -420,6 +433,14 @@ async function getPosts(req, res) {
     // Hide posts belonging to inactive users for everyone except the owner/admin.
     const filtered = rows.filter((p) => {
       const owner = p?.user;
+      if (auth?.id && owner?.id) {
+        // If I blocked them -> hide.
+        if (myBlockedSet.has(String(owner.id))) return false;
+        // If they blocked me -> hide (best-effort; requires metadata to be selected).
+        const theirMeta = owner?.metadata && typeof owner.metadata === 'object' ? owner.metadata : {};
+        const theirBlocked = Array.isArray(theirMeta.blocked_user_ids) ? theirMeta.blocked_user_ids.map(String) : [];
+        if (theirBlocked.includes(String(auth.id))) return false;
+      }
       if (!owner) return true;
       if (owner.is_active === false) {
         if (auth?.is_admin) return true;
@@ -440,6 +461,20 @@ async function getPostById(req, res, id) {
     });
     const post = rows?.[0];
     if (!post) return res.status(404).json({ success: false, error: 'Post bulunamadı' });
+    // Block filtering (best-effort)
+    if (auth?.id) {
+      try {
+        const ownerId = post?.user?.id ?? post?.user_id ?? null;
+        if (ownerId) {
+          const blocked = await isBlockedBetween(auth.id, ownerId);
+          if (blocked && !auth?.is_admin && String(auth.id) !== String(ownerId)) {
+            return res.status(404).json({ success: false, error: 'Post bulunamadı' });
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
     // If the owner is inactive (e.g. deletion confirmed), hide the post for everyone except the owner/admin.
     if (post?.user?.is_active === false) {
       const ownerId = post?.user?.id ?? post?.user_id;
@@ -484,6 +519,26 @@ async function getPostComments(req, res, postId) {
     }
     const raw = await supabaseRestGet('comments', params).catch(() => []);
     let rows = Array.isArray(raw) ? raw : [];
+
+    // Hide comments from blocked users (best-effort)
+    if (auth?.id && rows.length > 0) {
+      try {
+        const meRows = await supabaseRestGet('users', { select: 'metadata', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+        const meta = meRows?.[0]?.metadata && typeof meRows[0].metadata === 'object' ? meRows[0].metadata : {};
+        const myBlocked = new Set(parseUserIdsFromMetadata(meta).map(String));
+        rows = rows.filter((c) => {
+          const uid = String(c?.user_id ?? c?.user?.id ?? '');
+          if (uid && myBlocked.has(uid)) return false;
+          const u = c?.user;
+          const theirMeta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+          const theirBlocked = Array.isArray(theirMeta.blocked_user_ids) ? theirMeta.blocked_user_ids.map(String) : [];
+          if (theirBlocked.includes(String(auth.id))) return false;
+          return true;
+        });
+      } catch {
+        // ignore
+      }
+    }
 
     // Add per-user "liked_by_me" for comment hearts so UI can render empty/full state.
     if (auth?.id && rows.length > 0) {
@@ -740,6 +795,14 @@ async function addPostComment(req, res, postId) {
     const content = analyzed.text;
     const parent_id = body.parent_id || null;
 
+    // Load post owner (also used for notifications later) + block enforcement
+    const postRows = await supabaseRestGet('posts', { select: 'id,user_id,is_deleted', id: `eq.${postId}`, limit: '1' }).catch(() => []);
+    const ownerId = postRows?.[0]?.user_id ?? null;
+    if (!ownerId) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
+    if (postRows?.[0]?.is_deleted === true) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
+    const blocked = await isBlockedBetween(auth.id, ownerId).catch(() => false);
+    if (blocked) return res.status(403).json({ success: false, error: 'Bu kullanıcıyla etkileşemezsiniz (engelleme mevcut).' });
+
     // Max 3 comments per user per post
     const existing = await supabaseRestGet('comments', {
       select: 'id',
@@ -765,8 +828,6 @@ async function addPostComment(req, res, postId) {
 
     // Notify post owner (no self-notify). We notify even if pending, so owner knows something happened.
     try {
-      const postRows = await supabaseRestGet('posts', { select: 'id,user_id', id: `eq.${postId}`, limit: '1' }).catch(() => []);
-      const ownerId = postRows?.[0]?.user_id ?? null;
       if (ownerId && String(ownerId) !== String(auth.id)) {
         await supabaseInsertNotifications([
           {
@@ -1021,6 +1082,14 @@ async function toggleCommentLike(req, res, commentId) {
     const commentRows = await supabaseRestGet('comments', { select: '*', id: `eq.${cid}`, limit: '1' }).catch(() => []);
     const c = commentRows?.[0];
     if (!c) return res.status(404).json({ success: false, error: 'Yorum bulunamadı.' });
+
+    // Block checks (either direction) between liker and comment author
+    try {
+      const blocked = await isBlockedBetween(auth.id, c.user_id);
+      if (blocked) return res.status(403).json({ success: false, error: 'Bu kullanıcıyla etkileşemezsiniz (engelleme mevcut).' });
+    } catch {
+      // ignore
+    }
 
     if (supportsCommentId) {
       try {
@@ -2144,6 +2213,10 @@ async function toggleFollow(req, res, targetId) {
   const isValidId = /^\d+$/.test(tid) || /^[0-9a-fA-F-]{36}$/.test(tid);
   if (!tid || !isValidId) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
   if (String(auth.id) === tid) return res.status(400).json({ success: false, error: 'Kendinizi takip edemezsiniz.' });
+
+  // Block checks (either direction)
+  const blocked = await isBlockedBetween(auth.id, tid).catch(() => false);
+  if (blocked) return res.status(403).json({ success: false, error: 'Bu kullanıcıyla etkileşemezsiniz (engelleme mevcut).' });
 
   // Ensure target exists
   const targetRows = await supabaseRestGet('users', { select: 'id,full_name,is_active', id: `eq.${tid}`, limit: '1' }).catch(() => []);
