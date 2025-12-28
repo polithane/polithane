@@ -5,7 +5,7 @@ import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { Modal } from '../components/common/Modal';
 import { formatTimeAgo } from '../utils/formatters';
-import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck, Plus, ArrowLeft, Flag } from 'lucide-react';
+import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck, Plus, ArrowLeft, Flag, MoreVertical } from 'lucide-react';
 import { messages as messagesApi, users as usersApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
@@ -26,6 +26,7 @@ export const MessagesPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [convActionBusyId, setConvActionBusyId] = useState(null);
+  const [convMenuOpenId, setConvMenuOpenId] = useState('');
   const [reportingConv, setReportingConv] = useState(null);
   const [reportReason, setReportReason] = useState('spam');
   const [reportDetails, setReportDetails] = useState('');
@@ -739,6 +740,58 @@ export const MessagesPage = () => {
                           {conv.is_muted && (
                             <span className="text-xs text-gray-400 mt-1">🔇 Sessize alındı</span>
                           )}
+                        </div>
+
+                        {/* Mobile: actions menu */}
+                        <div className="md:hidden relative flex-shrink-0">
+                          <button
+                            type="button"
+                            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+                            title="İşlemler"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConvMenuOpenId((prev) => (prev === String(conv.conversation_id) ? '' : String(conv.conversation_id)));
+                            }}
+                          >
+                            <MoreVertical className="w-5 h-5" />
+                          </button>
+                          {convMenuOpenId === String(conv.conversation_id) ? (
+                            <div
+                              className="absolute right-0 top-11 z-20 w-44 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                className="w-full px-3 py-3 text-left text-sm font-bold text-gray-800 hover:bg-gray-50 flex items-center gap-2"
+                                disabled={convActionBusyId === String(conv?.participant_id || '')}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConvMenuOpenId('');
+                                  deleteConversation(conv);
+                                }}
+                              >
+                                <Trash2 className="w-5 h-5" />
+                                Sohbeti sil
+                              </button>
+                              <button
+                                type="button"
+                                className="w-full px-3 py-3 text-left text-sm font-bold text-gray-800 hover:bg-gray-50 flex items-center gap-2"
+                                disabled={convActionBusyId === String(conv?.participant_id || '')}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConvMenuOpenId('');
+                                  setError('');
+                                  setReportingConv(conv);
+                                  setReportReason('spam');
+                                  setReportDetails('');
+                                  setReportDone(false);
+                                }}
+                              >
+                                <Flag className="w-5 h-5" />
+                                Şikayet et
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
 
                         {/* List actions: delete + report */}
