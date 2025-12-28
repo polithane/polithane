@@ -90,22 +90,33 @@ export const HomePage = () => {
   }, [postsOffset]);
 
   useEffect(() => {
-    if (!mobileSentinelRef.current) return;
+    // IMPORTANT:
+    // HomePage renders a loading screen first, so the sentinel ref is null on initial mount.
+    // We must re-attach the observer after loading finishes (otherwise mobile infinite load never triggers).
+    if (loading) return undefined;
+    const el = mobileSentinelRef.current;
+    if (!el) return undefined;
+
     if (mobileObserverRef.current) mobileObserverRef.current.disconnect();
+    const maxLen = Math.max(0, Number(activeTab?.posts?.length || 0) || 0);
     mobileObserverRef.current = new IntersectionObserver(
       (entries) => {
-        const e = entries[0];
+        const e = entries?.[0];
         if (!e?.isIntersecting) return;
         if (!hasUserScrolledRef.current) return;
-        setMobileVisibleCount((prev) => Math.min(prev + 5, 500));
+        setMobileVisibleCount((prev) => {
+          const next = prev + 5;
+          // Clamp to available items to avoid useless state churn / flicker
+          return Math.min(next, maxLen || next);
+        });
       },
       { root: null, rootMargin: '180px', threshold: 0.01 }
     );
-    mobileObserverRef.current.observe(mobileSentinelRef.current);
+    mobileObserverRef.current.observe(el);
     return () => {
       mobileObserverRef.current?.disconnect();
     };
-  }, []);
+  }, [loading, activeCategory, hasUserScrolled, activeTab?.posts?.length]);
 
   const computeHitPosts = (input = [], limit = 30) => {
     const now = Date.now();
