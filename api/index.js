@@ -3526,11 +3526,18 @@ async function storageCreateSignedUpload(req, res) {
     'image/jpeg',
     'image/png',
     'image/webp',
+    'image/gif',
     'video/webm',
     'video/mp4',
+    'video/x-m4v',
     'video/quicktime',
+    'video/3gpp',
+    'video/3gpp2',
     'audio/webm',
     'audio/mpeg',
+    'audio/mp4',
+    'audio/aac',
+    'audio/x-m4a',
   ]);
   if (!allowedTypes.has(contentType)) {
     return res.status(400).json({
@@ -3564,16 +3571,28 @@ async function storageCreateSignedUpload(req, res) {
       ? 'png'
       : contentType === 'image/webp'
         ? 'webp'
+        : contentType === 'image/gif'
+          ? 'gif'
         : contentType === 'image/jpeg'
           ? 'jpg'
           : contentType === 'video/quicktime'
             ? 'mov'
           : contentType === 'video/mp4'
             ? 'mp4'
+            : contentType === 'video/x-m4v'
+              ? 'm4v'
             : contentType === 'video/webm'
               ? 'webm'
+              : contentType === 'video/3gpp'
+                ? '3gp'
+                : contentType === 'video/3gpp2'
+                  ? '3g2'
               : contentType === 'audio/mpeg'
                 ? 'mp3'
+                : contentType === 'audio/mp4' || contentType === 'audio/x-m4a'
+                  ? 'm4a'
+                  : contentType === 'audio/aac'
+                    ? 'aac'
                 : 'webm';
 
   const objectPath = `${folder}/${auth.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;

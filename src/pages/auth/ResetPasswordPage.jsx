@@ -89,7 +89,7 @@ export const ResetPasswordPage = () => {
             >
               {!logoFailed ? (
                 <img
-                  src="/logo-mark.svg"
+                  src="/logo.png"
                   alt="Polithane"
                   width={96}
                   height={96}
@@ -146,7 +146,7 @@ export const ResetPasswordPage = () => {
           >
             {!logoFailed ? (
               <img
-                src="/logo-mark.svg"
+                src="/logo.png"
                 alt="Polithane"
                 width={96}
                 height={96}

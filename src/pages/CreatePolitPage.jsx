@@ -404,7 +404,14 @@ export const CreatePolitPage = () => {
           previewRef.current.srcObject = stream;
           previewRef.current.muted = true;
           previewRef.current.playsInline = true;
+          // Some mobile browsers require the attribute for inline playback.
+          previewRef.current.setAttribute('playsinline', 'true');
+          previewRef.current.setAttribute('webkit-playsinline', 'true');
           await previewRef.current.play().catch(() => null);
+          // Retry shortly (iOS sometimes needs a second tick)
+          setTimeout(() => {
+            try { previewRef.current?.play?.().catch(() => null); } catch { /* ignore */ }
+          }, 250);
         } catch {
           // ignore
         }
@@ -429,7 +436,12 @@ export const CreatePolitPage = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || (contentType === 'audio' ? 'audio/webm' : 'video/webm') });
         const url = URL.createObjectURL(blob);
         setRecordedUrl(url);
-        const filename = contentType === 'audio' ? 'polit-audio.webm' : 'polit-video.webm';
+        const t = String(blob.type || '').toLowerCase();
+        const ext =
+          contentType === 'audio'
+            ? (t.includes('mpeg') ? 'mp3' : t.includes('mp4') ? 'm4a' : 'webm')
+            : (t.includes('quicktime') ? 'mov' : t.includes('mp4') ? 'mp4' : 'webm');
+        const filename = contentType === 'audio' ? `polit-audio.${ext}` : `polit-video.${ext}`;
         const file = new File([blob], filename, { type: blob.type });
         setFiles([file]);
       };
@@ -500,8 +512,30 @@ export const CreatePolitPage = () => {
       throw new Error(`Dosya çok büyük. Şimdilik maksimum ${mb}MB yükleyebilirsiniz.`);
     }
 
-    const ct = String(file?.type || '').trim();
-    if (!ct) throw new Error('Dosya türü bulunamadı.');
+    const guessContentType = (f) => {
+      const t = String(f?.type || '').trim();
+      if (t) return t;
+      const name = String(f?.name || '').trim().toLowerCase();
+      const ext = name.includes('.') ? name.split('.').pop() : '';
+      if (!ext) return '';
+      if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+      if (ext === 'png') return 'image/png';
+      if (ext === 'webp') return 'image/webp';
+      if (ext === 'gif') return 'image/gif';
+      if (ext === 'mp4') return 'video/mp4';
+      if (ext === 'm4v') return 'video/x-m4v';
+      if (ext === 'mov') return 'video/quicktime';
+      if (ext === 'webm') return 'video/webm';
+      if (ext === '3gp') return 'video/3gpp';
+      if (ext === '3g2') return 'video/3gpp2';
+      if (ext === 'mp3') return 'audio/mpeg';
+      if (ext === 'm4a') return 'audio/mp4';
+      if (ext === 'aac') return 'audio/aac';
+      return '';
+    };
+
+    const ct = guessContentType(file);
+    if (!ct) throw new Error('Dosya türü bulunamadı. Lütfen farklı bir dosya seçin.');
 
     const sign = await apiCall('/api/storage/sign-upload', {
       method: 'POST',
@@ -767,7 +801,7 @@ export const CreatePolitPage = () => {
                   {contentType === 'video' ? (
                     <div className="rounded-2xl border border-gray-200 bg-black overflow-hidden">
                       {isRecording ? (
-                        <video ref={previewRef} className="w-full aspect-video object-cover" playsInline muted />
+                        <video ref={previewRef} className="w-full aspect-video object-cover" playsInline muted autoPlay />
                       ) : recordedUrl ? (
                         <video src={recordedUrl} controls className="w-full aspect-video object-contain bg-black" playsInline />
                       ) : (

@@ -203,7 +203,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
                   </div>
                 </Link>
                 <div className="flex-shrink-0">
-                  <FollowButton targetUserId={id} size="sm" />
+                  <FollowButton targetUserId={id} size="sm" iconOnly={true} />
                 </div>
               </div>
 
@@ -233,7 +233,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
                       </div>
                     </div>
                     <div className="mt-3">
-                      <FollowButton userId={id} size="md" />
+                      <FollowButton targetUserId={id} size="md" />
                     </div>
                   </div>
                 </div>

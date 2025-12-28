@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { users as usersApi } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 
-export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
+export const FollowButton = ({ targetUserId, size = 'md', onChange, iconOnly = false }) => {
   const { user: me, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -120,10 +120,16 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
       <button
         onClick={handleFollow}
         disabled={!isAuthenticated || loading}
-        className={`flex items-center gap-2 ${sizeClasses[size]} bg-primary-blue hover:bg-blue-600 text-white rounded-lg font-semibold transition-all duration-200 transform hover:scale-105`}
+        className={
+          iconOnly
+            ? 'inline-flex items-center justify-center p-2 bg-primary-blue hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors'
+            : `flex items-center gap-2 ${sizeClasses[size]} bg-primary-blue hover:bg-blue-600 text-white rounded-lg font-semibold transition-all duration-200 transform hover:scale-105`
+        }
+        title="Takip Et"
+        aria-label="Takip Et"
       >
         {loading ? <Loader2 className={`${iconSizes[size]} animate-spin`} /> : <UserPlus className={iconSizes[size]} />}
-        Takip Et
+        {!iconOnly ? 'Takip Et' : null}
       </button>
     );
   }
@@ -133,10 +139,16 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange }) => {
       <button
         onClick={handleFollow}
         disabled={!isAuthenticated || loading}
-        className={`flex items-center gap-2 ${sizeClasses[size]} bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors`}
+        className={
+          iconOnly
+            ? 'inline-flex items-center justify-center p-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors'
+            : `flex items-center gap-2 ${sizeClasses[size]} bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors`
+        }
+        title="Takip Ediliyor"
+        aria-label="Takip Ediliyor"
       >
         {loading ? <Loader2 className={`${iconSizes[size]} animate-spin`} /> : <UserCheck className={iconSizes[size]} />}
-        Takip Ediliyor
+        {!iconOnly ? 'Takip Ediliyor' : null}
       </button>
     );
   }

@@ -53,7 +53,7 @@ export const VerifyEmailPage = () => {
           <div className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform" onClick={() => navigate('/')}>
             {!logoFailed && (
               <img
-                src="/logo-mark.svg"
+                src="/logo.png"
                 alt="Polithane"
                 width={96}
                 height={96}

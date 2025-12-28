@@ -32,9 +32,22 @@ export const HomePage = () => {
   const [postsOffset, setPostsOffset] = useState(0);
   const postsSentinelRef = useRef(null);
   const postsObserverRef = useRef(null);
+  const hasUserScrolledRef = useRef(false);
+  const [hasUserScrolled, setHasUserScrolled] = useState(false);
 
   // Keep initial payload small for mobile performance.
-  const POSTS_PAGE_SIZE = 60;
+  // Social-style batching: small pages, no background loading until user scrolls.
+  const POSTS_PAGE_SIZE = 20;
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (hasUserScrolledRef.current) return;
+      hasUserScrolledRef.current = true;
+      setHasUserScrolled(true);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const computeHitPosts = (input = [], limit = 30) => {
     const now = Date.now();
@@ -209,7 +222,41 @@ export const HomePage = () => {
             : null,
         });
 
-        const initialPosts = (postsData || []).map(mapDbPostToUi);
+        let initialPosts = (postsData || []).map(mapDbPostToUi);
+
+        // Ensure each category has at least 5 posts (best-effort, capped).
+        const needPer = 5;
+        const maxExtraPages = 5; // 5*20 = 100 extra max
+        let extraPage = 0;
+        let offset = initialPosts.length;
+        const countByType = (list) => {
+          const arr = Array.isArray(list) ? list : [];
+          return {
+            mp: arr.filter((p) => p?.user?.user_type === 'mp').length,
+            org: arr.filter((p) => p?.user?.user_type === 'party_official').length,
+            media: arr.filter((p) => p?.user?.user_type === 'media').length,
+            citizen: arr.filter((p) => p?.user?.user_type === 'party_member' || p?.user?.user_type === 'citizen').length,
+          };
+        };
+        const isEnough = (c) => c.mp >= needPer && c.org >= needPer && c.media >= needPer && c.citizen >= needPer;
+
+        while (!isEnough(countByType(initialPosts)) && extraPage < maxExtraPages) {
+          // eslint-disable-next-line no-await-in-loop
+          const more = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset, order: 'created_at.desc' }).catch(() => []);
+          const nextBatch = (more || []).map(mapDbPostToUi);
+          if (nextBatch.length === 0) break;
+          const seen = new Set(initialPosts.map((p) => String(p?.post_id ?? p?.id ?? '')));
+          for (const p of nextBatch) {
+            const id = String(p?.post_id ?? p?.id ?? '');
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            initialPosts.push(p);
+          }
+          offset += nextBatch.length;
+          extraPage += 1;
+          if (nextBatch.length < POSTS_PAGE_SIZE) break;
+        }
+
         setPosts(initialPosts);
         setPostsOffset(initialPosts.length);
         setHasMorePosts(initialPosts.length >= POSTS_PAGE_SIZE);
@@ -381,16 +428,18 @@ export const HomePage = () => {
     postsObserverRef.current = new IntersectionObserver(
       (entries) => {
         const e = entries[0];
+        // Don't waste bandwidth unless user scrolls.
+        if (!hasUserScrolledRef.current) return;
         if (e?.isIntersecting) fetchMorePosts();
       },
-      { root: null, rootMargin: '600px', threshold: 0.01 }
+      { root: null, rootMargin: '120px', threshold: 0.01 }
     );
     postsObserverRef.current.observe(postsSentinelRef.current);
     return () => {
       postsObserverRef.current?.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, hasMorePosts, postsOffset, parties]);
+  }, [loading, hasMorePosts, postsOffset, parties, hasUserScrolled]);
   
   // Kategorilere göre post filtreleme (DB user_type ile)
   const pickFixedMix = (list = []) => {

@@ -38,7 +38,7 @@ export const AnimatedSlogan = () => {
       {/* Logo - Tıklanabilir */}
       {!logoFailed && (
         <img
-          src="/logo-mark.svg"
+          src="/logo.png"
           alt="Polithane"
           width={40}
           height={40}
