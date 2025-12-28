@@ -449,11 +449,24 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
         
         {/* Açıklama - Her zaman 2 satırlık alan (SABİT YÜKSEKLİK) */}
         {post.content_text && (
-          <p className="text-gray-800 text-sm line-clamp-2 leading-snug mb-2 h-[42px]">
-            {post.content_text}
-          </p>
+          post.content_type === CONTENT_TYPES.TEXT ? (
+            <div className="mb-2">
+              <div className="border-t border-gray-300 pt-3">
+                <p className="text-gray-800 text-sm line-clamp-2 leading-snug h-[42px]">
+                  {post.content_text}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-800 text-sm line-clamp-2 leading-snug mb-2 h-[42px]">
+              {post.content_text}
+            </p>
+          )
         )}
       </div>
+
+      {/* Metin polit: metin altına boşluk bırak (alt çizgi = etkileşim çubuğunun border-t'si) */}
+      {post.content_type === CONTENT_TYPES.TEXT ? <div className="h-[30px]" /> : null}
       
       {/* Gündem Etiketi ve Polit Puan - Alt kısım */}
       <div className="mt-auto">

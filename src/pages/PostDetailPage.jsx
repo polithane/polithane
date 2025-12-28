@@ -408,7 +408,11 @@ export const PostDetailPage = () => {
               {/* İçerik */}
               <div className="mb-4">
                 {uiPost.content_type === 'text' && (
-                  <p className="text-gray-900 text-2xl leading-relaxed font-medium whitespace-pre-wrap">{uiPost.content_text}</p>
+                  <div className="border-t border-gray-300 pt-6">
+                    <p className="text-gray-900 text-2xl leading-relaxed font-medium whitespace-pre-wrap">{uiPost.content_text}</p>
+                    <div className="h-[30px]" />
+                    <div className="border-t border-gray-300" />
+                  </div>
                 )}
                 {uiPost.content_type === 'image' && (
                   <div>
