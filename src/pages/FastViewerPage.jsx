@@ -19,6 +19,8 @@ export const FastViewerPage = () => {
 
   const current = items[idx] || null;
   const progressCount = Math.max(items.length, 1);
+  const audioRef = useRef(null);
+  const videoRef = useRef(null);
 
   const go = (dir) => {
     setIdx((prev) => {
@@ -31,8 +33,9 @@ export const FastViewerPage = () => {
 
   const currentDuration = useMemo(() => {
     if (!current) return DEFAULT_DURATION_MS;
-    if (current.content_type === 'video' && current.media_duration) return Math.max(2000, current.media_duration * 1000);
-    if (current.content_type === 'audio' && current.media_duration) return Math.max(3000, current.media_duration * 1000);
+    // We do not auto-advance for audio/video; we advance on "ended".
+    // Keep timer for image/text only.
+    if (current.content_type === 'audio' || current.content_type === 'video') return 0;
     return DEFAULT_DURATION_MS;
   }, [current]);
 
@@ -59,6 +62,7 @@ export const FastViewerPage = () => {
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (!items.length) return;
+    if (!currentDuration) return;
     timerRef.current = setTimeout(() => {
       if (idx < items.length - 1) setIdx(idx + 1);
       else closeToList();
@@ -72,6 +76,22 @@ export const FastViewerPage = () => {
     const m = p?.media_urls ?? p?.media_url ?? [];
     return Array.isArray(m) ? m[0] : m;
   };
+
+  useEffect(() => {
+    // Ensure media starts from the beginning when switching items.
+    try {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.pause?.();
+      }
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.pause?.();
+      }
+    } catch {
+      // ignore
+    }
+  }, [idx]);
 
   return (
     <div className="fixed inset-0 bg-black text-white z-50">
@@ -107,15 +127,32 @@ export const FastViewerPage = () => {
         ) : current.content_type === 'image' ? (
           <img src={mediaUrl(current)} alt="" className="max-h-full max-w-full object-contain" />
         ) : current.content_type === 'video' ? (
-          <img
-            src={current.thumbnail_url || mediaUrl(current)}
-            alt=""
+          <video
+            ref={videoRef}
+            src={mediaUrl(current)}
+            controls
+            autoPlay
+            playsInline
             className="max-h-full max-w-full object-contain"
+            onEnded={() => {
+              if (idx < items.length - 1) setIdx(idx + 1);
+              else closeToList();
+            }}
           />
         ) : current.content_type === 'audio' ? (
           <div className="max-w-xl w-full">
             <div className="bg-black/40 border border-white/15 rounded-2xl p-4">
-              <audio src={mediaUrl(current)} controls autoPlay className="w-full" />
+              <audio
+                ref={audioRef}
+                src={mediaUrl(current)}
+                controls
+                autoPlay
+                className="w-full"
+                onEnded={() => {
+                  if (idx < items.length - 1) setIdx(idx + 1);
+                  else closeToList();
+                }}
+              />
             </div>
             {current.content_text ? (
               <div className="mt-4 text-lg leading-relaxed whitespace-pre-wrap">{current.content_text}</div>

@@ -249,19 +249,48 @@ export const CreatePolitPage = () => {
     }
     const readDuration = () =>
       new Promise((resolve) => {
+        // Some browsers (esp. MediaRecorder webm) report Infinity/NaN duration on metadata load.
+        // Workaround: seek to a very large time to force duration computation.
         try {
           const url = URL.createObjectURL(f);
           const el = document.createElement(contentType === 'audio' ? 'audio' : 'video');
+          let settled = false;
+
+          const cleanup = () => {
+            if (settled) return;
+            settled = true;
+            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+          };
+
+          const finish = (d) => {
+            cleanup();
+            resolve(Number.isFinite(d) && d > 0 ? d : 0);
+          };
+
           el.preload = 'metadata';
           el.onloadedmetadata = () => {
-            const d = Number(el.duration);
-            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
-            resolve(Number.isFinite(d) ? d : 0);
+            const d0 = Number(el.duration);
+            if (Number.isFinite(d0) && d0 > 0) return finish(d0);
+            // Infinity / NaN workaround
+            const onFix = () => {
+              el.removeEventListener('timeupdate', onFix);
+              const d1 = Number(el.duration);
+              finish(d1);
+            };
+            el.addEventListener('timeupdate', onFix);
+            try {
+              el.currentTime = 1e101;
+            } catch {
+              el.removeEventListener('timeupdate', onFix);
+              finish(0);
+            }
+            // Safety timeout
+            setTimeout(() => {
+              try { el.removeEventListener('timeupdate', onFix); } catch { /* ignore */ }
+              finish(Number(el.duration));
+            }, 1200);
           };
-          el.onerror = () => {
-            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
-            resolve(0);
-          };
+          el.onerror = () => finish(0);
           el.src = url;
         } catch {
           resolve(0);
@@ -307,28 +336,44 @@ export const CreatePolitPage = () => {
   };
 
   const getVideoDurationSec = (file) =>
-    new Promise((resolve, reject) => {
+    new Promise((resolve) => {
       try {
         const url = URL.createObjectURL(file);
         const v = document.createElement('video');
+        let settled = false;
+        const cleanup = () => {
+          if (settled) return;
+          settled = true;
+          try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+        };
+        const finish = (d) => {
+          cleanup();
+          resolve(Number.isFinite(d) && d > 0 ? d : 0);
+        };
         v.preload = 'metadata';
         v.onloadedmetadata = () => {
+          const d0 = Number(v.duration);
+          if (Number.isFinite(d0) && d0 > 0) return finish(d0);
+          const onFix = () => {
+            v.removeEventListener('timeupdate', onFix);
+            finish(Number(v.duration));
+          };
+          v.addEventListener('timeupdate', onFix);
           try {
-            const d = Number(v.duration);
-            URL.revokeObjectURL(url);
-            resolve(Number.isFinite(d) ? d : 0);
-          } catch (e) {
-            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
-            reject(e);
+            v.currentTime = 1e101;
+          } catch {
+            v.removeEventListener('timeupdate', onFix);
+            finish(0);
           }
+          setTimeout(() => {
+            try { v.removeEventListener('timeupdate', onFix); } catch { /* ignore */ }
+            finish(Number(v.duration));
+          }, 1200);
         };
-        v.onerror = () => {
-          try { URL.revokeObjectURL(url); } catch { /* ignore */ }
-          reject(new Error('Video okunamadı.'));
-        };
+        v.onerror = () => finish(0);
         v.src = url;
-      } catch (e) {
-        reject(e);
+      } catch {
+        resolve(0);
       }
     });
 
