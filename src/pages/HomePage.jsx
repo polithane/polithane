@@ -337,15 +337,13 @@ export const HomePage = () => {
           setAgendas([]);
         }
 
-        // Fast: only followings (plus self), last 24h (server-filtered)
+        // Fast: If logged in -> followings (plus self) with global fallback.
+        // If not logged in -> global public fast (polit_score / popularity).
         try {
-          if (isAuthenticated) {
-            const r = await apiCall('/api/fast?limit=24').catch(() => null);
-            const list = r?.data || [];
-            setPolifest(filterActiveFastUsers(list));
-          } else {
-            setPolifest([]);
-          }
+          const endpoint = isAuthenticated ? '/api/fast?limit=24' : '/api/fast/public?limit=24';
+          const r = await apiCall(endpoint).catch(() => null);
+          const list = r?.data || [];
+          setPolifest(filterActiveFastUsers(list));
         } catch {
           setPolifest([]);
         }
@@ -373,11 +371,8 @@ export const HomePage = () => {
     let cancelled = false;
     (async () => {
       try {
-        if (!isAuthenticated) {
-          if (!cancelled) setPolifest([]);
-          return;
-        }
-        const r = await apiCall('/api/fast?limit=24').catch(() => null);
+        const endpoint = isAuthenticated ? '/api/fast?limit=24' : '/api/fast/public?limit=24';
+        const r = await apiCall(endpoint).catch(() => null);
         const list = r?.data || [];
         if (!cancelled) setPolifest(filterActiveFastUsers(list));
       } catch {
@@ -391,12 +386,12 @@ export const HomePage = () => {
 
   // Keep Fast list fresh so 24h expiry is reflected without a full refresh.
   useEffect(() => {
-    if (!isAuthenticated) return;
     let cancelled = false;
     const tick = async () => {
       try {
         if (document?.hidden) return;
-        const r = await apiCall('/api/fast?limit=24').catch(() => null);
+        const endpoint = isAuthenticated ? '/api/fast?limit=24' : '/api/fast/public?limit=24';
+        const r = await apiCall(endpoint).catch(() => null);
         const list = r?.data || [];
         if (!cancelled) setPolifest(filterActiveFastUsers(list));
       } catch {

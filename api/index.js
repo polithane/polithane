@@ -1387,6 +1387,74 @@ function fastSinceIso(hours = 24) {
   return new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
 }
 
+async function getFastPublicUsers(req, res) {
+  const since = fastSinceIso(24);
+  const { limit = 80 } = req.query || {};
+  const lim = Math.min(200, Math.max(1, parseInt(limit, 10) || 80));
+
+  // Public: show globally active Fast users (last 24h), ordered by polit_score (and recency).
+  const posts = await supabaseRestGet('posts', {
+    select: 'id,user_id,created_at',
+    is_deleted: 'eq.false',
+    is_trending: 'eq.true',
+    created_at: `gte.${since}`,
+    order: 'created_at.desc',
+    limit: '2500',
+  }).catch(() => []);
+
+  const byUser = new Map();
+  for (const p of Array.isArray(posts) ? posts : []) {
+    const uid = p?.user_id != null ? String(p.user_id) : '';
+    if (!uid) continue;
+    const cur = byUser.get(uid) || { user_id: uid, story_count: 0, latest: 0 };
+    cur.story_count += 1;
+    const t = new Date(p.created_at || 0).getTime();
+    if (t > cur.latest) cur.latest = t;
+    byUser.set(uid, cur);
+  }
+
+  const ids = Array.from(byUser.keys()).slice(0, 400);
+  if (ids.length === 0) return res.json({ success: true, data: [] });
+
+  // NOTE: We keep room for future "Fast visibility" privacy setting.
+  // If a user sets metadata.privacy_settings.fastVisibility = 'private', we exclude them from public Fast.
+  const users = await supabaseRestGet('users', {
+    select: 'id,username,full_name,avatar_url,is_active,polit_score,metadata',
+    id: `in.(${ids.join(',')})`,
+    is_active: 'eq.true',
+    limit: String(Math.min(400, ids.length)),
+  }).catch(() => []);
+  const userMap = new Map((users || []).map((u) => [String(u.id), u]));
+
+  const cards = ids
+    .map((id) => {
+      const u = userMap.get(String(id));
+      const info = byUser.get(String(id));
+      if (!u || !info) return null;
+      const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+      const ps = meta?.privacy_settings && typeof meta.privacy_settings === 'object' ? meta.privacy_settings : {};
+      const fastVis = String(ps.fastVisibility || 'public').trim().toLowerCase();
+      if (fastVis === 'private') return null;
+
+      return {
+        user_id: u.id,
+        username: u.username,
+        full_name: u.full_name,
+        avatar_url: u.avatar_url,
+        profile_image: u.avatar_url,
+        story_count: info.story_count,
+        latest_created_at: info.latest ? new Date(info.latest).toISOString() : null,
+        polit_score: u.polit_score ?? 0,
+      };
+    })
+    .filter(Boolean);
+
+  cards.sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0)) || (new Date(b.latest_created_at || 0).getTime() - new Date(a.latest_created_at || 0).getTime()));
+
+  const out = cards.slice(0, lim).map(({ polit_score, ...rest }) => rest);
+  return res.json({ success: true, data: out });
+}
+
 async function getFastUsers(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -7428,6 +7496,9 @@ export default async function handler(req, res) {
       if ((url === '/api/agendas' || url === '/api/agendas/') && req.method === 'GET') return await getAgendas(req, res);
       if (url === '/api/parties' || url === '/api/parties/') return await getParties(req, res);
       if ((url === '/api/fast' || url === '/api/fast/') && req.method === 'GET') return await getFastUsers(req, res);
+      if ((url === '/api/fast/public' || url === '/api/fast/public/' || url === '/api/fast-public' || url === '/api/fast-public/') && req.method === 'GET') {
+        return await getFastPublicUsers(req, res);
+      }
       if (url.startsWith('/api/fast/') && req.method === 'GET') {
         const key = url.split('/api/fast/')[1];
         if (key) return await getFastForUser(req, res, key);
