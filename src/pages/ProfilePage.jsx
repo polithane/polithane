@@ -555,7 +555,7 @@ export const ProfilePage = () => {
                         navigate(`/messages?to=${encodeURIComponent(tid)}&focus=1`);
                       }}
                     >
-                      <MessageCircle className="w-5 h-5" />
+                      <MessageCircle className="w-6 h-6" />
                     </button>
                   )}
                   
@@ -565,7 +565,7 @@ export const ProfilePage = () => {
                       onClick={() => setShowMenu(!showMenu)}
                       className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg p-2 transition-colors"
                     >
-                      <MoreVertical className="w-5 h-5" />
+                      <MoreVertical className="w-6 h-6" />
                     </button>
                     
                     {showMenu && (
