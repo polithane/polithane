@@ -30,10 +30,15 @@
     @apply max-w-[1230px] mx-auto px-4 lg:px-8 xl:px-4;
   }
 
-  /* Home route: keep centered, but shrink on xl+ to make room for fixed sidebars */
-  @media (min-width: 1280px) {
-    .home-layout .container-main {
+  /* When fixed sidebars are visible (lg+), reserve space so content never sits underneath. */
+  @media (min-width: 1024px) {
+    .app-shell .container-main {
       max-width: min(1230px, calc(100vw - 280px));
+    }
+  }
+  @media (min-width: 1280px) {
+    .app-shell .container-main {
+      max-width: min(1230px, calc(100vw - 320px));
     }
   }
   

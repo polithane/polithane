@@ -84,7 +84,7 @@ import { ScrollToTop } from './components/system/ScrollToTop';
 
 function App() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col app-shell">
       <SiteHeadManager />
       <ScrollToTop />
       <Routes>
