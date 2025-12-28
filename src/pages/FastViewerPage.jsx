@@ -21,6 +21,7 @@ export const FastViewerPage = () => {
   const progressCount = Math.max(items.length, 1);
   const audioRef = useRef(null);
   const videoRef = useRef(null);
+  const [videoRotate, setVideoRotate] = useState(false);
 
   const go = (dir) => {
     setIdx((prev) => {
@@ -91,6 +92,7 @@ export const FastViewerPage = () => {
     } catch {
       // ignore
     }
+    setVideoRotate(false);
   }, [idx]);
 
   return (
@@ -134,6 +136,18 @@ export const FastViewerPage = () => {
             autoPlay
             playsInline
             className="max-h-full max-w-full object-contain"
+            onLoadedMetadata={(e) => {
+              try {
+                const el = e?.currentTarget;
+                const w = Number(el?.videoWidth || 0);
+                const h = Number(el?.videoHeight || 0);
+                // If video is recorded as landscape but should be shown portrait, rotate.
+                setVideoRotate(w > 0 && h > 0 && w > h);
+              } catch {
+                setVideoRotate(false);
+              }
+            }}
+            style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
             onEnded={() => {
               if (idx < items.length - 1) setIdx(idx + 1);
               else closeToList();

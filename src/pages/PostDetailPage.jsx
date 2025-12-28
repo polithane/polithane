@@ -6,12 +6,36 @@ import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
 import { formatNumber, formatPolitScore, formatTimeAgo, formatDate, formatDuration, getSourceDomain } from '../utils/formatters';
-import ReactPlayer from 'react-player';
 import { posts as postsApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getProfilePath } from '../utils/paths';
 import { FollowButton } from '../components/common/FollowButton';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
+
+const SmartVideo = ({ src }) => {
+  const [rotate, setRotate] = useState(false);
+  const url = String(src || '').trim();
+  if (!url) return null;
+  return (
+    <video
+      src={url}
+      controls
+      playsInline
+      className="w-full max-h-[70vh] bg-black rounded-lg object-contain"
+      onLoadedMetadata={(e) => {
+        try {
+          const el = e?.currentTarget;
+          const w = Number(el?.videoWidth || 0);
+          const h = Number(el?.videoHeight || 0);
+          setRotate(w > 0 && h > 0 && w > h);
+        } catch {
+          setRotate(false);
+        }
+      }}
+      style={rotate ? { transform: 'rotate(90deg)' } : undefined}
+    />
+  );
+};
 
 export const PostDetailPage = () => {
   const { postId } = useParams();
@@ -450,7 +474,7 @@ export const PostDetailPage = () => {
                 )}
                 {uiPost.content_type === 'video' && (
                   <div>
-                    <ReactPlayer url={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} controls width="100%" />
+                    <SmartVideo src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} />
                     {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
                   </div>
                 )}

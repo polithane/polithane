@@ -119,6 +119,7 @@ export const CreatePolitPage = () => {
   const previewRef = useRef(null);
   const recordTimeoutRef = useRef(null);
   const [videoFacingMode, setVideoFacingMode] = useState('user'); // user | environment
+  const [videoRotate, setVideoRotate] = useState(false);
 
   const imageUploadRef = useRef(null);
   const imageCaptureRef = useRef(null);
@@ -162,6 +163,7 @@ export const CreatePolitPage = () => {
       }
     }
     setRecordedUrl('');
+    setVideoRotate(false);
     chunksRef.current = [];
     setIsRecording(false);
     if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
@@ -802,9 +804,42 @@ export const CreatePolitPage = () => {
                   {contentType === 'video' ? (
                     <div className="rounded-2xl border border-gray-200 bg-black overflow-hidden">
                       {isRecording ? (
-                        <video ref={previewRef} className="w-full aspect-video object-cover" playsInline muted autoPlay />
+                        <video
+                          ref={previewRef}
+                          className={['w-full aspect-video bg-black', videoRotate ? 'object-contain' : 'object-cover'].join(' ')}
+                          playsInline
+                          muted
+                          autoPlay
+                          onLoadedMetadata={(e) => {
+                            try {
+                              const el = e?.currentTarget;
+                              const w = Number(el?.videoWidth || 0);
+                              const h = Number(el?.videoHeight || 0);
+                              setVideoRotate(w > 0 && h > 0 && w > h);
+                            } catch {
+                              setVideoRotate(false);
+                            }
+                          }}
+                          style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
+                        />
                       ) : recordedUrl ? (
-                        <video src={recordedUrl} controls className="w-full aspect-video object-contain bg-black" playsInline />
+                        <video
+                          src={recordedUrl}
+                          controls
+                          className={['w-full aspect-video bg-black', videoRotate ? 'object-contain' : 'object-contain'].join(' ')}
+                          playsInline
+                          onLoadedMetadata={(e) => {
+                            try {
+                              const el = e?.currentTarget;
+                              const w = Number(el?.videoWidth || 0);
+                              const h = Number(el?.videoHeight || 0);
+                              setVideoRotate(w > 0 && h > 0 && w > h);
+                            } catch {
+                              setVideoRotate(false);
+                            }
+                          }}
+                          style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
+                        />
                       ) : (
                         <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
                       )}
