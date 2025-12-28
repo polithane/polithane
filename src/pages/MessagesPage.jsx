@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 import { apiCall } from '../utils/api';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 
 export const MessagesPage = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -450,23 +451,25 @@ export const MessagesPage = () => {
       setError(null);
       const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
       if (!allowed.has(file.type)) throw new Error('Sadece JPG / PNG / WEBP gönderebilirsiniz.');
-      if (file.size > 5 * 1024 * 1024) throw new Error('Resim çok büyük (max 5MB).');
+      if (file.size > 10 * 1024 * 1024) throw new Error('Resim çok büyük (max 10MB).');
 
-      const toDataUrl = (f) =>
-        new Promise((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(String(r.result || ''));
-          r.onerror = () => reject(new Error('Dosya okunamadı.'));
-          r.readAsDataURL(f);
-        });
-      const dataUrl = await toDataUrl(file);
-
-      const up = await apiCall('/api/storage/upload', {
+      // IMPORTANT: Use signed upload so the file goes directly to Supabase Storage
+      // (avoids Vercel request-body limits from base64 uploads).
+      const sign = await apiCall('/api/storage/sign-upload', {
         method: 'POST',
-        body: JSON.stringify({ bucket: 'uploads', folder: 'messages', dataUrl, contentType: file.type }),
+        body: JSON.stringify({
+          bucket: 'uploads',
+          folder: 'messages',
+          contentType: file.type,
+        }),
       });
-      const url = up?.data?.publicUrl;
-      if (!url) throw new Error('Resim yüklenemedi.');
+      if (!sign?.success) throw new Error(sign?.error || 'Yükleme hazırlığı başarısız.');
+      const { bucket, path, token, publicUrl } = sign?.data || {};
+      if (!bucket || !path || !token || !publicUrl) throw new Error('Yükleme anahtarı alınamadı.');
+
+      const { error: upErr } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, { contentType: file.type });
+      if (upErr) throw new Error(String(upErr?.message || 'Resim yüklenemedi.'));
+      const url = String(publicUrl);
 
       const receiverId = getReceiverId(selectedConv);
       if (!receiverId) throw new Error('Geçersiz alıcı.');
