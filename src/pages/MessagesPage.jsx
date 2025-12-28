@@ -6,7 +6,7 @@ import { Input } from '../components/common/Input';
 import { Modal } from '../components/common/Modal';
 import { formatTimeAgo } from '../utils/formatters';
 import { Search, Send, AlertCircle, Image as ImageIcon, Trash2, Check, CheckCheck, Plus, ArrowLeft, Flag } from 'lucide-react';
-import { messages as messagesApi } from '../utils/api';
+import { messages as messagesApi, users as usersApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { apiCall } from '../utils/api';
@@ -35,6 +35,8 @@ export const MessagesPage = () => {
   const messageInputRef = useRef(null);
   const focusOnSelectRef = useRef(false);
   const shouldAutoScrollRef = useRef(true);
+
+  const [blockedIds, setBlockedIds] = useState(new Set());
   
   const [conversations, setConversations] = useState([]);
   const convPollRef = useRef(null);
@@ -254,6 +256,21 @@ export const MessagesPage = () => {
     load();
   }, [user?.id]);
 
+  // Load my blocked users (so we can disable messaging UI immediately).
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.id) return;
+      try {
+        const r = await usersApi.getBlocks().catch(() => null);
+        const list = Array.isArray(r?.data) ? r.data : Array.isArray(r) ? r : [];
+        setBlockedIds(new Set(list.map((u) => String(u?.id || '')).filter(Boolean)));
+      } catch {
+        setBlockedIds(new Set());
+      }
+    };
+    load();
+  }, [user?.id]);
+
   // Poll conversations (unread count + latest message)
   useEffect(() => {
     if (!user?.id) return;
@@ -438,6 +455,10 @@ export const MessagesPage = () => {
         setError('Geçersiz alıcı.');
         return;
       }
+      if (blockedIds instanceof Set && blockedIds.has(String(receiverId))) {
+        setError('Bu kullanıcıyı engellediniz. Mesaj gönderemezsiniz.');
+        return;
+      }
       const sent = await messagesApi.send(receiverId, newMessage.trim());
       if (sent?.success) {
         setMessages((prev) => [...prev, sent.data]);
@@ -489,6 +510,10 @@ export const MessagesPage = () => {
       const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
       if (!allowed.has(file.type)) throw new Error('Sadece JPG / PNG / WEBP gönderebilirsiniz.');
       if (file.size > 10 * 1024 * 1024) throw new Error('Resim çok büyük (max 10MB).');
+      const receiverId = getReceiverId(selectedConv);
+      if (blockedIds instanceof Set && receiverId && blockedIds.has(String(receiverId))) {
+        throw new Error('Bu kullanıcıyı engellediniz. Resim gönderemezsiniz.');
+      }
 
       // IMPORTANT: Use signed upload so the file goes directly to Supabase Storage
       // (avoids Vercel request-body limits from base64 uploads).
@@ -508,7 +533,6 @@ export const MessagesPage = () => {
       if (upErr) throw new Error(String(upErr?.message || 'Resim yüklenemedi.'));
       const url = String(publicUrl);
 
-      const receiverId = getReceiverId(selectedConv);
       if (!receiverId) throw new Error('Geçersiz alıcı.');
       const sent = await messagesApi.send(receiverId, '', { kind: 'image', url });
       if (sent?.success) {
@@ -812,6 +836,36 @@ export const MessagesPage = () => {
                     )}
                   </div>
                 </div>
+
+                {(() => {
+                  const rid = getReceiverId(selectedConv);
+                  const isBlockedByMe = rid && blockedIds instanceof Set ? blockedIds.has(String(rid)) : false;
+                  if (!isBlockedByMe) return null;
+                  return (
+                    <div className="px-4 py-3 border-b bg-red-50 text-red-800 text-sm flex items-center justify-between gap-3">
+                      <div className="font-semibold">Bu kullanıcıyı engellediniz. Mesaj gönderemezsiniz.</div>
+                      <button
+                        type="button"
+                        className="px-3 py-2 rounded-lg bg-white border border-red-200 text-red-800 font-black hover:bg-red-100"
+                        onClick={async () => {
+                          try {
+                            await usersApi.unblock(rid);
+                            setBlockedIds((prev) => {
+                              const next = new Set(prev instanceof Set ? Array.from(prev) : []);
+                              next.delete(String(rid));
+                              return next;
+                            });
+                            setError(null);
+                          } catch (e) {
+                            setError(e?.message || 'Engel kaldırılamadı.');
+                          }
+                        }}
+                      >
+                        Engeli kaldır
+                      </button>
+                    </div>
+                  );
+                })()}
                 
                 {/* Messages Area (only this part scrolls) */}
                 <div
@@ -948,12 +1002,26 @@ export const MessagesPage = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSendMessage();
                       }}
-                      placeholder="Mesajınızı yazın..."
+                      placeholder={
+                        (() => {
+                          const rid = getReceiverId(selectedConv);
+                          const isBlockedByMe = rid && blockedIds instanceof Set ? blockedIds.has(String(rid)) : false;
+                          return isBlockedByMe ? 'Engellediğiniz kullanıcıya mesaj gönderemezsiniz.' : 'Mesajınızı yazın...';
+                        })()
+                      }
+                      disabled={(() => {
+                        const rid = getReceiverId(selectedConv);
+                        return rid && blockedIds instanceof Set ? blockedIds.has(String(rid)) : false;
+                      })()}
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
                     />
                     <button
                       type="button"
                       onClick={handlePickImage}
+                      disabled={(() => {
+                        const rid = getReceiverId(selectedConv);
+                        return rid && blockedIds instanceof Set ? blockedIds.has(String(rid)) : false;
+                      })()}
                       className="bg-white border border-gray-300 text-gray-800 rounded-lg p-2 hover:bg-gray-50 transition-colors"
                       title="Resim gönder"
                     >
@@ -961,7 +1029,13 @@ export const MessagesPage = () => {
                     </button>
                     <button
                       onClick={handleSendMessage}
-                      disabled={!newMessage.trim()}
+                      disabled={
+                        !newMessage.trim() ||
+                        (() => {
+                          const rid = getReceiverId(selectedConv);
+                          return rid && blockedIds instanceof Set ? blockedIds.has(String(rid)) : false;
+                        })()
+                      }
                       className="bg-primary-blue hover:bg-blue-600 disabled:bg-gray-300 text-white rounded-lg p-2 px-4 transition-colors flex items-center gap-2"
                     >
                       <Send className="w-5 h-5" />
