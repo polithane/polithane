@@ -4008,8 +4008,35 @@ async function adminGetPosts(req, res) {
 async function adminDeletePost(req, res, postId) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
-  const updated = await supabaseRestPatch('posts', { id: `eq.${postId}` }, { is_deleted: true });
-  res.json({ success: true, data: updated?.[0] || null });
+  const id = String(postId || '').trim();
+  if (!id) return res.status(400).json({ success: false, error: 'Geçersiz paylaşım.' });
+
+  // Best-effort: also delete uploaded media objects from storage (same logic as user delete).
+  try {
+    const rows = await supabaseRestGet('posts', { select: '*', id: `eq.${id}`, limit: '1' }).catch(() => []);
+    const post = rows?.[0] || null;
+    const urls = [];
+    if (Array.isArray(post?.media_urls)) urls.push(...post.media_urls);
+    if (post?.thumbnail_url) urls.push(post.thumbnail_url);
+    const objs = (urls || [])
+      .map((u) => parseSupabasePublicObjectUrl(u))
+      .filter(Boolean)
+      // Only delete from uploads bucket (avoid shared assets like avatars/logos)
+      .filter((p) => p.bucket === 'uploads' && p.objectPath);
+    const seen = new Set();
+    for (const o of objs) {
+      const key = `${o.bucket}/${o.objectPath}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // eslint-disable-next-line no-await-in-loop
+      await supabaseStorageDeleteObject(o.bucket, o.objectPath).catch(() => null);
+    }
+  } catch {
+    // ignore
+  }
+
+  const updated = await supabaseRestPatch('posts', { id: `eq.${id}` }, { is_deleted: true, updated_at: new Date().toISOString() }).catch(() => []);
+  return res.json({ success: true, data: updated?.[0] || null });
 }
 
 async function adminGetAgendas(req, res) {

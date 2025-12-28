@@ -278,6 +278,28 @@ export const HomePage = () => {
     };
   }, [isAuthenticated]);
 
+  // Keep Fast list fresh so 24h expiry is reflected without a full refresh.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        if (document?.hidden) return;
+        const r = await apiCall('/api/fast?limit=24').catch(() => null);
+        const list = r?.data || [];
+        if (!cancelled) setPolifest(Array.isArray(list) ? list : []);
+      } catch {
+        // ignore
+      }
+    };
+    // refresh fairly often (cheap endpoint; keeps 24h expiry accurate)
+    const t = setInterval(tick, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [isAuthenticated]);
+
   const fetchMorePosts = async () => {
     if (loadingMorePosts || !hasMorePosts) return;
     setLoadingMorePosts(true);

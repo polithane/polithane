@@ -14,7 +14,13 @@ export const AgendaManagement = () => {
   const [showInactive, setShowInactive] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [createDraft, setCreateDraft] = useState({ title: '', trending_score: 5000, is_trending: true, is_active: true });
+  const [createDraft, setCreateDraft] = useState({
+    title: '',
+    trending_score: 5000,
+    total_polit_score: 0,
+    is_trending: true,
+    is_active: true,
+  });
 
   const fetchList = async () => {
     setLoading(true);
@@ -68,6 +74,7 @@ export const AgendaManagement = () => {
         is_active: !!row.is_active,
         is_trending: !!row.is_trending,
         trending_score: Number(row.trending_score || 0),
+        total_polit_score: Number(row.total_polit_score || 0),
       };
       const r = await adminApi.updateAgenda(id, payload);
       if (r?.success && r?.data) {
@@ -104,12 +111,13 @@ export const AgendaManagement = () => {
       const r = await adminApi.createAgenda({
         title,
         trending_score: Number(createDraft.trending_score || 0),
+        total_polit_score: Number(createDraft.total_polit_score || 0),
         is_trending: !!createDraft.is_trending,
         is_active: !!createDraft.is_active,
       });
       if (r?.success && r?.data) {
         setRows((prev) => [r.data, ...(prev || [])]);
-        setCreateDraft({ title: '', trending_score: 5000, is_trending: true, is_active: true });
+        setCreateDraft({ title: '', trending_score: 5000, total_polit_score: 0, is_trending: true, is_active: true });
         setCreateOpen(false);
       }
     } catch (e) {
@@ -155,7 +163,7 @@ export const AgendaManagement = () => {
 
       {createOpen && (
         <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <input
               value={createDraft.title}
               onChange={(e) => setCreateDraft((p) => ({ ...p, title: e.target.value }))}
@@ -166,6 +174,13 @@ export const AgendaManagement = () => {
               value={createDraft.trending_score}
               onChange={(e) => setCreateDraft((p) => ({ ...p, trending_score: e.target.value }))}
               placeholder="trend_skoru"
+              className="px-4 py-3 border border-gray-300 rounded-lg"
+              inputMode="numeric"
+            />
+            <input
+              value={createDraft.total_polit_score}
+              onChange={(e) => setCreateDraft((p) => ({ ...p, total_polit_score: e.target.value }))}
+              placeholder="başlangıç_polit_puan"
               className="px-4 py-3 border border-gray-300 rounded-lg"
               inputMode="numeric"
             />
@@ -254,7 +269,8 @@ export const AgendaManagement = () => {
                 <tr>
                   <th className="px-4 py-3 text-left font-black text-gray-700">Başlık</th>
                   <th className="px-4 py-3 text-left font-black text-gray-700">Kısa Adres</th>
-                  <th className="px-4 py-3 text-left font-black text-gray-700">Skor</th>
+                  <th className="px-4 py-3 text-left font-black text-gray-700">Trend Skoru</th>
+                  <th className="px-4 py-3 text-left font-black text-gray-700">PolitPuan</th>
                   <th className="px-4 py-3 text-left font-black text-gray-700">Trend</th>
                   <th className="px-4 py-3 text-left font-black text-gray-700">Aktif</th>
                   <th className="px-4 py-3 text-right font-black text-gray-700">İşlem</th>
@@ -281,6 +297,14 @@ export const AgendaManagement = () => {
                       <input
                         value={a.trending_score ?? 0}
                         onChange={(e) => updateRowLocal(a.id, { trending_score: e.target.value })}
+                        className="w-[120px] px-3 py-2 border border-gray-200 rounded-lg"
+                        inputMode="numeric"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        value={a.total_polit_score ?? 0}
+                        onChange={(e) => updateRowLocal(a.id, { total_polit_score: e.target.value })}
                         className="w-[120px] px-3 py-2 border border-gray-200 rounded-lg"
                         inputMode="numeric"
                       />
@@ -327,7 +351,7 @@ export const AgendaManagement = () => {
                 ))}
                 {sorted.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
                       Kayıt bulunamadı.
                     </td>
                   </tr>
