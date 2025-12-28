@@ -576,7 +576,7 @@ export const MessagesPage = () => {
   const deleteConversation = async (conv) => {
     const pid = String(conv?.participant_id || '').trim();
     if (!pid) return;
-    if (!window.confirm('Bu sohbeti silmek istiyor musunuz? Bu işlem sohbetin tüm mesajlarını veritabanından siler.')) return;
+    if (!window.confirm('Bu sohbeti silmek istiyor musunuz? Sohbet yalnızca sizin tarafınızda gizlenir. Karşı tarafta sohbet geçmişi korunur.')) return;
     setConvActionBusyId(pid);
     try {
       await messagesApi.deleteConversation(pid);
