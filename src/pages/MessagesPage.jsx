@@ -551,7 +551,7 @@ export const MessagesPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
       <div className="container-main py-8">
-        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-220px)] md:h-[calc(100vh-190px)] lg:h-[calc(100vh-160px)] min-h-[520px]">
+        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[calc(100dvh-220px)] md:h-[calc(100dvh-190px)] lg:h-[calc(100dvh-160px)] min-h-[520px] min-h-0">
           {/* Konuşma Listesi */}
           <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col ${selectedConv ? 'hidden md:flex' : ''}`}>
             <div className="p-4 border-b">
@@ -723,7 +723,7 @@ export const MessagesPage = () => {
           </div>
           
           {/* Mesaj Thread */}
-          <div className={`bg-white rounded-xl border border-gray-200 flex flex-col ${selectedConv ? '' : 'hidden md:flex'}`}>
+          <div className={`bg-white rounded-xl border border-gray-200 flex flex-col min-h-0 ${selectedConv ? '' : 'hidden md:flex'}`}>
             {selectedConv ? (
               <>
                 {/* Header */}
@@ -764,7 +764,7 @@ export const MessagesPage = () => {
                 {/* Messages Area */}
                 <div
                   ref={messagesAreaRef}
-                  className="flex-1 overflow-y-auto p-4 bg-gray-50"
+                  className="flex-1 min-h-0 overflow-y-auto p-4 bg-gray-50"
                   onScroll={() => {
                     shouldAutoScrollRef.current = isNearBottom();
                   }}
@@ -878,8 +878,8 @@ export const MessagesPage = () => {
                   )}
                 </div>
                 
-                {/* Message Input */}
-                <div className="p-4 border-t">
+                {/* Message Input (sticky so it never hides under footer/bottom bar) */}
+                <div className="p-4 border-t bg-white sticky bottom-0">
                   <input
                     ref={fileRef}
                     type="file"

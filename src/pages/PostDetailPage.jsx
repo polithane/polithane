@@ -514,15 +514,6 @@ export const PostDetailPage = () => {
                   } catch {
                     // ignore
                   }
-                  // If native share exists, offer it first
-                  try {
-                    if (navigator?.share) {
-                      await navigator.share({ title: 'Polithane', url: postUrl });
-                      return;
-                    }
-                  } catch {
-                    // ignore
-                  }
                   setShowShare(true);
                 }}
                 className="flex items-center justify-center gap-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
@@ -739,6 +730,10 @@ export const PostDetailPage = () => {
                         onClick={async () => {
                           try {
                             setCommentError('');
+                            if (!isAuthenticated) {
+                              navigate('/login-new');
+                              return;
+                            }
                             const id = comment.id || comment.comment_id;
                             if (!id) return;
                             const r = await postsApi.likeComment(id);
