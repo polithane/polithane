@@ -6703,7 +6703,8 @@ async function sendMessage(req, res) {
     if (analyzed?.flagged) {
       return res.status(400).json({
         success: false,
-        error: 'Mesaj güvenlik filtresine takıldı. Lütfen metni düzenleyip tekrar deneyin.',
+        error:
+          'Mesajınız gönderilemedi. İçerik, topluluk kurallarımıza aykırı olabilecek ifadeler içeriyor olabilir. Lütfen metni düzenleyip tekrar deneyin.',
         code: 'CONTENT_FILTERED',
         reasons: analyzed.reasons || [],
       });
