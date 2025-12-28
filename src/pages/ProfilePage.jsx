@@ -394,12 +394,12 @@ export const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b">
-        <div className="container-main py-8">
+        <div className="container-main py-6 md:py-8">
           {/* Profil Header */}
-          <div className="flex items-start gap-6">
+          <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-6">
             <Avatar 
               src={user.avatar_url || user.profile_image} 
-              size="120px" 
+              size="96px" 
               verified={isUiVerifiedUser(user)}
               ring={hasFast ? 'fast' : null}
               onClick={() => {
@@ -413,7 +413,7 @@ export const ProfilePage = () => {
             />
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <h1 className="text-2xl md:text-3xl font-bold break-words">{user.full_name}</h1>
+                <h1 className="text-xl md:text-3xl font-bold break-words">{user.full_name}</h1>
                 {user.party_id && user.party?.party_logo && (
                   <Link
                     to={`/party/${user.party.party_slug || user.party.party_id || user.party_id}`}
@@ -448,7 +448,7 @@ export const ProfilePage = () => {
                 })()}
               </div>
               {getUserTitle(user) && (
-                <p className="text-primary-blue font-semibold text-lg mb-2">
+                <p className="text-primary-blue font-semibold text-base md:text-lg mb-2">
                   {getUserTitle(user)}
                 </p>
               )}
@@ -481,7 +481,7 @@ export const ProfilePage = () => {
               )}
               
               {/* İstatistikler */}
-              <div className="flex gap-8 mt-4">
+              <div className="flex flex-wrap gap-6 mt-4">
                 {((user?.metadata && user.metadata.privacy_settings?.showFollowers) ?? true) && (
                   <div
                     onClick={() => {
@@ -518,17 +518,17 @@ export const ProfilePage = () => {
             </div>
             
             {/* Aksiyon Butonları */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto md:justify-end">
               {isOwnProfile ? (
                 <>
                   <Link to="/settings/profile">
-                    <Button variant="outline">
+                    <Button variant="outline" size="small" className="w-full sm:w-auto">
                       <Edit className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
                       Profili Düzenle
                     </Button>
                   </Link>
                   <Link to="/settings">
-                    <Button variant="outline">
+                    <Button variant="outline" size="small" className="w-full sm:w-auto">
                       <Settings className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
                       Ayarlar
                     </Button>

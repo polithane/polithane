@@ -100,35 +100,35 @@ function App() {
             </>
           }
         />
-        <Route path="/post/:postId" element={<><Header /><PostDetailPage /><Footer /><ActionBar /></>} />
-        <Route path="/profile/:userId" element={<><Header /><ProfilePage /><Footer /><ActionBar /></>} />
-        <Route path="/@:username" element={<><Header /><ProfilePage /><Footer /><ActionBar /></>} />
-        <Route path="/:username" element={<><Header /><ProfilePage /><Footer /><ActionBar /></>} />
-        <Route path="/party/:partyId" element={<><Header /><PartyDetailPage /><Footer /><ActionBar /></>} />
-        <Route path="/agenda/:agendaSlug" element={<><Header /><AgendaDetailPage /><Footer /><ActionBar /></>} />
-        <Route path="/category/:categoryId" element={<><Header /><CategoryFeedPage /><Footer /><ActionBar /></>} />
-        <Route path="/hit" element={<><Header /><HitFeedPage /><Footer /><ActionBar /></>} />
-        <Route path="/gundem-disi" element={<><Header /><NoAgendaFeedPage /><Footer /><ActionBar /></>} />
-        <Route path="/agendas" element={<><Header /><AgendasPage /><Footer /><ActionBar /></>} />
-        <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><ActionBar /></>} />
-        <Route path="/messages" element={<><Header /><MessagesPage /><Footer /><ActionBar /></>} />
-        <Route path="/search" element={<><Header /><SearchPage /><Footer /><ActionBar /></>} />
-        <Route path="/polit-at" element={<><Header /><CreatePolitPage /><Footer /><ActionBar /></>} />
-        <Route path="/test" element={<><Header /><TestPage /><Footer /><ActionBar /></>} />
-        <Route path="/polifest" element={<><Header /><PoliFestPage /><Footer /><ActionBar /></>} />
-        <Route path="/fast" element={<><Header /><FastPage /><Footer /><ActionBar /></>} />
-        <Route path="/fast-at" element={<><Header /><CreatePolitPage /><Footer /><ActionBar /></>} />
+        <Route path="/post/:postId" element={<><Header /><PostDetailPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/profile/:userId" element={<><Header /><ProfilePage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/@:username" element={<><Header /><ProfilePage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/:username" element={<><Header /><ProfilePage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/party/:partyId" element={<><Header /><PartyDetailPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/agenda/:agendaSlug" element={<><Header /><AgendaDetailPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/category/:categoryId" element={<><Header /><CategoryFeedPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/hit" element={<><Header /><HitFeedPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/gundem-disi" element={<><Header /><NoAgendaFeedPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/agendas" element={<><Header /><AgendasPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/messages" element={<><Header /><MessagesPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/search" element={<><Header /><SearchPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/polit-at" element={<><Header /><CreatePolitPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/test" element={<><Header /><TestPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/polifest" element={<><Header /><PoliFestPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/fast" element={<><Header /><FastPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/fast-at" element={<><Header /><CreatePolitPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/fast/:usernameOrId" element={<FastViewerPage />} />
         <Route path="/polifest/:usernameOrId" element={<PoliFestViewerPage />} />
         <Route path="/delete-confirm" element={<DeleteConfirmPage />} />
-        <Route path="/about" element={<><Header /><AboutPage /><Footer /><ActionBar /></>} />
-        <Route path="/mission" element={<><Header /><MissionPage /><Footer /><ActionBar /></>} />
-        <Route path="/contact" element={<><Header /><ContactPage /><Footer /><ActionBar /></>} />
-        <Route path="/parliament" element={<><Header /><ParliamentInfoPage /><Footer /><ActionBar /></>} />
-        <Route path="/parties" element={<><Header /><PartiesDirectoryPage /><Footer /><ActionBar /></>} />
-        <Route path="/terms" element={<><Header /><TermsPage /><Footer /><ActionBar /></>} />
-        <Route path="/privacy-policy" element={<><Header /><PrivacyPolicyPage /><Footer /><ActionBar /></>} />
-        <Route path="/cookie-policy" element={<><Header /><CookiePolicyPage /><Footer /><ActionBar /></>} />
+        <Route path="/about" element={<><Header /><AboutPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/mission" element={<><Header /><MissionPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/contact" element={<><Header /><ContactPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/parliament" element={<><Header /><ParliamentInfoPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/parties" element={<><Header /><PartiesDirectoryPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/terms" element={<><Header /><TermsPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/privacy-policy" element={<><Header /><PrivacyPolicyPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/cookie-policy" element={<><Header /><CookiePolicyPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         {/* Backward-compatible legacy routes */}
         <Route path="/stories" element={<><Header /><PoliFestPage /><Footer /><ActionBar /></>} />
         <Route path="/stories/:usernameOrId" element={<PoliFestViewerPage />} />

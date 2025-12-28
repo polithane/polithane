@@ -158,7 +158,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
     <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 shadow-sm overflow-hidden text-[10px] leading-tight">
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] font-black text-gray-900">TAKİP ÖNERİLERİ</div>
-        <Link to="/search" className="text-[10px] font-black text-primary-blue hover:underline">
+        <Link to="/hit?mode=profiles" className="text-[10px] font-black text-primary-blue hover:underline">
           Keşfet
         </Link>
       </div>

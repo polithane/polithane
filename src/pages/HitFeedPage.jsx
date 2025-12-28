@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
+import { Avatar } from '../components/ui/Avatar';
+import { formatPolitScore } from '../utils/format';
+import { getProfilePath } from '../utils/paths';
+import { isUiVerifiedUser } from '../utils/verification';
 
 export const HitFeedPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [parties, setParties] = useState([]);
   const [pool, setPool] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -16,6 +22,12 @@ export const HitFeedPage = () => {
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
   const PAGE_SIZE = 120;
+
+  const mode = useMemo(() => {
+    const q = new URLSearchParams(location.search || '');
+    return String(q.get('mode') || '').trim();
+  }, [location.search]);
+  const isProfilesMode = mode === 'profiles';
 
   const partyMap = useMemo(() => new Map((parties || []).map((p) => [p.id, p])), [parties]);
 
@@ -121,6 +133,27 @@ export const HitFeedPage = () => {
 
   const hitPosts = useMemo(() => computeHitPosts(pool, Math.max(36, pool.length > 0 ? 72 : 0)), [pool]);
 
+  const fetchProfilesPage = async ({ nextOffset, replace } = {}) => {
+    const lim = 60;
+    const res = await api.users.getAll({ limit: lim, offset: nextOffset ?? 0, order: 'polit_score.desc' }).catch(() => []);
+    const list = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+
+    setProfiles((prev) => {
+      const base = replace ? [] : (Array.isArray(prev) ? prev : []);
+      const seen = new Set(base.map((u) => String(u?.id ?? u?.user_id ?? '')));
+      const next = base.slice();
+      for (const u of list) {
+        const id = String(u?.id ?? u?.user_id ?? '');
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        next.push(u);
+      }
+      return next;
+    });
+    setHasMore(list.length >= lim);
+    setOffset((nextOffset ?? 0) + list.length);
+  };
+
   const fetchPage = async ({ nextOffset, replace, pm }) => {
     const rows = await api.posts.getAll({ limit: PAGE_SIZE, offset: nextOffset, order: 'created_at.desc' }).catch(() => []);
     const list = Array.isArray(rows) ? rows : [];
@@ -147,18 +180,27 @@ export const HitFeedPage = () => {
     (async () => {
       setLoading(true);
       setPool([]);
+      setProfiles([]);
       setHasMore(true);
       setOffset(0);
       try {
-        const partiesData = await api.parties.getAll().catch(() => []);
-        const nextParties = Array.isArray(partiesData) ? partiesData : [];
-        const pm = new Map((nextParties || []).map((p) => [p.id, p]));
-        if (!cancelled) setParties(nextParties);
-        if (!cancelled) await fetchPage({ nextOffset: 0, replace: true, pm });
+        if (isProfilesMode) {
+          if (!cancelled) await fetchProfilesPage({ nextOffset: 0, replace: true });
+        } else {
+          const partiesData = await api.parties.getAll().catch(() => []);
+          const nextParties = Array.isArray(partiesData) ? partiesData : [];
+          const pm = new Map((nextParties || []).map((p) => [p.id, p]));
+          if (!cancelled) setParties(nextParties);
+          if (!cancelled) await fetchPage({ nextOffset: 0, replace: true, pm });
+        }
       } catch {
-        const pm = new Map();
         if (!cancelled) setParties([]);
-        if (!cancelled) await fetchPage({ nextOffset: 0, replace: true, pm });
+        if (isProfilesMode) {
+          if (!cancelled) await fetchProfilesPage({ nextOffset: 0, replace: true });
+        } else {
+          const pm = new Map();
+          if (!cancelled) await fetchPage({ nextOffset: 0, replace: true, pm });
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -167,7 +209,7 @@ export const HitFeedPage = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isProfilesMode]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -181,7 +223,11 @@ export const HitFeedPage = () => {
         (async () => {
           setLoadingMore(true);
           try {
-            await fetchPage({ nextOffset: offset, replace: false });
+            if (isProfilesMode) {
+              await fetchProfilesPage({ nextOffset: offset, replace: false });
+            } else {
+              await fetchPage({ nextOffset: offset, replace: false });
+            }
           } finally {
             setLoadingMore(false);
           }
@@ -192,37 +238,92 @@ export const HitFeedPage = () => {
     observerRef.current.observe(sentinelRef.current);
     return () => observerRef.current?.disconnect?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [offset, hasMore, loading, loadingMore]);
+  }, [offset, hasMore, loading, loadingMore, isProfilesMode]);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-8">
         <div className="flex items-center justify-between gap-3 mb-6">
           <div className="min-w-0">
-            <div className="text-2xl sm:text-3xl font-black text-gray-900 break-words">HİT PAYLAŞIMLAR</div>
-            <div className="text-sm text-gray-600 mt-1">Algoritmik seçim (Polit Puan + etkileşim + tazelik)</div>
+            {isProfilesMode ? (
+              <>
+                <div className="text-2xl sm:text-3xl font-black text-gray-900 break-words">KEŞFET PROFİLLER</div>
+                <div className="text-sm text-gray-600 mt-1">En yüksek Polit Puanlı profiller</div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl sm:text-3xl font-black text-gray-900 break-words">HİT PAYLAŞIMLAR</div>
+                <div className="text-sm text-gray-600 mt-1">Algoritmik seçim (Polit Puan + etkileşim + tazelik)</div>
+              </>
+            )}
           </div>
-          <button
-            type="button"
-            className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-900 font-black"
-            onClick={() => navigate('/')}
-          >
-            Ana Sayfa
-          </button>
+          {isProfilesMode ? (
+            <Link to="/hit" className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-900 font-black">
+              Hit Politler
+            </Link>
+          ) : (
+            <Link
+              to="/hit?mode=profiles"
+              className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-900 font-black"
+            >
+              Profilleri Keşfet
+            </Link>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {hitPosts.map((p) => (
-            <PostCardHorizontal key={p.post_id ?? p.id} post={p} fullWidth={true} />
-          ))}
-        </div>
+        {isProfilesMode ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(profiles || []).map((u) => {
+              const id = String(u?.id ?? u?.user_id ?? '');
+              if (!id) return null;
+              const name = String(u?.full_name || u?.username || 'Kullanıcı').trim();
+              const username = u?.username ? `@${u.username}` : null;
+              const path = getProfilePath({ ...(u || {}), user_id: id });
+              return (
+                <div key={id} className="bg-white border border-gray-200 rounded-2xl p-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar src={u?.avatar_url || u?.profile_image} size="56px" verified={isUiVerifiedUser(u)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-black text-gray-900 truncate">{name}</div>
+                      {username ? <div className="text-sm text-gray-600 truncate">{username}</div> : null}
+                      <div className="mt-2 text-sm text-gray-700 font-semibold">
+                        Polit Puan:{' '}
+                        <span className="font-black text-primary-blue">{formatPolitScore(u?.polit_score || 0)}</span>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <button
+                        type="button"
+                        className="px-4 py-2 rounded-xl bg-primary-blue text-white font-black hover:opacity-90"
+                        onClick={() => navigate(path)}
+                      >
+                        Profil
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {hitPosts.map((p) => (
+              <PostCardHorizontal key={p.post_id ?? p.id} post={p} fullWidth={true} />
+            ))}
+          </div>
+        )}
 
         {loading && <div className="mt-6 text-center text-sm text-gray-600">Yükleniyor…</div>}
-        {!loading && hitPosts.length === 0 && <div className="mt-6 text-center text-sm text-gray-600">Henüz paylaşım yok.</div>}
+        {!loading && isProfilesMode && profiles.length === 0 && (
+          <div className="mt-6 text-center text-sm text-gray-600">Henüz profil yok.</div>
+        )}
+        {!loading && !isProfilesMode && hitPosts.length === 0 && (
+          <div className="mt-6 text-center text-sm text-gray-600">Henüz paylaşım yok.</div>
+        )}
 
         <div ref={sentinelRef} className="h-8" />
         {loadingMore && <div className="mt-2 text-center text-sm text-gray-600">Daha fazla yükleniyor…</div>}
-        {!loading && !loadingMore && !hasMore && hitPosts.length > 0 && (
+        {!loading && !loadingMore && !hasMore && (isProfilesMode ? profiles.length > 0 : hitPosts.length > 0) && (
           <div className="mt-6 text-center text-xs text-gray-500">Hepsi bu kadar.</div>
         )}
       </div>

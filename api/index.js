@@ -1729,6 +1729,19 @@ async function getUsers(req, res) {
       return res.json(Array.isArray(rows) ? rows : []);
     }
 
+    // Default list (Explore profiles, etc.) - return ARRAY
+    if (!search) {
+      const params = {
+        select: '*,party:parties(*)',
+        is_active: 'eq.true',
+        limit: String(Math.min(parseInt(limit, 10) || 20, 60)),
+        offset: String(Math.max(0, parseInt(offset, 10) || 0)),
+      };
+      if (order) params.order = order;
+      const rows = await supabaseRestGet('users', params).catch(() => []);
+      return res.json(Array.isArray(rows) ? rows : []);
+    }
+
     // Search list
     if (!search || String(search).length < 3) return res.json([]);
     const data = await supabaseRestGet('users', {

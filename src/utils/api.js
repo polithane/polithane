@@ -261,6 +261,11 @@ export const users = {
   getByUsername: (username) => apiCall(`/api/users?username=${encodeURIComponent(username)}`),
   getById: (id) => apiCall(`/api/users?id=${encodeURIComponent(id)}`),
 
+  getAll: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/users${query ? `?${query}` : ''}`);
+  },
+
   updateProfile: (formData) =>
     apiCall('/api/users/profile', {
       method: 'PUT',
