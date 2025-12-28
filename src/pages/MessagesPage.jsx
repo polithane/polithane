@@ -39,6 +39,17 @@ export const MessagesPage = () => {
   const [conversations, setConversations] = useState([]);
   const convPollRef = useRef(null);
   const msgPollRef = useRef(null);
+  
+  // Compose modal (MUST be above any early returns; otherwise React hook order breaks in production)
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeContacts, setComposeContacts] = useState([]);
+  const [composeLoading, setComposeLoading] = useState(false);
+  const [composeQuery, setComposeQuery] = useState('');
+  const [composeResults, setComposeResults] = useState([]);
+  const [composeSuggestions, setComposeSuggestions] = useState([]);
+  const [composeFollowingIds, setComposeFollowingIds] = useState(new Set());
+  const [composeMutualIds, setComposeMutualIds] = useState(new Set());
+  const composeTimerRef = useRef(null);
 
   const getReceiverId = (conv) => {
     const pid = conv?.participant_id ?? conv?.participant?.id ?? null;
@@ -72,17 +83,6 @@ export const MessagesPage = () => {
   if (!isAuthenticated) {
     return null;
   }
-
-  // Compose modal
-  const [showCompose, setShowCompose] = useState(false);
-  const [composeContacts, setComposeContacts] = useState([]);
-  const [composeLoading, setComposeLoading] = useState(false);
-  const [composeQuery, setComposeQuery] = useState('');
-  const [composeResults, setComposeResults] = useState([]);
-  const [composeSuggestions, setComposeSuggestions] = useState([]);
-  const [composeFollowingIds, setComposeFollowingIds] = useState(new Set());
-  const [composeMutualIds, setComposeMutualIds] = useState(new Set());
-  const composeTimerRef = useRef(null);
   
   const filteredConversations = useMemo(() => {
     const base = (conversations || []).filter((c) => (tab === 'requests' ? c.message_type === 'request' : c.message_type !== 'request'));
