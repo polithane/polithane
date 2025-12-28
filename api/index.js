@@ -373,15 +373,23 @@ async function supabaseInsertNotifications(rows) {
 // --- CONTROLLERS ---
 
 async function getPosts(req, res) {
-    const { limit = '50', offset = '0', party_id, user_id, user_ids, category, agenda_tag, order = 'created_at.desc' } = req.query;
+    const { limit = '50', offset = '0', party_id, user_id, user_ids, category, agenda_tag, is_trending, order = 'created_at.desc' } = req.query;
     const auth = verifyJwtFromRequest(req);
     const params = {
         // Keep selects schema-agnostic: embed with *
         select: '*,user:users(*),party:parties(*)',
         limit: String(limit),
         offset: String(offset),
-        is_deleted: 'eq.false'
+        is_deleted: 'eq.false',
     };
+    // IMPORTANT:
+    // Fast content (is_trending=true) is displayed in the Fast/Stories surfaces, not in regular feeds.
+    // Otherwise cross-publishing Polit→Fast looks like a duplicated post in the normal feed.
+    if (String(is_trending || '') === 'true' || String(is_trending || '') === 'false') {
+      params.is_trending = `eq.${String(is_trending)}`;
+    } else {
+      params.is_trending = 'eq.false';
+    }
     if (order) params.order = order;
     if (party_id) params.party_id = `eq.${party_id}`;
     if (user_id) params.user_id = `eq.${user_id}`;
