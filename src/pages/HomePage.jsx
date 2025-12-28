@@ -629,15 +629,21 @@ export const HomePage = () => {
       <div className="container-main py-6 lg:pr-0">
         {/* Üst Tanıtım Slaytı */}
         <IntroSlider />
-        
-        {/* Parti Bayrakları - Meclis Dağılımı */}
-        <ParliamentBar parliamentData={parliamentParties} totalSeats={totalSeats} />
-        
+
+        <div className="mt-2">
+          {/* Parti Bayrakları - Meclis Dağılımı */}
+          <ParliamentBar parliamentData={parliamentParties} totalSeats={totalSeats} />
+        </div>
+
         {/* Stories/Reels Bar */}
-        <StoriesBar stories={polifest} mode="fast" />
-        
+        <div className="-mt-2">
+          <StoriesBar stories={polifest} mode="fast" />
+        </div>
+
         {/* Gündem Bar */}
-        {agendas.length > 0 && <AgendaBar agendas={agendas} />}
+        <div className="-mt-2">
+          {agendas.length > 0 && <AgendaBar agendas={agendas} />}
+        </div>
         
         {/* MOBİL: Tab Navigation - Sticky (full-width, no right gap) */}
         <div className="md:hidden sticky top-[72px] z-10 bg-gray-50 -mx-4 px-4 pb-3 mb-4 border-b border-gray-200">

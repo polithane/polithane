@@ -38,11 +38,11 @@ export const AnimatedSlogan = () => {
       {/* Logo - Tıklanabilir */}
       {!logoFailed && (
         <img
-          src="/logo.svg"
+          src="/logo.png"
           alt="Polithane"
           width={40}
           height={40}
-          className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+          className="h-10 w-10 object-contain cursor-pointer hover:opacity-80 transition-opacity"
           onClick={() => navigate('/')}
           onError={() => setLogoFailed(true)}
         />
