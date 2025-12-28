@@ -287,7 +287,7 @@ export const PaymentSystem = () => {
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-2">BTC, ETH, USDT</p>
-            <span className="text-xs text-gray-500 font-semibold">Yakında</span>
+            <span className="text-xs text-gray-500 font-semibold">Pasif (entegrasyon yok)</span>
           </div>
         </div>
       </div>
