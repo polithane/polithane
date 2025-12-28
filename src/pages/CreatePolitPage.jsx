@@ -538,7 +538,7 @@ export const CreatePolitPage = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-6">
         <div className="max-w-xl mx-auto">
-          <div className={['bg-white rounded-3xl border-2 shadow-xl overflow-hidden', theme.borderClass].join(' ')}>
+          <div className={['bg-white rounded-3xl border-2 overflow-hidden', theme.borderClass].join(' ')}>
             {/* Fixed top identity + back */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -560,13 +560,6 @@ export const CreatePolitPage = () => {
             </div>
 
             <div className="p-5 space-y-4">
-              {approvalPending ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-                  <div className="text-sm font-black">Üyeliğiniz onay bekliyor</div>
-                  <div className="text-xs mt-1">Onay gelene kadar paylaşım yapamazsınız.</div>
-                </div>
-              ) : null}
-
               {/* STEP: TYPE */}
               {step === 'type' ? (
                 <div className="grid grid-cols-2 gap-3">
