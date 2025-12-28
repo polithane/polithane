@@ -10,6 +10,7 @@ export const ActionBar = () => {
   const [hovered, setHovered] = useState(false);
   const { isAuthenticated } = useAuth();
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
+  const [messageRequestCount, setMessageRequestCount] = useState(0);
 
   // Close hover labels on scroll (desktop nicety)
   useEffect(() => {
@@ -22,6 +23,7 @@ export const ActionBar = () => {
   useEffect(() => {
     if (!isAuthenticated) {
       setMessageUnreadCount(0);
+      setMessageRequestCount(0);
       return;
     }
     let cancelled = false;
@@ -31,9 +33,14 @@ export const ActionBar = () => {
         const r = await apiCall('/api/messages/conversations').catch(() => null);
         const list = Array.isArray(r?.data) ? r.data : Array.isArray(r) ? r : [];
         const total = (list || []).reduce((sum, c) => sum + (Number(c?.unread_count || 0) || 0), 0);
+        const reqCount = (list || []).filter((c) => String(c?.message_type || '') === 'request').length;
         if (!cancelled) setMessageUnreadCount(total);
+        if (!cancelled) setMessageRequestCount(reqCount);
       } catch {
-        if (!cancelled) setMessageUnreadCount(0);
+        if (!cancelled) {
+          setMessageUnreadCount(0);
+          setMessageRequestCount(0);
+        }
       }
     };
     tick();
@@ -113,7 +120,8 @@ export const ActionBar = () => {
       >
         {items.map((it) => {
           const Icon = it.icon;
-          const showBadge = it.key === 'messages' && messageUnreadCount > 0;
+          const showBadge = it.key === 'messages' && (messageUnreadCount > 0 || messageRequestCount > 0);
+          const badgeCount = (messageUnreadCount || 0) + (messageRequestCount || 0);
           return (
             <button
               key={it.key}
@@ -135,7 +143,7 @@ export const ActionBar = () => {
                 <Icon className={['w-7 h-7', it.iconClass].join(' ')} />
                 {showBadge ? (
                   <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
-                    {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </Badge>
                 ) : null}
               </span>
@@ -160,7 +168,8 @@ export const ActionBar = () => {
           <div className="flex items-center justify-between">
             {items.map((it) => {
               const Icon = it.icon;
-              const showBadge = it.key === 'messages' && messageUnreadCount > 0;
+              const showBadge = it.key === 'messages' && (messageUnreadCount > 0 || messageRequestCount > 0);
+              const badgeCount = (messageUnreadCount || 0) + (messageRequestCount || 0);
               return (
                 <button
                   key={it.key}
@@ -180,7 +189,7 @@ export const ActionBar = () => {
                     <Icon className={['w-5 h-5', it.iconClass].join(' ')} />
                     {showBadge ? (
                       <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
-                        {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                        {badgeCount > 99 ? '99+' : badgeCount}
                       </Badge>
                     ) : null}
                   </span>

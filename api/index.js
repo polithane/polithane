@@ -6265,15 +6265,17 @@ async function getConversations(req, res) {
   const conversationPreview = (content) => {
     const s = String(content || '').trim();
     if (!s) return '';
-    if (s.startsWith('{')) {
-      try {
+    // If it's a JSON-encoded attachment, avoid leaking raw payload in previews.
+    // Note: conversations may store a truncated JSON snippet, so check loosely.
+    try {
+      if (s.startsWith('{')) {
         const obj = JSON.parse(s);
-        if (obj && typeof obj === 'object' && obj.type === 'image') return 'Resim gönderildi.';
-      } catch {
-        // If it's a truncated JSON preview, still avoid showing raw payload.
-        if (s.includes('"type":"image"') || s.includes('"type": "image"')) return 'Resim gönderildi.';
+        if (obj && typeof obj === 'object' && obj.type === 'image') return 'Resim Gönderildi.';
       }
+    } catch {
+      // ignore
     }
+    if (/"type"\s*:\s*"image"/i.test(s)) return 'Resim Gönderildi.';
     return s;
   };
 
@@ -6338,8 +6340,11 @@ async function getConversations(req, res) {
   }
   const userMap = new Map((users || []).map((u) => [u.id, u]));
 
-  // Determine if I follow the other user (if yes, treat incoming as regular, not request)
+  // Determine if there's a social link between users:
+  // - If I follow the other user: incoming should not be treated as "request"
+  // - If the other user follows me: also treat as regular (prevents false requests)
   let followingSet = new Set();
+  let followersOfMeSet = new Set();
   try {
     if (participants.length > 0 && participantIn) {
       const fr = await supabaseRestGet('follows', {
@@ -6353,11 +6358,27 @@ async function getConversations(req, res) {
   } catch {
     // ignore
   }
+  try {
+    if (participants.length > 0 && participantIn) {
+      const rr = await supabaseRestGet('follows', {
+        select: 'follower_id',
+        following_id: `eq.${userId}`,
+        follower_id: `in.(${participantIn})`,
+        limit: String(Math.min(2000, participants.length)),
+      }).catch(() => []);
+      followersOfMeSet = new Set((rr || []).map((r) => String(r?.follower_id)).filter(Boolean));
+    }
+  } catch {
+    // ignore
+  }
 
   const out = Array.from(byOther.values())
     .map((c) => {
-      const isFollowingOther = followingSet.has(String(c.participant_id));
-      const message_type = c.has_incoming && !c.has_outgoing && !isFollowingOther ? 'request' : 'regular';
+      const pid = String(c.participant_id);
+      const isFollowingOther = followingSet.has(pid);
+      const isFollowedByOther = followersOfMeSet.has(pid);
+      const hasSocialLink = isFollowingOther || isFollowedByOther;
+      const message_type = c.has_incoming && !c.has_outgoing && !hasSocialLink ? 'request' : 'regular';
       const { has_incoming, has_outgoing, ...rest } = c;
       return { ...rest, message_type, participant: userMap.get(c.participant_id) || null };
     })

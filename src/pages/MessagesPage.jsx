@@ -112,25 +112,22 @@ export const MessagesPage = () => {
   };
 
   const canDeleteMessage = (m) => {
-    if (!m) return false;
-    if (String(m.sender_id) !== String(user?.id || '')) return false;
-    const createdAt = new Date(m.created_at || 0).getTime();
-    if (!Number.isFinite(createdAt) || createdAt <= 0) return false;
-    return Date.now() - createdAt <= 15 * 60 * 1000;
+    // Per product: sent messages shouldn't expose a delete action in the thread UI.
+    return false;
   };
 
   const previewConversationText = (v) => {
     const s = String(v || '').trim();
     if (!s) return '';
-    if (s.startsWith('{')) {
-      try {
+    try {
+      if (s.startsWith('{')) {
         const obj = JSON.parse(s);
-        if (obj && typeof obj === 'object' && obj.type === 'image') return 'Resim gönderildi.';
-      } catch {
-        // If it's a truncated JSON preview, still avoid showing raw payload.
-        if (s.includes('"type":"image"') || s.includes('"type": "image"')) return 'Resim gönderildi.';
+        if (obj && typeof obj === 'object' && obj.type === 'image') return 'Resim Gönderildi.';
       }
+    } catch {
+      // ignore
     }
+    if (/"type"\s*:\s*"image"/i.test(s)) return 'Resim Gönderildi.';
     return s;
   };
   
