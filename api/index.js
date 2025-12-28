@@ -1080,6 +1080,94 @@ async function adminApproveComment(req, res, commentId) {
   return res.json({ success: true, data: updated?.[0] || null });
 }
 
+async function adminGetComments(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const { limit = 100, offset = 0, status = 'all' } = req.query || {};
+  const lim = Math.min(200, Math.max(1, parseInt(String(limit), 10) || 100));
+  const off = Math.max(0, parseInt(String(offset), 10) || 0);
+  const st = String(status || 'all').trim();
+
+  const params = {
+    select: 'id,content,created_at,updated_at,is_deleted,like_count,post_id,user_id,user:users(id,username,full_name,avatar_url),post:posts(id,content,created_at)',
+    order: 'created_at.desc',
+    limit: String(lim),
+    offset: String(off),
+  };
+  if (st === 'approved') params.is_deleted = 'eq.false';
+  if (st === 'pending') params.is_deleted = 'eq.true';
+  const rows = await supabaseRestGet('comments', params).catch(() => []);
+  return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+}
+
+async function adminDeleteComment(req, res, commentId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const cid = String(commentId || '').trim();
+  if (!isSafeId(cid)) return res.status(400).json({ success: false, error: 'Geçersiz yorum.' });
+  const updated = await supabaseRestPatch(
+    'comments',
+    { id: `eq.${cid}` },
+    { is_deleted: true, content: '[Silindi]', updated_at: new Date().toISOString() }
+  ).catch(() => []);
+  return res.json({ success: true, data: updated?.[0] || null });
+}
+
+async function adminStorageList(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const bucket = String(req.query?.bucket || 'uploads').trim() || 'uploads';
+  const prefix = String(req.query?.prefix || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+  const limit = Math.min(200, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
+  const offset = Math.max(0, parseInt(String(req.query?.offset || 0), 10) || 0);
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .list(prefix, { limit, offset, sortBy: { column: 'updated_at', order: 'desc' } });
+    if (error) throw error;
+    const items = Array.isArray(data) ? data : [];
+    const out = items
+      .filter((it) => it && it.name && !it.name.endsWith('/'))
+      .map((it) => {
+        const path = prefix ? `${prefix}/${it.name}` : it.name;
+        const pub = supabase.storage.from(bucket).getPublicUrl(path)?.data?.publicUrl || '';
+        const size = Number(it?.metadata?.size || 0) || 0;
+        const mimetype = String(it?.metadata?.mimetype || '').trim();
+        return {
+          name: it.name,
+          path,
+          bucket,
+          public_url: pub,
+          created_at: it.created_at || null,
+          updated_at: it.updated_at || null,
+          size,
+          mimetype,
+        };
+      });
+    return res.json({ success: true, data: out, meta: { bucket, prefix, limit, offset } });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: String(e?.message || 'Storage listesi alınamadı.') });
+  }
+}
+
+async function adminStorageDelete(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const bucket = String(body?.bucket || 'uploads').trim() || 'uploads';
+  const paths = Array.isArray(body?.paths) ? body.paths.map((p) => String(p || '').trim()).filter(Boolean) : [];
+  if (paths.length === 0) return res.status(400).json({ success: false, error: 'Silinecek dosya seçin.' });
+  if (paths.length > 50) return res.status(400).json({ success: false, error: 'Tek seferde en fazla 50 dosya silinebilir.' });
+  try {
+    const { error } = await supabase.storage.from(bucket).remove(paths);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: String(e?.message || 'Dosya silinemedi.') });
+  }
+}
+
 async function togglePostLike(req, res, postId) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -7264,6 +7352,9 @@ export default async function handler(req, res) {
       if (url === '/api/admin/email/test' && req.method === 'POST') return await adminSendTestEmail(req, res);
       if (url === '/api/admin/notifications' && req.method === 'POST') return await adminSendNotification(req, res);
       if (url === '/api/admin/comments/pending' && req.method === 'GET') return await adminListPendingComments(req, res);
+      if (url === '/api/admin/comments' && req.method === 'GET') return await adminGetComments(req, res);
+      if (url === '/api/admin/storage/list' && req.method === 'GET') return await adminStorageList(req, res);
+      if (url === '/api/admin/storage/delete' && req.method === 'POST') return await adminStorageDelete(req, res);
       if (url.startsWith('/api/admin/notification-rules/') && req.method === 'PUT') {
         const ruleId = url.split('/api/admin/notification-rules/')[1];
         return await adminUpdateNotificationRule(req, res, ruleId);
@@ -7366,6 +7457,10 @@ export default async function handler(req, res) {
         const commentId = parts[0];
         const tail = parts[1];
         if (commentId && tail === 'approve') return await adminApproveComment(req, res, commentId);
+      }
+      if (url.startsWith('/api/admin/comments/') && req.method === 'DELETE') {
+        const commentId = url.split('/api/admin/comments/')[1] || '';
+        return await adminDeleteComment(req, res, commentId);
       }
 
       // Search

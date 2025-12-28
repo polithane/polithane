@@ -1,21 +1,49 @@
-import { useState } from 'react';
-import { Search, Eye, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Search, Eye, Trash2, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { admin as adminApi } from '../../utils/api';
+import { Avatar } from '../../components/common/Avatar';
 
 export const CommentModeration = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedComments, setSelectedComments] = useState([]);
 
-  // NOTE: This screen used to show mock comments. We intentionally show no fake moderation data.
-  // Backend integration (admin comments listing + approve/delete/report workflows) will be wired here later.
-  const comments = [];
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [comments, setComments] = useState([]);
 
-  const filteredComments = comments.filter(comment => {
-    const matchesSearch = comment.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         comment.user.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || comment.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const r = await adminApi.getComments({ status: statusFilter === 'all' ? 'all' : statusFilter, limit: 200 }).catch(() => null);
+      if (!r?.success) throw new Error(r?.error || 'Yorumlar yüklenemedi.');
+      setComments(Array.isArray(r.data) ? r.data : []);
+      setSelectedComments([]);
+    } catch (e) {
+      setError(String(e?.message || 'Yorumlar yüklenemedi.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  const filteredComments = useMemo(() => {
+    const q = String(searchQuery || '').trim().toLocaleLowerCase('tr-TR');
+    const list = Array.isArray(comments) ? comments : [];
+    if (!q) return list;
+    return list.filter((c) => {
+      const content = String(c?.content || '').toLocaleLowerCase('tr-TR');
+      const u = c?.user || {};
+      const name = String(u?.full_name || u?.name || '').toLocaleLowerCase('tr-TR');
+      const username = String(u?.username || '').toLocaleLowerCase('tr-TR');
+      return content.includes(q) || name.includes(q) || username.includes(q);
+    });
+  }, [comments, searchQuery]);
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -37,7 +65,6 @@ export const CommentModeration = () => {
     const badges = {
       approved: { color: 'bg-green-100 text-green-700', icon: CheckCircle, text: 'Onaylandı' },
       pending: { color: 'bg-yellow-100 text-yellow-700', icon: AlertTriangle, text: 'Bekliyor' },
-      reported: { color: 'bg-red-100 text-red-700', icon: XCircle, text: 'Şikayet Edildi' },
     };
     const badge = badges[status];
     const Icon = badge.icon;
@@ -49,13 +76,74 @@ export const CommentModeration = () => {
     );
   };
 
+  const statusOf = (c) => (c?.is_deleted ? 'pending' : 'approved');
+
+  const approveOne = async (id) => {
+    const rid = String(id || '');
+    if (!rid) return;
+    const r = await adminApi.approveComment(rid).catch(() => null);
+    if (!r?.success) {
+      setError(r?.error || 'Onaylanamadı.');
+      return;
+    }
+    await load();
+  };
+
+  const deleteOne = async (id) => {
+    const rid = String(id || '');
+    if (!rid) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Bu yorum silinsin mi?')) return;
+    const r = await adminApi.deleteComment(rid).catch(() => null);
+    if (!r?.success) {
+      setError(r?.error || 'Silinemedi.');
+      return;
+    }
+    await load();
+  };
+
+  const approveSelected = async () => {
+    const ids = selectedComments.map(String).filter(Boolean);
+    if (!ids.length) return;
+    for (const id of ids) {
+      // eslint-disable-next-line no-await-in-loop
+      await adminApi.approveComment(id).catch(() => null);
+    }
+    await load();
+  };
+
+  const deleteSelected = async () => {
+    const ids = selectedComments.map(String).filter(Boolean);
+    if (!ids.length) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(`${ids.length} yorumu silmek istiyor musunuz?`)) return;
+    for (const id of ids) {
+      // eslint-disable-next-line no-await-in-loop
+      await adminApi.deleteComment(id).catch(() => null);
+    }
+    await load();
+  };
+
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Yorum Moderasyonu</h1>
-        <p className="text-gray-600">Kullanıcı yorumlarını yönetin ve moderasyonu yapın</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Yorum Moderasyonu</h1>
+          <p className="text-gray-600">Kullanıcı yorumlarını yönetin (mock yok)</p>
+        </div>
+        <button
+          type="button"
+          onClick={load}
+          className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 font-black inline-flex items-center gap-2"
+        >
+          <RefreshCw className="w-5 h-5" />
+          Yenile
+        </button>
       </div>
+
+      {error ? <div className="mb-4 text-sm text-red-600 font-semibold">{error}</div> : null}
+      {loading ? <div className="mb-4 text-sm text-gray-600">Yükleniyor…</div> : null}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
@@ -65,22 +153,15 @@ export const CommentModeration = () => {
         </div>
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="text-sm text-green-600 mb-1">Onaylanmış</div>
-          <div className="text-2xl font-black text-green-700">—</div>
+          <div className="text-2xl font-black text-green-700">{comments.filter((c) => !c?.is_deleted).length}</div>
         </div>
         <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
           <div className="text-sm text-yellow-600 mb-1">Bekleyen</div>
-          <div className="text-2xl font-black text-yellow-700">—</div>
+          <div className="text-2xl font-black text-yellow-700">{comments.filter((c) => !!c?.is_deleted).length}</div>
         </div>
         <div className="bg-red-50 rounded-xl border border-red-200 p-4">
-          <div className="text-sm text-red-600 mb-1">Şikayet Edilen</div>
-          <div className="text-2xl font-black text-red-700">—</div>
-        </div>
-      </div>
-
-      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-        <div className="font-black">Bu modül henüz canlı backend’e bağlı değil</div>
-        <div className="text-sm mt-1">
-          Güvenlik ve doğruluk için sahte yorum/moderasyon verisi göstermiyoruz. Moderasyon iş akışları backend’e bağlanınca bu ekran aktifleşecek.
+          <div className="text-sm text-red-600 mb-1">Seçili</div>
+          <div className="text-2xl font-black text-red-700">{selectedComments.length}</div>
         </div>
       </div>
 
@@ -106,7 +187,6 @@ export const CommentModeration = () => {
             <option value="all">Tüm Durumlar</option>
             <option value="approved">Onaylanmış</option>
             <option value="pending">Bekleyen</option>
-            <option value="reported">Şikayet Edilen</option>
           </select>
         </div>
 
@@ -115,10 +195,18 @@ export const CommentModeration = () => {
             <span className="text-sm font-semibold text-gray-700">
               {selectedComments.length} yorum seçildi
             </span>
-            <button className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-semibold">
+            <button
+              type="button"
+              onClick={approveSelected}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-semibold"
+            >
               Onayla
             </button>
-            <button className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-semibold">
+            <button
+              type="button"
+              onClick={deleteSelected}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-semibold"
+            >
               Sil
             </button>
           </div>
@@ -161,32 +249,52 @@ export const CommentModeration = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <img src={comment.user.avatar} alt="" className="w-10 h-10 rounded-full" />
+                      <Avatar src={comment?.user?.avatar_url} alt="" size={40} />
                       <div>
-                        <div className="font-semibold text-gray-900">{comment.user.name}</div>
-                        <div className="text-sm text-gray-500">@{comment.user.username}</div>
+                        <div className="font-semibold text-gray-900">{comment?.user?.full_name || '—'}</div>
+                        <div className="text-sm text-gray-500">@{comment?.user?.username || '—'}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 max-w-xs truncate">{comment.post_title}</div>
+                    <div className="text-sm text-gray-900 max-w-xs truncate">{String(comment?.post?.content || '').slice(0, 80) || '—'}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-gray-700 max-w-md line-clamp-2">{comment.content}</div>
                   </td>
-                  <td className="px-6 py-4">{getStatusBadge(comment.status)}</td>
+                  <td className="px-6 py-4">{getStatusBadge(statusOf(comment))}</td>
                   <td className="px-6 py-4">
-                    <span className="text-sm font-semibold text-gray-700">{comment.likes}</span>
+                    <span className="text-sm font-semibold text-gray-700">{Number(comment.like_count || 0)}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm text-gray-500">{comment.created_at}</span>
+                    <span className="text-sm text-gray-500">{String(comment.created_at || '').slice(0, 19) || '—'}</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Görüntüle">
+                      <button
+                        type="button"
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Görüntüle"
+                        onClick={() => window.open(`/post/${comment?.post_id}`, '_blank')}
+                      >
                         <Eye className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" />
                       </button>
-                      <button className="p-2 hover:bg-red-50 rounded-lg transition-colors" title="Sil">
+                      {comment?.is_deleted ? (
+                        <button
+                          type="button"
+                          className="p-2 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Onayla"
+                          onClick={() => approveOne(comment.id)}
+                        >
+                          <CheckCircle className="w-6 h-6 sm:w-5 sm:h-5 text-green-600" />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Sil"
+                        onClick={() => deleteOne(comment.id)}
+                      >
                         <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
                       </button>
                     </div>

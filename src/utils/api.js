@@ -413,6 +413,19 @@ export const admin = {
     apiCall(`/api/admin/email-templates/${templateId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
   deleteEmailTemplate: (templateId) => apiCall(`/api/admin/email-templates/${templateId}`, { method: 'DELETE' }),
 
+  getComments: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/comments${query ? `?${query}` : ''}`);
+  },
+  approveComment: (commentId) => apiCall(`/api/admin/comments/${commentId}/approve`, { method: 'POST' }),
+  deleteComment: (commentId) => apiCall(`/api/admin/comments/${commentId}`, { method: 'DELETE' }),
+
+  storageList: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/storage/list${query ? `?${query}` : ''}`);
+  },
+  storageDelete: (payload) => apiCall('/api/admin/storage/delete', { method: 'POST', body: JSON.stringify(payload || {}) }),
+
   getAnalytics: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return apiCall(`/api/admin/analytics${query ? `?${query}` : ''}`);
