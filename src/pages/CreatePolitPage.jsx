@@ -315,6 +315,29 @@ export const CreatePolitPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // IMPORTANT: During recording, the preview <video> is mounted only after `isRecording` is set.
+  // We must attach the stream in an effect (otherwise preview stays black).
+  useEffect(() => {
+    if (!isRecording) return;
+    if (contentType !== 'video') return;
+    const stream = streamRef.current;
+    const el = previewRef.current;
+    if (!stream || !el) return;
+    try {
+      el.srcObject = stream;
+      el.muted = true;
+      el.playsInline = true;
+      el.setAttribute('playsinline', 'true');
+      el.setAttribute('webkit-playsinline', 'true');
+      el.play?.().catch(() => null);
+      setTimeout(() => {
+        try { el.play?.().catch(() => null); } catch { /* ignore */ }
+      }, 250);
+    } catch {
+      // ignore
+    }
+  }, [isRecording, contentType]);
+
   const pickType = (t) => {
     setContentType(t);
     setAgendaTag('');
@@ -517,11 +540,12 @@ export const CreatePolitPage = () => {
 
     const guessContentType = (f) => {
       const t = String(f?.type || '').trim();
-      if (t) return t;
+      if (t) return t.split(';')[0].trim();
       const name = String(f?.name || '').trim().toLowerCase();
       const ext = name.includes('.') ? name.split('.').pop() : '';
       if (!ext) return '';
       if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+      if (ext === 'jpg') return 'image/jpg';
       if (ext === 'png') return 'image/png';
       if (ext === 'webp') return 'image/webp';
       if (ext === 'gif') return 'image/gif';

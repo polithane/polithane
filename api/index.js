@@ -3484,7 +3484,7 @@ async function storageCreateSignedUpload(req, res) {
   const body = await readJsonBody(req);
   const bucket = String(body?.bucket || 'uploads').trim();
   const folder = String(body?.folder || 'posts').trim();
-  const contentType = String(body?.contentType || '').trim();
+  const contentType = String(body?.contentType || '').trim().split(';')[0].trim();
 
   const allowedBuckets = new Set(['uploads', 'politfest']);
   if (!allowedBuckets.has(bucket)) return res.status(400).json({ success: false, error: 'Geçersiz bucket.' });
@@ -3524,6 +3524,7 @@ async function storageCreateSignedUpload(req, res) {
 
   const allowedTypes = new Set([
     'image/jpeg',
+    'image/jpg',
     'image/png',
     'image/webp',
     'image/gif',
@@ -3573,7 +3574,7 @@ async function storageCreateSignedUpload(req, res) {
         ? 'webp'
         : contentType === 'image/gif'
           ? 'gif'
-        : contentType === 'image/jpeg'
+        : contentType === 'image/jpeg' || contentType === 'image/jpg'
           ? 'jpg'
           : contentType === 'video/quicktime'
             ? 'mov'

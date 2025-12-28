@@ -88,6 +88,12 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange, iconOnly = f
     md: 'w-6 h-6 sm:w-5 sm:h-5',
     lg: 'w-7 h-7 sm:w-6 sm:h-6'
   };
+
+  const iconOnlyPad = {
+    sm: 'p-1.5',
+    md: 'p-2',
+    lg: 'p-2.5',
+  };
   
   // Takipten çık onay popup'ı
   if (showUnfollowConfirm) {
@@ -122,7 +128,7 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange, iconOnly = f
         disabled={!isAuthenticated || loading}
         className={
           iconOnly
-            ? 'inline-flex items-center justify-center p-2 bg-primary-blue hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors'
+            ? `inline-flex items-center justify-center ${iconOnlyPad[size] || 'p-2'} bg-primary-blue hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors`
             : `flex items-center gap-2 ${sizeClasses[size]} bg-primary-blue hover:bg-blue-600 text-white rounded-lg font-semibold transition-all duration-200 transform hover:scale-105`
         }
         title="Takip Et"
@@ -141,7 +147,7 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange, iconOnly = f
         disabled={!isAuthenticated || loading}
         className={
           iconOnly
-            ? 'inline-flex items-center justify-center p-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors'
+            ? `inline-flex items-center justify-center ${iconOnlyPad[size] || 'p-2'} bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors`
             : `flex items-center gap-2 ${sizeClasses[size]} bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors`
         }
         title="Takip Ediliyor"

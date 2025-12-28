@@ -155,7 +155,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 shadow-sm overflow-hidden text-[10px] leading-tight">
+    <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 shadow-sm text-[10px] leading-tight">
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] font-black text-gray-900">TAKİP ÖNERİLERİ</div>
         <Link to="/hit?mode=profiles" className="text-[10px] font-black text-primary-blue hover:underline">
@@ -181,7 +181,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
               onMouseEnter={() => onEnter(id)}
               onMouseLeave={onLeave}
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-start justify-between gap-2">
                 <Link to={`/profile/${id}`} className="flex items-center gap-2 min-w-0">
                   <Avatar src={u?.avatar_url || u?.profile_image} alt={name} size="34px" />
                   <div className="min-w-0">
@@ -189,7 +189,7 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
                     {username ? <div className="text-[9px] text-gray-500 truncate leading-4">{username}</div> : null}
                     {isAuthenticated ? (
                       friendCount > 0 ? (
-                        <div className="text-[9px] text-gray-600 leading-4 mt-0.5">
+                        <div className="text-[9px] text-gray-600 leading-4 mt-0.5 line-clamp-2">
                           <span className="font-black">{friendNames.join(', ')}</span>
                           {friendCount > friendNames.length ? (
                             <span className="font-semibold"> ve {friendCount - friendNames.length} kişi daha</span>
