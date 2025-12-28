@@ -376,6 +376,21 @@ export const messages = {
 export const admin = {
   getStats: () => apiCall('/api/admin/stats'),
 
+  getAnalytics: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/analytics${query ? `?${query}` : ''}`);
+  },
+
+  getNotificationRules: () => apiCall('/api/admin/notification-rules'),
+  createNotificationRule: (data) =>
+    apiCall('/api/admin/notification-rules', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateNotificationRule: (ruleId, data) =>
+    apiCall(`/api/admin/notification-rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteNotificationRule: (ruleId) => apiCall(`/api/admin/notification-rules/${ruleId}`, { method: 'DELETE' }),
+  getNotificationChannels: () => apiCall('/api/admin/notification-channels'),
+  updateNotificationChannels: (data) =>
+    apiCall('/api/admin/notification-channels', { method: 'PUT', body: JSON.stringify(data || {}) }),
+
   seedDemo: (params = {}) =>
     apiCall('/api/admin/seed/demo', {
       method: 'POST',

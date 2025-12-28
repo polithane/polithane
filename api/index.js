@@ -2322,6 +2322,9 @@ async function adminSchemaCheck(req, res) {
   await check('comments', ['id', 'post_id', 'user_id', 'content', 'is_deleted', 'created_at']);
   await check('likes', ['id', 'post_id', 'comment_id', 'user_id', 'created_at']);
   await check('parties', ['id', 'name', 'short_name', 'slug', 'logo_url', 'color', 'is_active']);
+  // Admin panel tables (no-mock requirement)
+  await check('admin_notification_rules', ['id', 'name', 'description', 'trigger', 'enabled', 'channels', 'priority', 'created_at', 'updated_at']);
+  await check('admin_notification_channels', ['id', 'in_app_enabled', 'push_enabled', 'email_enabled', 'sms_enabled', 'updated_at']);
 
   const ok = missingTables.length === 0 && Object.keys(missingColumns).length === 0;
   return res.json({
@@ -3668,6 +3671,228 @@ async function adminGetStats(req, res) {
       topPosts,
     },
   });
+}
+
+function isMissingRelationError(err) {
+  const msg = String(err?.message || '').toLowerCase();
+  return msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found');
+}
+
+// Minimal DB tables for "admin panel is fully real-data (no mock)".
+const SQL_ADMIN_NOTIFICATION_RULES = `
+create table if not exists public.admin_notification_rules (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text not null default '',
+  trigger text not null,
+  enabled boolean not null default true,
+  channels jsonb not null default '["in_app"]'::jsonb,
+  priority text not null default 'normal',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists admin_notification_rules_trigger_idx on public.admin_notification_rules (trigger);
+`;
+
+const SQL_ADMIN_NOTIFICATION_CHANNELS = `
+create table if not exists public.admin_notification_channels (
+  id bigint primary key default 1,
+  in_app_enabled boolean not null default true,
+  push_enabled boolean not null default false,
+  email_enabled boolean not null default true,
+  sms_enabled boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+insert into public.admin_notification_channels (id)
+values (1)
+on conflict (id) do nothing;
+`;
+
+async function adminGetAnalytics(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  const range = String(req.query?.range || '7days').trim();
+  const now = Date.now();
+  const ms =
+    range === 'today' ? 24 * 60 * 60 * 1000 : range === '30days' ? 30 * 24 * 60 * 60 * 1000 : range === '90days' ? 90 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+  const sinceIso = new Date(now - ms).toISOString();
+
+  const [totalUsers, totalPosts, postsInRange, usersInRange] = await Promise.all([
+    supabaseCount('users', { select: 'id' }).catch(() => 0),
+    supabaseCount('posts', { select: 'id', is_deleted: 'eq.false' }).catch(() => 0),
+    supabaseCount('posts', { select: 'id', is_deleted: 'eq.false', created_at: `gte.${sinceIso}` }).catch(() => 0),
+    supabaseCount('users', { select: 'id', created_at: `gte.${sinceIso}` }).catch(() => 0),
+  ]);
+
+  // User type distribution (best-effort, multiple counts)
+  const types = ['normal', 'party_member', 'media', 'politician', 'party_official', 'mp', 'ex_politician', 'citizen'];
+  const counts = await Promise.all(
+    types.map((t) => supabaseCount('users', { select: 'id', user_type: `eq.${t}` }).catch(() => 0))
+  );
+  const userTypeCounts = {};
+  for (let i = 0; i < types.length; i += 1) userTypeCounts[types[i]] = counts[i] || 0;
+
+  // Top agendas by PolitPuan (real)
+  let topAgendas = [];
+  try {
+    const rows = await supabaseRestGet('agendas', {
+      select: 'id,title,slug,total_polit_score,trending_score,post_count,is_active',
+      order: 'total_polit_score.desc',
+      limit: '10',
+    });
+    topAgendas = Array.isArray(rows) ? rows : [];
+  } catch {
+    topAgendas = [];
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      range,
+      since: sinceIso,
+      totals: { totalUsers, totalPosts },
+      window: { usersInRange, postsInRange },
+      userTypeCounts,
+      topAgendas,
+    },
+  });
+}
+
+async function adminGetNotificationRules(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  try {
+    const rows = await supabaseRestGet('admin_notification_rules', {
+      select: '*',
+      order: 'created_at.desc',
+      limit: '200',
+    });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_NOTIFICATION_RULES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Kurallar yüklenemedi.') });
+  }
+}
+
+async function adminCreateNotificationRule(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  const body = await readJsonBody(req);
+  const name = String(body?.name || '').trim();
+  const trigger = String(body?.trigger || '').trim();
+  const description = String(body?.description || '').trim();
+  const enabled = body?.enabled !== false;
+  const priority = String(body?.priority || 'normal').trim() || 'normal';
+  const channels = Array.isArray(body?.channels) ? body.channels.map((c) => String(c || '').trim()).filter(Boolean) : ['in_app'];
+
+  if (!name || name.length < 2) return res.status(400).json({ success: false, error: 'Kural adı gerekli.' });
+  if (!trigger || trigger.length < 2) return res.status(400).json({ success: false, error: 'Tetikleyici gerekli.' });
+
+  const payload = { name, trigger, description, enabled: !!enabled, priority, channels };
+  try {
+    const inserted = await supabaseRestInsert('admin_notification_rules', [payload]);
+    const row = inserted?.[0] || null;
+    return res.json({ success: true, data: row });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_NOTIFICATION_RULES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Kural oluşturulamadı.') });
+  }
+}
+
+async function adminUpdateNotificationRule(req, res, ruleId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(ruleId)) return res.status(400).json({ success: false, error: 'Geçersiz kural.' });
+
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (body?.name !== undefined) patch.name = String(body.name || '').trim();
+  if (body?.trigger !== undefined) patch.trigger = String(body.trigger || '').trim();
+  if (body?.description !== undefined) patch.description = String(body.description || '').trim();
+  if (body?.enabled !== undefined) patch.enabled = !!body.enabled;
+  if (body?.priority !== undefined) patch.priority = String(body.priority || '').trim() || 'normal';
+  if (body?.channels !== undefined) {
+    patch.channels = Array.isArray(body.channels) ? body.channels.map((c) => String(c || '').trim()).filter(Boolean) : ['in_app'];
+  }
+  patch.updated_at = new Date().toISOString();
+
+  try {
+    const updated = await supabaseRestPatch('admin_notification_rules', { id: `eq.${ruleId}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_NOTIFICATION_RULES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Kural güncellenemedi.') });
+  }
+}
+
+async function adminDeleteNotificationRule(req, res, ruleId) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  if (!isSafeId(ruleId)) return res.status(400).json({ success: false, error: 'Geçersiz kural.' });
+
+  try {
+    await supabaseRestDelete('admin_notification_rules', { id: `eq.${ruleId}` });
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_NOTIFICATION_RULES.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Kural silinemedi.') });
+  }
+}
+
+async function adminGetNotificationChannels(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  try {
+    const rows = await supabaseRestGet('admin_notification_channels', { select: '*', id: 'eq.1', limit: '1' });
+    const row = Array.isArray(rows) ? rows?.[0] : null;
+    return res.json({ success: true, data: row || { id: 1, in_app_enabled: true, push_enabled: false, email_enabled: true, sms_enabled: false } });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({
+        success: true,
+        data: { id: 1, in_app_enabled: true, push_enabled: false, email_enabled: true, sms_enabled: false },
+        schemaMissing: true,
+        requiredSql: SQL_ADMIN_NOTIFICATION_CHANNELS.trim(),
+      });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Ayarlar yüklenemedi.') });
+  }
+}
+
+async function adminUpdateNotificationChannels(req, res) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+
+  const body = await readJsonBody(req);
+  const patch = {
+    ...(body?.in_app_enabled !== undefined ? { in_app_enabled: !!body.in_app_enabled } : {}),
+    ...(body?.push_enabled !== undefined ? { push_enabled: !!body.push_enabled } : {}),
+    ...(body?.email_enabled !== undefined ? { email_enabled: !!body.email_enabled } : {}),
+    ...(body?.sms_enabled !== undefined ? { sms_enabled: !!body.sms_enabled } : {}),
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    const updated = await supabaseRestPatch('admin_notification_channels', { id: 'eq.1' }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_NOTIFICATION_CHANNELS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Ayarlar güncellenemedi.') });
+  }
 }
 
 async function adminSeedDemoContent(req, res) {
@@ -6389,6 +6614,11 @@ export default async function handler(req, res) {
       if (url === '/api/admin/schema-check' && req.method === 'GET') return await adminSchemaCheck(req, res);
       if (url === '/api/admin/stats' && req.method === 'GET') return await adminGetStats(req, res);
       if (url === '/api/admin/seed/demo' && req.method === 'POST') return await adminSeedDemoContent(req, res);
+      if (url === '/api/admin/analytics' && req.method === 'GET') return await adminGetAnalytics(req, res);
+      if (url === '/api/admin/notification-rules' && req.method === 'GET') return await adminGetNotificationRules(req, res);
+      if (url === '/api/admin/notification-rules' && req.method === 'POST') return await adminCreateNotificationRule(req, res);
+      if (url === '/api/admin/notification-channels' && req.method === 'GET') return await adminGetNotificationChannels(req, res);
+      if (url === '/api/admin/notification-channels' && req.method === 'PUT') return await adminUpdateNotificationChannels(req, res);
       if (url === '/api/admin/users' && req.method === 'GET') return await adminGetUsers(req, res);
       if (url === '/api/admin/users/duplicates' && req.method === 'GET') return await adminFindDuplicateUsers(req, res);
       if (url === '/api/admin/users/dedupe' && req.method === 'POST') return await adminDedupeUsers(req, res);
@@ -6400,6 +6630,14 @@ export default async function handler(req, res) {
       if (url === '/api/admin/email/test' && req.method === 'POST') return await adminSendTestEmail(req, res);
       if (url === '/api/admin/notifications' && req.method === 'POST') return await adminSendNotification(req, res);
       if (url === '/api/admin/comments/pending' && req.method === 'GET') return await adminListPendingComments(req, res);
+      if (url.startsWith('/api/admin/notification-rules/') && req.method === 'PUT') {
+        const ruleId = url.split('/api/admin/notification-rules/')[1];
+        return await adminUpdateNotificationRule(req, res, ruleId);
+      }
+      if (url.startsWith('/api/admin/notification-rules/') && req.method === 'DELETE') {
+        const ruleId = url.split('/api/admin/notification-rules/')[1];
+        return await adminDeleteNotificationRule(req, res, ruleId);
+      }
       if (url.startsWith('/api/admin/parties/') && req.method === 'GET') {
         const rest = url.split('/api/admin/parties/')[1] || '';
         const parts = rest.split('/').filter(Boolean);
