@@ -16,6 +16,12 @@ export const FastViewerPage = () => {
   const timerRef = useRef(null);
   // UX: closing Fast should return to home.
   const closeToList = useCallback(() => navigate('/'), [navigate]);
+  const goToProfile = useCallback(() => {
+    const uname = String(user?.username || '').trim();
+    const id = String(user?.id || '').trim();
+    if (uname) navigate(`/@${encodeURIComponent(uname)}`);
+    else if (id) navigate(`/profile/${encodeURIComponent(id)}`);
+  }, [navigate, user?.id, user?.username]);
 
   const current = items[idx] || null;
   const progressCount = Math.max(items.length, 1);
@@ -110,13 +116,18 @@ export const FastViewerPage = () => {
 
       {/* header */}
       <div className="absolute top-0 left-0 right-0 px-3 pt-6 flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
+        <button
+          type="button"
+          onClick={goToProfile}
+          className="flex items-center gap-2 min-w-0 text-left"
+          title="Profile git"
+        >
           <Avatar src={user?.avatar_url} size="36px" verified={isUiVerifiedUser(user)} ring="fast" />
           <div className="min-w-0">
             <div className="text-sm font-bold truncate">{user?.full_name || 'Fast'}</div>
             <div className="text-xs text-white/70 truncate">@{user?.username || '-'}</div>
           </div>
-        </div>
+        </button>
         <button onClick={closeToList} className="p-3 rounded-full bg-black/45 hover:bg-black/60">
           <X className="w-14 h-14" />
         </button>
@@ -182,19 +193,19 @@ export const FastViewerPage = () => {
       {/* nav tap areas */}
       <button
         onClick={() => go(-1)}
-        className="absolute left-0 top-0 bottom-0 w-1/3 flex items-center justify-start px-3 text-white/70 hover:text-white"
+        className="absolute left-0 top-24 bottom-0 w-1/3 flex items-center justify-start px-3 text-white/70 hover:text-white"
         aria-label="Önceki"
       >
-        <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/55 backdrop-blur-sm border border-white/20">
+        <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/25 backdrop-blur-sm border border-white/15">
           <ChevronLeft className="w-14 h-14" />
         </span>
       </button>
       <button
         onClick={() => go(1)}
-        className="absolute right-0 top-0 bottom-0 w-1/3 flex items-center justify-end px-3 text-white/70 hover:text-white"
+        className="absolute right-0 top-24 bottom-0 w-1/3 flex items-center justify-end px-3 text-white/70 hover:text-white"
         aria-label="Sonraki"
       >
-        <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/55 backdrop-blur-sm border border-white/20">
+        <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/25 backdrop-blur-sm border border-white/15">
           <ChevronRight className="w-14 h-14" />
         </span>
       </button>
