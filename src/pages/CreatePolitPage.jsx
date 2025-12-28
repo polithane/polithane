@@ -98,6 +98,7 @@ export const CreatePolitPage = () => {
   const [contentType, setContentType] = useState(''); // video | image | audio | text
   const [agendaTag, setAgendaTag] = useState(''); // '' => gündem dışı
   const [agendas, setAgendas] = useState([]);
+  const [agendaVisibleCount, setAgendaVisibleCount] = useState(10);
 
   const [files, setFiles] = useState([]);
   const [recordedUrl, setRecordedUrl] = useState('');
@@ -245,6 +246,7 @@ export const CreatePolitPage = () => {
     setAgendaTag('');
     setText('');
     setPrimaryPost(null);
+    setAgendaVisibleCount(10);
     resetMedia();
     setStep('agenda');
   };
@@ -261,6 +263,32 @@ export const CreatePolitPage = () => {
     if (contentType === 'text') setStep('desc');
     else setStep('media');
   };
+
+  const getVideoDurationSec = (file) =>
+    new Promise((resolve, reject) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => {
+          try {
+            const d = Number(v.duration);
+            URL.revokeObjectURL(url);
+            resolve(Number.isFinite(d) ? d : 0);
+          } catch (e) {
+            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+            reject(e);
+          }
+        };
+        v.onerror = () => {
+          try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+          reject(new Error('Video okunamadı.'));
+        };
+        v.src = url;
+      } catch (e) {
+        reject(e);
+      }
+    });
 
   const startRecording = async () => {
     if (isRecording) return;
@@ -359,6 +387,20 @@ export const CreatePolitPage = () => {
     // IMPORTANT:
     // - Base64 uploads hit Vercel request-body limits quickly (esp. video).
     // - Use signed upload so the file goes directly to Supabase Storage.
+    // Soft client limits (we still rely on provider limits on upload).
+    // Keep generous enough to avoid the old 12MB issue.
+    const bytes = Number(file?.size || 0) || 0;
+    const maxBytes =
+      contentType === 'video'
+        ? 80 * 1024 * 1024
+        : contentType === 'audio'
+          ? 40 * 1024 * 1024
+          : 15 * 1024 * 1024;
+    if (bytes > maxBytes) {
+      const mb = Math.round(maxBytes / 1024 / 1024);
+      throw new Error(`Dosya çok büyük. Şimdilik maksimum ${mb}MB yükleyebilirsiniz.`);
+    }
+
     const ct = String(file?.type || '').trim();
     if (!ct) throw new Error('Dosya türü bulunamadı.');
 
@@ -572,7 +614,7 @@ export const CreatePolitPage = () => {
                 <div className="space-y-3">
                   <div className="text-sm font-black text-gray-900">Gündem Seçin</div>
                   <div className="space-y-2 max-h-[360px] overflow-auto pr-1">
-                    {sortedAgendas.map((a) => {
+                    {sortedAgendas.slice(0, agendaVisibleCount).map((a) => {
                       const title = String(a?.title || a?.name || '').trim();
                       if (!title) return null;
                       const score = agendaScoreOf(a);
@@ -588,6 +630,15 @@ export const CreatePolitPage = () => {
                         </button>
                       );
                     })}
+                    {sortedAgendas.length > agendaVisibleCount ? (
+                      <button
+                        type="button"
+                        onClick={() => setAgendaVisibleCount((v) => Math.min(sortedAgendas.length, v + 10))}
+                        className="w-full py-4 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                      >
+                        + DİĞER GÜNDEMLERİ YÜKLE
+                      </button>
+                    ) : null}
                     {sortedAgendas.length === 0 ? (
                       <div className="text-sm text-gray-600">Gündem listesi boş.</div>
                     ) : null}
@@ -612,7 +663,7 @@ export const CreatePolitPage = () => {
                       {isRecording ? (
                         <video ref={previewRef} className="w-full aspect-video object-cover" playsInline muted />
                       ) : recordedUrl ? (
-                        <video src={recordedUrl} controls className="w-full" playsInline />
+                        <video src={recordedUrl} controls className="w-full aspect-video object-contain bg-black" playsInline />
                       ) : (
                         <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
                       )}
@@ -650,7 +701,7 @@ export const CreatePolitPage = () => {
                           {isRecording ? <StopCircle className="w-14 h-14" /> : <Video className="w-14 h-14" />}
                           <div>{isRecording ? 'Durdur' : 'Kayda Başla'}</div>
                           <div className="text-[11px] font-semibold opacity-90">
-                            Maksimum <span className="font-black">1 dk.</span>
+                            Maximum <span className="font-black">1 Dk.</span> uzunluğunda olabilir
                           </div>
                         </button>
                         <button
@@ -711,9 +762,19 @@ export const CreatePolitPage = () => {
                     type="file"
                     accept="video/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const f = e.target.files?.[0];
                       if (!f) return;
+                      try {
+                        const duration = await getVideoDurationSec(f).catch(() => 0);
+                        if (duration && duration > 60.5) {
+                          toast.error('Video maksimum 1 dakika olmalı.');
+                          e.target.value = '';
+                          return;
+                        }
+                      } catch {
+                        // ignore duration check
+                      }
                       resetMedia();
                       setFiles([f]);
                       try {
