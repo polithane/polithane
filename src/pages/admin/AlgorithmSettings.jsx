@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Save, RotateCcw, TestTube, Download } from 'lucide-react';
+import { apiCall } from '../../utils/api';
 
 export const AlgorithmSettings = () => {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
   const [algorithm, setAlgorithm] = useState({
     userTypeMultipliers: {
       normal: 1,
@@ -96,10 +100,59 @@ export const AlgorithmSettings = () => {
 
   useEffect(() => {
     calculateScore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testData, algorithm]);
 
-  const handleSave = () => {
-    alert('Algoritma kaydedildi!');
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await apiCall('/api/settings', { method: 'GET' }).catch(() => null);
+        const raw = r?.success ? r?.data?.algorithm_config : null;
+        const parsed = typeof raw === 'string' && raw.trim() ? JSON.parse(raw) : (raw && typeof raw === 'object' ? raw : null);
+        if (!cancelled && parsed && typeof parsed === 'object') {
+          // Merge onto defaults to keep any new keys.
+          setAlgorithm((prev) => ({
+            ...prev,
+            ...parsed,
+            userTypeMultipliers: { ...prev.userTypeMultipliers, ...(parsed.userTypeMultipliers || {}) },
+            actionWeights: { ...prev.actionWeights, ...(parsed.actionWeights || {}) },
+            timeFactors: { ...prev.timeFactors, ...(parsed.timeFactors || {}) },
+            agendaFactors: { ...prev.agendaFactors, ...(parsed.agendaFactors || {}) },
+          }));
+        }
+      } catch {
+        // ignore (best-effort)
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveMessage('');
+    try {
+      const payload = {
+        algorithm_config: JSON.stringify(algorithm),
+        algorithm_updated_at: new Date().toISOString(),
+      };
+      const r = await apiCall('/api/settings', { method: 'PUT', body: JSON.stringify(payload) }).catch(() => null);
+      if (r?.success) {
+        setSaveMessage('✅ Algoritma kaydedildi!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        setSaveMessage(`❌ ${r?.error || 'Kaydetme başarısız'}`);
+      }
+    } catch (e) {
+      setSaveMessage(`❌ ${String(e?.message || 'Kaydetme başarısız')}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleExport = () => {
@@ -123,13 +176,22 @@ export const AlgorithmSettings = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              {saveMessage ? (
+                <span className={`text-sm font-medium ${saveMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+                  {saveMessage}
+                </span>
+              ) : null}
               <button onClick={handleExport} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
                 <Download className="w-6 h-6 sm:w-5 sm:h-5" />
                 Dışa Aktar
               </button>
-              <button onClick={handleSave} className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 flex items-center gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saving || loading}
+                className="px-6 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 disabled:opacity-60"
+              >
                 <Save className="w-6 h-6 sm:w-5 sm:h-5" />
-                Kaydet
+                {saving ? 'Kaydediliyor…' : loading ? 'Yükleniyor…' : 'Kaydet'}
               </button>
             </div>
           </div>

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, Eye, Trash2 } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
 import { formatPolitScore, formatTimeAgo } from '../../utils/formatters';
+import { Avatar } from '../../components/common/Avatar';
 
 export const PostModeration = () => {
   const [posts, setPosts] = useState([]);
@@ -9,7 +10,6 @@ export const PostModeration = () => {
   const [filters, setFilters] = useState({
     status: 'all',
     content_type: 'all',
-    flagged: 'all',
   });
   const [selectedPosts, setSelectedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,12 @@ export const PostModeration = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const r = await adminApi.getPosts({ page: pagination.page, limit: 50, search: searchQuery || undefined });
+        const params = { page: pagination.page, limit: 50, include_deleted: 'true' };
+        const q = String(searchQuery || '').trim();
+        if (q) params.search = q;
+        if (filters.status === 'published') params.is_deleted = 'false';
+        if (filters.status === 'deleted') params.is_deleted = 'true';
+        const r = await adminApi.getPosts(params);
         if (r?.success) {
           setPosts(r.data || []);
           setPagination(r.pagination || pagination);
@@ -31,21 +36,21 @@ export const PostModeration = () => {
         setLoading(false);
       }
     };
-    load();
+    const t = setTimeout(load, 250);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page]);
+  }, [pagination.page, searchQuery, filters.status]);
 
-  const filteredPosts = posts.filter(post => {
-    if (filters.content_type !== 'all' && post.content_type !== filters.content_type) {
-      return false;
-    }
-    return true;
-  });
+  const filteredPosts = useMemo(() => {
+    const list = Array.isArray(posts) ? posts : [];
+    if (filters.content_type === 'all') return list;
+    return list.filter((p) => String(p?.content_type || '') === String(filters.content_type));
+  }, [posts, filters.content_type]);
 
   const handleDeletePost = (postId) => {
     if (confirm('Bu paylaşımı silmek istediğinize emin misiniz?')) {
       adminApi.deletePost(postId)
-        .then(() => setPosts((prev) => prev.filter((p) => (p.id || p.post_id) !== postId)))
+        .then(() => setPosts((prev) => prev.filter((p) => String(p.id || p.post_id) !== String(postId))))
         .catch((e) => alert('İşlem başarısız: ' + (e?.message || '')));
     }
   };
@@ -90,8 +95,7 @@ export const PostModeration = () => {
           >
             <option value="all">Tüm Durumlar</option>
             <option value="published">Yayında</option>
-            <option value="pending">Beklemede</option>
-            <option value="flagged">Şikayetli</option>
+            <option value="deleted">Silinmiş</option>
           </select>
         </div>
       </div>
@@ -125,7 +129,7 @@ export const PostModeration = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <img src={post.user?.avatar_url || post.user?.profile_image} alt="" className="w-8 h-8 rounded-full" />
+                      <Avatar src={post.user?.avatar_url || post.user?.profile_image} alt="" size={32} />
                       <span className="text-sm font-semibold text-gray-900">{post.user?.full_name}</span>
                     </div>
                   </td>
@@ -149,7 +153,12 @@ export const PostModeration = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <button className="p-2 text-blue-600 hover:bg-blue-50 rounded" title="Görüntüle">
+                      <button
+                        type="button"
+                        onClick={() => window.open(`/post/${post.id || post.post_id}`, '_blank')}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        title="Görüntüle"
+                      >
                         <Eye className="w-6 h-6 sm:w-5 sm:h-5" />
                       </button>
                       <button onClick={() => handleDeletePost(post.id || post.post_id)} className="p-2 text-red-600 hover:bg-red-50 rounded" title="Sil">

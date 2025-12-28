@@ -4,7 +4,8 @@ import { admin as adminApi } from '../../utils/api';
 import { Avatar } from '../../components/common/Avatar';
 
 // API URL for file links
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// In production on Vercel, call same-origin /api/* (no localhost).
+const API_URL = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
 
 export const UserManagement = () => {
   const [users, setUsers] = useState([]);

@@ -5069,18 +5069,26 @@ async function adminDeleteUser(req, res, userId) {
 async function adminGetPosts(req, res) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
-  const { page = 1, limit = 20, search } = req.query;
+  const { page = 1, limit = 20, search, include_deleted, is_deleted } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const offset = (pageNum - 1) * limitNum;
 
+  const includeDeleted = String(include_deleted || '').trim() === 'true';
+  const isDeletedFilter = String(is_deleted || '').trim();
+
   const baseParams = {
     select: '*,user:users(*),party:parties(*)',
-    is_deleted: 'eq.false',
     order: 'created_at.desc',
     limit: String(limitNum),
     offset: String(offset),
   };
+  if (!includeDeleted) {
+    baseParams.is_deleted = 'eq.false';
+  }
+  if (isDeletedFilter === 'true' || isDeletedFilter === 'false') {
+    baseParams.is_deleted = `eq.${isDeletedFilter}`;
+  }
 
   const q = search ? String(search).trim() : '';
   const makeParams = (or) => (or ? { ...baseParams, or } : { ...baseParams });
@@ -5108,7 +5116,14 @@ async function adminGetPosts(req, res) {
     }
   }
 
-  const total = await supabaseCount('posts', { select: 'id', is_deleted: 'eq.false' }).catch(() => 0);
+  const countParams = { select: 'id' };
+  if (!includeDeleted) countParams.is_deleted = 'eq.false';
+  if (isDeletedFilter === 'true' || isDeletedFilter === 'false') countParams.is_deleted = `eq.${isDeletedFilter}`;
+  if (q) {
+    // best-effort: count with same search filter, but ignore column fallback complexity
+    countParams.or = `(content.ilike.*${q}*,content_text.ilike.*${q}*)`;
+  }
+  const total = await supabaseCount('posts', countParams).catch(() => 0);
   res.json({
     success: true,
     data: Array.isArray(rows) ? rows : [],
