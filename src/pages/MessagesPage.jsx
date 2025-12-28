@@ -10,7 +10,8 @@ import { messages as messagesApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { apiCall } from '../utils/api';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getProfilePath } from '../utils/paths';
 import { supabase } from '../services/supabase';
 
 export const MessagesPage = () => {
@@ -29,7 +30,6 @@ export const MessagesPage = () => {
   const [reportReason, setReportReason] = useState('spam');
   const [reportDetails, setReportDetails] = useState('');
   const [reportDone, setReportDone] = useState(false);
-  const messagesEndRef = useRef(null);
   const messagesAreaRef = useRef(null);
   const fileRef = useRef(null);
   const messageInputRef = useRef(null);
@@ -786,19 +786,25 @@ export const MessagesPage = () => {
                     >
                       <ArrowLeft className="w-7 h-7 text-gray-700" />
                     </button>
-                    <Avatar 
-                      src={selectedConv.participant?.avatar_url || selectedConv.participant?.profile_image} 
-                      size="40px"
-                      verified={isUiVerifiedUser(selectedConv.participant)}
-                    />
-                    <div>
-                      <h3 className="font-semibold">
-                        {selectedConv.participant?.full_name}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        {selectedConv.participant?.username ? `@${selectedConv.participant.username}` : ''}
-                      </p>
-                    </div>
+                    <Link
+                      to={getProfilePath(selectedConv.participant || {})}
+                      className="inline-flex items-center gap-3 min-w-0 hover:opacity-90"
+                      title="Profile git"
+                    >
+                      <Avatar 
+                        src={selectedConv.participant?.avatar_url || selectedConv.participant?.profile_image} 
+                        size="40px"
+                        verified={isUiVerifiedUser(selectedConv.participant)}
+                      />
+                      <div className="min-w-0">
+                        <h3 className="font-semibold truncate">
+                          {selectedConv.participant?.full_name}
+                        </h3>
+                        <p className="text-xs text-gray-500 truncate">
+                          {selectedConv.participant?.username ? `@${selectedConv.participant.username}` : ''}
+                        </p>
+                      </div>
+                    </Link>
                     {selectedConv.message_type === 'request' && (
                       <div className="ml-auto text-xs font-black text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
                         Mesaj isteği (cevap verirseniz sohbet açılır)
@@ -919,13 +925,13 @@ export const MessagesPage = () => {
                           return null;
                         }
                       })}
-                      <div ref={messagesEndRef} />
+                      <div />
                     </div>
                   )}
                 </div>
                 
                 {/* Message Input (fixed inside panel; never scrolls with page) */}
-                <div className="p-4 border-t bg-white">
+                <div className="p-4 border-t bg-white pb-[calc(env(safe-area-inset-bottom)+16px)]">
                   <input
                     ref={fileRef}
                     type="file"
