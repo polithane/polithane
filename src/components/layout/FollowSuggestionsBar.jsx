@@ -47,10 +47,10 @@ export const FollowSuggestionsBar = ({ limit = 8 }) => {
         <button
           type="button"
           onClick={expand}
-          className="hidden lg:flex fixed right-2 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-gray-900/90 hover:bg-gray-900 text-white shadow-xl items-center justify-center"
+          className="hidden lg:flex fixed right-2 top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-gray-900/90 hover:bg-gray-900 text-white shadow-xl items-center justify-center"
           title="Takip önerilerini aç"
         >
-          <Compass className="w-6 h-6" />
+          <Compass className="w-7 h-7" />
         </button>
       ) : null}
     </>
