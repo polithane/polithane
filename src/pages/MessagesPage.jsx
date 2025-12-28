@@ -382,6 +382,7 @@ export const MessagesPage = () => {
     if (!newMessage.trim() || !selectedConv) return;
     
     try {
+      setError(null);
       const receiverId = getReceiverId(selectedConv);
       if (!receiverId) {
         setError('Geçersiz alıcı.');
@@ -410,7 +411,7 @@ export const MessagesPage = () => {
       setTimeout(scrollToBottom, 100);
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Mesaj gönderilemedi');
+      setError(err?.message || 'Mesaj gönderilemedi');
     }
   };
 
@@ -534,7 +535,7 @@ export const MessagesPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
       <div className="container-main py-8">
-        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[600px]">
+        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-220px)] md:h-[calc(100vh-190px)] lg:h-[calc(100vh-160px)] min-h-[520px]">
           {/* Konuşma Listesi */}
           <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col ${selectedConv ? 'hidden md:flex' : ''}`}>
             <div className="p-4 border-b">

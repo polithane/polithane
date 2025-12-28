@@ -5005,11 +5005,22 @@ async function getConversations(req, res) {
 
   // attach user profiles
   const participants = Array.from(byOther.keys());
+  // PostgREST in.(...) filter: quote UUID-like ids (hyphens break parsing without quotes)
+  const buildInList = (ids) => {
+    const isUuidLike = (v) => /^[0-9a-fA-F-]{36}$/.test(String(v));
+    return (ids || [])
+      .map((v) => String(v || '').trim())
+      .filter(Boolean)
+      .slice(0, 500)
+      .map((v) => (isUuidLike(v) ? `"${v}"` : v))
+      .join(',');
+  };
+  const participantIn = buildInList(participants);
   let users = [];
-  if (participants.length > 0) {
+  if (participants.length > 0 && participantIn) {
     users = await supabaseRestGet('users', {
       select: '*,party:parties(*)',
-      id: `in.(${participants.join(',')})`,
+      id: `in.(${participantIn})`,
       limit: String(Math.min(participants.length, 500)),
     }).catch(() => []);
   }
@@ -5018,11 +5029,11 @@ async function getConversations(req, res) {
   // Determine if I follow the other user (if yes, treat incoming as regular, not request)
   let followingSet = new Set();
   try {
-    if (participants.length > 0) {
+    if (participants.length > 0 && participantIn) {
       const fr = await supabaseRestGet('follows', {
         select: 'following_id',
         follower_id: `eq.${userId}`,
-        following_id: `in.(${participants.join(',')})`,
+        following_id: `in.(${participantIn})`,
         limit: String(Math.min(2000, participants.length)),
       }).catch(() => []);
       followingSet = new Set((fr || []).map((r) => String(r?.following_id)).filter(Boolean));
