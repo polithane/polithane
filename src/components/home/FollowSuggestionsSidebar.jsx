@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { FollowButton } from '../common/FollowButton';
 import { apiCall } from '../../utils/api';
 import api from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 
-export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
+export const FollowSuggestionsSidebar = ({ limit = 8, onCollapse }) => {
   const { user, isAuthenticated } = useAuth();
   const [users, setUsers] = useState([]);
   const [myFollowing, setMyFollowing] = useState([]);
@@ -158,9 +159,21 @@ export const FollowSuggestionsSidebar = ({ limit = 8 }) => {
     <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 shadow-sm text-[10px] leading-tight">
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] font-black text-gray-900">TAKİP ÖNERİLERİ</div>
-        <Link to="/hit?mode=profiles" className="text-[10px] font-black text-primary-blue hover:underline">
-          Keşfet
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/hit?mode=profiles" className="text-[10px] font-black text-primary-blue hover:underline">
+            Keşfet
+          </Link>
+          {typeof onCollapse === 'function' ? (
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white hover:bg-gray-100 text-gray-900 border border-gray-300"
+              title="Kapat"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {loading ? <div className="text-[10px] text-gray-600">Yükleniyor…</div> : null}
