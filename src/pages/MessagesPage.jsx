@@ -56,6 +56,25 @@ export const MessagesPage = () => {
     const s = String(pid ?? '').trim();
     return s || '';
   };
+
+  const selectConversationById = (participantId, { focus = false } = {}) => {
+    const pid = String(participantId || '').trim();
+    if (!pid) return;
+    const current = (conversations || []).find((c) => String(getReceiverId(c)) === pid) || null;
+    // Fall back to a minimal stub if it's not in the list yet (e.g. deep-link)
+    const conv =
+      current ||
+      ({
+        conversation_id: `${user?.id || 'me'}-${pid}`,
+        participant_id: pid,
+        last_message: '',
+        last_message_time: null,
+        unread_count: 0,
+        message_type: 'regular',
+        participant: null,
+      });
+    selectConversation(conv, { focus });
+  };
   
   const selectConversation = (conv, { focus = false } = {}) => {
     try {
@@ -144,9 +163,15 @@ export const MessagesPage = () => {
         setLoading(true);
         setError(null);
         try {
-          const r = await messagesApi.getMessages(selectedConv.participant_id);
+          const receiverId = getReceiverId(selectedConv);
+          if (!receiverId) {
+            setMessages([]);
+            return;
+          }
+          const r = await messagesApi.getMessages(receiverId);
           if (r?.success) setMessages(r.data || []);
-          setTimeout(scrollToBottom, 100);
+          shouldAutoScrollRef.current = true;
+          setTimeout(() => scrollToBottom('auto'), 50);
         } catch (err) {
           console.error('Error loading messages:', err);
           setError('Mesajlar yüklenirken bir hata oluştu');
@@ -173,7 +198,8 @@ export const MessagesPage = () => {
   useEffect(() => {
     if (!selectedConv?.participant_id) return;
     if (msgPollRef.current) clearInterval(msgPollRef.current);
-    const otherId = String(selectedConv.participant_id);
+    const otherId = String(getReceiverId(selectedConv));
+    if (!otherId) return undefined;
     const tick = async () => {
       try {
         if (document?.hidden) return;
@@ -255,6 +281,8 @@ export const MessagesPage = () => {
     if (!to) return;
     const targetId = String(to || '').trim();
     if (!targetId) return;
+    const shouldOpen = qs.get('focus') === '1' || qs.get('open') === '1';
+    if (!shouldOpen) return;
     // Optional: focus input when coming from profile/message shortcut
     focusOnSelectRef.current = qs.get('focus') === '1';
 
@@ -263,7 +291,7 @@ export const MessagesPage = () => {
 
     const existing = (conversations || []).find((c) => String(c?.participant_id) === targetId);
     if (existing) {
-      selectConversation(existing, { focus: focusOnSelectRef.current });
+      selectConversationById(targetId, { focus: focusOnSelectRef.current });
       // Consume the deep-link so revisiting /messages doesn't auto-open the last chat.
       navigate('/messages', { replace: true });
       return;
@@ -396,7 +424,7 @@ export const MessagesPage = () => {
     setComposeQuery('');
     setComposeResults([]);
     // Use URL param so refresh works and we keep it simple.
-    navigate(`/messages?to=${encodeURIComponent(id)}`);
+    navigate(`/messages?to=${encodeURIComponent(id)}&open=1&focus=1`);
   };
   
   // Send message
@@ -431,7 +459,7 @@ export const MessagesPage = () => {
       
       // Scroll to bottom after sending
       shouldAutoScrollRef.current = true;
-      setTimeout(scrollToBottom, 100);
+      setTimeout(() => scrollToBottom('auto'), 30);
     } catch (err) {
       console.error('Error sending message:', err);
       setError(err?.message || 'Mesaj gönderilemedi');
@@ -640,7 +668,7 @@ export const MessagesPage = () => {
                   return (
                     <div
                       key={conv.conversation_id}
-                      onClick={() => selectConversation(conv)}
+                      onClick={() => selectConversationById(getReceiverId(conv))}
                       className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
                         selectedConv?.conversation_id === conv.conversation_id ? 'bg-blue-50' : ''
                       } ${conv.unread_count > 0 ? 'bg-blue-50/30' : ''}`}
@@ -690,7 +718,7 @@ export const MessagesPage = () => {
                         </div>
 
                         {/* List actions: delete + report */}
-                        <div className="flex flex-col gap-2 flex-shrink-0">
+                        <div className="hidden md:flex flex-col gap-2 flex-shrink-0">
                           <button
                             type="button"
                             className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
@@ -701,7 +729,7 @@ export const MessagesPage = () => {
                               deleteConversation(conv);
                             }}
                           >
-                            <Trash2 className="w-6 h-6" />
+                            <Trash2 className="w-5 h-5" />
                           </button>
                           <button
                             type="button"
@@ -717,7 +745,7 @@ export const MessagesPage = () => {
                               setReportDone(false);
                             }}
                           >
-                            <Flag className="w-6 h-6" />
+                            <Flag className="w-5 h-5" />
                           </button>
                         </div>
                       </div>
@@ -779,10 +807,10 @@ export const MessagesPage = () => {
                   </div>
                 </div>
                 
-                {/* Messages Area */}
+                {/* Messages Area (only this part scrolls) */}
                 <div
                   ref={messagesAreaRef}
-                  className="flex-1 min-h-0 overflow-y-auto p-4 bg-gray-50"
+                  className="flex-1 min-h-0 overflow-y-auto p-4 bg-gray-50 overscroll-contain"
                   onScroll={() => {
                     shouldAutoScrollRef.current = isNearBottom();
                   }}
@@ -896,8 +924,8 @@ export const MessagesPage = () => {
                   )}
                 </div>
                 
-                {/* Message Input (sticky so it never hides under footer/bottom bar) */}
-                <div className="p-4 border-t bg-white sticky bottom-0">
+                {/* Message Input (fixed inside panel; never scrolls with page) */}
+                <div className="p-4 border-t bg-white">
                   <input
                     ref={fileRef}
                     type="file"
