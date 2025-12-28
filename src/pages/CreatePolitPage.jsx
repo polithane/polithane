@@ -118,6 +118,7 @@ export const CreatePolitPage = () => {
   const chunksRef = useRef([]);
   const previewRef = useRef(null);
   const recordTimeoutRef = useRef(null);
+  const [videoFacingMode, setVideoFacingMode] = useState('user'); // user | environment
 
   const imageUploadRef = useRef(null);
   const imageCaptureRef = useRef(null);
@@ -385,7 +386,7 @@ export const CreatePolitPage = () => {
         contentType === 'video'
           ? {
               video: {
-                facingMode: 'user',
+                facingMode: { ideal: videoFacingMode },
                 // Try to keep mobile capture vertical and predictable.
                 // Not all browsers honor these, but it reduces "sideways" recordings on many devices.
                 width: { ideal: 720 },
@@ -851,6 +852,14 @@ export const CreatePolitPage = () => {
                         >
                           <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
                           <div>Video Yükle</div>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isRecording}
+                          onClick={() => setVideoFacingMode((p) => (p === 'user' ? 'environment' : 'user'))}
+                          className="col-span-2 px-4 py-3 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black disabled:opacity-60"
+                        >
+                          Kamera Değiştir ({videoFacingMode === 'user' ? 'Ön Kamera' : 'Arka Kamera'})
                         </button>
                       </>
                     ) : contentType === 'image' ? (

@@ -26,6 +26,7 @@ export const HomePage = () => {
   const [polifest, setPolifest] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
   const [homePostsPerRow, setHomePostsPerRow] = useState(2);
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(5);
   const [loading, setLoading] = useState(true);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
@@ -34,6 +35,8 @@ export const HomePage = () => {
   const postsObserverRef = useRef(null);
   const hasUserScrolledRef = useRef(false);
   const [hasUserScrolled, setHasUserScrolled] = useState(false);
+  const mobileSentinelRef = useRef(null);
+  const mobileObserverRef = useRef(null);
 
   // Keep initial payload small for mobile performance.
   // Social-style batching: small pages, no background loading until user scrolls.
@@ -47,6 +50,28 @@ export const HomePage = () => {
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Mobile: render posts in small batches (5 by 5)
+  useEffect(() => {
+    setMobileVisibleCount(5);
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (!mobileSentinelRef.current) return;
+    if (mobileObserverRef.current) mobileObserverRef.current.disconnect();
+    mobileObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        if (!e?.isIntersecting) return;
+        setMobileVisibleCount((prev) => Math.min(prev + 5, 500));
+      },
+      { root: null, rootMargin: '180px', threshold: 0.01 }
+    );
+    mobileObserverRef.current.observe(mobileSentinelRef.current);
+    return () => {
+      mobileObserverRef.current?.disconnect();
+    };
   }, []);
 
   const computeHitPosts = (input = [], limit = 30) => {
@@ -630,7 +655,7 @@ export const HomePage = () => {
                       homePostsPerRow >= 3 ? 'grid-cols-3' : homePostsPerRow === 2 ? 'grid-cols-2' : 'grid-cols-1',
                     ].join(' ')}
                   >
-                    {activeTab.posts.slice(0, 20).map(post => (
+                    {activeTab.posts.slice(0, mobileVisibleCount).map(post => (
                       <PostCardHorizontal 
                         key={post.post_id ?? post.id} 
                         post={post}
@@ -640,6 +665,7 @@ export const HomePage = () => {
                       />
                     ))}
                   </div>
+                  <div ref={mobileSentinelRef} className="h-8" />
                 </section>
               )}
             </div>
