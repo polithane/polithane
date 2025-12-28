@@ -135,15 +135,15 @@ export const LoginPageNew = () => {
 
             {/* Remember & Forgot */}
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex items-center gap-3 cursor-pointer select-none py-2 pr-2 -my-2">
                 <input
                   type="checkbox"
                   name="remember"
                   checked={formData.remember}
                   onChange={handleChange}
-                  className="w-4 h-4 text-primary-blue border-gray-300 rounded focus:ring-primary-blue"
+                  className="w-6 h-6 text-primary-blue border-gray-300 rounded focus:ring-primary-blue"
                 />
-                <span className="text-sm text-gray-700">Beni hatırla</span>
+                <span className="text-sm font-semibold text-gray-800">Beni hatırla</span>
               </label>
               
               <Link
