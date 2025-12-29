@@ -4373,11 +4373,6 @@ async function adminGetStats(req, res) {
   });
 }
 
-function isMissingRelationError(err) {
-  const msg = String(err?.message || '').toLowerCase();
-  return msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found');
-}
-
 // Minimal DB tables for "admin panel is fully real-data (no mock)".
 const SQL_ADMIN_NOTIFICATION_RULES = `
 create table if not exists public.admin_notification_rules (
@@ -7975,15 +7970,29 @@ function siteSettingsRequiredSql() {
 }
 
 function isMissingRelationError(e, relationName) {
-  const msg = String(e?.message || e || '');
+  const msgRaw = String(e?.message || e || '');
+  const msg = msgRaw.toLowerCase();
   const rel = String(relationName || '').trim();
-  if (!rel) return false;
-  // PostgREST / Postgres error shapes
+
+  // Generic (schema-agnostic) check used by most admin endpoints.
+  if (!rel) {
+    return (
+      msg.includes('does not exist') ||
+      msg.includes('relation') && msg.includes('does not exist') ||
+      msg.includes('table') && msg.includes('does not exist') ||
+      // PostgREST common shapes
+      msg.includes('could not find the relation') ||
+      msg.includes('unknown table') ||
+      msg.includes('not found') && msg.includes('relation')
+    );
+  }
+
+  // Targeted check for a specific relation/table name.
   return (
-    msg.includes(`relation "${rel}" does not exist`) ||
-    msg.includes(`"${rel}"`) && msg.toLowerCase().includes('does not exist') ||
-    msg.toLowerCase().includes(`relation "${rel}"`) ||
-    msg.toLowerCase().includes(`table "${rel}"`) && msg.toLowerCase().includes('does not exist')
+    msgRaw.includes(`relation "${rel}" does not exist`) ||
+    (msgRaw.includes(`"${rel}"`) && msg.includes('does not exist')) ||
+    msg.includes(`relation "${rel}"`) ||
+    (msg.includes(`table "${rel}"`) && msg.includes('does not exist'))
   );
 }
 
