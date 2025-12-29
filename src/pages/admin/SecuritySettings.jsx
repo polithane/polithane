@@ -6,6 +6,7 @@ export const SecuritySettings = () => {
   const [loading, setLoading] = useState(true);
   const [envPresent, setEnvPresent] = useState(null);
   const [dbCounts, setDbCounts] = useState(null);
+  const [schemaSql, setSchemaSql] = useState('');
   const [settings, setSettings] = useState({
     admin_mfa_enabled: 'false',
     admin_mfa_require_new_device: 'false',
@@ -19,6 +20,7 @@ export const SecuritySettings = () => {
           api.admin.envCheck().catch(() => null),
           api.admin.getDbOverview().catch(() => null),
         ]);
+        if (res?.schemaMissing && res?.requiredSql) setSchemaSql(String(res.requiredSql || ''));
         if (res?.success && res?.data && typeof res.data === 'object') setSettings((prev) => ({ ...prev, ...res.data }));
         if (env?.success) setEnvPresent(env?.data?.present || null);
         if (dbo?.success) setDbCounts(dbo?.data?.counts || null);
@@ -56,12 +58,20 @@ export const SecuritySettings = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Güvenlik Ayarları</h1>
         <p className="text-gray-600">Platform güvenliğini yönetin ve izleyin</p>
       </div>
+
+      {schemaSql ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="font-black">DB tablosu eksik: `site_settings`</div>
+          <div className="text-sm mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+          <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+        </div>
+      ) : null}
 
       {/* Admin / Manager MFA (feature-ready, default off) */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">

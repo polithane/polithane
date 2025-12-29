@@ -91,6 +91,7 @@ export const Header = () => {
     if (n?.title) return String(n.title);
     const t = String(n?.type || 'system');
     if (t === 'like') return 'Beğeni';
+    if (t === 'comment_like') return 'Yorum beğenisi';
     if (t === 'comment') return 'Yorum';
     if (t === 'share') return 'Paylaşım';
     if (t === 'follow') return 'Takip';
@@ -103,6 +104,12 @@ export const Header = () => {
     if (n?.message) return String(n.message);
     if (String(n?.type || '') === 'approval') {
       return 'Üyeliğiniz onay bekliyor. Admin onayı gelene kadar Polit Atamazsınız.';
+    }
+    if (String(n?.type || '') === 'comment_like') {
+      return 'Yorumunuz beğenildi.';
+    }
+    if (String(n?.type || '') === 'mention') {
+      return 'Sizi bir içerikte etiketledi.';
     }
     if (n?.post?.content_text || n?.post?.content) return String(n.post.content_text ?? n.post.content);
     return '';
@@ -245,13 +252,16 @@ export const Header = () => {
                 <button
                   type="button"
                   onClick={onOpenNotif}
-                  className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className={[
+                    'relative p-2 hover:bg-gray-100 rounded-lg transition-colors',
+                    unreadCount > 0 ? 'animate-[pulse_0.9s_ease-in-out_infinite]' : '',
+                  ].join(' ')}
                   title="Bildirimler"
                 >
                   <Bell className="w-5 h-5 text-gray-600" />
                   {unreadCount > 0 && (
                     <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
-                      {unreadCount}
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </Badge>
                   )}
                 </button>
@@ -303,7 +313,9 @@ export const Header = () => {
                                 if (id) await markAsRead?.(id);
                                 setShowNotifMenu(false);
                                 if (targetPostId) {
-                                  navigate(`/post/${targetPostId}`);
+                                  const t = String(n?.type || '');
+                                  const isCommentShortcut = t === 'comment' || t === 'comment_like';
+                                  navigate(`/post/${targetPostId}${isCommentShortcut ? '?comment=1' : ''}`);
                                   return;
                                 }
                                 if (actor) {
@@ -401,7 +413,7 @@ export const Header = () => {
                       <>
                         <div className="border-t border-gray-100 my-2"></div>
                         <Link
-                          to="/admin"
+                          to="/adminyonetim"
                           className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors bg-blue-50"
                           onClick={() => setShowUserMenu(false)}
                         >

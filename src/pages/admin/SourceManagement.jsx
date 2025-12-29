@@ -114,7 +114,7 @@ export const SourceManagement = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Kaynak Yönetimi</h1>
@@ -206,7 +206,7 @@ export const SourceManagement = () => {
                 <td className="px-6 py-4">{getTypeBadge(source.type)}</td>
                 <td className="px-6 py-4">
                   <a href={source.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-primary-blue hover:underline">
-                    <LinkIcon className="w-5 h-5 sm:w-4 sm:h-4" />
+                    <LinkIcon className="w-5 h-5" />
                     <span className="max-w-xs truncate">{source.url}</span>
                   </a>
                 </td>

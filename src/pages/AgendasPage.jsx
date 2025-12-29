@@ -17,7 +17,9 @@ export const AgendasPage = () => {
       setAgendas(Array.isArray(list) ? list : []);
 
       const data = await api.posts.getAll({ limit: 500, order: 'polit_score.desc' }).catch(() => []);
-      setPosts(Array.isArray(data) ? data : []);
+      // Agendas page is a Polit page; exclude Fast copies (is_trending).
+      const rows = (Array.isArray(data) ? data : []).filter((p) => !p?.is_trending);
+      setPosts(rows);
     })();
   }, []);
 

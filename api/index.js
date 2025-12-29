@@ -149,6 +149,16 @@ function normalizeUsernameCandidate(raw) {
   return (base + '_____').slice(0, 5);
 }
 
+const RESERVED_USERNAMES = new Set([
+  // Reserved for route/security reasons (do not allow users to register/claim these).
+  'adminyonetim',
+]);
+
+function isReservedUsername(u) {
+  const s = String(u || '').trim().toLowerCase();
+  return RESERVED_USERNAMES.has(s);
+}
+
 async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   const chunks = [];
@@ -778,6 +788,83 @@ async function notifyAdminsAboutComment(req, { type, commentId, postId, actorId,
   }
 }
 
+function extractMentionUsernames(text) {
+  const t = String(text || '');
+  if (!t || t.length < 2) return [];
+  const out = new Set();
+  const re = /@([a-z0-9._-]{4,20})/gi;
+  let m;
+  // eslint-disable-next-line no-cond-assign
+  while ((m = re.exec(t))) {
+    const u = String(m[1] || '').trim().toLowerCase();
+    if (!u) continue;
+    // Keep compatibility with our username checks (min 5 chars).
+    if (u.length < 5 || u.length > 15) continue;
+    out.add(u);
+    if (out.size >= 5) break;
+  }
+  return Array.from(out);
+}
+
+async function notifyMentions(req, { text, actorId, postId = null, commentId = null, excludeUserIds = [] }) {
+  try {
+    const actor = String(actorId || '').trim();
+    if (!actor) return;
+    const usernames = extractMentionUsernames(text);
+    if (!usernames.length) return;
+
+    const exclude = new Set((excludeUserIds || []).map((x) => String(x)).filter(Boolean));
+    exclude.add(actor);
+
+    // PostgREST "in.(...)" doesn't like quotes for non-uuid; usernames are safe here.
+    const inList = usernames.join(',');
+    const users = await supabaseRestGet('users', {
+      select: 'id,username,is_active',
+      username: `in.(${inList})`,
+      is_active: 'eq.true',
+      limit: String(Math.min(10, usernames.length)),
+    }).catch(() => []);
+
+    const targets = (Array.isArray(users) ? users : [])
+      .filter((u) => u?.id && !exclude.has(String(u.id)))
+      .slice(0, 5);
+    if (!targets.length) return;
+
+    const rows = [];
+    for (const u of targets) {
+      const uid = String(u.id);
+      // Respect blocks (best-effort)
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const blocked = await isBlockedBetween(actor, uid).catch(() => false);
+        if (blocked) continue;
+      } catch {
+        // ignore
+      }
+      rows.push({
+        user_id: uid,
+        actor_id: actor,
+        type: 'mention',
+        post_id: postId || null,
+        comment_id: commentId || null,
+        title: 'Bahsedilme',
+        message: 'Sizi bir içerikte etiketledi.',
+        is_read: false,
+      });
+    }
+
+    if (!rows.length) return;
+    await supabaseInsertNotifications(rows).catch(() => null);
+    // Email (best-effort)
+    for (const r of rows) {
+      // eslint-disable-next-line no-await-in-loop
+      await sendNotificationEmail(req, { userId: r.user_id, type: 'mention', actorId: actor, postId: postId || null }).catch(() => null);
+    }
+  } catch {
+    // ignore (best-effort)
+  }
+}
+
 async function addPostComment(req, res, postId) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -843,6 +930,11 @@ async function addPostComment(req, res, postId) {
       }
     } catch {
       // best-effort
+    }
+
+    // Mention notifications in comment body (best-effort)
+    if (row?.id) {
+      notifyMentions(req, { text: content, actorId: auth.id, postId, commentId: row.id, excludeUserIds: [ownerId] }).catch(() => null);
     }
 
     if (pending && row?.id) {
@@ -1120,6 +1212,27 @@ async function toggleCommentLike(req, res, commentId) {
         });
         const next = Number(c.like_count || 0) + 1;
         await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: next }).catch(() => null);
+
+        // Notify comment owner (no self-notify)
+        try {
+          const ownerId = c?.user_id != null ? String(c.user_id) : '';
+          const postId = c?.post_id != null ? String(c.post_id) : null;
+          if (ownerId && String(ownerId) !== String(auth.id)) {
+            await supabaseInsertNotifications([
+              {
+                user_id: ownerId,
+                actor_id: auth.id,
+                type: 'comment_like',
+                post_id: postId,
+                comment_id: cid,
+                is_read: false,
+              },
+            ]).catch(() => null);
+            sendNotificationEmail(req, { userId: ownerId, type: 'comment_like', actorId: auth.id, postId }).catch(() => null);
+          }
+        } catch {
+          // ignore
+        }
         return res.json({ success: true, action: 'liked', like_count: next });
       } catch (e) {
         const msg = String(e?.message || '');
@@ -1143,6 +1256,29 @@ async function toggleCommentLike(req, res, commentId) {
 
     await safeUserPatch(auth.id, { metadata: { ...meta, liked_comment_ids: nextLiked } }).catch(() => null);
     await supabaseRestPatch('comments', { id: `eq.${cid}` }, { like_count: nextCount }).catch(() => null);
+
+    // Notify comment owner (fallback schema path) (no self-notify)
+    if (!has) {
+      try {
+        const ownerId = c?.user_id != null ? String(c.user_id) : '';
+        const postId = c?.post_id != null ? String(c.post_id) : null;
+        if (ownerId && String(ownerId) !== String(auth.id)) {
+          await supabaseInsertNotifications([
+            {
+              user_id: ownerId,
+              actor_id: auth.id,
+              type: 'comment_like',
+              post_id: postId,
+              comment_id: cid,
+              is_read: false,
+            },
+          ]).catch(() => null);
+          sendNotificationEmail(req, { userId: ownerId, type: 'comment_like', actorId: auth.id, postId }).catch(() => null);
+        }
+      } catch {
+        // ignore
+      }
+    }
     return res.json({ success: true, action: has ? 'unliked' : 'liked', like_count: nextCount });
   } catch (e) {
     // Prevent Vercel from returning a non-JSON 500 (so client doesn't show generic "Sunucu hatası").
@@ -1319,6 +1455,7 @@ async function createPost(req, res) {
     const agenda_tag = String(body.agenda_tag || '').trim() || null;
     const media_urls = Array.isArray(body.media_urls) ? body.media_urls : [];
     const content_type = String(body.content_type || (media_urls.length > 0 ? 'image' : 'text')).trim();
+    const thumbnail_url = String(body.thumbnail_url || '').trim() || null;
     const is_trending = typeof body?.is_trending === 'boolean' ? body.is_trending : undefined;
     const media_duration =
       body?.media_duration !== undefined && body?.media_duration !== null
@@ -1389,6 +1526,7 @@ async function createPost(req, res) {
         category,
         agenda_tag,
         media_urls,
+        ...(thumbnail_url ? { thumbnail_url } : {}),
         ...(Number.isFinite(media_duration) ? { media_duration } : {}),
         is_deleted: false,
         ...(typeof is_trending === 'boolean' ? { is_trending } : {}),
@@ -1397,7 +1535,7 @@ async function createPost(req, res) {
     } catch (e) {
       const msg = String(e?.message || '');
       // Retry without unsupported fields (schema-agnostic)
-      if (msg.includes('is_trending') || msg.includes('media_duration')) {
+      if (msg.includes('is_trending') || msg.includes('media_duration') || msg.includes('thumbnail_url')) {
         try {
           inserted = await supabaseRestInsert('posts', [{
             user_id: auth.id,
@@ -1423,13 +1561,14 @@ async function createPost(req, res) {
               category,
               agenda_tag,
               media_urls,
+              ...(thumbnail_url ? { thumbnail_url } : {}),
               ...(Number.isFinite(media_duration) ? { media_duration } : {}),
               is_deleted: false,
               ...(typeof is_trending === 'boolean' ? { is_trending } : {}),
             }]);
           } catch (e2) {
             const msg2 = String(e2?.message || '');
-            if (msg2.includes('is_trending') || msg2.includes('media_duration')) {
+            if (msg2.includes('is_trending') || msg2.includes('media_duration') || msg2.includes('thumbnail_url')) {
               inserted = await supabaseRestInsert('posts', [{
                 user_id: auth.id,
                 party_id,
@@ -1449,6 +1588,11 @@ async function createPost(req, res) {
       }
     }
     const post = inserted?.[0] || null;
+
+    // Mention notifications in post body (best-effort)
+    if (post?.id) {
+      notifyMentions(req, { text: content, actorId: auth.id, postId: String(post.id), commentId: null }).catch(() => null);
+    }
 
     // Agenda polit puanı: each post/fast increases selected agenda score by user type.
     // Best-effort only: never block publishing if agenda update fails.
@@ -1696,6 +1840,142 @@ async function getFastForUser(req, res, userKey) {
   return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
 }
 
+function fastViewsRequiredSql() {
+  // Keep types TEXT to support UUID or numeric ids without schema coupling.
+  return `
+-- Fast izleyenler (bakanlar) tablosu
+create extension if not exists pgcrypto;
+
+create table if not exists fast_views (
+  id uuid primary key default gen_random_uuid(),
+  post_id text not null,
+  owner_id text not null,
+  viewer_id text not null,
+  viewed_at timestamptz not null default now()
+);
+
+create unique index if not exists fast_views_post_viewer_uniq on fast_views (post_id, viewer_id);
+create index if not exists fast_views_owner_viewed_at_idx on fast_views (owner_id, viewed_at desc);
+create index if not exists fast_views_post_viewed_at_idx on fast_views (post_id, viewed_at desc);
+`.trim();
+}
+
+async function fastTrackView(req, res, postId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const id = String(postId || '').trim();
+  if (!id) return res.status(400).json({ success: false, error: 'Geçersiz içerik.' });
+
+  // Rate limit per viewer+post (best-effort)
+  const ip = getClientIp(req);
+  const rl = rateLimit(`fast_view:${auth.id}:${id}:${ip}`, { windowMs: 60_000, max: 10 });
+  if (!rl.ok) return res.json({ success: true, ignored: true });
+
+  // Validate post exists + is an active Fast (last 24h, trending)
+  const since = fastSinceIso(24);
+  const rows = await supabaseRestGet('posts', {
+    select: 'id,user_id,is_trending,is_deleted,created_at',
+    id: `eq.${id}`,
+    limit: '1',
+  }).catch(() => []);
+  const post = rows?.[0] || null;
+  if (!post || post?.is_deleted) return res.json({ success: true, ignored: true });
+  if (String(post.is_trending) !== 'true' && post.is_trending !== true) return res.json({ success: true, ignored: true });
+  const createdAt = String(post.created_at || '');
+  if (createdAt && createdAt < since) return res.json({ success: true, ignored: true });
+
+  const ownerId = String(post.user_id || '').trim();
+  if (!ownerId) return res.json({ success: true, ignored: true });
+  if (String(ownerId) === String(auth.id)) return res.json({ success: true, ignored: true });
+
+  // Respect blocks (best-effort)
+  try {
+    const blocked = await isBlockedBetween(auth.id, ownerId);
+    if (blocked) return res.json({ success: true, ignored: true });
+  } catch {
+    // ignore
+  }
+
+  try {
+    await supabaseRestRequest(
+      'POST',
+      'fast_views',
+      { on_conflict: 'post_id,viewer_id' },
+      [{ post_id: id, owner_id: ownerId, viewer_id: String(auth.id), viewed_at: new Date().toISOString() }],
+      { Prefer: 'resolution=ignore-duplicates,return=representation' }
+    );
+    return res.json({ success: true });
+  } catch (e) {
+    // If table doesn't exist yet, do not break viewing.
+    if (isMissingRelationError(e)) return res.json({ success: true, ignored: true });
+    return res.json({ success: true, ignored: true });
+  }
+}
+
+async function fastGetViewers(req, res, postId) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const id = String(postId || '').trim();
+  if (!id) return res.status(400).json({ success: false, error: 'Geçersiz içerik.' });
+  const lim = Math.min(200, Math.max(1, parseInt(String(req.query?.limit || 50), 10) || 50));
+
+  // Validate ownership
+  const rows = await supabaseRestGet('posts', {
+    select: 'id,user_id,is_trending,is_deleted,created_at',
+    id: `eq.${id}`,
+    limit: '1',
+  }).catch(() => []);
+  const post = rows?.[0] || null;
+  if (!post || post?.is_deleted) return res.status(404).json({ success: false, error: 'İçerik bulunamadı.' });
+  const ownerId = String(post.user_id || '').trim();
+  const isOwner = ownerId && String(ownerId) === String(auth.id);
+  if (!isOwner && !auth?.is_admin) return res.status(403).json({ success: false, error: 'Bu listeyi görüntüleyemezsiniz.' });
+
+  // Only for active Fast within 24h
+  const since = fastSinceIso(24);
+  const createdAt = String(post.created_at || '');
+  if (String(post.is_trending) !== 'true' && post.is_trending !== true) return res.json({ success: true, data: [], total: 0 });
+  if (createdAt && createdAt < since) return res.json({ success: true, data: [], total: 0 });
+
+  try {
+    const views = await supabaseRestGet('fast_views', {
+      select: 'viewer_id,viewed_at',
+      post_id: `eq.${id}`,
+      order: 'viewed_at.desc',
+      limit: String(lim),
+    }).catch(() => []);
+
+    const all = Array.isArray(views) ? views : [];
+    const viewerIds = all.map((v) => String(v.viewer_id || '')).filter(Boolean);
+    if (viewerIds.length === 0) return res.json({ success: true, data: [], total: 0 });
+
+    const isUuidLike = (v) => /^[0-9a-fA-F-]{36}$/.test(String(v));
+    const inList = viewerIds.map((v) => (isUuidLike(v) ? `"${v}"` : v)).join(',');
+    const users = await supabaseRestGet('users', {
+      select: 'id,username,full_name,avatar_url,is_verified,is_active,user_type',
+      id: `in.(${inList})`,
+      is_active: 'eq.true',
+      limit: String(Math.min(200, viewerIds.length)),
+    }).catch(() => []);
+    const map = new Map((Array.isArray(users) ? users : []).map((u) => [String(u.id), u]));
+
+    const out = all
+      .map((v) => {
+        const u = map.get(String(v.viewer_id || ''));
+        if (!u) return null;
+        return { user: u, viewed_at: v.viewed_at };
+      })
+      .filter(Boolean);
+
+    return res.json({ success: true, data: out, total: out.length });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: false, schemaMissing: true, requiredSql: fastViewsRequiredSql(), data: [], total: 0 });
+    }
+    return res.status(500).json({ success: false, error: 'Bakanlar yüklenemedi.' });
+  }
+}
+
 async function updatePost(req, res, postId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Giriş yapmalısınız.' });
@@ -1772,11 +2052,25 @@ async function deletePost(req, res, postId) {
 }
 
 async function getAgendas(req, res) {
-    const { limit = 50, search, is_trending, is_active } = req.query || {};
+    const { limit = 50, offset = 0, order, search, is_trending, is_active } = req.query || {};
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const off = Math.max(0, parseInt(offset, 10) || 0);
+    const allowedOrders = new Set([
+      'trending_score.desc',
+      'trending_score.asc',
+      'total_polit_score.desc',
+      'total_polit_score.asc',
+      'polit_score.desc',
+      'polit_score.asc',
+      'created_at.desc',
+      'created_at.asc',
+    ]);
+    const ord = allowedOrders.has(String(order || '')) ? String(order) : 'trending_score.desc';
     const params = {
       select: '*',
-      limit: String(Math.min(Math.max(parseInt(limit) || 50, 1), 200)),
-      order: 'trending_score.desc',
+      limit: String(lim),
+      offset: String(off),
+      order: ord,
     };
     if (String(is_active || 'true') === 'true') params.is_active = 'eq.true';
     if (String(is_trending || '') === 'true') params.is_trending = 'eq.true';
@@ -1882,7 +2176,18 @@ async function getAgendas(req, res) {
       }
     }
 
-    const rows = await supabaseRestGet('agendas', params).catch(() => []);
+    // Fetch; if caller requests an order by a column that doesn't exist in their schema,
+    // retry with the safe default order.
+    let rows;
+    try {
+      rows = await supabaseRestGet('agendas', params);
+    } catch {
+      if (ord !== 'trending_score.desc') {
+        rows = await supabaseRestGet('agendas', { ...params, order: 'trending_score.desc' }).catch(() => []);
+      } else {
+        rows = [];
+      }
+    }
     res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
 }
 
@@ -1961,6 +2266,11 @@ async function getUsers(req, res) {
         const rows = await supabaseRestGet('users', { select: '*,party:parties(*)', [key]: `eq.${value}`, limit: '1' });
         const user = rows?.[0];
         if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+        // Hide admin profile from everyone except the owner.
+        if (String(user?.username || '').toLowerCase() === 'admin') {
+          const isOwner = auth?.id && String(auth.id) === String(user.id);
+          if (!isOwner) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+        }
         if (user?.is_active === false) {
           const isOwner = auth?.id && String(auth.id) === String(user.id);
           if (!isOwner && !auth?.is_admin) {
@@ -1974,6 +2284,8 @@ async function getUsers(req, res) {
     if (party_id || user_type || province) {
       const params = {
         select: '*,party:parties(*)',
+        is_active: 'eq.true',
+        username: 'neq.admin',
         limit: String(limit),
         offset: String(offset),
       };
@@ -1994,6 +2306,7 @@ async function getUsers(req, res) {
       const params = {
         select: '*,party:parties(*)',
         is_active: 'eq.true',
+        username: 'neq.admin',
         limit: String(Math.min(parseInt(limit, 10) || 20, 60)),
         offset: String(Math.max(0, parseInt(offset, 10) || 0)),
       };
@@ -2007,6 +2320,7 @@ async function getUsers(req, res) {
     const data = await supabaseRestGet('users', {
         select: '*,party:parties(*)',
         or: `(username.ilike.*${search}*,full_name.ilike.*${search}*)`,
+        username: 'neq.admin',
         limit: String(Math.min(parseInt(limit), 50))
     });
     res.json(data || []);
@@ -2025,6 +2339,13 @@ async function getUserDetail(req, res, id) {
     }
     
     if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+    // Hide admin profile from everyone except the owner.
+    if (String(user?.username || '').toLowerCase() === 'admin') {
+      const isOwner = auth?.id && String(auth.id) === String(user.id);
+      if (!isOwner) {
+        return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+      }
+    }
     // Hide inactive profiles from everyone except the owner/admin (e.g. deletion confirmed).
     if (user?.is_active === false) {
       const isOwner = auth?.id && String(auth.id) === String(user.id);
@@ -3135,9 +3456,11 @@ async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
 
     const titleMap = {
       like: 'Beğeni',
+      comment_like: 'Yorum beğenisi',
       comment: 'Yorum',
       share: 'Paylaşım',
       follow: 'Yeni takip',
+      mention: 'Bahsedilme',
       message: 'Yeni mesaj',
       approval: 'Üyelik durumu',
       system: 'Bildirim',
@@ -3147,8 +3470,12 @@ async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
     const detail =
       type === 'like'
         ? `${actorName ? `<strong>${actorName}</strong> ` : ''}paylaşımınızı beğendi.`
+        : type === 'comment_like'
+          ? `${actorName ? `<strong>${actorName}</strong> ` : ''}yorumunuzu beğendi.`
         : type === 'comment'
           ? `${actorName ? `<strong>${actorName}</strong> ` : ''}paylaşımınıza yorum yaptı.`
+          : type === 'mention'
+            ? `${actorName ? `<strong>${actorName}</strong> ` : ''}sizi bir içerikte etiketledi.`
           : type === 'share'
             ? `${actorName ? `<strong>${actorName}</strong> ` : ''}paylaşımınızı paylaştı.`
             : type === 'follow'
@@ -3246,6 +3573,9 @@ async function usersCheckUsername(req, res, username) {
   if (!rl.ok) return res.status(429).json({ success: false, available: false, message: 'Çok fazla istek. Lütfen biraz bekleyin.' });
   if (!u || u.length < 5) return res.json({ success: true, available: false, message: 'En az 5 karakter olmalı' });
   if (u.length > 15) return res.json({ success: true, available: false, message: 'En fazla 15 karakter olabilir' });
+  if (isReservedUsername(u)) {
+    return res.json({ success: true, available: false, message: 'Bu kullanıcı adı sistem tarafından ayrılmıştır.' });
+  }
   if (!/^[a-z0-9._-]+$/.test(u)) {
     return res.json({
       success: true,
@@ -3265,6 +3595,7 @@ async function usersUpdateUsername(req, res) {
   const u = String(body?.username || '').trim().toLowerCase();
   if (!u || u.length < 5) return res.status(400).json({ success: false, error: 'Kullanıcı adı en az 5 karakter olmalı.' });
   if (u.length > 15) return res.status(400).json({ success: false, error: 'Kullanıcı adı en fazla 15 karakter olabilir.' });
+  if (isReservedUsername(u)) return res.status(400).json({ success: false, error: 'Bu kullanıcı adı sistem tarafından ayrılmıştır.' });
   if (!/^[a-z0-9._-]+$/.test(u)) {
     return res.status(400).json({
       success: false,
@@ -5468,10 +5799,44 @@ async function adminGetAgendas(req, res) {
   if (params.is_trending) countParams.is_trending = params.is_trending;
   if (params.or) countParams.or = params.or;
 
-  const [total, rows] = await Promise.all([
-    supabaseCount('agendas', countParams).catch(() => 0),
-    supabaseRestGet('agendas', params).catch(() => []),
-  ]);
+  const agendasRequiredSql = () => `
+-- Gündemler tablosu
+create extension if not exists pgcrypto;
+
+create table if not exists agendas (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  slug text not null unique,
+  description text null,
+  post_count integer not null default 0,
+  total_polit_score bigint not null default 0,
+  trending_score bigint not null default 0,
+  is_trending boolean not null default true,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists agendas_trending_score_idx on agendas (trending_score desc);
+create index if not exists agendas_total_polit_score_idx on agendas (total_polit_score desc);
+create index if not exists agendas_is_active_idx on agendas (is_active);
+`.trim();
+
+  let total = 0;
+  let rows = [];
+  try {
+    const r = await Promise.all([
+      supabaseCount('agendas', countParams).catch(() => 0),
+      supabaseRestGet('agendas', params),
+    ]);
+    total = Number(r?.[0] || 0) || 0;
+    rows = Array.isArray(r?.[1]) ? r[1] : [];
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: false, schemaMissing: true, requiredSql: agendasRequiredSql() });
+    }
+    return res.status(500).json({ success: false, error: 'Gündemler yüklenemedi.' });
+  }
 
   return res.json({
     success: true,
@@ -5510,8 +5875,40 @@ async function adminCreateAgenda(req, res) {
     updated_at: nowIso,
   };
 
-  const inserted = await supabaseRestInsert('agendas', [payload]).catch(() => []);
-  return res.status(201).json({ success: true, data: inserted?.[0] || null });
+  try {
+    const inserted = await supabaseRestInsert('agendas', [payload]).catch(() => []);
+    return res.status(201).json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({
+        success: false,
+        schemaMissing: true,
+        requiredSql: `
+-- Gündemler tablosu
+create extension if not exists pgcrypto;
+
+create table if not exists agendas (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  slug text not null unique,
+  description text null,
+  post_count integer not null default 0,
+  total_polit_score bigint not null default 0,
+  trending_score bigint not null default 0,
+  is_trending boolean not null default true,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists agendas_trending_score_idx on agendas (trending_score desc);
+create index if not exists agendas_total_polit_score_idx on agendas (total_polit_score desc);
+create index if not exists agendas_is_active_idx on agendas (is_active);
+`.trim(),
+      });
+    }
+    return res.status(500).json({ success: false, error: 'Gündem oluşturulamadı.' });
+  }
 }
 
 async function adminUpdateAgenda(req, res, agendaId) {
@@ -5528,15 +5925,83 @@ async function adminUpdateAgenda(req, res, agendaId) {
   allowed.updated_at = new Date().toISOString();
   if (Object.keys(allowed).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
 
-  const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, allowed).catch(() => []);
-  return res.json({ success: true, data: updated?.[0] || null });
+  try {
+    const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, allowed).catch(() => []);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({
+        success: false,
+        schemaMissing: true,
+        requiredSql: `
+-- Gündemler tablosu
+create extension if not exists pgcrypto;
+
+create table if not exists agendas (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  slug text not null unique,
+  description text null,
+  post_count integer not null default 0,
+  total_polit_score bigint not null default 0,
+  trending_score bigint not null default 0,
+  is_trending boolean not null default true,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists agendas_trending_score_idx on agendas (trending_score desc);
+create index if not exists agendas_total_polit_score_idx on agendas (total_polit_score desc);
+create index if not exists agendas_is_active_idx on agendas (is_active);
+`.trim(),
+      });
+    }
+    return res.status(500).json({ success: false, error: 'Gündem kaydedilemedi.' });
+  }
 }
 
 async function adminDeleteAgenda(req, res, agendaId) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
-  const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, { is_active: false, updated_at: new Date().toISOString() }).catch(() => []);
-  return res.json({ success: true, data: updated?.[0] || null });
+  try {
+    const updated = await supabaseRestPatch(
+      'agendas',
+      { id: `eq.${agendaId}` },
+      { is_active: false, updated_at: new Date().toISOString() }
+    ).catch(() => []);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({
+        success: false,
+        schemaMissing: true,
+        requiredSql: `
+-- Gündemler tablosu
+create extension if not exists pgcrypto;
+
+create table if not exists agendas (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  slug text not null unique,
+  description text null,
+  post_count integer not null default 0,
+  total_polit_score bigint not null default 0,
+  trending_score bigint not null default 0,
+  is_trending boolean not null default true,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists agendas_trending_score_idx on agendas (trending_score desc);
+create index if not exists agendas_total_polit_score_idx on agendas (total_polit_score desc);
+create index if not exists agendas_is_active_idx on agendas (is_active);
+`.trim(),
+      });
+    }
+    return res.status(500).json({ success: false, error: 'Gündem pasifleştirilemedi.' });
+  }
 }
 
 function slugifyParty(input) {
@@ -6266,12 +6731,19 @@ async function authRegister(req, res) {
     let username = normalizeUsernameCandidate(local);
     if (!username) username = normalizeUsernameCandidate(`user_${Date.now()}`) || `user_${Date.now()}`;
     const checkUser = async (u) => (await supabaseRestGet('users', { select: 'id', username: `eq.${u}`, limit: '1' })).length > 0;
+
+    // Never allow reserved usernames (route/security).
+    if (isReservedUsername(username)) {
+      username = normalizeUsernameCandidate(`user_${Date.now()}`) || `user_${Date.now()}`;
+    }
+
     // Ensure uniqueness (keep stable/padded shape where possible)
     if (await checkUser(username)) {
       const base = username.slice(0, 15);
       for (let i = 0; i < 10; i += 1) {
         const suffix = String(Math.floor(Math.random() * 10000)).padStart(2, '0');
         const cand = normalizeUsernameCandidate(`${base}_${suffix}`).slice(0, 20);
+        if (isReservedUsername(cand)) continue;
         // eslint-disable-next-line no-await-in-loop
         if (!(await checkUser(cand))) {
           username = cand;
@@ -7031,6 +7503,20 @@ async function sendMessage(req, res) {
     is_deleted_by_sender: false,
     is_deleted_by_receiver: false,
   }]);
+
+  // Notify receiver in-app (best-effort)
+  try {
+    await supabaseInsertNotifications([
+      {
+        user_id: receiver_id,
+        actor_id: auth.id,
+        type: 'message',
+        is_read: false,
+      },
+    ]).catch(() => null);
+  } catch {
+    // ignore
+  }
   // Email receiver (best-effort)
   try {
     const preview = (() => {
@@ -7106,14 +7592,27 @@ async function getNotifications(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
   const { limit = 50, offset = 0 } = req.query;
-  const rows = await supabaseRestGet('notifications', {
+  const params = {
     select: '*,actor:users(*),post:posts(*),comment:comments(*)',
     user_id: `eq.${auth.id}`,
     order: 'created_at.desc',
     limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
     offset: String(parseInt(offset, 10) || 0),
-  }).catch(() => []);
-  res.json({ success: true, data: rows || [] });
+  };
+  try {
+    const rows = await supabaseRestGet('notifications', params).catch(() => []);
+    return res.json({ success: true, data: rows || [] });
+  } catch {
+    // Fallback: schema-agnostic (in case embedded relations/columns differ)
+    const rows = await supabaseRestGet('notifications', {
+      select: '*',
+      user_id: `eq.${auth.id}`,
+      order: 'created_at.desc',
+      limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
+      offset: String(parseInt(offset, 10) || 0),
+    }).catch(() => []);
+    return res.json({ success: true, data: rows || [] });
+  }
 }
 
 async function markNotificationRead(req, res, id) {
@@ -7461,11 +7960,51 @@ function normalizeSiteSettingValue(value) {
   return typeof value === 'string' ? value : String(value ?? '');
 }
 
+function siteSettingsRequiredSql() {
+  return [
+    '-- Required table for admin/site settings (no mock)',
+    'create table if not exists public.site_settings (',
+    '  key text primary key,',
+    '  value text not null,',
+    '  updated_at timestamptz not null default now()',
+    ');',
+    '',
+    '-- Helpful index for admin lists (optional)',
+    'create index if not exists site_settings_updated_at_idx on public.site_settings(updated_at desc);',
+  ].join('\n');
+}
+
+function isMissingRelationError(e, relationName) {
+  const msg = String(e?.message || e || '');
+  const rel = String(relationName || '').trim();
+  if (!rel) return false;
+  // PostgREST / Postgres error shapes
+  return (
+    msg.includes(`relation "${rel}" does not exist`) ||
+    msg.includes(`"${rel}"`) && msg.toLowerCase().includes('does not exist') ||
+    msg.toLowerCase().includes(`relation "${rel}"`) ||
+    msg.toLowerCase().includes(`table "${rel}"`) && msg.toLowerCase().includes('does not exist')
+  );
+}
+
 async function getSiteSettings(req, res) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
 
-  const rows = await supabaseRestGet('site_settings', { select: 'key,value', order: 'key.asc', limit: '2000' }).catch(() => []);
+  let rows;
+  try {
+    rows = await supabaseRestGet('site_settings', { select: 'key,value', order: 'key.asc', limit: '2000' });
+  } catch (e) {
+    if (isMissingRelationError(e, 'site_settings')) {
+      return res.status(200).json({
+        success: false,
+        schemaMissing: true,
+        requiredSql: siteSettingsRequiredSql(),
+        error: 'DB tablosu eksik: site_settings',
+      });
+    }
+    return res.status(500).json({ success: false, error: 'Ayarlar yüklenemedi.' });
+  }
   const out = {};
   for (const r of rows || []) {
     const k = String(r?.key || '').trim();
@@ -7499,9 +8038,21 @@ async function updateSiteSettings(req, res) {
   if (rows.length === 0) return res.json({ success: true, data: { updated: 0 } });
 
   // Upsert in bulk.
-  await supabaseRestRequest('POST', 'site_settings', { on_conflict: 'key' }, rows, {
-    Prefer: 'return=representation,resolution=merge-duplicates',
-  });
+  try {
+    await supabaseRestRequest('POST', 'site_settings', { on_conflict: 'key' }, rows, {
+      Prefer: 'return=representation,resolution=merge-duplicates',
+    });
+  } catch (e) {
+    if (isMissingRelationError(e, 'site_settings')) {
+      return res.status(200).json({
+        success: false,
+        schemaMissing: true,
+        requiredSql: siteSettingsRequiredSql(),
+        error: 'DB tablosu eksik: site_settings',
+      });
+    }
+    return res.status(500).json({ success: false, error: 'Ayarlar kaydedilemedi.' });
+  }
 
   // Invalidate public cache so changes take effect immediately.
   publicSiteCache = null;
@@ -7713,6 +8264,56 @@ async function getPublicParliament(req, res) {
   return res.json({ success: true, data: out });
 }
 
+async function getPublicAds(req, res) {
+  // Public, read-only ads (safe subset).
+  const position = String(req.query?.position || '').trim() || null;
+  const lim = Math.min(20, Math.max(1, parseInt(String(req.query?.limit || 1), 10) || 1));
+  try {
+    const params = {
+      select: 'id,title,position,status,target_url,created_at,updated_at',
+      order: 'created_at.desc',
+      limit: String(lim),
+    };
+    if (position) params.position = `eq.${position}`;
+    // Show only active ads publicly.
+    params.status = 'eq.active';
+    const rows = await supabaseRestGet('admin_ads', params);
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    // If ads table doesn't exist yet, return empty list (public should not expose schema SQL).
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [] });
+    }
+    return res.status(500).json({ success: false, error: 'Reklamlar yüklenemedi.' });
+  }
+}
+
+async function publicTrackAd(req, res, adId, kind) {
+  const id = String(adId || '').trim();
+  const k = String(kind || '').trim().toLowerCase();
+  if (!id) return res.status(400).json({ success: false, error: 'Geçersiz reklam.' });
+  if (k !== 'click' && k !== 'impression') return res.status(400).json({ success: false, error: 'Geçersiz event.' });
+  try {
+    const rows = await supabaseRestGet('admin_ads', { select: 'id,status,clicks,impressions', id: `eq.${id}`, limit: '1' });
+    const ad = rows?.[0] || null;
+    if (!ad) return res.status(404).json({ success: false, error: 'Reklam bulunamadı.' });
+    // Only track active ads to avoid skew.
+    if (String(ad.status || '') !== 'active') return res.json({ success: true, ignored: true });
+
+    const clicks = Math.max(0, parseInt(String(ad.clicks || 0), 10) || 0);
+    const imps = Math.max(0, parseInt(String(ad.impressions || 0), 10) || 0);
+    const patch =
+      k === 'click'
+        ? { clicks: clicks + 1, updated_at: new Date().toISOString() }
+        : { impressions: imps + 1, updated_at: new Date().toISOString() };
+    await supabaseRestPatch('admin_ads', { id: `eq.${id}` }, patch).catch(() => null);
+    return res.json({ success: true });
+  } catch (e) {
+    if (isMissingRelationError(e)) return res.json({ success: true, ignored: true });
+    return res.status(500).json({ success: false, error: 'Event kaydedilemedi.' });
+  }
+}
+
 // --- DISPATCHER ---
 export default async function handler(req, res) {
   setSecurityHeaders(req, res);
@@ -7738,6 +8339,15 @@ export default async function handler(req, res) {
       if (url === '/api/theme' && req.method === 'GET') return await getPublicTheme(req, res);
       if (url === '/api/public/site' && req.method === 'GET') return await getPublicSite(req, res);
       if (url === '/api/public/parliament' && req.method === 'GET') return await getPublicParliament(req, res);
+      if (url === '/api/public/ads' && req.method === 'GET') return await getPublicAds(req, res);
+      if (url.startsWith('/api/public/ads/') && req.method === 'POST') {
+        const rest = url.split('/api/public/ads/')[1] || '';
+        const parts = rest.split('/').filter(Boolean);
+        const id = parts[0];
+        const tail = parts[1];
+        if (id && tail === 'impression') return await publicTrackAd(req, res, id, 'impression');
+        if (id && tail === 'click') return await publicTrackAd(req, res, id, 'click');
+      }
       
       // Public Lists
       if (url === '/api/posts' && req.method === 'POST') return await createPost(req, res);
@@ -7747,6 +8357,15 @@ export default async function handler(req, res) {
       if ((url === '/api/fast' || url === '/api/fast/') && req.method === 'GET') return await getFastUsers(req, res);
       if ((url === '/api/fast/public' || url === '/api/fast/public/' || url === '/api/fast-public' || url === '/api/fast-public/') && req.method === 'GET') {
         return await getFastPublicUsers(req, res);
+      }
+      // Fast item helpers (view tracking + viewers list)
+      if (url.startsWith('/api/fast/items/')) {
+        const rest = url.split('/api/fast/items/')[1] || '';
+        const parts = rest.split('/').filter(Boolean);
+        const postId = parts[0];
+        const tail = parts[1];
+        if (postId && tail === 'view' && req.method === 'POST') return await fastTrackView(req, res, postId);
+        if (postId && tail === 'viewers' && req.method === 'GET') return await fastGetViewers(req, res, postId);
       }
       if (url.startsWith('/api/fast/') && req.method === 'GET') {
         const key = url.split('/api/fast/')[1];

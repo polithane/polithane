@@ -54,7 +54,7 @@ export const ScrapingManagement = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex items-start justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Tarama Yönetimi</h1>

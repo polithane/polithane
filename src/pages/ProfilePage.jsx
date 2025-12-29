@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType, useParams, Link } from 'react-router-dom';
 import { MoreVertical, Ban, AlertCircle, MessageCircle, Settings, Edit } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
@@ -16,6 +16,7 @@ import { apiCall, users, posts } from '../utils/api';
 import { CITY_CODES, FEATURE_FLAGS } from '../utils/constants';
 import { normalizeUsername } from '../utils/validators';
 import { getProfilePath } from '../utils/paths';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 const normalizeCityName = (name) =>
   String(name || '')
@@ -41,6 +42,7 @@ export const ProfilePage = () => {
   const { userId, username } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const navType = useNavigationType();
   const { user: currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
@@ -53,6 +55,7 @@ export const ProfilePage = () => {
   const [friendsFollowing, setFriendsFollowing] = useState([]);
   const [friendsFollowingCount, setFriendsFollowingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [privacyBlocked, setPrivacyBlocked] = useState(false);
   const [privacyMessage, setPrivacyMessage] = useState('');
@@ -68,6 +71,13 @@ export const ProfilePage = () => {
   const [reportDetails, setReportDetails] = useState('');
   const [reportBusy, setReportBusy] = useState(false);
   const [reportDone, setReportDone] = useState(false);
+
+  const cacheKey = useMemo(() => {
+    const u = String(userId || '').trim();
+    const un = String(username || '').trim();
+    return `profile:${u || '-'}:${un || '-'}`;
+  }, [userId, username]);
+  const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
   
   const isOwnProfile = currentUser && (
     userId === 'me' || 
@@ -75,14 +85,46 @@ export const ProfilePage = () => {
     normalizeUsername(username || '') === normalizeUsername(currentUser.username || '')
   );
 
-  // Detail pages should always start at top (unless explicitly deep-linked to a section).
+  // Hydrate instantly from session cache (for back/forward instant UX).
   useEffect(() => {
+    if (!initialCache) return;
     try {
-      window.scrollTo(0, 0);
+      if (initialCache.user) setUser(initialCache.user);
+      if (Array.isArray(initialCache.userPosts)) setUserPosts(initialCache.userPosts);
+      if (initialCache.followStats) setFollowStats(initialCache.followStats);
+      if (Array.isArray(initialCache.friendsFollowing)) setFriendsFollowing(initialCache.friendsFollowing);
+      if (initialCache.friendsFollowingCount !== undefined) setFriendsFollowingCount(Number(initialCache.friendsFollowingCount || 0) || 0);
+      if (initialCache.privacyBlocked !== undefined) setPrivacyBlocked(!!initialCache.privacyBlocked);
+      if (initialCache.privacyMessage !== undefined) setPrivacyMessage(String(initialCache.privacyMessage || ''));
+      if (Array.isArray(initialCache.blockedIds)) setBlockedIds(initialCache.blockedIds);
+      if (initialCache.activeTab) setActiveTab(String(initialCache.activeTab));
+      if (initialCache.hasFast !== undefined) setHasFast(!!initialCache.hasFast);
+      setLoading(false);
+      setRefreshing(true);
+      if (navType === 'POP' && typeof initialCache.scrollY === 'number') {
+        setTimeout(() => {
+          try {
+            window.scrollTo(0, Math.max(0, Number(initialCache.scrollY) || 0));
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
     } catch {
       // ignore
     }
-  }, [userId, username]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
+
+  // Scroll behavior: on new navigations go to top; on POP we restore from cache above.
+  useEffect(() => {
+    if (navType === 'POP') return;
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch {
+      // ignore
+    }
+  }, [userId, username, navType]);
 
   const canShowMessageButton = useMemo(() => {
     if (isOwnProfile) return false;
@@ -104,15 +146,10 @@ export const ProfilePage = () => {
   }, [blockedIds, user]);
   
   useEffect(() => {
-    // Always start profile page from top (avoid mid-scroll starts)
-    try {
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    } catch {
-      // noop
-    }
-
     const loadProfile = async () => {
-      setLoading(true);
+      const hasCached = !!initialCache;
+      if (hasCached) setRefreshing(true);
+      else setLoading(true);
       setError('');
       setPrivacyBlocked(false);
       setPrivacyMessage('');
@@ -240,7 +277,9 @@ export const ProfilePage = () => {
               // Profile "Politler" list is time-based: newest on top.
               order: 'created_at.desc',
             });
-            setUserPosts((dbPosts || []).map(mapDbPostToUi).filter(Boolean));
+            // IMPORTANT: Profile "Politler" list should not include Fast copies (is_trending).
+            const rows = (dbPosts || []).filter((p) => !p?.is_trending);
+            setUserPosts(rows.map(mapDbPostToUi).filter(Boolean));
           } else {
             setUserPosts([]);
           }
@@ -298,11 +337,44 @@ export const ProfilePage = () => {
         setError('Profil yüklenirken bir hata oluştu');
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     };
     
     loadProfile();
-  }, [userId, username]);
+  }, [userId, username, initialCache]);
+
+  // Save to session cache (so returning to this profile is instant).
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        user,
+        userPosts,
+        followStats,
+        friendsFollowing,
+        friendsFollowingCount,
+        privacyBlocked,
+        privacyMessage,
+        blockedIds,
+        activeTab,
+        hasFast,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [
+    cacheKey,
+    user,
+    userPosts,
+    followStats,
+    friendsFollowing,
+    friendsFollowingCount,
+    privacyBlocked,
+    privacyMessage,
+    blockedIds,
+    activeTab,
+    hasFast,
+  ]);
 
   useEffect(() => {
     // Load secondary tabs lazily
@@ -526,7 +598,13 @@ export const ProfilePage = () => {
                     <div className="text-sm text-gray-500">Takip</div>
                   </div>
                 )}
-                <div>
+                <div
+                  onClick={() => {
+                    setActiveTab('posts');
+                  }}
+                  className="cursor-pointer hover:opacity-80 transition-opacity"
+                  title="Paylaşımları gör"
+                >
                   <div className="text-xl font-bold">{formatNumber(user.post_count)}</div>
                   <div className="text-sm text-gray-500">Paylaşım</div>
                 </div>

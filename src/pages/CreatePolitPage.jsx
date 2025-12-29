@@ -105,6 +105,8 @@ export const CreatePolitPage = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [mediaDurationSec, setMediaDurationSec] = useState(0);
+  const [videoThumbs, setVideoThumbs] = useState([]); // [{ timeSec, previewUrl, blob }]
+  const [selectedVideoThumbIdx, setSelectedVideoThumbIdx] = useState(0);
 
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -156,6 +158,15 @@ export const CreatePolitPage = () => {
 
   const resetMedia = () => {
     setFiles([]);
+    try {
+      (videoThumbs || []).forEach((t) => {
+        if (t?.previewUrl) URL.revokeObjectURL(t.previewUrl);
+      });
+    } catch {
+      // ignore
+    }
+    setVideoThumbs([]);
+    setSelectedVideoThumbIdx(0);
     if (recordedUrl) {
       try {
         URL.revokeObjectURL(recordedUrl);
@@ -239,6 +250,128 @@ export const CreatePolitPage = () => {
       });
     };
   }, [contentType, files]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cleanupPrev = (list) => {
+      try {
+        (list || []).forEach((t) => {
+          if (t?.previewUrl) URL.revokeObjectURL(t.previewUrl);
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    if (contentType !== 'video') {
+      cleanupPrev(videoThumbs);
+      setVideoThumbs([]);
+      setSelectedVideoThumbIdx(0);
+      return;
+    }
+    if (isRecording) return;
+    const src = String(recordedUrl || '').trim();
+    if (!src) {
+      cleanupPrev(videoThumbs);
+      setVideoThumbs([]);
+      setSelectedVideoThumbIdx(0);
+      return;
+    }
+
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+    const captureAt = (videoEl, timeSec) =>
+      new Promise((resolve) => {
+        try {
+          const duration = Number(videoEl.duration || 0);
+          const t = clamp(Number(timeSec || 0), 0, Math.max(0, duration - 0.12));
+          const onSeeked = () => {
+            videoEl.removeEventListener('seeked', onSeeked);
+            try {
+              const w = Number(videoEl.videoWidth || 0);
+              const h = Number(videoEl.videoHeight || 0);
+              if (!w || !h) return resolve(null);
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(videoEl, 0, 0, w, h);
+              canvas.toBlob(
+                (blob) => {
+                  if (!blob) return resolve(null);
+                  const previewUrl = URL.createObjectURL(blob);
+                  resolve({ timeSec: t, previewUrl, blob });
+                },
+                'image/jpeg',
+                0.86
+              );
+            } catch {
+              resolve(null);
+            }
+          };
+          videoEl.addEventListener('seeked', onSeeked);
+          videoEl.currentTime = t;
+          // safety timeout
+          setTimeout(() => {
+            try {
+              videoEl.removeEventListener('seeked', onSeeked);
+            } catch {
+              // ignore
+            }
+            resolve(null);
+          }, 1400);
+        } catch {
+          resolve(null);
+        }
+      });
+
+    (async () => {
+      const prev = videoThumbs;
+      cleanupPrev(prev);
+      setVideoThumbs([]);
+      setSelectedVideoThumbIdx(0);
+
+      try {
+        const videoEl = document.createElement('video');
+        videoEl.preload = 'metadata';
+        videoEl.src = src;
+        videoEl.muted = true;
+        videoEl.playsInline = true;
+        await new Promise((resolve) => {
+          const done = () => resolve();
+          videoEl.onloadedmetadata = done;
+          videoEl.onerror = done;
+          setTimeout(done, 1200);
+        });
+        const duration = Number(videoEl.duration || 0);
+        const d = Number.isFinite(duration) && duration > 0 ? duration : Math.max(1, Number(mediaDurationSec || 0) || 1);
+
+        const rawTimes = [d * 0.2, d * 0.5, d * 0.8].map((t) => clamp(t, 0.1, Math.max(0.1, d - 0.12)));
+        const uniqTimes = Array.from(new Set(rawTimes.map((t) => Number(t.toFixed(2))))).slice(0, 3);
+
+        const captured = [];
+        for (const t of uniqTimes) {
+          if (cancelled) break;
+          // eslint-disable-next-line no-await-in-loop
+          const one = await captureAt(videoEl, t);
+          if (one) captured.push(one);
+        }
+        if (cancelled) {
+          cleanupPrev(captured);
+          return;
+        }
+        setVideoThumbs(captured);
+        setSelectedVideoThumbIdx(0);
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentType, recordedUrl, isRecording]);
 
   useEffect(() => {
     let cancelled = false;
@@ -569,7 +702,7 @@ export const CreatePolitPage = () => {
       method: 'POST',
       body: JSON.stringify({
         bucket: 'uploads',
-        folder: 'posts',
+        folder: file?.__uploadFolder || 'posts',
         contentType: ct,
       }),
     });
@@ -616,9 +749,24 @@ export const CreatePolitPage = () => {
     }
 
     // Basic file type checks
-    if (contentType === 'video' && files.some((f) => !String(f.type || '').startsWith('video/'))) return toast.error('Sadece video dosyası.');
-    if (contentType === 'audio' && files.some((f) => !String(f.type || '').startsWith('audio/'))) return toast.error('Sadece ses dosyası.');
-    if (contentType === 'image' && files.some((f) => !String(f.type || '').startsWith('image/'))) return toast.error('Sadece resim dosyası.');
+    // NOTE: Some mobile browsers provide empty/incorrect MIME types (e.g. application/octet-stream),
+    // so we validate by a best-effort guess (MIME or extension) instead of strict `file.type`.
+    const guessKind = (f) => {
+      const t = String(f?.type || '').trim().toLowerCase();
+      if (t.startsWith('video/')) return 'video';
+      if (t.startsWith('audio/')) return 'audio';
+      if (t.startsWith('image/')) return 'image';
+      const name = String(f?.name || '').trim().toLowerCase();
+      const ext = name.includes('.') ? name.split('.').pop() : '';
+      if (!ext) return '';
+      if (['mp4', 'm4v', 'mov', 'webm', '3gp', '3g2'].includes(ext)) return 'video';
+      if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'webm'].includes(ext)) return 'audio';
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image';
+      return '';
+    };
+    if (contentType === 'video' && files.some((f) => guessKind(f) !== 'video')) return toast.error('Sadece video dosyası (mp4/mov/m4v/webm/3gp).');
+    if (contentType === 'audio' && files.some((f) => guessKind(f) !== 'audio')) return toast.error('Sadece ses dosyası (mp3/m4a/aac/wav/ogg).');
+    if (contentType === 'image' && files.some((f) => guessKind(f) !== 'image')) return toast.error('Sadece resim dosyası (jpg/png/webp/gif).');
 
     publishLockRef.current = true;
     setLoading(true);
@@ -628,6 +776,17 @@ export const CreatePolitPage = () => {
         media_urls = await Promise.all(files.slice(0, contentType === 'image' ? 10 : 1).map(uploadOne));
       }
 
+      let thumbnail_url = null;
+      if (contentType === 'video' && videoThumbs?.length > 0) {
+        const chosen = videoThumbs[Math.min(Math.max(0, selectedVideoThumbIdx), videoThumbs.length - 1)] || null;
+        if (chosen?.blob) {
+          const thumbFile = new File([chosen.blob], 'thumb.jpg', { type: 'image/jpeg' });
+          // mark folder without changing uploadOne signature
+          thumbFile.__uploadFolder = 'posts/thumbnails';
+          thumbnail_url = await uploadOne(thumbFile);
+        }
+      }
+
       const payload = {
         content: trimmed,
         content_text: trimmed,
@@ -635,6 +794,7 @@ export const CreatePolitPage = () => {
         category: 'general',
         agenda_tag: agendaTag || null,
         media_urls,
+        ...(thumbnail_url ? { thumbnail_url } : {}),
         ...(mediaDurationSec > 0 ? { media_duration: mediaDurationSec } : {}),
         ...(isFastMode ? { is_trending: true } : {}),
       };
@@ -666,6 +826,7 @@ export const CreatePolitPage = () => {
         category: String(primaryPost?.category || 'general'),
         agenda_tag: agendaTag || null,
         media_urls: Array.isArray(primaryPost?.media_urls) ? primaryPost.media_urls : [],
+        thumbnail_url: primaryPost?.thumbnail_url || null,
       };
       const payload = {
         ...base,
@@ -702,6 +863,7 @@ export const CreatePolitPage = () => {
         category: String(primaryPost?.category || 'general'),
         agenda_tag: primaryPost?.agenda_tag ?? agendaTag ?? null,
         media_urls: Array.isArray(primaryPost?.media_urls) ? primaryPost.media_urls : [],
+        thumbnail_url: primaryPost?.thumbnail_url || null,
         ...(primaryPost?.media_duration ? { media_duration: primaryPost.media_duration } : {}),
       };
       const payload = { ...base, is_trending: false };
@@ -862,50 +1024,86 @@ export const CreatePolitPage = () => {
                 <div className="space-y-4">
                   {/* Preview */}
                   {contentType === 'video' ? (
-                    <div className="rounded-2xl border border-gray-200 bg-black overflow-hidden">
-                      {isRecording ? (
-                        <video
-                          ref={previewRef}
-                          className={['w-full aspect-video bg-black', videoRotate ? 'object-contain' : 'object-cover'].join(' ')}
-                          playsInline
-                          muted
-                          autoPlay
-                          onLoadedMetadata={(e) => {
-                            try {
-                              const el = e?.currentTarget;
-                              const w = Number(el?.videoWidth || 0);
-                              const h = Number(el?.videoHeight || 0);
-                              setVideoRotate(w > 0 && h > 0 && w > h);
-                            } catch {
-                              setVideoRotate(false);
-                            }
-                          }}
-                          style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
-                        />
-                      ) : recordedUrl ? (
-                        <video
-                          src={recordedUrl}
-                          controls
-                          className={['w-full aspect-video bg-black', videoRotate ? 'object-contain' : 'object-contain'].join(' ')}
-                          playsInline
-                          onLoadedMetadata={(e) => {
-                            try {
-                              const el = e?.currentTarget;
-                              const w = Number(el?.videoWidth || 0);
-                              const h = Number(el?.videoHeight || 0);
-                              setVideoRotate(w > 0 && h > 0 && w > h);
-                            } catch {
-                              setVideoRotate(false);
-                            }
-                          }}
-                          style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
-                        />
-                      ) : (
-                        <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
-                      )}
+                    <div className="space-y-3">
+                      <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden">
+                        {isRecording ? (
+                          <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
+                            <span className="text-xs font-semibold text-white">Kayıt Yapıyor!</span>
+                          </div>
+                        ) : null}
+                        {isRecording ? (
+                          <video
+                            ref={previewRef}
+                            className={['w-full aspect-video bg-black', videoRotate ? 'object-contain' : 'object-cover'].join(' ')}
+                            playsInline
+                            muted
+                            autoPlay
+                            onLoadedMetadata={(e) => {
+                              try {
+                                const el = e?.currentTarget;
+                                const w = Number(el?.videoWidth || 0);
+                                const h = Number(el?.videoHeight || 0);
+                                setVideoRotate(w > 0 && h > 0 && w > h);
+                              } catch {
+                                setVideoRotate(false);
+                              }
+                            }}
+                            style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
+                          />
+                        ) : recordedUrl ? (
+                          <video
+                            src={recordedUrl}
+                            controls
+                            className={['w-full aspect-video bg-black', videoRotate ? 'object-contain' : 'object-contain'].join(' ')}
+                            playsInline
+                            onLoadedMetadata={(e) => {
+                              try {
+                                const el = e?.currentTarget;
+                                const w = Number(el?.videoWidth || 0);
+                                const h = Number(el?.videoHeight || 0);
+                                setVideoRotate(w > 0 && h > 0 && w > h);
+                              } catch {
+                                setVideoRotate(false);
+                              }
+                            }}
+                            style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
+                          />
+                        ) : (
+                          <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
+                        )}
+                      </div>
+
+                      {videoThumbs.length > 0 ? (
+                        <div>
+                          <div className="text-xs font-black text-gray-900 mb-2">Önizleme seçin</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {videoThumbs.map((t, i) => (
+                              <button
+                                key={`${t?.previewUrl || ''}_${i}`}
+                                type="button"
+                                onClick={() => setSelectedVideoThumbIdx(i)}
+                                className={[
+                                  'rounded-2xl overflow-hidden border-2 bg-gray-50',
+                                  i === selectedVideoThumbIdx ? theme.borderClass : 'border-gray-200',
+                                ].join(' ')}
+                                title={`Önizleme ${i + 1}`}
+                              >
+                                <img src={t.previewUrl} alt="" className="w-full aspect-video object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   ) : contentType === 'audio' ? (
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="relative rounded-2xl border border-gray-200 bg-white p-4">
+                      {isRecording ? (
+                        <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/10 border border-gray-200">
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
+                          <span className="text-xs font-semibold text-gray-900">Kayıt Yapıyor!</span>
+                        </div>
+                      ) : null}
                       {recordedUrl ? <audio src={recordedUrl} controls className="w-full" /> : <div className="text-sm text-gray-600">Ses önizleme burada.</div>}
                     </div>
                   ) : contentType === 'image' ? (

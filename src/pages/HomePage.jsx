@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigationType } from 'react-router-dom';
 import { HeroSlider } from '../components/home/HeroSlider';
 import { IntroSlider } from '../components/home/IntroSlider';
 import { ParliamentBar } from '../components/home/ParliamentBar';
@@ -15,9 +15,19 @@ import { filterConsecutiveTextAudio } from '../utils/postFilters';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 export const HomePage = () => {
   const { user, isAuthenticated } = useAuth();
+  const navType = useNavigationType();
+
+  const cacheKey = `pagecache:home:${isAuthenticated ? String(user?.id || 'me') : 'anon'}`;
+  const initialCache =
+    readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }) ||
+    (isAuthenticated ? readSessionCache('pagecache:home:me', { maxAgeMs: 10 * 60_000 }) : null) ||
+    readSessionCache('pagecache:home:anon', { maxAgeMs: 10 * 60_000 }) ||
+    null;
+
   const [posts, setPosts] = useState([]);
   const [parties, setParties] = useState([]);
   const [parliamentDistribution, setParliamentDistribution] = useState(currentParliamentDistribution);
@@ -28,16 +38,52 @@ export const HomePage = () => {
   const [homePostsPerRow, setHomePostsPerRow] = useState(2);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(5);
   const [desktopVisible, setDesktopVisible] = useState({ hit: 10, mp: 10, org: 10, citizen: 10 });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !(initialCache?.posts && Array.isArray(initialCache.posts) && initialCache.posts.length > 0));
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [postsOffset, setPostsOffset] = useState(0);
   const postsSentinelRef = useRef(null);
   const postsObserverRef = useRef(null);
+  const loadingMorePostsRef = useRef(false);
   const hasUserScrolledRef = useRef(false);
   const [hasUserScrolled, setHasUserScrolled] = useState(false);
   const mobileSentinelRef = useRef(null);
   const mobileObserverRef = useRef(null);
+  const [isMdUp, setIsMdUp] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 768 : false));
+
+  // Instant restore from cache (no blocking loader), then refresh silently.
+  useEffect(() => {
+    if (!initialCache) return;
+    try {
+      if (Array.isArray(initialCache.posts) && initialCache.posts.length > 0) setPosts(initialCache.posts);
+      if (Array.isArray(initialCache.parties)) setParties(initialCache.parties);
+      if (Array.isArray(initialCache.agendas)) setAgendas(initialCache.agendas);
+      if (Array.isArray(initialCache.polifest)) setPolifest(initialCache.polifest);
+      if (Array.isArray(initialCache.parliamentDistribution)) setParliamentDistribution(initialCache.parliamentDistribution);
+      if (initialCache.homePostsPerRow != null) setHomePostsPerRow(Number(initialCache.homePostsPerRow) || 2);
+      if (initialCache.activeCategory) setActiveCategory(String(initialCache.activeCategory));
+      if (initialCache.desktopVisible) setDesktopVisible(initialCache.desktopVisible);
+      if (initialCache.postsOffset != null) setPostsOffset(Number(initialCache.postsOffset) || 0);
+      if (initialCache.hasMorePosts != null) setHasMorePosts(!!initialCache.hasMorePosts);
+      setLoading(false);
+
+      // Restore scroll position only on back/forward navigation.
+      if (navType === 'POP' && initialCache.scrollY != null) {
+        const y = Math.max(0, Number(initialCache.scrollY) || 0);
+        setTimeout(() => {
+          try {
+            window.scrollTo({ top: y, left: 0, behavior: 'auto' });
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keep initial payload small for mobile performance.
   // Social-style batching: small pages, no background loading until user scrolls.
@@ -61,6 +107,12 @@ export const HomePage = () => {
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setIsMdUp(window.innerWidth >= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   // Mobile: render posts in small batches (5 by 5)
@@ -175,7 +227,9 @@ export const HomePage = () => {
   useEffect(() => {
     // Load data from Supabase
     const loadData = async () => {
-      setLoading(true);
+      const hasCached = Array.isArray(initialCache?.posts) && initialCache.posts.length > 0;
+      if (hasCached) setRefreshing(true);
+      else setLoading(true);
       try {
         // Partiler + postlar (paged) (tamamı DB - Vercel /api üzerinden)
         const [partiesData, postsData, parliamentRes, publicSiteRes] = await Promise.all([
@@ -269,7 +323,10 @@ export const HomePage = () => {
             : null,
         });
 
-        let initialPosts = (postsData || []).map(mapDbPostToUi);
+        // IMPORTANT: Home feed should not include Fast copies (is_trending).
+        // Fast content is shown via /api/fast and the StoriesBar only.
+        const baseRows = (postsData || []).filter((p) => !p?.is_trending);
+        let initialPosts = baseRows.map(mapDbPostToUi);
 
         // Ensure each category has at least 5 posts (best-effort, capped).
         const needPer = 5;
@@ -290,7 +347,8 @@ export const HomePage = () => {
         while (!isEnough(countByType(initialPosts)) && extraPage < maxExtraPages) {
           // eslint-disable-next-line no-await-in-loop
           const more = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset, order: 'created_at.desc' }).catch(() => []);
-          const nextBatch = (more || []).map(mapDbPostToUi);
+          const moreRows = (more || []).filter((p) => !p?.is_trending);
+          const nextBatch = moreRows.map(mapDbPostToUi);
           if (nextBatch.length === 0) break;
           const seen = new Set(initialPosts.map((p) => String(p?.post_id ?? p?.id ?? '')));
           for (const p of nextBatch) {
@@ -342,12 +400,45 @@ export const HomePage = () => {
         setHasMorePosts(false);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     };
 
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Save to session cache (so returning to this page is instant).
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        posts,
+        parties,
+        agendas,
+        polifest,
+        parliamentDistribution,
+        postsOffset,
+        hasMorePosts,
+        homePostsPerRow,
+        activeCategory,
+        desktopVisible,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [
+    cacheKey,
+    posts,
+    parties,
+    agendas,
+    polifest,
+    parliamentDistribution,
+    postsOffset,
+    hasMorePosts,
+    homePostsPerRow,
+    activeCategory,
+    desktopVisible,
+  ]);
 
   // Refresh Fast list when auth state changes (without reloading whole HomePage)
   useEffect(() => {
@@ -391,7 +482,9 @@ export const HomePage = () => {
   }, [isAuthenticated]);
 
   const fetchMorePosts = async () => {
-    if (loadingMorePosts || !hasMorePosts) return;
+    // Guard against double-trigger on mobile (IntersectionObserver can fire multiple times quickly)
+    if (loadingMorePostsRef.current || loadingMorePosts || !hasMorePosts) return;
+    loadingMorePostsRef.current = true;
     setLoadingMorePosts(true);
     try {
       const partyMap = new Map((parties || []).map((p) => [p.id, p]));
@@ -443,7 +536,9 @@ export const HomePage = () => {
       });
 
       const postsData = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: postsOffset, order: 'created_at.desc' }).catch(() => []);
-      const nextBatch = (postsData || []).map(mapDbPostToUi);
+      // Do not append Fast copies into the Home feed.
+      const rows = (postsData || []).filter((p) => !p?.is_trending);
+      const nextBatch = rows.map(mapDbPostToUi);
       setPosts((prev) => {
         const seen = new Set((prev || []).map((p) => String(p?.post_id ?? p?.id ?? '')));
         const merged = prev ? prev.slice() : [];
@@ -461,11 +556,18 @@ export const HomePage = () => {
       setHasMorePosts(false);
     } finally {
       setLoadingMorePosts(false);
+      loadingMorePostsRef.current = false;
     }
   };
 
   useEffect(() => {
     if (loading) return;
+    // IMPORTANT: Desktop/tablet uses horizontal carousels; vertical scroll must NOT trigger loading.
+    // Only mobile uses bottom sentinel to fetch more posts.
+    if (isMdUp) {
+      postsObserverRef.current?.disconnect();
+      return;
+    }
     if (!postsSentinelRef.current) return;
     if (postsObserverRef.current) postsObserverRef.current.disconnect();
     postsObserverRef.current = new IntersectionObserver(
@@ -482,7 +584,7 @@ export const HomePage = () => {
       postsObserverRef.current?.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, hasMorePosts, postsOffset, parties, hasUserScrolled]);
+  }, [loading, hasMorePosts, postsOffset, parties, hasUserScrolled, isMdUp]);
   
   // Kategorilere göre post filtreleme (DB user_type ile)
   const pickFixedMix = (list = []) => {
@@ -609,6 +711,7 @@ export const HomePage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-6 lg:pr-0">
+        {refreshing ? <div className="mb-2 text-[11px] text-gray-500 font-semibold">Güncelleniyor…</div> : null}
         {/* Üst Tanıtım Slaytı */}
         <IntroSlider />
 
@@ -726,6 +829,8 @@ export const HomePage = () => {
                       ...p,
                       hit: Math.min((p.hit || 10) + inc, hitPosts.length),
                     }));
+                    const nextVisible = Math.max(10, (desktopVisible.hit || 10) + inc);
+                    if (hasMorePosts && !loadingMorePosts && nextVisible >= hitPosts.length - 2) fetchMorePosts();
                   }}
                 >
                   {hitPosts.slice(0, Math.max(10, desktopVisible.hit)).map(post => (
@@ -760,6 +865,8 @@ export const HomePage = () => {
                     ...p,
                     mp: Math.min((p.mp || 10) + inc, mpPostsDesktop.length),
                   }));
+                  const nextVisible = Math.max(10, (desktopVisible.mp || 10) + inc);
+                  if (hasMorePosts && !loadingMorePosts && nextVisible >= mpPostsDesktop.length - 2) fetchMorePosts();
                 }}
               >
                 {mpPostsDesktop.slice(0, Math.max(10, desktopVisible.mp)).map(post => (
@@ -794,6 +901,8 @@ export const HomePage = () => {
                     ...p,
                     org: Math.min((p.org || 10) + inc, organizationPostsDesktop.length),
                   }));
+                  const nextVisible = Math.max(10, (desktopVisible.org || 10) + inc);
+                  if (hasMorePosts && !loadingMorePosts && nextVisible >= organizationPostsDesktop.length - 2) fetchMorePosts();
                 }}
               >
                 {organizationPostsDesktop.slice(0, Math.max(10, desktopVisible.org)).map(post => (
@@ -827,6 +936,8 @@ export const HomePage = () => {
                     ...p,
                     citizen: Math.min((p.citizen || 10) + inc, citizenPostsDesktop.length),
                   }));
+                  const nextVisible = Math.max(10, (desktopVisible.citizen || 10) + inc);
+                  if (hasMorePosts && !loadingMorePosts && nextVisible >= citizenPostsDesktop.length - 2) fetchMorePosts();
                 }}
               >
                 {citizenPostsDesktop.slice(0, Math.max(10, desktopVisible.citizen)).map(post => (
@@ -853,11 +964,13 @@ export const HomePage = () => {
             </div>
           </aside>
         </div>
-        {/* Infinite feed loader (best-effort) */}
-        <div ref={postsSentinelRef} className="h-10" />
-        {loadingMorePosts && (
-          <div className="text-center text-sm text-gray-600 py-4">Daha fazla içerik yükleniyor…</div>
-        )}
+        {/* Infinite feed loader: ONLY mobile (desktop is driven by horizontal carousels) */}
+        {!isMdUp ? (
+          <>
+            <div ref={postsSentinelRef} className="h-10" />
+            {loadingMorePosts && <div className="text-center text-sm text-gray-600 py-4">Daha fazla içerik yükleniyor…</div>}
+          </>
+        ) : null}
       </div>
     </div>
   );

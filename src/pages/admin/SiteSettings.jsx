@@ -52,6 +52,7 @@ export const SiteSettings = () => {
 
   const [loading, setLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
 
   // Load settings from API
   useEffect(() => {
@@ -60,7 +61,9 @@ export const SiteSettings = () => {
         const response = await apiCall('/api/settings', {
           method: 'GET',
         });
-        
+        if (response?.schemaMissing && response?.requiredSql) {
+          setSchemaSql(String(response.requiredSql || ''));
+        }
         if (response.success) {
           const d = response.data && typeof response.data === 'object' ? response.data : {};
           const social = tryParseJson(d.social_links);
@@ -142,6 +145,7 @@ export const SiteSettings = () => {
         setSaveMessage('✅ Ayarlar başarıyla kaydedildi!');
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
+        if (response?.schemaMissing && response?.requiredSql) setSchemaSql(String(response.requiredSql || ''));
         setSaveMessage('❌ ' + (response.error || 'Kaydetme başarısız'));
       }
     } catch (error) {
@@ -175,6 +179,14 @@ export const SiteSettings = () => {
           </button>
         </div>
       </div>
+
+      {schemaSql ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="font-black">DB tablosu eksik: `site_settings`</div>
+          <div className="text-sm mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+          <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+        </div>
+      ) : null}
       
       <div className="space-y-6">
         {/* Home feed layout */}

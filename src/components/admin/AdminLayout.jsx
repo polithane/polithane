@@ -2,9 +2,12 @@ import { Outlet } from 'react-router-dom';
 import { AdminSidebar } from './AdminSidebar';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Menu, X } from 'lucide-react';
 
 export const AdminLayout = () => {
   const { isAuthenticated, isAdmin, loading } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // While auth state is being restored/verified, don't redirect.
   if (loading) {
@@ -31,9 +34,48 @@ export const AdminLayout = () => {
   }
   
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
-      <div className="flex-1 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50 lg:flex">
+      {/* Mobile overlay */}
+      {sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Menüyü kapat"
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
+
+      {/* Sidebar */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 lg:w-64 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <AdminSidebar
+          onNavigate={() => setSidebarOpen(false)}
+          onClose={() => setSidebarOpen(false)}
+          showCloseButton
+        />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0 overflow-x-hidden">
+        {/* Mobile top bar */}
+        <div className="sticky top-0 z-30 bg-white border-b border-gray-200 lg:hidden">
+          <div className="h-14 px-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="p-2 rounded-lg hover:bg-gray-100"
+              aria-label={sidebarOpen ? 'Menüyü kapat' : 'Menüyü aç'}
+            >
+              {sidebarOpen ? <X className="w-6 h-6 text-gray-700" /> : <Menu className="w-6 h-6 text-gray-700" />}
+            </button>
+            <div className="font-black text-gray-900">Admin Paneli</div>
+            <div className="w-10" />
+          </div>
+        </div>
+
         <Outlet />
       </div>
     </div>

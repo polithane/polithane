@@ -39,8 +39,9 @@ export const MEDIA_LIMITS = {
 // İzin verilen dosya tipleri
 export const ALLOWED_FILE_TYPES = {
   IMAGE: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
-  VIDEO: ['video/mp4', 'video/webm', 'video/ogg'],
-  AUDIO: ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg'],
+  // NOTE: Mobile (esp. iOS) can produce MOV/M4V/3GP types.
+  VIDEO: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-m4v', 'video/3gpp', 'video/3gpp2'],
+  AUDIO: ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/webm'],
   DOCUMENT: ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
 };
 

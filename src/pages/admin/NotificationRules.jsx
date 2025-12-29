@@ -178,7 +178,7 @@ export const NotificationRules = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -304,7 +304,12 @@ export const NotificationRules = () => {
                   {getPriorityBadge(rule.priority)}
                   <button
                     onClick={() => toggleRule(rule.id)}
-                    className={`ml-auto ${rule.enabled ? 'text-green-500' : 'text-gray-400'}`}
+                    className={[
+                      'ml-auto p-2 rounded-lg hover:bg-gray-50',
+                      rule.enabled ? 'text-green-500' : 'text-gray-400',
+                    ].join(' ')}
+                    type="button"
+                    aria-label={rule.enabled ? 'Kuralı kapat' : 'Kuralı aç'}
                   >
                     {rule.enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
                   </button>
@@ -427,8 +432,12 @@ export const NotificationRules = () => {
               <button
                 type="button"
                 onClick={() => setChannels((p) => ({ ...p, in_app_enabled: !p.in_app_enabled }))}
-                className={channels.in_app_enabled ? 'text-green-500' : 'text-gray-400'}
+                className={[
+                  'p-2 rounded-lg hover:bg-gray-50',
+                  channels.in_app_enabled ? 'text-green-500' : 'text-gray-400',
+                ].join(' ')}
                 title="Aç/Kapat"
+                aria-label={channels.in_app_enabled ? 'Uygulama içi bildirimleri kapat' : 'Uygulama içi bildirimleri aç'}
               >
                 {channels.in_app_enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
               </button>
@@ -441,8 +450,12 @@ export const NotificationRules = () => {
               <button
                 type="button"
                 onClick={() => setChannels((p) => ({ ...p, push_enabled: !p.push_enabled }))}
-                className={channels.push_enabled ? 'text-green-500' : 'text-gray-400'}
+                className={[
+                  'p-2 rounded-lg hover:bg-gray-50',
+                  channels.push_enabled ? 'text-green-500' : 'text-gray-400',
+                ].join(' ')}
                 title="Aç/Kapat"
+                aria-label={channels.push_enabled ? 'Anlık bildirimleri kapat' : 'Anlık bildirimleri aç'}
               >
                 {channels.push_enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
               </button>
@@ -455,8 +468,12 @@ export const NotificationRules = () => {
               <button
                 type="button"
                 onClick={() => setChannels((p) => ({ ...p, email_enabled: !p.email_enabled }))}
-                className={channels.email_enabled ? 'text-green-500' : 'text-gray-400'}
+                className={[
+                  'p-2 rounded-lg hover:bg-gray-50',
+                  channels.email_enabled ? 'text-green-500' : 'text-gray-400',
+                ].join(' ')}
                 title="Aç/Kapat"
+                aria-label={channels.email_enabled ? 'E-posta bildirimlerini kapat' : 'E-posta bildirimlerini aç'}
               >
                 {channels.email_enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
               </button>
@@ -469,8 +486,12 @@ export const NotificationRules = () => {
               <button
                 type="button"
                 onClick={() => setChannels((p) => ({ ...p, sms_enabled: !p.sms_enabled }))}
-                className={channels.sms_enabled ? 'text-green-500' : 'text-gray-400'}
+                className={[
+                  'p-2 rounded-lg hover:bg-gray-50',
+                  channels.sms_enabled ? 'text-green-500' : 'text-gray-400',
+                ].join(' ')}
                 title="Aç/Kapat"
+                aria-label={channels.sms_enabled ? 'SMS bildirimlerini kapat' : 'SMS bildirimlerini aç'}
               >
                 {channels.sms_enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
               </button>

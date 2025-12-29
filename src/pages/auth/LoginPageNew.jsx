@@ -38,7 +38,7 @@ export const LoginPageNew = () => {
       if (result.success) {
         // Admin kullanıcıları admin paneline yönlendir
         if (result.user?.is_admin || result.user?.user_type === 'admin') {
-          navigate('/admin');
+          navigate('/adminyonetim');
         } else {
           navigate('/');
         }

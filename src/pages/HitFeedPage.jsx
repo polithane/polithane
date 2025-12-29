@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
@@ -7,14 +7,17 @@ import { Avatar } from '../components/common/Avatar';
 import { formatPolitScore } from '../utils/formatters';
 import { getProfilePath } from '../utils/paths';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 export const HitFeedPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const navType = useNavigationType();
   const [parties, setParties] = useState([]);
   const [pool, setPool] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
@@ -28,6 +31,34 @@ export const HitFeedPage = () => {
     return String(q.get('mode') || '').trim();
   }, [location.search]);
   const isProfilesMode = mode === 'profiles';
+
+  const cacheKey = useMemo(() => `hit:${mode || 'posts'}`, [mode]);
+  const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
+
+  useEffect(() => {
+    if (!initialCache) return;
+    try {
+      if (Array.isArray(initialCache.parties)) setParties(initialCache.parties);
+      if (Array.isArray(initialCache.pool)) setPool(initialCache.pool);
+      if (Array.isArray(initialCache.profiles)) setProfiles(initialCache.profiles);
+      if (typeof initialCache.offset === 'number') setOffset(Number(initialCache.offset || 0) || 0);
+      if (typeof initialCache.hasMore === 'boolean') setHasMore(!!initialCache.hasMore);
+      setLoading(false);
+      setRefreshing(true);
+      if (navType === 'POP' && typeof initialCache.scrollY === 'number') {
+        setTimeout(() => {
+          try {
+            window.scrollTo(0, Math.max(0, Number(initialCache.scrollY) || 0));
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
 
   const partyMap = useMemo(() => new Map((parties || []).map((p) => [p.id, p])), [parties]);
 
@@ -156,7 +187,8 @@ export const HitFeedPage = () => {
 
   const fetchPage = async ({ nextOffset, replace, pm }) => {
     const rows = await api.posts.getAll({ limit: PAGE_SIZE, offset: nextOffset, order: 'created_at.desc' }).catch(() => []);
-    const list = Array.isArray(rows) ? rows : [];
+    // Keep Hit feed as "Polit" content; Fast copies live in the Fast viewer.
+    const list = (Array.isArray(rows) ? rows : []).filter((p) => !p?.is_trending);
     const mapperMap = pm instanceof Map ? pm : partyMap;
     const mapped = list.map((r) => mapDbPostToUi(r, mapperMap));
     setPool((prev) => {
@@ -178,7 +210,9 @@ export const HitFeedPage = () => {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      const hasCached = !!initialCache;
+      if (hasCached) setRefreshing(true);
+      else setLoading(true);
       setPool([]);
       setProfiles([]);
       setHasMore(true);
@@ -203,6 +237,7 @@ export const HitFeedPage = () => {
         }
       } finally {
         if (!cancelled) setLoading(false);
+        if (!cancelled) setRefreshing(false);
       }
     })();
     return () => {
@@ -210,6 +245,20 @@ export const HitFeedPage = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProfilesMode]);
+
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        parties,
+        pool,
+        profiles,
+        offset,
+        hasMore,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [cacheKey, parties, pool, profiles, offset, hasMore]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useNavigationType } from 'react-router-dom';
 import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 const CATEGORY_META = {
   all: { title: 'HİT PAYLAŞIMLAR', subtitle: 'Tüm kategorilerden (Polit Puan’a göre)', queryCategory: null },
@@ -15,10 +16,12 @@ const CATEGORY_META = {
 export const CategoryFeedPage = () => {
   const { categoryId } = useParams();
   const navigate = useNavigate();
+  const navType = useNavigationType();
 
   const meta = CATEGORY_META[String(categoryId || 'all')] || CATEGORY_META.all;
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
@@ -26,6 +29,32 @@ export const CategoryFeedPage = () => {
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
   const PAGE_SIZE = 24;
+
+  const cacheKey = useMemo(() => `cat:${String(categoryId || 'all')}`, [categoryId]);
+  const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
+
+  useEffect(() => {
+    if (!initialCache) return;
+    try {
+      if (Array.isArray(initialCache.posts)) setPosts(initialCache.posts);
+      if (typeof initialCache.offset === 'number') setOffset(Number(initialCache.offset || 0) || 0);
+      if (typeof initialCache.hasMore === 'boolean') setHasMore(!!initialCache.hasMore);
+      setLoading(false);
+      setRefreshing(true);
+      if (navType === 'POP' && typeof initialCache.scrollY === 'number') {
+        setTimeout(() => {
+          try {
+            window.scrollTo(0, Math.max(0, Number(initialCache.scrollY) || 0));
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
 
   const paramsBase = useMemo(() => {
     const p = {
@@ -40,7 +69,8 @@ export const CategoryFeedPage = () => {
   const fetchPage = async ({ nextOffset, replace }) => {
     const p = { ...paramsBase, offset: nextOffset };
     const rows = await api.posts.getAll(p).catch(() => []);
-    const list = Array.isArray(rows) ? rows : [];
+    // Category feeds are Polit feeds; exclude Fast copies (is_trending).
+    const list = (Array.isArray(rows) ? rows : []).filter((x) => !x?.is_trending);
     setPosts((prev) => (replace ? list : [...(prev || []), ...list]));
     setHasMore(list.length >= PAGE_SIZE);
     setOffset(nextOffset + list.length);
@@ -49,7 +79,9 @@ export const CategoryFeedPage = () => {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      const hasCached = !!initialCache;
+      if (hasCached) setRefreshing(true);
+      else setLoading(true);
       setPosts([]);
       setHasMore(true);
       setOffset(0);
@@ -57,6 +89,7 @@ export const CategoryFeedPage = () => {
         if (!cancelled) await fetchPage({ nextOffset: 0, replace: true });
       } finally {
         if (!cancelled) setLoading(false);
+        if (!cancelled) setRefreshing(false);
       }
     })();
     return () => {
@@ -64,6 +97,18 @@ export const CategoryFeedPage = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramsBase, categoryId]);
+
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        posts,
+        offset,
+        hasMore,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [cacheKey, posts, offset, hasMore]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;

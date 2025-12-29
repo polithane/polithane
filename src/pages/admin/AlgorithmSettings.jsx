@@ -6,6 +6,7 @@ export const AlgorithmSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
   const [algorithm, setAlgorithm] = useState({
     userTypeMultipliers: {
       normal: 1,
@@ -109,6 +110,7 @@ export const AlgorithmSettings = () => {
       setLoading(true);
       try {
         const r = await apiCall('/api/settings', { method: 'GET' }).catch(() => null);
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
         const raw = r?.success ? r?.data?.algorithm_config : null;
         const parsed = typeof raw === 'string' && raw.trim() ? JSON.parse(raw) : (raw && typeof raw === 'object' ? raw : null);
         if (!cancelled && parsed && typeof parsed === 'object') {
@@ -146,6 +148,7 @@ export const AlgorithmSettings = () => {
         setSaveMessage('✅ Algoritma kaydedildi!');
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
         setSaveMessage(`❌ ${r?.error || 'Kaydetme başarısız'}`);
       }
     } catch (e) {
@@ -168,6 +171,13 @@ export const AlgorithmSettings = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="container-main">
+        {schemaSql ? (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <div className="font-black">DB tablosu eksik: `site_settings`</div>
+            <div className="text-sm mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+            <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+          </div>
+        ) : null}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -295,12 +305,22 @@ export const AlgorithmSettings = () => {
                 
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={testData.isVerified} onChange={(e) => setTestData(prev => ({ ...prev, isVerified: e.target.checked }))} className="w-4 h-4" />
+                    <input
+                      type="checkbox"
+                      checked={testData.isVerified}
+                      onChange={(e) => setTestData((prev) => ({ ...prev, isVerified: e.target.checked }))}
+                      className="w-5 h-5 accent-primary-blue cursor-pointer"
+                    />
                     <span className="text-sm">Onaylı</span>
                   </label>
                   
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={testData.isTrending} onChange={(e) => setTestData(prev => ({ ...prev, isTrending: e.target.checked }))} className="w-4 h-4" />
+                    <input
+                      type="checkbox"
+                      checked={testData.isTrending}
+                      onChange={(e) => setTestData((prev) => ({ ...prev, isTrending: e.target.checked }))}
+                      className="w-5 h-5 accent-primary-blue cursor-pointer"
+                    />
                     <span className="text-sm">Trend</span>
                   </label>
                 </div>

@@ -292,7 +292,7 @@ export const PartyManagement = () => {
                   type="checkbox"
                   checked={createForm.is_active}
                   onChange={(e) => setCreateForm((p) => ({ ...p, is_active: e.target.checked }))}
-                  className="w-4 h-4"
+                  className="w-5 h-5 accent-primary-blue cursor-pointer"
                 />
                 Aktif
               </label>
@@ -471,7 +471,7 @@ export const PartyManagement = () => {
                     type="checkbox"
                     checked={editDraft.is_active}
                     onChange={(e) => setEditDraft((p) => ({ ...p, is_active: e.target.checked }))}
-                    className="w-4 h-4"
+                  className="w-5 h-5 accent-primary-blue cursor-pointer"
                   />
                   Aktif
                 </label>
@@ -773,16 +773,16 @@ export const PartyManagement = () => {
                                         </span>
                                         {unit.province && (
                                           <span className="inline-flex items-center gap-1 text-gray-600">
-                                            <MapPin className="w-5 h-5 sm:w-4 sm:h-4" /> {unit.province}
+                                            <MapPin className="w-5 h-5" /> {unit.province}
                                           </span>
                                         )}
                                         {unit.district_name && <span className="text-gray-600">/ {unit.district_name}</span>}
                                       </div>
                                       {unit.title && <div className="text-xs text-gray-700 mt-1">{unit.title}</div>}
                                       <div className="mt-2 text-xs text-gray-600 space-y-1">
-                                        {contact.phone && <div><Phone className="w-5 h-5 sm:w-4 sm:h-4 inline-block mr-1" /> {contact.phone}</div>}
-                                        {contact.email && <div><Mail className="w-5 h-5 sm:w-4 sm:h-4 inline-block mr-1" /> {contact.email}</div>}
-                                        {contact.website && <div><Globe className="w-5 h-5 sm:w-4 sm:h-4 inline-block mr-1" /> {contact.website}</div>}
+                                        {contact.phone && <div><Phone className="w-5 h-5 inline-block mr-1" /> {contact.phone}</div>}
+                                        {contact.email && <div><Mail className="w-5 h-5 inline-block mr-1" /> {contact.email}</div>}
+                                        {contact.website && <div><Globe className="w-5 h-5 inline-block mr-1" /> {contact.website}</div>}
                                       </div>
                                     </div>
                                   </div>

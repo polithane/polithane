@@ -115,7 +115,8 @@ function App() {
         <Route path="/gundem-disi" element={<><Header /><NoAgendaFeedPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/agendas" element={<><Header /><AgendasPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
-        <Route path="/messages" element={<><Header /><MessagesPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        {/* Messages is a full-height app surface; no footer (avoids mobile input hiding behind ActionBar) */}
+        <Route path="/messages" element={<><Header /><MessagesPage /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/search" element={<><Header /><SearchPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/polit-at" element={<><Header /><CreatePolitPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/test" element={<><Header /><TestPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
@@ -159,7 +160,7 @@ function App() {
         </Route>
         
         {/* Admin Routes (With Sidebar) */}
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/adminyonetim" element={<AdminLayout />}>
           <Route index element={<AdminDashboardNew />} />
           <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="users" element={<UserManagement />} />

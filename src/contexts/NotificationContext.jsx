@@ -22,10 +22,10 @@ export const NotificationProvider = ({ children }) => {
     const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
     return meta.notification_settings && typeof meta.notification_settings === 'object' ? meta.notification_settings : {};
   })();
-  const pushEnabled = notifSettings.pushNotifications !== false;
   const typeAllowed = (n) => {
     const t = String(n?.type || 'system');
     if (t === 'like') return notifSettings.likes !== false;
+    if (t === 'comment_like') return notifSettings.likes !== false;
     if (t === 'comment') return notifSettings.comments !== false;
     if (t === 'follow') return notifSettings.follows !== false;
     if (t === 'mention') return notifSettings.mentions !== false;
@@ -36,7 +36,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Fetch notifications
   const fetchNotifications = async () => {
-    if (!isAuthenticated || !pushEnabled) return;
+    if (!isAuthenticated) return;
     if (typeof document !== 'undefined' && document?.hidden) return;
     
     setLoading(true);
@@ -98,7 +98,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Poll for new notifications every 30 seconds
   useEffect(() => {
-    if (isAuthenticated && pushEnabled) {
+    if (isAuthenticated) {
       fetchNotifications();
       
       const interval = setInterval(() => {
@@ -108,12 +108,12 @@ export const NotificationProvider = ({ children }) => {
       
       return () => clearInterval(interval);
     }
-    // If push disabled, clear state
-    if (isAuthenticated && !pushEnabled) {
+    // If logged out, clear state
+    if (!isAuthenticated) {
       setNotifications([]);
       setUnreadCount(0);
     }
-  }, [isAuthenticated, pushEnabled]);
+  }, [isAuthenticated]);
 
   const value = {
     notifications,

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Users, FileText, TrendingUp, Activity, DollarSign, Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
+import { Users, FileText, TrendingUp, Activity, Settings, Eye, Heart, MessageCircle, Share2, Flame, Palette } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { admin as adminApi } from '../../utils/api';
 import { getUserTitle } from '../../utils/titleHelpers';
 
 export const AdminDashboardNew = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalPosts: 0,
@@ -25,7 +27,10 @@ export const AdminDashboardNew = () => {
   useEffect(() => {
     const load = async () => {
       try {
+        setLoading(true);
+        setError('');
         const r = await adminApi.getStats();
+        if (!r?.success) throw new Error(r?.error || 'İstatistikler yüklenemedi.');
         if (r?.success) {
           setStats((prev) => ({
             ...prev,
@@ -46,6 +51,9 @@ export const AdminDashboardNew = () => {
         }
       } catch (e) {
         console.error('Admin stats load error:', e);
+        setError(String(e?.message || 'İstatistikler yüklenemedi.'));
+      } finally {
+        setLoading(false);
       }
     };
     load();
@@ -53,10 +61,10 @@ export const AdminDashboardNew = () => {
   
   // NOTE: Avoid dynamic Tailwind classes like `bg-${color}-100` in production builds.
   const statCards = [
-    { label: 'Toplam Kullanıcı', value: stats.totalUsers.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-blue-100', iconText: 'text-blue-600', link: '/admin/users' },
-    { label: 'Toplam Paylaşım', value: stats.totalPosts.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-green-100', iconText: 'text-green-600', link: '/admin/posts' },
+    { label: 'Toplam Kullanıcı', value: stats.totalUsers.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-blue-100', iconText: 'text-blue-600', link: '/adminyonetim/users' },
+    { label: 'Toplam Paylaşım', value: stats.totalPosts.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-green-100', iconText: 'text-green-600', link: '/adminyonetim/posts' },
     { label: 'Toplam Görüntülenme', value: stats.totalViews.toLocaleString('tr-TR'), icon: Eye, iconBg: 'bg-purple-100', iconText: 'text-purple-600' },
-    { label: 'Toplam Polit Puan', value: `${(stats.totalPolitScore / 1000000).toFixed(1)}M`, icon: TrendingUp, iconBg: 'bg-orange-100', iconText: 'text-orange-600', link: '/admin/algorithm' },
+    { label: 'Toplam Polit Puan', value: `${(stats.totalPolitScore / 1000000).toFixed(1)}M`, icon: TrendingUp, iconBg: 'bg-orange-100', iconText: 'text-orange-600', link: '/adminyonetim/algorithm' },
     { label: 'Bugün Yeni Kullanıcı', value: stats.newUsersToday.toLocaleString('tr-TR'), icon: Users, iconBg: 'bg-green-100', iconText: 'text-green-600' },
     { label: 'Bugün Yeni Paylaşım', value: stats.newPostsToday.toLocaleString('tr-TR'), icon: FileText, iconBg: 'bg-blue-100', iconText: 'text-blue-600' },
     { label: 'Aktif Kullanıcı (24s)', value: stats.activeUsers24h.toLocaleString('tr-TR'), icon: Activity, iconBg: 'bg-red-100', iconText: 'text-red-600' },
@@ -71,24 +79,46 @@ export const AdminDashboardNew = () => {
           <p className="text-gray-600">Platform yönetim merkezi - Tüm istatistikler</p>
         </div>
       </div>
+
+      {error ? (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="mb-6 text-sm text-gray-600 font-semibold">Yükleniyor…</div>
+      ) : null}
       
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {statCards.map((stat, index) => (
-          <Link
-            key={index}
-            to={stat.link || '#'}
-            className={`bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow ${stat.link ? 'cursor-pointer' : ''}`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 rounded-lg ${stat.iconBg}`}>
-                <stat.icon className={`w-6 h-6 ${stat.iconText}`} />
+        {statCards.map((stat, index) => {
+          const Card = (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-lg ${stat.iconBg}`}>
+                  <stat.icon className={`w-6 h-6 ${stat.iconText}`} />
+                </div>
               </div>
+              <div className="text-3xl font-black text-gray-900 mb-1">{stat.value}</div>
+              <div className="text-sm text-gray-600">{stat.label}</div>
             </div>
-            <div className="text-3xl font-black text-gray-900 mb-1">{stat.value}</div>
-            <div className="text-sm text-gray-600">{stat.label}</div>
-          </Link>
-        ))}
+          );
+
+          if (!stat.link) {
+            return (
+              <div key={index} className="cursor-default">
+                {Card}
+              </div>
+            );
+          }
+
+          return (
+            <Link key={index} to={stat.link} className="cursor-pointer">
+              {Card}
+            </Link>
+          );
+        })}
       </div>
       
       {/* Engagement Stats */}
@@ -124,22 +154,26 @@ export const AdminDashboardNew = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-900">Son Kullanıcılar</h3>
-            <Link to="/admin/users" className="text-sm text-primary-blue hover:text-blue-600 font-semibold">
+            <Link to="/adminyonetim/users" className="text-sm text-primary-blue hover:text-blue-600 font-semibold">
               Tümünü Gör →
             </Link>
           </div>
           
           <div className="space-y-3">
-            {recentUsers.map(user => (
-              <div key={user.user_id || user.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                <img src={user.avatar_url || user.profile_image} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900 truncate">{user.full_name}</div>
-                  <div className="text-xs text-gray-500">{getUserTitle(user, true) || 'Üye'}</div>
+            {recentUsers.length === 0 ? (
+              <div className="text-sm text-gray-500">Henüz veri yok.</div>
+            ) : (
+              recentUsers.map(user => (
+                <div key={user.user_id || user.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                  <img src={user.avatar_url || user.profile_image} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-900 truncate">{user.full_name}</div>
+                    <div className="text-xs text-gray-500">{getUserTitle(user, true) || 'Üye'}</div>
+                  </div>
+                  <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-semibold">Yeni</span>
                 </div>
-                <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-semibold">Yeni</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
         
@@ -147,52 +181,68 @@ export const AdminDashboardNew = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-900">En Yüksek Polit Puan</h3>
-            <Link to="/admin/posts" className="text-sm text-primary-blue hover:text-blue-600 font-semibold">
+            <Link to="/adminyonetim/posts" className="text-sm text-primary-blue hover:text-blue-600 font-semibold">
               Tümünü Gör →
             </Link>
           </div>
           
           <div className="space-y-3">
-            {topPosts.map(post => (
-              <div key={post.post_id ?? post.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900 truncate">{post.user?.full_name}</div>
-                  <div className="text-xs text-gray-500 truncate">{String(post.content_text ?? post.content ?? '').slice(0, 50)}...</div>
+            {topPosts.length === 0 ? (
+              <div className="text-sm text-gray-500">Henüz veri yok.</div>
+            ) : (
+              topPosts.map(post => (
+                <div key={post.post_id ?? post.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-900 truncate">{post.user?.full_name}</div>
+                    <div className="text-xs text-gray-500 truncate">{String(post.content_text ?? post.content ?? '').slice(0, 50)}...</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-primary-blue">{(post.polit_score / 1000).toFixed(1)}K</div>
+                    <div className="text-xs text-gray-500">Polit Puan</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-primary-blue">{(post.polit_score / 1000).toFixed(1)}K</div>
-                  <div className="text-xs text-gray-500">Polit Puan</div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
       
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Link to="/admin/users" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Link to="/adminyonetim/users" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
           <Users className="w-8 h-8 text-blue-500 mb-2" />
           <div className="font-bold text-gray-900">Kullanıcılar</div>
           <div className="text-xs text-gray-500">Yönet & Doğrula</div>
         </Link>
         
-        <Link to="/admin/posts" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
+        <Link to="/adminyonetim/posts" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
           <FileText className="w-8 h-8 text-green-500 mb-2" />
           <div className="font-bold text-gray-900">Paylaşımlar</div>
           <div className="text-xs text-gray-500">Moderasyon</div>
         </Link>
+
+        <Link to="/adminyonetim/agendas" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
+          <Flame className="w-8 h-8 text-orange-500 mb-2" />
+          <div className="font-bold text-gray-900">Gündemler</div>
+          <div className="text-xs text-gray-500">Sıralama & Yönetim</div>
+        </Link>
         
-        <Link to="/admin/algorithm" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
+        <Link to="/adminyonetim/algorithm" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
           <TrendingUp className="w-8 h-8 text-purple-500 mb-2" />
           <div className="font-bold text-gray-900">Algoritma</div>
           <div className="text-xs text-gray-500">Polit Puan</div>
         </Link>
         
-        <Link to="/admin/theme" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
-          <DollarSign className="w-8 h-8 text-orange-500 mb-2" />
+        <Link to="/adminyonetim/theme" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
+          <Palette className="w-8 h-8 text-pink-500 mb-2" />
           <div className="font-bold text-gray-900">Tasarım</div>
           <div className="text-xs text-gray-500">Tema & Renk</div>
+        </Link>
+
+        <Link to="/adminyonetim/site-settings" className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
+          <Settings className="w-8 h-8 text-slate-700 mb-2" />
+          <div className="font-bold text-gray-900">Site Ayarları</div>
+          <div className="text-xs text-gray-500">Genel yapılandırma</div>
         </Link>
       </div>
     </div>

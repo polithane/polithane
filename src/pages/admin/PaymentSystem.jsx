@@ -73,14 +73,14 @@ export const PaymentSystem = () => {
     const Icon = badge.icon;
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
-        <Icon className="w-5 h-5 sm:w-4 sm:h-4" />
+        <Icon className="w-5 h-5" />
         {badge.text}
       </span>
     );
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Ödeme Sistemi</h1>

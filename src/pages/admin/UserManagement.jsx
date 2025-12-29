@@ -10,6 +10,7 @@ const API_URL = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'ht
 export const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     user_type: '',
@@ -32,6 +33,7 @@ export const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      setError('');
       const params = {
         page: pagination.page,
         limit: 20,
@@ -40,12 +42,16 @@ export const UserManagement = () => {
       if (searchQuery) params.search = searchQuery;
 
       const response = await adminApi.getUsers(params);
+      if (!response?.success) throw new Error(response?.error || 'Kullanıcılar yüklenemedi.');
       if (response.success) {
         setUsers(response.data);
         setPagination(response.pagination);
       }
     } catch (error) {
       console.error('Fetch users error:', error);
+      setUsers([]);
+      setPagination((p) => ({ ...p, totalPages: 1, total: 0 }));
+      setError(String(error?.message || 'Kullanıcılar yüklenemedi.'));
     } finally {
       setLoading(false);
     }
@@ -180,6 +186,12 @@ export const UserManagement = () => {
           </div>
         </div>
       )}
+
+      {error ? (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold">
+          {error}
+        </div>
+      ) : null}
       
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">

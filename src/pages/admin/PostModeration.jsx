@@ -11,7 +11,6 @@ export const PostModeration = () => {
     status: 'all',
     content_type: 'all',
   });
-  const [selectedPosts, setSelectedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
 

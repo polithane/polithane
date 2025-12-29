@@ -61,7 +61,7 @@ export const DatabaseManagement = () => {
   }, [tableRows]);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Veritabanı Yönetimi</h1>
         <p className="text-gray-600">Supabase Postgres özet görünümü (mock yok)</p>

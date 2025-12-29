@@ -27,6 +27,7 @@ export const ThemeEditor = () => {
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
 
   const handleColorChange = (key, value) => {
     setColors(prev => ({ ...prev, [key]: value }));
@@ -75,6 +76,7 @@ export const ThemeEditor = () => {
         setSaveMessage('✅ Tema kaydedildi!');
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
         setSaveMessage(`❌ ${r?.error || 'Kaydetme başarısız'}`);
       }
     } catch (e) {
@@ -113,6 +115,7 @@ export const ThemeEditor = () => {
         setSaveMessage('✅ Tema varsayılana döndürüldü.');
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
         setSaveMessage(`❌ ${r?.error || 'Kaydetme başarısız'}`);
       }
     } catch (e) {
@@ -154,6 +157,14 @@ export const ThemeEditor = () => {
           </button>
         </div>
       </div>
+
+      {schemaSql ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="font-black">DB tablosu eksik: `site_settings`</div>
+          <div className="text-sm mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+          <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+        </div>
+      ) : null}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Color Settings */}

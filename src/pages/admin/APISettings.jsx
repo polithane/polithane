@@ -68,7 +68,7 @@ export const APISettings = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">API Ayarları</h1>
@@ -145,7 +145,7 @@ export const APISettings = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold inline-flex items-center gap-1">
-                    <EyeOff className="w-4 h-4" /> Gizli
+                    <EyeOff className="w-5 h-5" /> Gizli
                   </span>
                   <button type="button" onClick={() => deleteKey(k.id)} className="p-2 hover:bg-red-50 rounded-lg transition-colors" title="Sil">
                     <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />

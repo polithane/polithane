@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
 import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
@@ -11,16 +11,49 @@ import { useAuth } from '../contexts/AuthContext';
 import { getProfilePath } from '../utils/paths';
 import { FollowButton } from '../components/common/FollowButton';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
-const SmartVideo = ({ src }) => {
+const SmartVideo = ({ src, autoPlay = false }) => {
   const [rotate, setRotate] = useState(false);
+  const videoRef = useRef(null);
   const url = String(src || '').trim();
   if (!url) return null;
+
+  useEffect(() => {
+    if (!autoPlay) return;
+    const el = videoRef.current;
+    if (!el) return;
+    let cancelled = false;
+    const tryPlay = async () => {
+      try {
+        el.muted = false;
+        await el.play();
+      } catch {
+        try {
+          el.muted = true; // mobile autoplay fallback
+          await el.play();
+        } catch {
+          // ignore
+        }
+      }
+    };
+    // small delay helps on some mobile browsers
+    setTimeout(() => {
+      if (!cancelled) tryPlay();
+    }, 50);
+    return () => {
+      cancelled = true;
+    };
+  }, [autoPlay, url]);
+
   return (
     <video
+      ref={videoRef}
       src={url}
       controls
       playsInline
+      autoPlay={autoPlay}
+      preload="metadata"
       className="w-full max-h-[70vh] bg-black rounded-lg object-contain"
       onLoadedMetadata={(e) => {
         try {
@@ -41,6 +74,7 @@ export const PostDetailPage = () => {
   const { postId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const navType = useNavigationType();
   const { user: currentUser, isAuthenticated } = useAuth();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
@@ -51,6 +85,7 @@ export const PostDetailPage = () => {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentEditSubmittingId, setCommentEditSubmittingId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const [editingId, setEditingId] = useState(null);
@@ -77,10 +112,40 @@ export const PostDetailPage = () => {
   const [showDeletePost, setShowDeletePost] = useState(false);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [expandedScoreCategory, setExpandedScoreCategory] = useState(null);
+
+  const cacheKey = useMemo(() => `post:${String(postId || '').trim() || '-'}`, [postId]);
+  const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
+
+  // Hydrate instantly from session cache (for back/forward instant UX).
+  useEffect(() => {
+    if (!initialCache) return;
+    try {
+      if (initialCache.post) setPost(initialCache.post);
+      if (Array.isArray(initialCache.comments)) setComments(initialCache.comments);
+      if (initialCache.activeImageIdx !== undefined) setActiveImageIdx(Number(initialCache.activeImageIdx || 0) || 0);
+      setLoading(false);
+      setRefreshing(true);
+      const q = new URLSearchParams(location.search || '');
+      if (navType === 'POP' && q.get('comment') !== '1' && typeof initialCache.scrollY === 'number') {
+        setTimeout(() => {
+          try {
+            window.scrollTo(0, Math.max(0, Number(initialCache.scrollY) || 0));
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
   
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
+      const hasCached = !!initialCache;
+      if (hasCached) setRefreshing(true);
+      else setLoading(true);
       setError('');
       try {
         const detail = await postsApi.getById(postId);
@@ -97,10 +162,24 @@ export const PostDetailPage = () => {
         setComments([]);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     };
     load();
-  }, [postId]);
+  }, [postId, initialCache]);
+
+  // Save to session cache (so returning to this post is instant).
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        post,
+        comments,
+        activeImageIdx,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [cacheKey, post, comments, activeImageIdx]);
 
   // Detail pages should start at top, except when opened via the "comment" shortcut.
   useEffect(() => {
@@ -474,7 +553,7 @@ export const PostDetailPage = () => {
                 )}
                 {uiPost.content_type === 'video' && (
                   <div>
-                    <SmartVideo src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} />
+                    <SmartVideo src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} autoPlay />
                     {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
                   </div>
                 )}

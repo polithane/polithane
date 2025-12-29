@@ -21,6 +21,7 @@ export const SEOSettings = () => {
 
   const [loading, setLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
 
   const keyMap = {
     metaTitle: 'seo_metaTitle',
@@ -42,6 +43,7 @@ export const SEOSettings = () => {
     const load = async () => {
       try {
         const r = await apiCall('/api/settings', { method: 'GET' });
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
         if (r?.success && r?.data && typeof r.data === 'object') {
           setSeo((prev) => {
             const next = { ...prev };
@@ -76,6 +78,7 @@ export const SEOSettings = () => {
         setSaveMessage('✅ SEO ayarları kaydedildi!');
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
         setSaveMessage(`❌ ${r?.error || 'Kaydetme başarısız'}`);
       }
     } catch (e) {
@@ -109,6 +112,14 @@ export const SEOSettings = () => {
           </button>
         </div>
       </div>
+
+      {schemaSql ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="font-black">DB tablosu eksik: `site_settings`</div>
+          <div className="text-sm mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+          <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+        </div>
+      ) : null}
       
       <div className="space-y-6">
         {/* Meta Tags */}

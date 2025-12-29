@@ -77,7 +77,7 @@ export const ParliamentBar = ({ parliamentData = [], totalSeats = 600 }) => {
   };
   
   return (
-    <div className="mb-4">
+    <div className="mb-1">
       {/* Desktop Parliament Bar (hidden on mobile) */}
       <div className="hidden md:block">
         <div className="flex h-24 overflow-hidden rounded-t-lg border border-gray-300 w-full">

@@ -70,7 +70,7 @@ export const CommentModeration = () => {
     const Icon = badge.icon;
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
-        <Icon className="w-5 h-5 sm:w-4 sm:h-4" />
+        <Icon className="w-5 h-5" />
         {badge.text}
       </span>
     );
@@ -125,7 +125,7 @@ export const CommentModeration = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
@@ -224,7 +224,7 @@ export const CommentModeration = () => {
                     type="checkbox"
                     checked={selectedComments.length === filteredComments.length}
                     onChange={handleSelectAll}
-                    className="w-4 h-4 text-primary-blue border-gray-300 rounded focus:ring-primary-blue"
+                    className="w-5 h-5 text-primary-blue border-gray-300 rounded focus:ring-primary-blue cursor-pointer accent-primary-blue"
                   />
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Kullanıcı</th>
@@ -244,7 +244,7 @@ export const CommentModeration = () => {
                       type="checkbox"
                       checked={selectedComments.includes(comment.id)}
                       onChange={() => handleSelectComment(comment.id)}
-                      className="w-4 h-4 text-primary-blue border-gray-300 rounded focus:ring-primary-blue"
+                      className="w-5 h-5 text-primary-blue border-gray-300 rounded focus:ring-primary-blue cursor-pointer accent-primary-blue"
                     />
                   </td>
                   <td className="px-6 py-4">

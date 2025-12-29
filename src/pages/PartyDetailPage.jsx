@@ -141,8 +141,9 @@ export const PartyDetailPage = () => {
 
         // Posts in party (DB)
         const dbPosts = await api.posts.getAll({ party_id: partyObj.party_id, limit: 50, order: 'polit_score.desc' }).catch(() => []);
-
-        setPartyPosts((dbPosts || []).map(mapDbPostToUi).filter(Boolean));
+        // Party feeds show Polits; exclude Fast copies (is_trending).
+        const rows = (dbPosts || []).filter((p) => !p?.is_trending);
+        setPartyPosts(rows.map(mapDbPostToUi).filter(Boolean));
       } catch (e) {
         console.error(e);
         setError('Parti verileri yüklenirken hata oluştu');

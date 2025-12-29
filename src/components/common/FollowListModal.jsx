@@ -6,13 +6,22 @@ import { getUserTitle, isUiVerifiedUser } from '../../utils/titleHelpers';
 import { useNavigate } from 'react-router-dom';
 import { users as usersApi } from '../../utils/api';
 import { getProfilePath } from '../../utils/paths';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) => {
   const navigate = useNavigate();
+  const { user: me } = useAuth();
   const [activeTab, setActiveTab] = useState(tab); // followers, following
   const [loading, setLoading] = useState(false);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
+  
+  const resolvedUserId = (() => {
+    const raw = String(userId || '').trim();
+    if (!raw) return '';
+    if (raw === 'me' || raw === 'currentUser') return String(me?.id || '');
+    return raw;
+  })();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -20,11 +29,11 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
   }, [isOpen, tab]);
 
   useEffect(() => {
-    if (!isOpen || !userId) return;
+    if (!isOpen || !resolvedUserId) return;
     (async () => {
       setLoading(true);
       try {
-        const r = activeTab === 'followers' ? await usersApi.getFollowers(userId) : await usersApi.getFollowing(userId);
+        const r = activeTab === 'followers' ? await usersApi.getFollowers(resolvedUserId) : await usersApi.getFollowing(resolvedUserId);
         const list = r?.data || r?.data?.data || r || [];
         if (activeTab === 'followers') setFollowers(Array.isArray(list) ? list : []);
         else setFollowing(Array.isArray(list) ? list : []);
@@ -35,7 +44,7 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
         setLoading(false);
       }
     })();
-  }, [isOpen, userId, activeTab]);
+  }, [isOpen, resolvedUserId, activeTab]);
 
   const displayList = activeTab === 'followers' ? followers : following;
   
@@ -142,12 +151,11 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
                     </p>
                   </div>
                   
-                  {/* Kendi profilindeysek takip butonu gösterme */}
-                  {userId !== 'currentUser' && (
-                    <div className="flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    {String(user.user_id || user.id || '') === String(me?.id || '') ? null : (
                       <FollowButton targetUserId={user.user_id || user.id} size="sm" />
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

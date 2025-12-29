@@ -69,7 +69,8 @@ export const AgendaDetailPage = () => {
     if (category && category !== 'all') params.category = category;
 
     const dbPosts = await api.posts.getAll(params).catch(() => []);
-    const rows = Array.isArray(dbPosts) ? dbPosts : [];
+    // Agenda feeds show Polits (topic posts). Fast copies live in the Fast viewer.
+    const rows = (Array.isArray(dbPosts) ? dbPosts : []).filter((p) => !p?.is_trending);
     setAgendaPosts((prev) => (replace ? rows : [...(prev || []), ...rows]));
     setHasMore(rows.length >= PAGE_SIZE);
     setOffset(nextOffset + rows.length);

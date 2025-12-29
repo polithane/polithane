@@ -6,7 +6,7 @@ import {
   Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark
 } from 'lucide-react';
 
-export const AdminSidebar = () => {
+export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) => {
   const location = useLocation();
   const [logoFailed, setLogoFailed] = useState(false);
   
@@ -14,67 +14,67 @@ export const AdminSidebar = () => {
     {
       title: 'Genel',
       items: [
-        { path: '/admin', icon: LayoutDashboard, label: 'Genel Bakış' },
-        { path: '/admin/analytics', icon: BarChart3, label: 'Analitik & Raporlar' },
+        { path: '/adminyonetim', icon: LayoutDashboard, label: 'Genel Bakış' },
+        { path: '/adminyonetim/analytics', icon: BarChart3, label: 'Analitik & Raporlar' },
       ]
     },
     {
       title: 'İçerik Yönetimi',
       items: [
-        { path: '/admin/users', icon: Users, label: 'Kullanıcı Yönetimi' },
-        { path: '/admin/parliament', icon: Landmark, label: 'Meclis Yönetimi' },
-        { path: '/admin/parties', icon: Flag, label: 'Parti Yönetimi' },
-        { path: '/admin/agendas', icon: Flame, label: 'Gündem Yönetimi' },
-        { path: '/admin/posts', icon: FileText, label: 'Post Moderasyonu' },
-        { path: '/admin/comments', icon: FileText, label: 'Yorum Moderasyonu' },
-        { path: '/admin/media', icon: Image, label: 'Medya Yönetimi' },
+        { path: '/adminyonetim/users', icon: Users, label: 'Kullanıcı Yönetimi' },
+        { path: '/adminyonetim/parliament', icon: Landmark, label: 'Meclis Yönetimi' },
+        { path: '/adminyonetim/parties', icon: Flag, label: 'Parti Yönetimi' },
+        { path: '/adminyonetim/agendas', icon: Flame, label: 'Gündem Yönetimi' },
+        { path: '/adminyonetim/posts', icon: FileText, label: 'Post Moderasyonu' },
+        { path: '/adminyonetim/comments', icon: FileText, label: 'Yorum Moderasyonu' },
+        { path: '/adminyonetim/media', icon: Image, label: 'Medya Yönetimi' },
       ]
     },
     {
       title: 'Platform Ayarları',
       items: [
-        { path: '/admin/algorithm', icon: TrendingUp, label: 'Polit Puan Algoritması' },
-        { path: '/admin/site-settings', icon: Settings, label: 'Site Ayarları' },
-        { path: '/admin/theme', icon: Palette, label: 'Tasarım & Tema' },
-        { path: '/admin/seo', icon: Search, label: 'SEO Ayarları' },
-        { path: '/admin/email', icon: Mail, label: 'E-posta Şablonları' },
-        { path: '/admin/email-test', icon: Send, label: 'E-posta Testi' },
-        { path: '/admin/notifications', icon: Bell, label: 'Bildirim Kuralları' },
+        { path: '/adminyonetim/algorithm', icon: TrendingUp, label: 'Polit Puan Algoritması' },
+        { path: '/adminyonetim/site-settings', icon: Settings, label: 'Site Ayarları' },
+        { path: '/adminyonetim/theme', icon: Palette, label: 'Tasarım & Tema' },
+        { path: '/adminyonetim/seo', icon: Search, label: 'SEO Ayarları' },
+        { path: '/adminyonetim/email', icon: Mail, label: 'E-posta Şablonları' },
+        { path: '/adminyonetim/email-test', icon: Send, label: 'E-posta Testi' },
+        { path: '/adminyonetim/notifications', icon: Bell, label: 'Bildirim Kuralları' },
       ]
     },
     {
       title: 'Otomasyon',
       items: [
-        { path: '/admin/automation', icon: Bot, label: 'Otomasyon Kontrol' },
-        { path: '/admin/scraping', icon: Zap, label: 'Tarama Yönetimi' },
-        { path: '/admin/sources', icon: Globe, label: 'Kaynak Yönetimi' },
+        { path: '/adminyonetim/automation', icon: Bot, label: 'Otomasyon Kontrol' },
+        { path: '/adminyonetim/scraping', icon: Zap, label: 'Tarama Yönetimi' },
+        { path: '/adminyonetim/sources', icon: Globe, label: 'Kaynak Yönetimi' },
       ]
     },
     {
       title: 'Gelir & Reklam',
       items: [
-        { path: '/admin/ads', icon: Megaphone, label: 'Reklam Yönetimi' },
-        { path: '/admin/payments', icon: DollarSign, label: 'Ödeme Sistemi' },
-        { path: '/admin/revenue', icon: DollarSign, label: 'Gelir Analizi' },
+        { path: '/adminyonetim/ads', icon: Megaphone, label: 'Reklam Yönetimi' },
+        { path: '/adminyonetim/payments', icon: DollarSign, label: 'Ödeme Sistemi' },
+        { path: '/adminyonetim/revenue', icon: DollarSign, label: 'Gelir Analizi' },
       ]
     },
     {
       title: 'Sistem',
       items: [
-        { path: '/admin/security', icon: Shield, label: 'Güvenlik' },
-        { path: '/admin/database', icon: Database, label: 'Veritabanı Yönetimi' },
-        { path: '/admin/api', icon: Code, label: 'API Ayarları' },
+        { path: '/adminyonetim/security', icon: Shield, label: 'Güvenlik' },
+        { path: '/adminyonetim/database', icon: Database, label: 'Veritabanı Yönetimi' },
+        { path: '/adminyonetim/api', icon: Code, label: 'API Ayarları' },
       ]
     }
   ];
   
   return (
-    <div className="w-64 bg-white border-r border-gray-200 h-screen overflow-y-auto sticky top-0">
-      <div className="p-6 border-b border-gray-200">
+    <div className="w-full bg-white border-r border-gray-200 h-[100dvh] overflow-y-auto lg:h-screen">
+      <div className="p-6 border-b border-gray-200 flex items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" aria-label="Ana sayfaya git">
           {!logoFailed ? (
             <img
-              src="/favicon.ico"
+              src="/logo.png"
               alt="Polithane"
               className="w-12 h-12 rounded-2xl object-contain drop-shadow"
               onError={() => setLogoFailed(true)}
@@ -89,6 +89,16 @@ export const AdminSidebar = () => {
             <p className="text-xs text-gray-500 truncate">Admin Paneli</p>
           </div>
         </Link>
+        {showCloseButton ? (
+          <button
+            type="button"
+            onClick={() => onClose?.()}
+            className="p-2 rounded-lg hover:bg-gray-100 lg:hidden"
+            aria-label="Menüyü kapat"
+          >
+            <span className="text-xl font-black text-gray-700">×</span>
+          </button>
+        ) : null}
       </div>
       
       <nav className="p-4">
@@ -107,6 +117,7 @@ export const AdminSidebar = () => {
                       ? 'bg-primary-blue text-white font-semibold'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
+                  onClick={() => onNavigate?.()}
                 >
                   <item.icon className="w-5 h-5" />
                   <span className="text-sm">{item.label}</span>

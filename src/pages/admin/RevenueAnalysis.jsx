@@ -94,7 +94,7 @@ export const RevenueAnalysis = () => {
   }, [byCategory]);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Gelir Analizi</h1>
         <p className="text-gray-600">Veritabanı tabanlı gelir kayıtları (mock yok)</p>

@@ -17,6 +17,7 @@ const tryParseJson = (v) => {
 export const ParliamentManagement = () => {
   const [loading, setLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
 
   const [info, setInfo] = useState({
     legislatureName: 'TBMM',
@@ -47,6 +48,7 @@ export const ParliamentManagement = () => {
       try {
         const r = await apiCall('/api/settings', { method: 'GET' });
         if (!mounted) return;
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
         if (!r?.success) return;
         const d = r?.data && typeof r.data === 'object' ? r.data : {};
         const dist = tryParseJson(d.parliament_distribution);
@@ -196,6 +198,7 @@ export const ParliamentManagement = () => {
         setSaveMessage('✅ Kaydedildi');
         setTimeout(() => setSaveMessage(''), 2500);
       } else {
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
         setSaveMessage(`❌ ${r?.error || 'Kaydedilemedi'}`);
       }
     } catch (e) {
@@ -250,6 +253,14 @@ export const ParliamentManagement = () => {
           </button>
         </div>
       </div>
+
+      {schemaSql ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="font-black">DB tablosu eksik: `site_settings`</div>
+          <div className="text-sm mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+          <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+        </div>
+      ) : null}
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5">
         <div className="text-lg font-black text-gray-900 mb-4">Genel Bilgiler</div>

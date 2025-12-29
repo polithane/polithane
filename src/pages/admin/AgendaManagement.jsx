@@ -8,6 +8,7 @@ export const AgendaManagement = () => {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
   const [bootstrapping, setBootstrapping] = useState(false);
 
   const [q, setQ] = useState('');
@@ -25,12 +26,19 @@ export const AgendaManagement = () => {
   const fetchList = async () => {
     setLoading(true);
     setError('');
+    setSchemaSql('');
     try {
       const r = await adminApi.getAgendas({
         limit: 200,
         search: q.trim() || undefined,
         is_active: showInactive ? undefined : 'true',
       });
+      if (r?.schemaMissing && r?.requiredSql) {
+        setSchemaSql(String(r.requiredSql || ''));
+        setRows([]);
+        return;
+      }
+      if (!r?.success) throw new Error(r?.error || 'Gündemler yüklenemedi.');
       setRows(Array.isArray(r?.data) ? r.data : []);
     } catch (e) {
       setRows([]);
@@ -66,6 +74,7 @@ export const AgendaManagement = () => {
     if (!id) return;
     setSavingId(id);
     setError('');
+    setSchemaSql('');
     try {
       const payload = {
         title: String(row.title || '').trim(),
@@ -77,6 +86,11 @@ export const AgendaManagement = () => {
         total_polit_score: Number(row.total_polit_score || 0),
       };
       const r = await adminApi.updateAgenda(id, payload);
+      if (r?.schemaMissing && r?.requiredSql) {
+        setSchemaSql(String(r.requiredSql || ''));
+        throw new Error('DB tablosu eksik.');
+      }
+      if (!r?.success) throw new Error(r?.error || 'Kaydedilemedi.');
       if (r?.success && r?.data) {
         updateRowLocal(id, r.data);
       }
@@ -92,8 +106,14 @@ export const AgendaManagement = () => {
     if (!id) return;
     setSavingId(id);
     setError('');
+    setSchemaSql('');
     try {
-      await adminApi.deleteAgenda(id);
+      const r = await adminApi.deleteAgenda(id);
+      if (r?.schemaMissing && r?.requiredSql) {
+        setSchemaSql(String(r.requiredSql || ''));
+        throw new Error('DB tablosu eksik.');
+      }
+      if (!r?.success) throw new Error(r?.error || 'Silinemedi.');
       updateRowLocal(id, { is_active: false });
     } catch (e) {
       setError(e?.message || 'Silinemedi.');
@@ -107,6 +127,7 @@ export const AgendaManagement = () => {
     if (!title) return;
     setSavingId('__create__');
     setError('');
+    setSchemaSql('');
     try {
       const r = await adminApi.createAgenda({
         title,
@@ -115,6 +136,11 @@ export const AgendaManagement = () => {
         is_trending: !!createDraft.is_trending,
         is_active: !!createDraft.is_active,
       });
+      if (r?.schemaMissing && r?.requiredSql) {
+        setSchemaSql(String(r.requiredSql || ''));
+        throw new Error('DB tablosu eksik.');
+      }
+      if (!r?.success) throw new Error(r?.error || 'Oluşturulamadı.');
       if (r?.success && r?.data) {
         setRows((prev) => [r.data, ...(prev || [])]);
         setCreateDraft({ title: '', trending_score: 5000, total_polit_score: 0, is_trending: true, is_active: true });
@@ -200,7 +226,7 @@ export const AgendaManagement = () => {
                 type="checkbox"
                 checked={!!createDraft.is_trending}
                 onChange={(e) => setCreateDraft((p) => ({ ...p, is_trending: e.target.checked }))}
-                className="w-5 h-5"
+                className="w-5 h-5 accent-primary-blue cursor-pointer"
               />
               Trend
             </label>
@@ -209,13 +235,21 @@ export const AgendaManagement = () => {
                 type="checkbox"
                 checked={!!createDraft.is_active}
                 onChange={(e) => setCreateDraft((p) => ({ ...p, is_active: e.target.checked }))}
-                className="w-5 h-5"
+                className="w-5 h-5 accent-primary-blue cursor-pointer"
               />
               Aktif
             </label>
           </div>
         </div>
       )}
+
+      {schemaSql ? (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="font-black text-amber-900">DB tablosu eksik: `agendas`</div>
+          <div className="text-sm text-amber-900 mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+          <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+        </div>
+      ) : null}
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
         <div className="relative flex-1">
@@ -228,7 +262,12 @@ export const AgendaManagement = () => {
           />
         </div>
         <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-          <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="w-5 h-5" />
+          <input
+            type="checkbox"
+            checked={showInactive}
+            onChange={(e) => setShowInactive(e.target.checked)}
+            className="w-5 h-5 accent-primary-blue cursor-pointer"
+          />
           Pasifleri de göster
         </label>
       </div>
@@ -314,7 +353,7 @@ export const AgendaManagement = () => {
                         type="checkbox"
                         checked={!!a.is_trending}
                         onChange={(e) => updateRowLocal(a.id, { is_trending: e.target.checked })}
-                        className="w-5 h-5"
+                        className="w-5 h-5 accent-primary-blue cursor-pointer"
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -322,7 +361,7 @@ export const AgendaManagement = () => {
                         type="checkbox"
                         checked={!!a.is_active}
                         onChange={(e) => updateRowLocal(a.id, { is_active: e.target.checked })}
-                        className="w-5 h-5"
+                        className="w-5 h-5 accent-primary-blue cursor-pointer"
                       />
                     </td>
                     <td className="px-4 py-3">
