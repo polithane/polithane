@@ -1,27 +1,74 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useNavigationType } from 'react-router-dom';
 import { Flame } from 'lucide-react';
 import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { apiCall } from '../utils/api';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 export const AgendasPage = () => {
   const navigate = useNavigate();
+  const navType = useNavigationType();
   const [posts, setPosts] = useState([]);
   const [agendas, setAgendas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const cacheKey = useMemo(() => 'agendas', []);
+  const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
+
+  useEffect(() => {
+    if (!initialCache) return;
+    try {
+      if (Array.isArray(initialCache.agendas)) setAgendas(initialCache.agendas);
+      if (Array.isArray(initialCache.posts)) setPosts(initialCache.posts);
+      setLoading(false);
+      setRefreshing(true);
+      if (navType === 'POP' && typeof initialCache.scrollY === 'number') {
+        setTimeout(() => {
+          try {
+            window.scrollTo(0, Math.max(0, Number(initialCache.scrollY) || 0));
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
 
   useEffect(() => {
     (async () => {
+      const hasCached = !!initialCache;
+      if (hasCached) setRefreshing(true);
+      else setLoading(true);
       const agendaRes = await apiCall('/api/agendas?limit=120').catch(() => null);
       const list = agendaRes?.data || [];
       setAgendas(Array.isArray(list) ? list : []);
 
-      const data = await api.posts.getAll({ limit: 500, order: 'polit_score.desc' }).catch(() => []);
+      const data = await api.posts.getAll({ limit: 250, order: 'polit_score.desc' }).catch(() => []);
       // Agendas page is a Polit page; exclude Fast copies (is_trending).
       const rows = (Array.isArray(data) ? data : []).filter((p) => !p?.is_trending);
       setPosts(rows);
+
+      setLoading(false);
+      setRefreshing(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        agendas,
+        posts,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [cacheKey, agendas, posts]);
 
   const postsByAgenda = useMemo(() => {
     const m = new Map();
@@ -82,6 +129,7 @@ export const AgendasPage = () => {
         </div>
 
         <div className="space-y-8">
+          {refreshing ? <div className="text-xs text-gray-500">Güncelleniyor…</div> : null}
           {agendaSections.map((section, idx) => (
             <div key={section.slug || section.title} className="card">
               <button
@@ -106,6 +154,7 @@ export const AgendasPage = () => {
           {agendaSections.length === 0 && (
             <div className="card text-sm text-gray-600">Henüz gündem içeriği bulunmuyor.</div>
           )}
+          {loading ? <div className="text-center text-sm text-gray-600">Yükleniyor…</div> : null}
         </div>
       </div>
     </div>

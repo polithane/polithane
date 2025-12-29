@@ -1,27 +1,33 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useNavigationType } from 'react-router-dom';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { formatNumber, formatPolitScore } from '../utils/formatters';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 export const AgendaDetailPage = () => {
   const { agendaSlug } = useParams();
   const navigate = useNavigate();
+  const navType = useNavigationType();
   const [agenda, setAgenda] = useState(null);
   const [agendaPosts, setAgendaPosts] = useState([]);
   const [category, setCategory] = useState('all');
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [resolvedAgendaTitle, setResolvedAgendaTitle] = useState('');
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
+  const loadingMoreRef = useRef(false);
 
   const PAGE_SIZE = 24;
+  const cacheKey = useMemo(() => `agenda:${String(agendaSlug || '').trim() || '-'}`, [agendaSlug]);
+  const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
 
   const agendaTitle = String(agenda?.title || agenda?.agenda_title || '').trim();
   const agendaScore = Number(agenda?.total_polit_score ?? agenda?.polit_score ?? 0);
@@ -29,14 +35,42 @@ export const AgendaDetailPage = () => {
   // Some older mock data used `participant_count`; API doesn't guarantee it.
   const agendaParticipantCount = Number(agenda?.participant_count ?? 0);
   
-  // Detail pages should always start at top.
+  // Hydrate instantly from session cache (for back/forward instant UX).
   useEffect(() => {
+    if (!initialCache) return;
     try {
-      window.scrollTo(0, 0);
+      if (initialCache.agenda) setAgenda(initialCache.agenda);
+      if (Array.isArray(initialCache.agendaPosts)) setAgendaPosts(initialCache.agendaPosts);
+      if (initialCache.category) setCategory(String(initialCache.category));
+      if (typeof initialCache.offset === 'number') setOffset(Number(initialCache.offset || 0) || 0);
+      if (typeof initialCache.hasMore === 'boolean') setHasMore(!!initialCache.hasMore);
+      if (initialCache.resolvedAgendaTitle !== undefined) setResolvedAgendaTitle(String(initialCache.resolvedAgendaTitle || ''));
+      setLoadingPosts(false);
+      setRefreshing(true);
+      if (navType === 'POP' && typeof initialCache.scrollY === 'number') {
+        setTimeout(() => {
+          try {
+            window.scrollTo(0, Math.max(0, Number(initialCache.scrollY) || 0));
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
     } catch {
       // ignore
     }
-  }, [agendaSlug]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
+
+  // Scroll behavior: on new navigations go to top; on POP we restore from cache above.
+  useEffect(() => {
+    if (navType === 'POP') return;
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch {
+      // ignore
+    }
+  }, [agendaSlug, navType]);
 
   useEffect(() => {
     (async () => {
@@ -82,13 +116,16 @@ export const AgendaDetailPage = () => {
     (async () => {
       const title = String(resolvedAgendaTitle || '').trim();
       if (!title) return;
-      setLoadingPosts(true);
+      const hasCached = !!initialCache;
+      if (hasCached) setRefreshing(true);
+      else setLoadingPosts(true);
       setHasMore(true);
       setOffset(0);
       try {
         if (!cancelled) await fetchPostsPage({ nextOffset: 0, replace: true });
       } finally {
         if (!cancelled) setLoadingPosts(false);
+        if (!cancelled) setRefreshing(false);
       }
     })();
     return () => {
@@ -106,15 +143,18 @@ export const AgendaDetailPage = () => {
       (entries) => {
         const e = entries?.[0];
         if (!e?.isIntersecting) return;
+        if (loadingMoreRef.current) return;
         if (loadingPosts || loadingMore) return;
         if (!hasMore) return;
         // Load next page
         (async () => {
+          loadingMoreRef.current = true;
           setLoadingMore(true);
           try {
             await fetchPostsPage({ nextOffset: offset, replace: false });
           } finally {
             setLoadingMore(false);
+            loadingMoreRef.current = false;
           }
         })();
       },
@@ -125,6 +165,22 @@ export const AgendaDetailPage = () => {
     return () => observerRef.current?.disconnect?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset, hasMore, loadingPosts, loadingMore, resolvedAgendaTitle, category]);
+
+  // Save to session cache (so returning to this page is instant).
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        agenda,
+        agendaPosts,
+        category,
+        offset,
+        hasMore,
+        resolvedAgendaTitle,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [cacheKey, agenda, agendaPosts, category, offset, hasMore, resolvedAgendaTitle]);
   
   if (!agenda) {
     return (

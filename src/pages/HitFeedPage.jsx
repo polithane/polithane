@@ -24,6 +24,7 @@ export const HitFeedPage = () => {
 
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
+  const loadingMoreRef = useRef(false);
   const PAGE_SIZE = 120;
 
   const mode = useMemo(() => {
@@ -267,9 +268,11 @@ export const HitFeedPage = () => {
       (entries) => {
         const e = entries?.[0];
         if (!e?.isIntersecting) return;
+        if (loadingMoreRef.current) return;
         if (loading || loadingMore) return;
         if (!hasMore) return;
         (async () => {
+          loadingMoreRef.current = true;
           setLoadingMore(true);
           try {
             if (isProfilesMode) {
@@ -279,6 +282,7 @@ export const HitFeedPage = () => {
             }
           } finally {
             setLoadingMore(false);
+            loadingMoreRef.current = false;
           }
         })();
       },

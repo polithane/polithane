@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useNavigate, useParams, Link, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, Link, useLocation, useNavigationType } from 'react-router-dom';
 import { Avatar } from '../components/common/Avatar';
 import { formatNumber, formatPolitScore, formatDate } from '../utils/formatters';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
@@ -9,11 +9,13 @@ import { normalizeUsername } from '../utils/validators';
 import { CITY_CODES } from '../utils/constants';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 export const PartyDetailPage = () => {
   const { partyId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const navType = useNavigationType();
   const [party, setParty] = useState(null);
   const [mainTab, setMainTab] = useState('mps'); // mps | org | members | provincial | district | metro_mayor | district_mayor
   const [subTab, setSubTab] = useState('profiles'); // profiles | posts
@@ -26,20 +28,56 @@ export const PartyDetailPage = () => {
   const [filterDistrict, setFilterDistrict] = useState('');
   const [filterRole, setFilterRole] = useState(''); // for org tab (party officials)
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+
+  const cacheKey = useMemo(() => `party:${String(partyId || '').trim() || '-'}`, [partyId]);
+  const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
   
-  // Detail pages should always start at top.
+  // Hydrate instantly from session cache (for back/forward instant UX).
   useEffect(() => {
+    if (!initialCache) return;
     try {
-      window.scrollTo(0, 0);
+      if (initialCache.party) setParty(initialCache.party);
+      if (Array.isArray(initialCache.partyPosts)) setPartyPosts(initialCache.partyPosts);
+      if (initialCache.mainTab) setMainTab(String(initialCache.mainTab));
+      if (initialCache.subTab) setSubTab(String(initialCache.subTab));
+      if (initialCache.postSortMode) setPostSortMode(String(initialCache.postSortMode));
+      if (initialCache.filterProvince !== undefined) setFilterProvince(String(initialCache.filterProvince || ''));
+      if (initialCache.filterDistrict !== undefined) setFilterDistrict(String(initialCache.filterDistrict || ''));
+      if (initialCache.filterRole !== undefined) setFilterRole(String(initialCache.filterRole || ''));
+      setLoading(false);
+      setRefreshing(true);
+      if (navType === 'POP' && typeof initialCache.scrollY === 'number') {
+        setTimeout(() => {
+          try {
+            window.scrollTo(0, Math.max(0, Number(initialCache.scrollY) || 0));
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
     } catch {
       // ignore
     }
-  }, [partyId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
+
+  // Scroll behavior: on new navigations go to top; on POP we restore from cache above.
+  useEffect(() => {
+    if (navType === 'POP') return;
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch {
+      // ignore
+    }
+  }, [partyId, navType]);
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
+      const hasCached = !!initialCache;
+      if (hasCached) setRefreshing(true);
+      else setLoading(true);
       setError('');
 
       const normalizeParty = (p) => {
@@ -149,11 +187,30 @@ export const PartyDetailPage = () => {
         setError('Parti verileri yüklenirken hata oluştu');
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     };
 
     load();
-  }, [partyId]);
+  }, [partyId, initialCache]);
+
+  // Save to session cache (so returning to this page is instant).
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        party,
+        partyPosts,
+        mainTab,
+        subTab,
+        postSortMode,
+        filterProvince,
+        filterDistrict,
+        filterRole,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [cacheKey, party, partyPosts, mainTab, subTab, postSortMode, filterProvince, filterDistrict, filterRole]);
 
   // Support deep-linking via query string (e.g. /party/:id?tab=mps)
   useEffect(() => {

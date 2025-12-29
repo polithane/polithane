@@ -28,6 +28,7 @@ export const CategoryFeedPage = () => {
 
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
+  const loadingMoreRef = useRef(false);
   const PAGE_SIZE = 24;
 
   const cacheKey = useMemo(() => `cat:${String(categoryId || 'all')}`, [categoryId]);
@@ -118,14 +119,17 @@ export const CategoryFeedPage = () => {
       (entries) => {
         const e = entries?.[0];
         if (!e?.isIntersecting) return;
+        if (loadingMoreRef.current) return;
         if (loading || loadingMore) return;
         if (!hasMore) return;
         (async () => {
+          loadingMoreRef.current = true;
           setLoadingMore(true);
           try {
             await fetchPage({ nextOffset: offset, replace: false });
           } finally {
             setLoadingMore(false);
+            loadingMoreRef.current = false;
           }
         })();
       },
