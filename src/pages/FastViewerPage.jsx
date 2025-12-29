@@ -147,14 +147,16 @@ export const FastViewerPage = () => {
     setLikedById((p) => ({ ...(p || {}), [id]: !prev }));
     setLikeCountById((p) => ({ ...(p || {}), [id]: Math.max(0, safePrevCount + (prev ? -1 : 1)) }));
     try {
-      const r = await postsApi.like(id).catch(() => null);
+      const r = await postsApi.like(id);
       const action = String(r?.action || r?.data?.action || '').toLowerCase();
+      const serverCountRaw = r?.like_count ?? r?.data?.like_count;
+      const serverCount = Number.isFinite(Number(serverCountRaw)) ? Math.max(0, Number(serverCountRaw)) : null;
       if (action === 'liked') {
         setLikedById((p) => ({ ...(p || {}), [id]: true }));
-        setLikeCountById((p) => ({ ...(p || {}), [id]: Math.max(0, safePrevCount + 1) }));
+        setLikeCountById((p) => ({ ...(p || {}), [id]: serverCount != null ? serverCount : Math.max(0, safePrevCount + 1) }));
       } else if (action === 'unliked') {
         setLikedById((p) => ({ ...(p || {}), [id]: false }));
-        setLikeCountById((p) => ({ ...(p || {}), [id]: Math.max(0, safePrevCount - 1) }));
+        setLikeCountById((p) => ({ ...(p || {}), [id]: serverCount != null ? serverCount : Math.max(0, safePrevCount - 1) }));
       } else {
         // unknown: keep optimistic state
       }

@@ -26,10 +26,23 @@ const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Sunucuya bağlanılamıyor. Lütfen backend serverın çalıştığından emin olun.',
   SERVER_ERROR: 'Sunucu hatası oluştu. Lütfen daha sonra tekrar deneyin.',
   UNAUTHORIZED: 'Oturum süreniz doldu. Lütfen tekrar giriş yapın.',
+  FORBIDDEN: 'Bu işlem için yetkiniz yok.',
   NOT_FOUND: 'İstek bulunamadı.',
   BAD_REQUEST: 'Geçersiz istek.',
   UNKNOWN: 'Bilinmeyen bir hata oluştu.',
 };
+
+export class ApiError extends Error {
+  constructor(message, { status, endpoint, method, payload, code } = {}) {
+    super(String(message || ERROR_MESSAGES.UNKNOWN));
+    this.name = 'ApiError';
+    this.status = status;
+    this.endpoint = endpoint;
+    this.method = method;
+    this.payload = payload;
+    this.code = code;
+  }
+}
 
 // Helper function for API calls
 export const apiCall = async (endpoint, options = {}) => {
@@ -99,35 +112,56 @@ export const apiCall = async (endpoint, options = {}) => {
       throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
     }
 
-    const data = await response.json().catch(() => ({}));
+    const ct = String(response.headers?.get?.('content-type') || '');
+    let data = null;
+    if (ct.includes('application/json')) {
+      data = await response.json().catch(() => null);
+    } else {
+      const text = await response.text().catch(() => '');
+      data = text ? { raw: text } : null;
+    }
 
     if (!response.ok) {
       // Backend'den gelen hata mesajını kullan
-      let errorMessage = data.error || data.message || ERROR_MESSAGES.UNKNOWN;
+      const safe = data && typeof data === 'object' ? data : {};
+      let errorMessage = safe.error || safe.message || ERROR_MESSAGES.UNKNOWN;
       
       // HTTP status'e göre varsayılan mesajlar (sadece backend mesajı yoksa)
-      if (response.status === 401 && !data.error) {
+      if (response.status === 401 && !safe.error) {
         errorMessage = ERROR_MESSAGES.UNAUTHORIZED;
-      } else if (response.status === 404 && !data.error) {
-        errorMessage = data.error || ERROR_MESSAGES.NOT_FOUND;
-      } else if (response.status === 400 && !data.error) {
+      } else if (response.status === 403 && !safe.error) {
+        errorMessage = ERROR_MESSAGES.FORBIDDEN;
+      } else if (response.status === 404 && !safe.error) {
+        errorMessage = safe.error || ERROR_MESSAGES.NOT_FOUND;
+      } else if (response.status === 400 && !safe.error) {
         errorMessage = errorMessage || ERROR_MESSAGES.BAD_REQUEST;
       } else if (response.status === 429) {
         // Rate Limit (429) - Backend mesajını kullan
-        errorMessage = data.error || 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyip tekrar deneyin.';
-      } else if (response.status >= 500 && !data.error) {
+        errorMessage = safe.error || 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyip tekrar deneyin.';
+      } else if (response.status >= 500 && !safe.error) {
         errorMessage = ERROR_MESSAGES.SERVER_ERROR;
+      }
+
+      // Schema missing contract (backend may return this in 4xx/5xx too)
+      if (safe?.schemaMissing) {
+        errorMessage = safe.error || 'Veritabanı şeması eksik. Gerekli SQL’i çalıştırmanız gerekiyor.';
       }
       
       // Kalan deneme hakkını ekle (brute force koruması)
-      if (data.remainingAttempts !== undefined) {
-        errorMessage += ` (Kalan deneme: ${data.remainingAttempts})`;
+      if (safe.remainingAttempts !== undefined) {
+        errorMessage += ` (Kalan deneme: ${safe.remainingAttempts})`;
       }
       
-      throw new Error(errorMessage);
+      throw new ApiError(errorMessage, {
+        status: response.status,
+        endpoint,
+        method: String(options?.method || 'GET').toUpperCase(),
+        payload: safe,
+      });
     }
 
-    return data;
+    // Normalize non-JSON "ok" responses
+    return data ?? {};
   } catch (error) {
     debugError('💥 API Hatası:', error);
     debugError('Error name:', error.name);
@@ -135,15 +169,36 @@ export const apiCall = async (endpoint, options = {}) => {
     
     // Timeout hatası
     if (error.name === 'AbortError' || error.message === 'REQUEST_TIMEOUT') {
-      throw new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.');
+      throw new ApiError('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.', {
+        code: 'TIMEOUT',
+        endpoint,
+        method: String(options?.method || 'GET').toUpperCase(),
+      });
     }
     
     // Network hatası kontrolü
     if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
-      throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
+      throw new ApiError(ERROR_MESSAGES.NETWORK_ERROR, {
+        code: 'NETWORK',
+        endpoint,
+        method: String(options?.method || 'GET').toUpperCase(),
+      });
     }
     
     throw error;
+  }
+};
+
+// Admin UI convenience:
+// Many admin endpoints return `schemaMissing + requiredSql` with 4xx status codes.
+// For admin screens we prefer receiving that payload instead of throwing (so the UI can render the SQL).
+const adminCall = async (endpoint, options = {}) => {
+  try {
+    return await apiCall(endpoint, options);
+  } catch (e) {
+    const payload = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+    if (payload) return payload;
+    throw e;
   }
 };
 
@@ -182,13 +237,8 @@ export const auth = {
 // ============================================
 export const posts = {
   getAll: async (params = {}) => {
-    try {
-      const query = new URLSearchParams(params).toString();
-      return await apiCall(`/api/posts${query ? `?${query}` : ''}`);
-    } catch (error) {
-      debugError('Posts API error:', error);
-      return [];
-    }
+    const query = new URLSearchParams(params).toString();
+    return await apiCall(`/api/posts${query ? `?${query}` : ''}`);
   },
 
   getById: (id) => apiCall(`/api/posts/${id}`),
@@ -375,89 +425,95 @@ export const messages = {
 // ADMIN API
 // ============================================
 export const admin = {
-  getStats: () => apiCall('/api/admin/stats'),
-  envCheck: () => apiCall('/api/admin/env-check'),
-  schemaCheck: () => apiCall('/api/admin/schema-check'),
-  getDbOverview: () => apiCall('/api/admin/db/overview'),
-  getAds: () => apiCall('/api/admin/ads'),
-  createAd: (data) => apiCall('/api/admin/ads', { method: 'POST', body: JSON.stringify(data || {}) }),
-  updateAd: (adId, data) => apiCall(`/api/admin/ads/${adId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
-  deleteAd: (adId) => apiCall(`/api/admin/ads/${adId}`, { method: 'DELETE' }),
+  getStats: () => adminCall('/api/admin/stats'),
+  envCheck: () => adminCall('/api/admin/env-check'),
+  schemaCheck: () => adminCall('/api/admin/schema-check'),
+  getDbOverview: () => adminCall('/api/admin/db/overview'),
+  getAds: () => adminCall('/api/admin/ads'),
+  createAd: (data) => adminCall('/api/admin/ads', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateAd: (adId, data) => adminCall(`/api/admin/ads/${adId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteAd: (adId) => adminCall(`/api/admin/ads/${adId}`, { method: 'DELETE' }),
 
-  getWorkflows: () => apiCall('/api/admin/workflows'),
-  createWorkflow: (data) => apiCall('/api/admin/workflows', { method: 'POST', body: JSON.stringify(data || {}) }),
+  getWorkflows: () => adminCall('/api/admin/workflows'),
+  createWorkflow: (data) => adminCall('/api/admin/workflows', { method: 'POST', body: JSON.stringify(data || {}) }),
   updateWorkflow: (workflowId, data) =>
-    apiCall(`/api/admin/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
-  deleteWorkflow: (workflowId) => apiCall(`/api/admin/workflows/${workflowId}`, { method: 'DELETE' }),
+    adminCall(`/api/admin/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteWorkflow: (workflowId) => adminCall(`/api/admin/workflows/${workflowId}`, { method: 'DELETE' }),
 
-  getRevenueSummary: () => apiCall('/api/admin/revenue/summary'),
+  getRevenueSummary: () => adminCall('/api/admin/revenue/summary'),
   getRevenueEntries: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/revenue/entries${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/revenue/entries${query ? `?${query}` : ''}`);
   },
-  createRevenueEntry: (data) => apiCall('/api/admin/revenue/entries', { method: 'POST', body: JSON.stringify(data || {}) }),
-  deleteRevenueEntry: (entryId) => apiCall(`/api/admin/revenue/entries/${entryId}`, { method: 'DELETE' }),
+  createRevenueEntry: (data) =>
+    adminCall('/api/admin/revenue/entries', { method: 'POST', body: JSON.stringify(data || {}) }),
+  deleteRevenueEntry: (entryId) => adminCall(`/api/admin/revenue/entries/${entryId}`, { method: 'DELETE' }),
 
-  getApiKeys: () => apiCall('/api/admin/api-keys'),
-  createApiKey: (data) => apiCall('/api/admin/api-keys', { method: 'POST', body: JSON.stringify(data || {}) }),
-  updateApiKey: (keyId, data) => apiCall(`/api/admin/api-keys/${keyId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
-  deleteApiKey: (keyId) => apiCall(`/api/admin/api-keys/${keyId}`, { method: 'DELETE' }),
+  getApiKeys: () => adminCall('/api/admin/api-keys'),
+  createApiKey: (data) => adminCall('/api/admin/api-keys', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateApiKey: (keyId, data) =>
+    adminCall(`/api/admin/api-keys/${keyId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteApiKey: (keyId) => adminCall(`/api/admin/api-keys/${keyId}`, { method: 'DELETE' }),
 
-  getSources: () => apiCall('/api/admin/sources'),
-  createSource: (data) => apiCall('/api/admin/sources', { method: 'POST', body: JSON.stringify(data || {}) }),
-  updateSource: (sourceId, data) => apiCall(`/api/admin/sources/${sourceId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
-  deleteSource: (sourceId) => apiCall(`/api/admin/sources/${sourceId}`, { method: 'DELETE' }),
+  getSources: () => adminCall('/api/admin/sources'),
+  createSource: (data) => adminCall('/api/admin/sources', { method: 'POST', body: JSON.stringify(data || {}) }),
+  updateSource: (sourceId, data) =>
+    adminCall(`/api/admin/sources/${sourceId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteSource: (sourceId) => adminCall(`/api/admin/sources/${sourceId}`, { method: 'DELETE' }),
 
-  getEmailTemplates: () => apiCall('/api/admin/email-templates'),
-  createEmailTemplate: (data) => apiCall('/api/admin/email-templates', { method: 'POST', body: JSON.stringify(data || {}) }),
+  getEmailTemplates: () => adminCall('/api/admin/email-templates'),
+  createEmailTemplate: (data) =>
+    adminCall('/api/admin/email-templates', { method: 'POST', body: JSON.stringify(data || {}) }),
   updateEmailTemplate: (templateId, data) =>
-    apiCall(`/api/admin/email-templates/${templateId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
-  deleteEmailTemplate: (templateId) => apiCall(`/api/admin/email-templates/${templateId}`, { method: 'DELETE' }),
+    adminCall(`/api/admin/email-templates/${templateId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteEmailTemplate: (templateId) => adminCall(`/api/admin/email-templates/${templateId}`, { method: 'DELETE' }),
 
   getComments: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/comments${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/comments${query ? `?${query}` : ''}`);
   },
-  approveComment: (commentId) => apiCall(`/api/admin/comments/${commentId}/approve`, { method: 'POST' }),
-  deleteComment: (commentId) => apiCall(`/api/admin/comments/${commentId}`, { method: 'DELETE' }),
+  approveComment: (commentId) => adminCall(`/api/admin/comments/${commentId}/approve`, { method: 'POST' }),
+  deleteComment: (commentId) => adminCall(`/api/admin/comments/${commentId}`, { method: 'DELETE' }),
 
   storageList: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/storage/list${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/storage/list${query ? `?${query}` : ''}`);
   },
-  storageDelete: (payload) => apiCall('/api/admin/storage/delete', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  storageDelete: (payload) =>
+    adminCall('/api/admin/storage/delete', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
-  getPaymentPlans: () => apiCall('/api/admin/payments/plans'),
-  createPaymentPlan: (data) => apiCall('/api/admin/payments/plans', { method: 'POST', body: JSON.stringify(data || {}) }),
+  getPaymentPlans: () => adminCall('/api/admin/payments/plans'),
+  createPaymentPlan: (data) =>
+    adminCall('/api/admin/payments/plans', { method: 'POST', body: JSON.stringify(data || {}) }),
   updatePaymentPlan: (planId, data) =>
-    apiCall(`/api/admin/payments/plans/${planId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
-  deletePaymentPlan: (planId) => apiCall(`/api/admin/payments/plans/${planId}`, { method: 'DELETE' }),
+    adminCall(`/api/admin/payments/plans/${planId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deletePaymentPlan: (planId) => adminCall(`/api/admin/payments/plans/${planId}`, { method: 'DELETE' }),
 
   getPaymentTransactions: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/payments/transactions${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/payments/transactions${query ? `?${query}` : ''}`);
   },
   createPaymentTransaction: (data) =>
-    apiCall('/api/admin/payments/transactions', { method: 'POST', body: JSON.stringify(data || {}) }),
-  deletePaymentTransaction: (txId) => apiCall(`/api/admin/payments/transactions/${txId}`, { method: 'DELETE' }),
+    adminCall('/api/admin/payments/transactions', { method: 'POST', body: JSON.stringify(data || {}) }),
+  deletePaymentTransaction: (txId) => adminCall(`/api/admin/payments/transactions/${txId}`, { method: 'DELETE' }),
 
   getAnalytics: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/analytics${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/analytics${query ? `?${query}` : ''}`);
   },
 
-  getNotificationRules: () => apiCall('/api/admin/notification-rules'),
+  getNotificationRules: () => adminCall('/api/admin/notification-rules'),
   createNotificationRule: (data) =>
-    apiCall('/api/admin/notification-rules', { method: 'POST', body: JSON.stringify(data || {}) }),
+    adminCall('/api/admin/notification-rules', { method: 'POST', body: JSON.stringify(data || {}) }),
   updateNotificationRule: (ruleId, data) =>
-    apiCall(`/api/admin/notification-rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
-  deleteNotificationRule: (ruleId) => apiCall(`/api/admin/notification-rules/${ruleId}`, { method: 'DELETE' }),
-  getNotificationChannels: () => apiCall('/api/admin/notification-channels'),
+    adminCall(`/api/admin/notification-rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  deleteNotificationRule: (ruleId) => adminCall(`/api/admin/notification-rules/${ruleId}`, { method: 'DELETE' }),
+  getNotificationChannels: () => adminCall('/api/admin/notification-channels'),
   updateNotificationChannels: (data) =>
-    apiCall('/api/admin/notification-channels', { method: 'PUT', body: JSON.stringify(data || {}) }),
+    adminCall('/api/admin/notification-channels', { method: 'PUT', body: JSON.stringify(data || {}) }),
 
   seedDemo: (params = {}) =>
-    apiCall('/api/admin/seed/demo', {
+    adminCall('/api/admin/seed/demo', {
       method: 'POST',
       body: JSON.stringify(params),
     }),
@@ -465,74 +521,74 @@ export const admin = {
   // Users
   getUsers: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/users${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/users${query ? `?${query}` : ''}`);
   },
 
   getDuplicateUsers: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/users/duplicates${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/users/duplicates${query ? `?${query}` : ''}`);
   },
 
   dedupeUsers: ({ primaryId, duplicateIds, dryRun = true }) =>
-    apiCall('/api/admin/users/dedupe', {
+    adminCall('/api/admin/users/dedupe', {
       method: 'POST',
       body: JSON.stringify({ primaryId, duplicateIds, dryRun }),
     }),
 
   updateUser: (userId, data) =>
-    apiCall(`/api/admin/users/${userId}`, {
+    adminCall(`/api/admin/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 
   deleteUser: (userId) =>
-    apiCall(`/api/admin/users/${userId}`, {
+    adminCall(`/api/admin/users/${userId}`, {
       method: 'DELETE',
     }),
 
   // Posts
   getPosts: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/posts${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/posts${query ? `?${query}` : ''}`);
   },
 
   deletePost: (postId) =>
-    apiCall(`/api/admin/posts/${postId}`, {
+    adminCall(`/api/admin/posts/${postId}`, {
       method: 'DELETE',
     }),
 
   // Agendas
   getAgendas: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/agendas${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/agendas${query ? `?${query}` : ''}`);
   },
   createAgenda: (data) =>
-    apiCall('/api/admin/agendas', {
+    adminCall('/api/admin/agendas', {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
   updateAgenda: (agendaId, data) =>
-    apiCall(`/api/admin/agendas/${agendaId}`, {
+    adminCall(`/api/admin/agendas/${agendaId}`, {
       method: 'PUT',
       body: JSON.stringify(data || {}),
     }),
   deleteAgenda: (agendaId) =>
-    apiCall(`/api/admin/agendas/${agendaId}`, {
+    adminCall(`/api/admin/agendas/${agendaId}`, {
       method: 'DELETE',
     }),
 
   // Settings
-  getSettings: () => apiCall('/api/settings'),
+  getSettings: () => adminCall('/api/settings'),
 
   updateSettings: (settings) =>
-    apiCall('/api/settings', {
+    adminCall('/api/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
     }),
 
   // Notifications (admin broadcast / direct)
   sendNotification: ({ user_id, title, message, type = 'system', broadcast = false }) =>
-    apiCall('/api/admin/notifications', {
+    adminCall('/api/admin/notifications', {
       method: 'POST',
       body: JSON.stringify({ user_id, title, message, type, broadcast }),
     }),
@@ -540,43 +596,43 @@ export const admin = {
   // Parties
   getParties: (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return apiCall(`/api/admin/parties${query ? `?${query}` : ''}`);
+    return adminCall(`/api/admin/parties${query ? `?${query}` : ''}`);
   },
   createParty: (data) =>
-    apiCall('/api/admin/parties', {
+    adminCall('/api/admin/parties', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   updateParty: (partyId, data) =>
-    apiCall(`/api/admin/parties/${partyId}`, {
+    adminCall(`/api/admin/parties/${partyId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   deleteParty: (partyId) =>
-    apiCall(`/api/admin/parties/${partyId}`, {
+    adminCall(`/api/admin/parties/${partyId}`, {
       method: 'DELETE',
     }),
 
-  getPartyHierarchy: (partyId) => apiCall(`/api/admin/parties/${partyId}/hierarchy`),
+  getPartyHierarchy: (partyId) => adminCall(`/api/admin/parties/${partyId}/hierarchy`),
   assignPartyUnit: (partyId, payload) =>
-    apiCall(`/api/admin/parties/${partyId}/assign`, {
+    adminCall(`/api/admin/parties/${partyId}/assign`, {
       method: 'POST',
       body: JSON.stringify(payload || {}),
     }),
   unassignPartyUnit: (partyId, payload) =>
-    apiCall(`/api/admin/parties/${partyId}/unassign`, {
+    adminCall(`/api/admin/parties/${partyId}/unassign`, {
       method: 'POST',
       body: JSON.stringify(payload || {}),
     }),
   setPartyChair: (partyId, userId) =>
-    apiCall(`/api/admin/parties/${partyId}/chair`, {
+    adminCall(`/api/admin/parties/${partyId}/chair`, {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
     }),
 
   // Email
   sendTestEmail: ({ to, subject, text, html } = {}) =>
-    apiCall('/api/admin/email/test', {
+    adminCall('/api/admin/email/test', {
       method: 'POST',
       body: JSON.stringify({ to, subject, text, html }),
     }),
@@ -608,14 +664,7 @@ export const notifications = {
 // PARTIES API
 // ============================================
 export const parties = {
-  getAll: async () => {
-    try {
-      return await apiCall('/api/parties');
-    } catch (error) {
-      debugError('Parties API error:', error);
-      return [];
-    }
-  },
+  getAll: async () => await apiCall('/api/parties'),
   getById: (id) => apiCall(`/api/parties/${id}`),
 };
 

@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useNavigationType } from 'react-router-dom';
 import { MapPin, Users, Building2, Briefcase, ArrowLeft, TrendingUp } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
@@ -10,26 +10,67 @@ import { getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 import { formatPolitScore } from '../utils/formatters';
 import { apiCall } from '../utils/api';
 import { getProfilePath } from '../utils/paths';
+import { ApiNotice } from '../components/common/ApiNotice';
+import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 export const CityDetailPage = () => {
   const { cityCode } = useParams();
   const navigate = useNavigate();
+  const navType = useNavigationType();
   const [activeTab, setActiveTab] = useState('mps'); // mps, provincial_chairs, district_chairs, metropolitan_mayors, district_mayors, members
   const [activePartyId, setActivePartyId] = useState(null);
   const [districtFilter, setDistrictFilter] = useState(''); // only for district_* tabs
   const [cityData, setCityData] = useState(null);
+  const [error, setError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const cacheKey = useMemo(() => `city:${String(cityCode || '').trim() || '-'}`, [cityCode]);
+  const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
   
   // Detail pages should always start at top.
   useEffect(() => {
+    if (navType === 'POP') return;
     try {
       window.scrollTo(0, 0);
     } catch {
       // ignore
     }
-  }, [cityCode]);
+  }, [cityCode, navType]);
+
+  // Hydrate instantly from session cache (for back/forward instant UX).
+  useEffect(() => {
+    if (!initialCache) return;
+    try {
+      if (initialCache.cityData) setCityData(initialCache.cityData);
+      if (initialCache.activeTab) setActiveTab(String(initialCache.activeTab));
+      if (initialCache.activePartyId !== undefined) setActivePartyId(initialCache.activePartyId ? String(initialCache.activePartyId) : null);
+      if (initialCache.districtFilter !== undefined) setDistrictFilter(String(initialCache.districtFilter || ''));
+      setLoading(false);
+      setRefreshing(true);
+      if (navType === 'POP' && typeof initialCache.scrollY === 'number') {
+        setTimeout(() => {
+          try {
+            window.scrollTo(0, Math.max(0, Number(initialCache.scrollY) || 0));
+          } catch {
+            // ignore
+          }
+        }, 0);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
 
   useEffect(() => {
     const load = async () => {
+      const hasCached = !!initialCache?.cityData;
+      if (hasCached) setRefreshing(true);
+      else setLoading(true);
+      setError('');
+      setSchemaSql('');
       const cityName = CITY_CODES[cityCode] || cityCode;
       const provinceQuery = String(cityName || '').toLocaleUpperCase('tr-TR');
 
@@ -80,83 +121,112 @@ export const CityDetailPage = () => {
         };
       };
 
-      // Users in city (DB)
-      // NOTE: We fetch by province name (city name).
-      const dbUsers = await apiCall(
-        `/api/users?province=${encodeURIComponent(provinceQuery)}&limit=2000`
-      ).catch(() => []);
+      try {
+        // Users in city (DB)
+        // NOTE: We fetch by province name (city name).
+        const dbUsers = await apiCall(`/api/users?province=${encodeURIComponent(provinceQuery)}&limit=2000`);
+        const listUsers = Array.isArray(dbUsers) ? dbUsers : Array.isArray(dbUsers?.data) ? dbUsers.data : [];
+        const cityUsers = (listUsers || []).map(normalizeUser).filter(Boolean);
 
-      const cityUsers = (dbUsers || []).map(normalizeUser).filter(Boolean);
+        // Derive lists from user_type + politician_type (backfilled in DB)
+        const mps = cityUsers
+          .filter((u) => u.user_type === 'mp')
+          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+        const provincialChairs = cityUsers
+          .filter((u) => u.user_type === 'party_official' && u.politician_type === 'provincial_chair')
+          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+        const districtChairs = cityUsers
+          .filter((u) => u.user_type === 'party_official' && u.politician_type === 'district_chair')
+          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+        const metroMayors = cityUsers
+          .filter((u) => u.user_type === 'party_official' && u.politician_type === 'metropolitan_mayor')
+          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+        const districtMayors = cityUsers
+          .filter((u) => u.user_type === 'party_official' && u.politician_type === 'district_mayor')
+          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
+        const members = cityUsers
+          .filter((u) => u.user_type === 'party_member' || u.user_type === 'normal')
+          .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
 
-      // Derive lists from user_type + politician_type (backfilled in DB)
-      const mps = cityUsers
-        .filter(u => u.user_type === 'mp')
-        .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const provincialChairs = cityUsers
-        .filter(u => u.user_type === 'party_official' && u.politician_type === 'provincial_chair')
-        .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const districtChairs = cityUsers
-        .filter(u => u.user_type === 'party_official' && u.politician_type === 'district_chair')
-        .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const metroMayors = cityUsers
-        .filter(u => u.user_type === 'party_official' && u.politician_type === 'metropolitan_mayor')
-        .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const districtMayors = cityUsers
-        .filter(u => u.user_type === 'party_official' && u.politician_type === 'district_mayor')
-        .sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-      const members = cityUsers.filter(u => u.user_type === 'party_member' || u.user_type === 'normal').sort((a, b) => (b.polit_score || 0) - (a.polit_score || 0));
-
-      // Posts in city (DB) - via user_id list
-      const userIds = cityUsers.map(u => u.user_id).filter(Boolean).slice(0, 2000);
-      let cityPosts = [];
-      if (userIds.length > 0) {
-        const dbPosts = await apiCall(
-          `/api/posts?user_ids=${encodeURIComponent(userIds.join(','))}&limit=20&order=polit_score.desc`
-        ).catch(() => []);
-        if (dbPosts && dbPosts.length > 0) cityPosts = dbPosts.map(mapDbPostToUi).filter(Boolean);
-      }
-
-      // Parties in city
-      const partiesInCity = [...new Set(cityUsers.map(p => p.party_id).filter(Boolean))];
-      const partyData = partiesInCity.map(partyId => {
-        const party = normalizeParty((cityUsers.find(u => u.party_id === partyId)?.party) || null);
-        const partyMps = mps.filter(m => m.party_id === partyId);
-        const leader = provincialChairs.find(l => l.party_id === partyId);
-        const mayor = metroMayors.find(m => m.party_id === partyId);
-        return {
-          party,
-          mps: partyMps,
-          leader,
-          mayor,
-          totalPolit: partyMps.reduce((sum, mp) => sum + (mp.polit_score || 0), 0) + (leader?.polit_score || 0) + (mayor?.polit_score || 0)
-        };
-      }).sort((a, b) => b.totalPolit - a.totalPolit);
-
-      setCityData({
-        cityName,
-        cityCode,
-        mps,
-        provincialChairs,
-        districtChairs,
-        metroMayors,
-        districtMayors,
-        members,
-        posts: cityPosts,
-        partyData,
-        stats: {
-          totalMps: mps.length,
-          totalProvincialChairs: provincialChairs.length,
-          totalDistrictChairs: districtChairs.length,
-          totalMetroMayors: metroMayors.length,
-          totalDistrictMayors: districtMayors.length,
-          totalMembers: members.length,
-          totalParties: partiesInCity.length
+        // Posts in city (DB) - via user_id list
+        const userIds = cityUsers.map((u) => u.user_id).filter(Boolean).slice(0, 2000);
+        let cityPosts = [];
+        if (userIds.length > 0) {
+          const dbPosts = await apiCall(
+            `/api/posts?user_ids=${encodeURIComponent(userIds.join(','))}&limit=20&order=polit_score.desc`
+          );
+          const postList = Array.isArray(dbPosts) ? dbPosts : Array.isArray(dbPosts?.data) ? dbPosts.data : [];
+          if (postList.length > 0) cityPosts = postList.map(mapDbPostToUi).filter(Boolean);
         }
-      });
+
+        // Parties in city
+        const partiesInCity = [...new Set(cityUsers.map((p) => p.party_id).filter(Boolean))];
+        const partyData = partiesInCity
+          .map((partyId) => {
+            const party = normalizeParty(cityUsers.find((u) => u.party_id === partyId)?.party || null);
+            const partyMps = mps.filter((m) => m.party_id === partyId);
+            const leader = provincialChairs.find((l) => l.party_id === partyId);
+            const mayor = metroMayors.find((m) => m.party_id === partyId);
+            return {
+              party,
+              mps: partyMps,
+              leader,
+              mayor,
+              totalPolit:
+                partyMps.reduce((sum, mp) => sum + (mp.polit_score || 0), 0) + (leader?.polit_score || 0) + (mayor?.polit_score || 0),
+            };
+          })
+          .sort((a, b) => b.totalPolit - a.totalPolit);
+
+        setCityData({
+          cityName,
+          cityCode,
+          mps,
+          provincialChairs,
+          districtChairs,
+          metroMayors,
+          districtMayors,
+          members,
+          posts: cityPosts,
+          partyData,
+          stats: {
+            totalMps: mps.length,
+            totalProvincialChairs: provincialChairs.length,
+            totalDistrictChairs: districtChairs.length,
+            totalMetroMayors: metroMayors.length,
+            totalDistrictMayors: districtMayors.length,
+            totalMembers: members.length,
+            totalParties: partiesInCity.length,
+          },
+        });
+      } catch (e) {
+        const msg = e?.message || 'Şehir verileri yüklenemedi.';
+        setError(msg);
+        const p = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+        if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
+        if (!hasCached) setCityData(null);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
     };
 
     load();
   }, [cityCode]);
+
+  // Save to session cache (so returning to this page is instant).
+  useEffect(() => {
+    const save = () => {
+      writeSessionCache(cacheKey, {
+        cityData,
+        activeTab,
+        activePartyId,
+        districtFilter,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+      });
+    };
+    return () => save();
+  }, [cacheKey, cityData, activeTab, activePartyId, districtFilter]);
 
   const currentListForPartySelector = useMemo(() => {
     if (!cityData) return [];
@@ -216,17 +286,34 @@ export const CityDetailPage = () => {
   if (!cityData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-20 h-20 rounded-full bg-gray-100 animate-pulse" />
-          </div>
-          <div className="text-xl font-black text-gray-900">Yükleniyor…</div>
-          <div className="text-sm text-gray-600 mt-1">Şehir verileri hazırlanıyor, lütfen bekleyin.</div>
-          <div className="mt-6 space-y-3">
-            <div className="h-4 bg-gray-100 rounded-full w-4/5 mx-auto animate-pulse" />
-            <div className="h-4 bg-gray-100 rounded-full w-3/5 mx-auto animate-pulse" />
-            <div className="h-24 bg-gray-100 rounded-2xl w-full animate-pulse" />
-          </div>
+        <div className="w-full max-w-md">
+          {error ? (
+            <ApiNotice
+              title={schemaSql ? 'Schema eksik' : 'Veriler yüklenemedi'}
+              message={error}
+              schemaSql={schemaSql}
+              onRetry={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+            />
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-20 h-20 rounded-full bg-gray-100 animate-pulse" />
+              </div>
+              <div className="text-xl font-black text-gray-900">{loading ? 'Yükleniyor…' : 'Hazırlanıyor…'}</div>
+              <div className="text-sm text-gray-600 mt-1">Şehir verileri hazırlanıyor, lütfen bekleyin.</div>
+              <div className="mt-6 space-y-3">
+                <div className="h-4 bg-gray-100 rounded-full w-4/5 mx-auto animate-pulse" />
+                <div className="h-4 bg-gray-100 rounded-full w-3/5 mx-auto animate-pulse" />
+                <div className="h-24 bg-gray-100 rounded-2xl w-full animate-pulse" />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

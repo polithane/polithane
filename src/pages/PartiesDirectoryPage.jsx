@@ -4,6 +4,7 @@ import { Building2 } from 'lucide-react';
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
+import { ApiNotice } from '../components/common/ApiNotice';
 
 const shortNameToPartySlug = (shortName) => {
   const v = String(shortName || '').trim().toUpperCase('tr-TR');
@@ -29,13 +30,21 @@ export const PartiesDirectoryPage = () => {
   const navigate = useNavigate();
   const [dbParties, setDbParties] = useState([]);
   const [parliamentDistribution, setParliamentDistribution] = useState(currentParliamentDistribution);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const rows = await api.parties.getAll().catch(() => []);
-      if (!mounted) return;
-      setDbParties(Array.isArray(rows) ? rows : []);
+      setError('');
+      try {
+        const rows = await api.parties.getAll();
+        if (!mounted) return;
+        setDbParties(Array.isArray(rows) ? rows : []);
+      } catch (e) {
+        if (!mounted) return;
+        setError(e?.message || 'Partiler yüklenemedi.');
+        setDbParties([]);
+      }
     })();
     return () => {
       mounted = false;
@@ -111,6 +120,22 @@ export const PartiesDirectoryPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-8">
+        {error ? (
+          <div className="mb-5">
+            <ApiNotice
+              title="Veriler yüklenemedi"
+              message={error}
+              onRetry={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+              compact={true}
+            />
+          </div>
+        ) : null}
         <div className="bg-white border border-gray-200 rounded-3xl p-6 md:p-10">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">

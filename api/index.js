@@ -1400,28 +1400,41 @@ async function togglePostLike(req, res, postId) {
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
     const userId = auth.id;
 
-    // Block checks (either direction) between liker and post owner
+    // Fetch post + block checks (either direction) between liker and post owner.
+    // NOTE: we also use like_count to keep UI consistent (best-effort).
+    let ownerId = null;
+    let baseLikeCount = 0;
     try {
-      const postRows = await supabaseRestGet('posts', { select: 'id,user_id,is_deleted', id: `eq.${postId}`, limit: '1' }).catch(() => []);
-      const ownerId = postRows?.[0]?.user_id ?? null;
+      const postRows = await supabaseRestGet('posts', {
+        select: 'id,user_id,is_deleted,like_count',
+        id: `eq.${postId}`,
+        limit: '1',
+      }).catch(() => []);
+      ownerId = postRows?.[0]?.user_id ?? null;
+      baseLikeCount = Math.max(0, parseInt(String(postRows?.[0]?.like_count || 0), 10) || 0);
       if (!ownerId || postRows?.[0]?.is_deleted === true) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
       const blocked = await isBlockedBetween(auth.id, ownerId);
       if (blocked) return res.status(403).json({ success: false, error: 'Bu kullanıcıyla etkileşemezsiniz (engelleme mevcut).' });
-    } catch {
-      // ignore (best-effort)
+    } catch (e) {
+      // If we can't validate owner/block, still allow like toggle (legacy/best-effort),
+      // but avoid crashing the whole API.
+      ownerId = ownerId || null;
+      baseLikeCount = Number.isFinite(baseLikeCount) ? baseLikeCount : 0;
     }
 
     const existing = await supabaseRestGet('likes', { select: 'id', post_id: `eq.${postId}`, user_id: `eq.${userId}`, limit: '1' }).catch(() => []);
     if (existing && existing.length > 0) {
         await supabaseRestDelete('likes', { post_id: `eq.${postId}`, user_id: `eq.${userId}` });
-        return res.json({ success: true, action: 'unliked' });
+        const next = Math.max(0, baseLikeCount - 1);
+        await supabaseRestPatch('posts', { id: `eq.${postId}` }, { like_count: next }).catch(() => null);
+        return res.json({ success: true, action: 'unliked', like_count: next });
     }
     await supabaseRestInsert('likes', [{ post_id: postId, user_id: userId }]);
+    const next = Math.max(0, baseLikeCount + 1);
+    await supabaseRestPatch('posts', { id: `eq.${postId}` }, { like_count: next }).catch(() => null);
 
     // Notify post owner (no self-notify)
     try {
-      const postRows = await supabaseRestGet('posts', { select: 'id,user_id', id: `eq.${postId}`, limit: '1' }).catch(() => []);
-      const ownerId = postRows?.[0]?.user_id ?? null;
       if (ownerId && String(ownerId) !== String(userId)) {
         await supabaseInsertNotifications([
           {
@@ -1437,7 +1450,7 @@ async function togglePostLike(req, res, postId) {
     } catch {
       // best-effort
     }
-    return res.json({ success: true, action: 'liked' });
+    return res.json({ success: true, action: 'liked', like_count: next });
 }
 
 async function createPost(req, res) {
