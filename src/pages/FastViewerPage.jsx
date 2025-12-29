@@ -53,6 +53,12 @@ export const FastViewerPage = () => {
   const goToProfile = useCallback(() => {
     const uname = String(user?.username || '').trim();
     const id = String(user?.id || '').trim();
+    // Ensure close works even if gesture overlay has active pointer capture
+    try {
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    } catch {
+      // ignore
+    }
     if (uname) navigate(`/@${encodeURIComponent(uname)}`);
     else if (id) navigate(`/profile/${encodeURIComponent(id)}`);
   }, [navigate, user?.id, user?.username]);
@@ -85,16 +91,34 @@ export const FastViewerPage = () => {
 
   const safeKey = useMemo(() => String(usernameOrId || '').trim(), [usernameOrId]);
 
+  const navigateToUserIndex = useCallback(
+    (nextIndex, { replace = true } = {}) => {
+      const q = Array.isArray(queue) ? queue : [];
+      const ni = Math.max(0, Math.min(q.length - 1, Number(nextIndex) || 0));
+      const key = String(q?.[ni]?.key || '').trim();
+      if (!key) return;
+      // Keep URL in sync (so refresh/back behaves correctly).
+      navigate(`/fast/${encodeURIComponent(key)}`, {
+        replace,
+        state: {
+          fastQueue: q,
+          fastStartIndex: ni,
+          fastStartKey: key,
+        },
+      });
+      setUserIdx(ni);
+    },
+    [navigate, queue]
+  );
+
   const goUser = useCallback(
     (dir) => {
-      setUserIdx((prev) => {
-        const next = prev + dir;
-        if (next < 0) return 0;
-        if (next >= (queue || []).length) return prev;
-        return next;
-      });
+      const next = userIdx + dir;
+      if (next < 0) return;
+      if (next >= (queue || []).length) return;
+      navigateToUserIndex(next, { replace: true });
     },
-    [queue]
+    [navigateToUserIndex, queue, userIdx]
   );
 
   const goItem = useCallback(
@@ -104,7 +128,7 @@ export const FastViewerPage = () => {
         if (next < 0) {
           // go to previous user (last item)
           if (userIdx > 0) {
-            goUser(-1);
+            navigateToUserIndex(userIdx - 1, { replace: true });
             return prev; // idx will be reset when new user loads
           }
           return 0;
@@ -112,7 +136,7 @@ export const FastViewerPage = () => {
         if (next >= items.length) {
           // next user
           if (userIdx < (queue || []).length - 1) {
-            goUser(1);
+            navigateToUserIndex(userIdx + 1, { replace: true });
             return prev;
           }
           closeToList();
@@ -121,7 +145,7 @@ export const FastViewerPage = () => {
         return next;
       });
     },
-    [closeToList, goUser, items.length, queue, userIdx]
+    [closeToList, items.length, navigateToUserIndex, queue, userIdx]
   );
 
   const currentDuration = useMemo(() => {
