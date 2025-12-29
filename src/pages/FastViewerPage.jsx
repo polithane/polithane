@@ -9,7 +9,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { normalizeAvatarUrl } from '../utils/avatarUrl';
 
 const DEFAULT_DURATION_MS = 5000; // image/text
-const HOLD_TO_PAUSE_MS = 80;
+const HOLD_TO_PAUSE_MS = 120;
+const SWIPE_MIN_PX = 50;
+const SWIPE_DOWN_MIN_PX = 80;
 
 export const FastViewerPage = () => {
   const navigate = useNavigate();
@@ -30,6 +32,17 @@ export const FastViewerPage = () => {
   const timerRef = useRef(null);
   const rafRef = useRef(null);
   const holdTimerRef = useRef(null);
+  const gestureRef = useRef({
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    moved: false,
+    zoneDir: 0,
+    pausedByHold: false,
+  });
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1 for current item
   const [mediaBlocked, setMediaBlocked] = useState(false);
@@ -162,6 +175,24 @@ export const FastViewerPage = () => {
   }, [location?.state, safeKey]);
 
   // (responsive behavior is handled via Tailwind breakpoints in markup)
+
+  // Persist current position so refresh can continue the same playlist.
+  useEffect(() => {
+    if (!queue || queue.length === 0) return;
+    try {
+      sessionStorage.setItem(
+        'fast_queue_v1',
+        JSON.stringify({
+          ts: Date.now(),
+          queue,
+          startKey: String(queue?.[userIdx]?.key || '').trim(),
+          startIndex: userIdx,
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, [queue, userIdx]);
 
   useEffect(() => {
     // Load current user + items by queue[userIdx]
@@ -447,32 +478,122 @@ export const FastViewerPage = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [closeToList, goItem]);
 
-  // Tap / press-hold to pause (Instagram-like)
-  const onPressStart = () => {
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    holdTimerRef.current = setTimeout(() => setIsPaused(true), HOLD_TO_PAUSE_MS);
-  };
-  const onPressEnd = () => {
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    holdTimerRef.current = null;
-    setIsPaused(false);
+  // Tap / press-hold to pause + swipe gestures (Instagram-like)
+  const finishGesture = () => {
+    gestureRef.current.active = false;
+    gestureRef.current.pointerId = null;
+    gestureRef.current.moved = false;
+    gestureRef.current.zoneDir = 0;
+    gestureRef.current.pausedByHold = false;
   };
 
-  const onTapZone = (e, dir) => {
-    // Avoid triggering if user intended a hold-pause
+  const onPointerDownZone = (e, dir) => {
+    // Ignore gesture start on interactive elements (header/like/etc.)
+    try {
+      if (e?.target?.closest?.('button,a,input,textarea,select')) return;
+    } catch {
+      // ignore
+    }
+    const pid = e?.pointerId;
+    if (pid == null) return;
+
+    gestureRef.current.active = true;
+    gestureRef.current.pointerId = pid;
+    gestureRef.current.zoneDir = dir;
+    gestureRef.current.startX = e.clientX;
+    gestureRef.current.startY = e.clientY;
+    gestureRef.current.lastX = e.clientX;
+    gestureRef.current.lastY = e.clientY;
+    gestureRef.current.moved = false;
+    gestureRef.current.pausedByHold = false;
+
+    try {
+      e.currentTarget?.setPointerCapture?.(pid);
+    } catch {
+      // ignore
+    }
+
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = setTimeout(() => {
+      gestureRef.current.pausedByHold = true;
+      setIsPaused(true);
+    }, HOLD_TO_PAUSE_MS);
+  };
+
+  const onPointerMoveZone = (e) => {
+    const g = gestureRef.current;
+    if (!g.active) return;
+    if (g.pointerId != null && e.pointerId !== g.pointerId) return;
+    g.lastX = e.clientX;
+    g.lastY = e.clientY;
+    const dx = g.lastX - g.startX;
+    const dy = g.lastY - g.startY;
+    if (!g.moved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      g.moved = true;
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      if (g.pausedByHold) {
+        g.pausedByHold = false;
+        setIsPaused(false);
+      }
+    }
+  };
+
+  const onPointerUpZone = (e) => {
+    const g = gestureRef.current;
+    if (!g.active) return;
+    if (g.pointerId != null && e.pointerId !== g.pointerId) return;
+
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
-    // If we were paused via hold, keep paused (don't navigate)
-    if (isPaused) return;
-    // Prevent double navigation from nested buttons
-    try {
-      e?.stopPropagation?.();
-    } catch {
-      // ignore
+
+    const dx = (g.lastX || e.clientX) - g.startX;
+    const dy = (g.lastY || e.clientY) - g.startY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+
+    // Swipe down to close
+    if (dy > SWIPE_DOWN_MIN_PX && absY > absX * 1.2) {
+      setIsPaused(false);
+      finishGesture();
+      closeToList();
+      return;
     }
-    goItem(dir);
+
+    // Swipe left/right to switch users
+    if (absX > SWIPE_MIN_PX && absX > absY * 1.2) {
+      setIsPaused(false);
+      finishGesture();
+      if (dx < 0) goUser(1);
+      else goUser(-1);
+      return;
+    }
+
+    // Tap (no meaningful move): left/right zones navigate items
+    if (!g.moved && !g.pausedByHold && !isPaused) {
+      const tapDir = g.zoneDir || 0;
+      if (tapDir) goItem(tapDir);
+    }
+
+    // Hold-to-pause resumes on release
+    if (g.pausedByHold) setIsPaused(false);
+    finishGesture();
+  };
+
+  const onPointerCancelZone = (e) => {
+    const g = gestureRef.current;
+    if (!g.active) return;
+    if (g.pointerId != null && e.pointerId !== g.pointerId) return;
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (g.pausedByHold) setIsPaused(false);
+    finishGesture();
   };
 
   const UserPreviewCard = ({ u, side }) => {
@@ -581,14 +702,29 @@ export const FastViewerPage = () => {
           {/* tap zones + hold-to-pause */}
           <div
             className="absolute inset-0 z-10"
-            onPointerDown={onPressStart}
-            onPointerUp={onPressEnd}
-            onPointerCancel={onPressEnd}
-            onPointerLeave={onPressEnd}
+            style={{ touchAction: 'none' }}
           >
             <div className="absolute inset-0 grid grid-cols-2">
-              <button type="button" className="w-full h-full" aria-label="Önceki" onClick={(e) => onTapZone(e, -1)} />
-              <button type="button" className="w-full h-full" aria-label="Sonraki" onClick={(e) => onTapZone(e, 1)} />
+              <div
+                role="button"
+                tabIndex={-1}
+                aria-label="Önceki"
+                className="w-full h-full"
+                onPointerDown={(e) => onPointerDownZone(e, -1)}
+                onPointerMove={onPointerMoveZone}
+                onPointerUp={onPointerUpZone}
+                onPointerCancel={onPointerCancelZone}
+              />
+              <div
+                role="button"
+                tabIndex={-1}
+                aria-label="Sonraki"
+                className="w-full h-full"
+                onPointerDown={(e) => onPointerDownZone(e, 1)}
+                onPointerMove={onPointerMoveZone}
+                onPointerUp={onPointerUpZone}
+                onPointerCancel={onPointerCancelZone}
+              />
             </div>
           </div>
 
