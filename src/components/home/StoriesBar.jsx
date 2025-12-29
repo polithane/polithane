@@ -23,6 +23,45 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
         : null,
     };
   }, [mode]);
+
+  const openFast = (story, index) => {
+    const keyOf = (s) => String(s?.username || s?.user_id || '').trim();
+    const queue = (items || [])
+      .map((s) => ({
+        key: keyOf(s),
+        user_id: s?.user_id,
+        username: s?.username,
+        full_name: s?.full_name,
+        avatar_url: s?.avatar_url || s?.profile_image,
+        profile_image: s?.profile_image || s?.avatar_url,
+        story_count: s?.story_count,
+        latest_created_at: s?.latest_created_at,
+      }))
+      .filter((x) => x.key);
+    const startKey = keyOf(story);
+    const startIndex = Math.max(0, queue.findIndex((x) => x.key === startKey));
+    // Persist so refresh/back can continue the same playlist.
+    try {
+      sessionStorage.setItem(
+        'fast_queue_v1',
+        JSON.stringify({
+          ts: Date.now(),
+          queue,
+          startKey,
+          startIndex,
+        })
+      );
+    } catch {
+      // ignore
+    }
+    navigate(cfg.itemPath(story), {
+      state: {
+        fastQueue: queue,
+        fastStartKey: startKey,
+        fastStartIndex: startIndex >= 0 ? startIndex : index || 0,
+      },
+    });
+  };
   
   return (
     <div className="mb-4 relative z-30">
@@ -30,10 +69,10 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
       <div className="overflow-x-auto scrollbar-hide pr-[60px]">
         <div className="flex items-center gap-2 py-2">
           {/* Story Items */}
-          {items.map((story) => (
+          {items.map((story, idx) => (
             <button
               key={story.user_id}
-              onClick={() => navigate(cfg.itemPath(story))}
+              onClick={() => (cfg.isFast ? openFast(story, idx) : navigate(cfg.itemPath(story)))}
               onMouseEnter={() => setHoveredStory(story.user_id)}
               onMouseLeave={() => setHoveredStory(null)}
               className="flex-shrink-0 group relative"
