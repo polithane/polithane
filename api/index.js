@@ -2633,7 +2633,7 @@ async function getFollowers(req, res, targetId) {
   const ids = (rows || []).map((r) => String(r?.follower_id || '').trim()).filter(Boolean);
   if (ids.length === 0) return res.json({ success: true, data: [] });
   const select =
-    'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
+    'id,auth_user_id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
   const urows = [];
   for (let i = 0; i < ids.length; i += 50) {
     const chunk = ids.slice(i, i + 50);
@@ -2660,22 +2660,61 @@ async function getFollowers(req, res, targetId) {
       }
       throw new Error('Empty in() result (quoted)');
     } catch {
+      // ignore
+    }
+
+    // If follows table stores auth ids (auth_user_id) instead of users.id, try that too.
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const part = await supabaseRestGet('users', { select, auth_user_id: `in.(${chunk.join(',')})`, limit: String(chunk.length) });
+      if (Array.isArray(part) && part.length > 0) {
+        urows.push(...part);
+        continue;
+      }
+      throw new Error('Empty auth_user_id in() result');
+    } catch {
+      // ignore
+    }
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const quoted = chunk.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+      // eslint-disable-next-line no-await-in-loop
+      const part = await supabaseRestGet('users', { select, auth_user_id: `in.(${quoted})`, limit: String(chunk.length) });
+      if (Array.isArray(part) && part.length > 0) {
+        urows.push(...part);
+        continue;
+      }
+      throw new Error('Empty auth_user_id in() result (quoted)');
+    } catch {
       // fall back to per-id eq lookups (slow but reliable for small limits)
     }
     for (const id of chunk) {
       // eslint-disable-next-line no-await-in-loop
       const one = await supabaseRestGet('users', { select, id: `eq.${id}`, limit: '1' }).catch(() => []);
-      if (Array.isArray(one) && one[0]) urows.push(one[0]);
+      if (Array.isArray(one) && one[0]) {
+        urows.push(one[0]);
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const oneByAuth = await supabaseRestGet('users', { select, auth_user_id: `eq.${id}`, limit: '1' }).catch(() => []);
+      if (Array.isArray(oneByAuth) && oneByAuth[0]) urows.push(oneByAuth[0]);
     }
   }
-  const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
-  const list = ids.map((id) => byId.get(id)).filter(Boolean);
+  const byAnyId = new Map();
+  (urows || []).forEach((u) => {
+    const id = String(u?.id || '').trim();
+    const authId = String(u?.auth_user_id || '').trim();
+    if (id) byAnyId.set(id, u);
+    if (authId) byAnyId.set(authId, u);
+  });
+  const list = ids.map((id) => byAnyId.get(id)).filter(Boolean);
   return res.json({
     success: true,
     data: list,
     meta: {
       follow_rows: ids.length,
       users_found: list.length,
+      sample_ids: ids.slice(0, 3),
     },
   });
 }
@@ -2706,7 +2745,7 @@ async function getFollowing(req, res, targetId) {
   const ids = (rows || []).map((r) => String(r?.following_id || '').trim()).filter(Boolean);
   if (ids.length === 0) return res.json({ success: true, data: [] });
   const select =
-    'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
+    'id,auth_user_id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
   const urows = [];
   for (let i = 0; i < ids.length; i += 50) {
     const chunk = ids.slice(i, i + 50);
@@ -2733,20 +2772,56 @@ async function getFollowing(req, res, targetId) {
     } catch {
       // ignore
     }
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const part = await supabaseRestGet('users', { select, auth_user_id: `in.(${chunk.join(',')})`, limit: String(chunk.length) });
+      if (Array.isArray(part) && part.length > 0) {
+        urows.push(...part);
+        continue;
+      }
+      throw new Error('Empty auth_user_id in() result');
+    } catch {
+      // ignore
+    }
+    try {
+      const quoted = chunk.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+      // eslint-disable-next-line no-await-in-loop
+      const part = await supabaseRestGet('users', { select, auth_user_id: `in.(${quoted})`, limit: String(chunk.length) });
+      if (Array.isArray(part) && part.length > 0) {
+        urows.push(...part);
+        continue;
+      }
+      throw new Error('Empty auth_user_id in() result (quoted)');
+    } catch {
+      // ignore
+    }
     for (const id of chunk) {
       // eslint-disable-next-line no-await-in-loop
       const one = await supabaseRestGet('users', { select, id: `eq.${id}`, limit: '1' }).catch(() => []);
-      if (Array.isArray(one) && one[0]) urows.push(one[0]);
+      if (Array.isArray(one) && one[0]) {
+        urows.push(one[0]);
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const oneByAuth = await supabaseRestGet('users', { select, auth_user_id: `eq.${id}`, limit: '1' }).catch(() => []);
+      if (Array.isArray(oneByAuth) && oneByAuth[0]) urows.push(oneByAuth[0]);
     }
   }
-  const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
-  const list = ids.map((id) => byId.get(id)).filter(Boolean);
+  const byAnyId = new Map();
+  (urows || []).forEach((u) => {
+    const id = String(u?.id || '').trim();
+    const authId = String(u?.auth_user_id || '').trim();
+    if (id) byAnyId.set(id, u);
+    if (authId) byAnyId.set(authId, u);
+  });
+  const list = ids.map((id) => byAnyId.get(id)).filter(Boolean);
   return res.json({
     success: true,
     data: list,
     meta: {
       follow_rows: ids.length,
       users_found: list.length,
+      sample_ids: ids.slice(0, 3),
     },
   });
 }
@@ -2793,15 +2868,24 @@ async function getUserFollowedByFriends(req, res, targetId) {
   }
 
   // 3) Fetch friend user objects (small payload)
-  const usersRows = await supabaseRestGet('users', {
-    select: 'id,username,full_name,avatar_url,profile_image,verification_badge,is_verified,is_active',
+  const friendSelect = 'id,auth_user_id,username,full_name,avatar_url,profile_image,verification_badge,is_verified,is_active';
+  const quoted = friendIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+  const limUsers = String(Math.min(friendIds.length, 50));
+  let usersRows = await supabaseRestGet('users', {
+    select: friendSelect,
     id: `in.(${friendIds.join(',')})`,
     is_active: 'eq.true',
-    limit: String(Math.min(friendIds.length, 50)),
-  }).catch(async () => {
-    const quoted = friendIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
-    return await supabaseRestGet('users', { select: 'id,username,full_name,avatar_url,profile_image,verification_badge,is_verified,is_active', id: `in.(${quoted})`, is_active: 'eq.true', limit: String(Math.min(friendIds.length, 50)) }).catch(() => []);
-  });
+    limit: limUsers,
+  }).catch(() => []);
+  if (!Array.isArray(usersRows) || usersRows.length === 0) {
+    usersRows = await supabaseRestGet('users', { select: friendSelect, id: `in.(${quoted})`, is_active: 'eq.true', limit: limUsers }).catch(() => []);
+  }
+  if (!Array.isArray(usersRows) || usersRows.length === 0) {
+    usersRows = await supabaseRestGet('users', { select: friendSelect, auth_user_id: `in.(${friendIds.join(',')})`, is_active: 'eq.true', limit: limUsers }).catch(() => []);
+  }
+  if (!Array.isArray(usersRows) || usersRows.length === 0) {
+    usersRows = await supabaseRestGet('users', { select: friendSelect, auth_user_id: `in.(${quoted})`, is_active: 'eq.true', limit: limUsers }).catch(() => []);
+  }
 
   const friends = (usersRows || [])
     .filter(Boolean)
