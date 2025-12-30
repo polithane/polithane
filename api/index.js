@@ -2670,7 +2670,14 @@ async function getFollowers(req, res, targetId) {
   }
   const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
   const list = ids.map((id) => byId.get(id)).filter(Boolean);
-  return res.json({ success: true, data: list });
+  return res.json({
+    success: true,
+    data: list,
+    meta: {
+      follow_rows: ids.length,
+      users_found: list.length,
+    },
+  });
 }
 
 async function getFollowing(req, res, targetId) {
@@ -2734,7 +2741,14 @@ async function getFollowing(req, res, targetId) {
   }
   const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
   const list = ids.map((id) => byId.get(id)).filter(Boolean);
-  return res.json({ success: true, data: list });
+  return res.json({
+    success: true,
+    data: list,
+    meta: {
+      follow_rows: ids.length,
+      users_found: list.length,
+    },
+  });
 }
 
 async function getUserFollowedByFriends(req, res, targetId) {
