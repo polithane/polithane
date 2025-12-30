@@ -119,6 +119,7 @@ export const CreatePolitPage = () => {
   const [files, setFiles] = useState([]);
   const [recordedUrl, setRecordedUrl] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [preparingMedia, setPreparingMedia] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [mediaDurationSec, setMediaDurationSec] = useState(0);
   const [videoThumbs, setVideoThumbs] = useState([]); // [{ timeSec, previewUrl, blob }]
@@ -126,6 +127,8 @@ export const CreatePolitPage = () => {
 
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadHint, setUploadHint] = useState('');
   const publishLockRef = useRef(false);
 
   const [primaryPost, setPrimaryPost] = useState(null);
@@ -201,8 +204,137 @@ export const CreatePolitPage = () => {
     // Hide submit button during picking/recording; show only when we have a preview-ready media.
     if (step !== 'media') return false;
     if (isRecording) return false;
+    if (preparingMedia) return false;
     return hasMedia;
-  }, [hasMedia, isRecording, step]);
+  }, [hasMedia, isRecording, preparingMedia, step]);
+
+  const optimizeImageFile = async (file) => {
+    try {
+      const t = String(file?.type || '').toLowerCase();
+      if (!t.startsWith('image/')) return file;
+      const bytes = Number(file?.size || 0) || 0;
+      if (bytes > 0 && bytes < 350 * 1024) return file;
+
+      const blob = file instanceof Blob ? file : new Blob([file]);
+      let bitmap = null;
+      try {
+        bitmap = await createImageBitmap(blob);
+      } catch {
+        bitmap = null;
+      }
+      if (!bitmap) return file;
+
+      const maxW = 1440;
+      const maxH = 1440;
+      const w0 = Number(bitmap.width || 0) || 0;
+      const h0 = Number(bitmap.height || 0) || 0;
+      if (!w0 || !h0) return file;
+
+      const scale = Math.min(1, maxW / w0, maxH / h0);
+      const w = Math.max(1, Math.round(w0 * scale));
+      const h = Math.max(1, Math.round(h0 * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return file;
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      try {
+        bitmap.close?.();
+      } catch {
+        // ignore
+      }
+
+      const outBlob = await new Promise((resolve) => {
+        try {
+          canvas.toBlob((b) => resolve(b), 'image/webp', 0.82);
+        } catch {
+          resolve(null);
+        }
+      });
+      if (!outBlob) return file;
+
+      const outBytes = Number(outBlob.size || 0) || 0;
+      if (bytes && outBytes && outBytes > bytes * 0.92) return file;
+
+      const name = String(file?.name || 'image').trim();
+      const base = name.includes('.') ? name.split('.').slice(0, -1).join('.') : name;
+      return new File([outBlob], `${base || 'image'}.webp`, { type: 'image/webp' });
+    } catch {
+      return file;
+    }
+  };
+
+  const optimizeImageFiles = async (picked) => {
+    const list = (Array.isArray(picked) ? picked : []).slice(0, 10);
+    if (list.length === 0) return [];
+    setPreparingMedia(true);
+    setUploadHint('Resimler optimize ediliyor…');
+    try {
+      const out = [];
+      for (const f of list) {
+        // eslint-disable-next-line no-await-in-loop
+        out.push(await optimizeImageFile(f));
+      }
+      return out;
+    } finally {
+      setPreparingMedia(false);
+      setUploadHint('');
+    }
+  };
+
+  const getUploadHeaders = async () => {
+    const headers = {};
+    try {
+      const anon = String(import.meta.env?.VITE_SUPABASE_ANON_KEY || '').trim();
+      if (anon) headers.apikey = anon;
+    } catch {
+      // ignore
+    }
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token || '';
+      if (token) headers.Authorization = `Bearer ${token}`;
+    } catch {
+      // ignore
+    }
+    return headers;
+  };
+
+  const xhrPutWithProgress = async ({ url, body, headers, onProgress }) =>
+    new Promise((resolve, reject) => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', url, true);
+        try {
+          Object.entries(headers || {}).forEach(([k, v]) => {
+            if (!k || !v) return;
+            xhr.setRequestHeader(k, String(v));
+          });
+        } catch {
+          // ignore
+        }
+        xhr.upload.onprogress = (e) => {
+          try {
+            if (!e.lengthComputable) return;
+            const pct = e.total > 0 ? e.loaded / e.total : 0;
+            onProgress?.(Math.max(0, Math.min(1, pct)));
+          } catch {
+            // ignore
+          }
+        };
+        xhr.onerror = () => reject(new Error('Yükleme sırasında bağlantı hatası.'));
+        xhr.onabort = () => reject(new Error('Yükleme iptal edildi.'));
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) return resolve(true);
+          const msg = String(xhr.responseText || '').trim();
+          return reject(new Error(msg || `Yükleme başarısız (HTTP ${xhr.status}).`));
+        };
+        xhr.send(body);
+      } catch (e) {
+        reject(e);
+      }
+    });
 
   const resetMedia = () => {
     setFiles([]);
@@ -228,6 +360,9 @@ export const CreatePolitPage = () => {
     recordStopFiredRef.current = false;
     if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
     recordIntervalRef.current = null;
+    setPreparingMedia(false);
+    setUploadPct(0);
+    setUploadHint('');
     chunksRef.current = [];
     setIsRecording(false);
     if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
@@ -687,7 +822,25 @@ export const CreatePolitPage = () => {
           : MediaRecorder.isTypeSupported('video/webm')
             ? 'video/webm'
             : '';
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      // Target: 720p story-like recording with reasonable bitrate for fast uploads.
+      // These are best-effort; some browsers ignore/reject them.
+      const recorderOptions =
+        contentType === 'video'
+          ? {
+              ...(mimeType ? { mimeType } : {}),
+              videoBitsPerSecond: 2_800_000, // ~2.8 Mbps
+              audioBitsPerSecond: 96_000,
+            }
+          : {
+              ...(mimeType ? { mimeType } : {}),
+              audioBitsPerSecond: 96_000,
+            };
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream, recorderOptions);
+      } catch {
+        recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      }
       recorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -778,7 +931,7 @@ export const CreatePolitPage = () => {
       reader.readAsDataURL(f);
     });
 
-  const uploadOne = async (file) => {
+  const uploadOne = async (file, progress) => {
     // IMPORTANT:
     // - Base64 uploads hit Vercel request-body limits quickly (esp. video).
     // - Use signed upload so the file goes directly to Supabase Storage.
@@ -831,11 +984,26 @@ export const CreatePolitPage = () => {
       }),
     });
     if (!sign?.success) throw new Error(sign?.error || 'Yükleme hazırlığı başarısız.');
-    const { bucket, path, token, publicUrl } = sign?.data || {};
+    const { bucket, path, token, publicUrl, signedUrl } = sign?.data || {};
     if (!bucket || !path || !token || !publicUrl) throw new Error('Yükleme anahtarı alınamadı.');
 
-    const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, { contentType: ct });
-    if (error) throw new Error(String(error?.message || 'Medya yüklenemedi.'));
+    // Progress-capable signed upload (XHR PUT) to match Supabase's `uploadToSignedUrl` endpoint behavior.
+    // Supabase expects a multipart/form-data body with cacheControl and the file under an empty field name.
+    const url =
+      String(signedUrl || '').trim() ||
+      `${String(import.meta.env?.VITE_SUPABASE_URL || '').replace(/\/+$/, '')}/storage/v1/object/upload/sign/${encodeURI(
+        `${bucket}/${path}`
+      )}?token=${encodeURIComponent(token)}`;
+    const fd = new FormData();
+    fd.append('cacheControl', '3600');
+    fd.append('', file);
+    const headers = await getUploadHeaders();
+    await xhrPutWithProgress({
+      url,
+      body: fd,
+      headers,
+      onProgress: (p) => progress?.(p),
+    });
     return String(publicUrl);
   };
 
@@ -894,10 +1062,29 @@ export const CreatePolitPage = () => {
 
     publishLockRef.current = true;
     setLoading(true);
+    setUploadPct(0);
+    setUploadHint('');
     try {
       let media_urls = [];
       if (files.length > 0) {
-        media_urls = await Promise.all(files.slice(0, contentType === 'image' ? 10 : 1).map(uploadOne));
+        const list = files.slice(0, contentType === 'image' ? 10 : 1);
+        const totalBytes = list.reduce((acc, f) => acc + (Number(f?.size || 0) || 0), 0) || 0;
+        let doneBytes = 0;
+        const out = [];
+        let idxFile = 0;
+        for (const f of list) {
+          idxFile += 1;
+          setUploadHint(`Yükleniyor… (${idxFile}/${list.length})`);
+          // eslint-disable-next-line no-await-in-loop
+          const url = await uploadOne(f, (p) => {
+            const pct = totalBytes > 0 ? (doneBytes + (Number(f?.size || 0) || 0) * p) / totalBytes : p;
+            setUploadPct(Math.max(0, Math.min(1, pct)));
+          });
+          out.push(url);
+          doneBytes += Number(f?.size || 0) || 0;
+          setUploadPct(totalBytes > 0 ? Math.min(1, doneBytes / totalBytes) : 1);
+        }
+        media_urls = out;
       }
 
       let thumbnail_url = null;
@@ -907,7 +1094,8 @@ export const CreatePolitPage = () => {
           const thumbFile = new File([chosen.blob], 'thumb.jpg', { type: 'image/jpeg' });
           // mark folder without changing uploadOne signature
           thumbFile.__uploadFolder = 'posts/thumbnails';
-          thumbnail_url = await uploadOne(thumbFile);
+          setUploadHint('Kapak yükleniyor…');
+          thumbnail_url = await uploadOne(thumbFile, (p) => setUploadPct(Math.max(0, Math.min(1, p))));
         }
       }
 
@@ -1445,7 +1633,13 @@ export const CreatePolitPage = () => {
                     accept="image/*"
                     multiple
                     className="hidden"
-                    onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 10))}
+                    onChange={async (e) => {
+                      const picked = Array.from(e.target.files || []).slice(0, 10);
+                      if (picked.length === 0) return;
+                      resetMedia();
+                      const optimized = await optimizeImageFiles(picked);
+                      setFiles(optimized);
+                    }}
                   />
                   <input
                     ref={imageCaptureRef}
@@ -1453,7 +1647,13 @@ export const CreatePolitPage = () => {
                     accept="image/*"
                     capture="environment"
                     className="hidden"
-                    onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 10))}
+                    onChange={async (e) => {
+                      const picked = Array.from(e.target.files || []).slice(0, 10);
+                      if (picked.length === 0) return;
+                      resetMedia();
+                      const optimized = await optimizeImageFiles(picked);
+                      setFiles(optimized);
+                    }}
                   />
 
                   {hasMedia ? (
@@ -1497,8 +1697,15 @@ export const CreatePolitPage = () => {
                           'py-5',
                         ].join(' ')}
                       >
-                        <div className="text-lg leading-none">{loading ? 'Gönderiliyor…' : 'Gönder'}</div>
-                        <div className="text-xs font-semibold opacity-90 mt-1">{isFastMode ? 'Fast paylaşımı' : 'Polit paylaşımı'}</div>
+                        <div className="text-lg leading-none">
+                          {preparingMedia ? 'Hazırlanıyor…' : loading ? `Yükleniyor… %${Math.round(uploadPct * 100)}` : 'Gönder'}
+                        </div>
+                        <div className="text-xs font-semibold opacity-90 mt-1">{uploadHint || (isFastMode ? 'Fast paylaşımı' : 'Polit paylaşımı')}</div>
+                        {loading ? (
+                          <div className="mt-3 w-full h-2 rounded-full bg-white/20 overflow-hidden">
+                            <div className="h-full bg-white/90" style={{ width: `${Math.round(uploadPct * 100)}%` }} />
+                          </div>
+                        ) : null}
                       </button>
                     )
                   ) : null}
