@@ -80,11 +80,24 @@ export const ProfilePage = () => {
   }, [userId, username]);
   const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
   
-  const isOwnProfile = currentUser && (
-    userId === 'me' || 
-    String(userId || '') === String(currentUser.id || '') ||
-    normalizeUsername(username || '') === normalizeUsername(currentUser.username || '')
-  );
+  const isOwnProfile = useMemo(() => {
+    if (!currentUser) return false;
+    const meId = String(currentUser.id || currentUser.user_id || '').trim();
+    // Prefer resolved profile user id when available (fixes route/underscore mismatches and prevents Follow flash)
+    const viewedIdRaw =
+      user?.user_id != null
+        ? user.user_id
+        : user?.id != null
+          ? user.id
+          : userId === 'me'
+            ? meId
+            : userId;
+    const viewedId = String(viewedIdRaw || '').trim();
+    if (meId && viewedId && meId === viewedId) return true;
+    if (userId === 'me') return true;
+    if (meId && String(userId || '').trim() === meId) return true;
+    return normalizeUsername(username || '') === normalizeUsername(currentUser.username || '');
+  }, [currentUser, user?.user_id, user?.id, userId, username]);
 
   // Hydrate instantly from session cache (for back/forward instant UX).
   useEffect(() => {
