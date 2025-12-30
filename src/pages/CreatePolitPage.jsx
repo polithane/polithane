@@ -15,6 +15,12 @@ export const CreatePolitPage = () => {
 
   const isFastMode = useMemo(() => String(location?.pathname || '') === '/fast-at', [location?.pathname]);
 
+  const [step, setStep] = useState('type'); // type | agenda | media | desc | success
+  const [contentType, setContentType] = useState(''); // video | image | audio | text
+  const [agendaTag, setAgendaTag] = useState(''); // '' => gündem dışı
+  const [agendas, setAgendas] = useState([]);
+  const [agendaVisibleCount, setAgendaVisibleCount] = useState(10);
+
   // Use user-provided icon images from Storage (ikons folder/bucket), fallback to local /icons.
   const iconBaseUrls = useMemo(() => {
     try {
@@ -109,12 +115,6 @@ export const CreatePolitPage = () => {
     const ut = String(user?.user_type || 'citizen');
     return ut !== 'citizen' && !user?.is_verified;
   }, [isAuthenticated, user?.is_admin, user?.user_type, user?.is_verified]);
-
-  const [step, setStep] = useState('type'); // type | agenda | media | desc | success
-  const [contentType, setContentType] = useState(''); // video | image | audio | text
-  const [agendaTag, setAgendaTag] = useState(''); // '' => gündem dışı
-  const [agendas, setAgendas] = useState([]);
-  const [agendaVisibleCount, setAgendaVisibleCount] = useState(10);
 
   const [files, setFiles] = useState([]);
   const [recordedUrl, setRecordedUrl] = useState('');
