@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { normalizeAvatarUrl } from '../../utils/avatarUrl';
 import { getUserHandle } from '../../utils/userHandle';
+import { Avatar } from '../common/Avatar';
 
 export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
   const navigate = useNavigate();
@@ -72,7 +72,7 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
           {/* Story Items */}
           {items.map((story, idx) => (
             <button
-              key={story.user_id}
+              key={String(story?.user_id || story?.id || getUserHandle(story) || idx)}
               onClick={() => (cfg.isFast ? openFast(story, idx) : navigate(cfg.itemPath(story)))}
               onMouseEnter={() => setHoveredStory(story.user_id)}
               onMouseLeave={() => setHoveredStory(null)}
@@ -92,11 +92,14 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
               >
                 {/* Inner circle - profile image */}
                 <div className={['w-full h-full rounded-full p-[1.5px]', cfg.isFast ? 'bg-white' : 'bg-white'].join(' ')}>
-                  <img 
-                    src={normalizeAvatarUrl(story.profile_image || story.avatar_url)} 
-                    alt={story.full_name}
-                    className="w-full h-full rounded-full object-cover group-hover:scale-105 transition-transform"
-                  />
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Avatar
+                      src={story?.profile_image || story?.avatar_url}
+                      alt={story?.full_name || story?.username || ''}
+                      size="45px"
+                      className="group-hover:scale-105 transition-transform"
+                    />
+                  </div>
                 </div>
               </div>
               
