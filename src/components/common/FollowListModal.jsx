@@ -188,22 +188,33 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
                       const id = String(user?.user_id || user?.id || '').trim();
                       const info = id ? friendsByUserId?.[id] : null;
                       const friends = Array.isArray(info?.friends) ? info.friends : [];
+                      // UX: When browsing someone else's "following" list, that profile owner trivially follows everyone in the list.
+                      // If the viewer also follows the owner, the mutual line becomes noisy (e.g. "Ali takip ediyor" under every row).
+                      // So we hide the owner from the mutual friends display.
+                      const ownerId = String(resolvedUserId || '').trim();
+                      const filteredFriends = ownerId ? friends.filter((f) => String(f?.id || '').trim() !== ownerId) : friends;
+                      const removedOwner = ownerId && filteredFriends.length !== friends.length ? 1 : 0;
                       const names = friends
                         .map((f) => String(f?.full_name || f?.username || '').trim())
                         .filter(Boolean)
                         .slice(0, 2);
-                      const extra = Math.max(0, (Number(info?.count || 0) || 0) - friends.length);
-                      if (!info || (Number(info?.count || 0) || 0) <= 0) return null;
+                      const namesFiltered = filteredFriends
+                        .map((f) => String(f?.full_name || f?.username || '').trim())
+                        .filter(Boolean)
+                        .slice(0, 2);
+                      const total = Math.max(0, (Number(info?.count || 0) || 0) - (removedOwner ? 1 : 0));
+                      const extra = Math.max(0, total - filteredFriends.length);
+                      if (!info || total <= 0) return null;
                       return (
                         <div className="text-[11px] text-gray-600 mt-0.5 line-clamp-1">
-                          {names.length > 0 ? (
+                          {namesFiltered.length > 0 ? (
                             <>
-                              <span className="font-semibold">{names.join(', ')}</span>
+                              <span className="font-semibold">{namesFiltered.join(', ')}</span>
                               {extra > 0 ? <span className="font-semibold"> ve {extra} kişi daha</span> : null}
                               <span className="font-semibold"> takip ediyor</span>
                             </>
                           ) : (
-                            <span className="font-semibold">{info.count} kişi takip ediyor</span>
+                            <span className="font-semibold">{total} kişi takip ediyor</span>
                           )}
                         </div>
                       );

@@ -489,11 +489,14 @@ export const CreatePolitPage = () => {
         setTimeout(() => resolve(true), 160);
       });
 
-    const captureAt = (videoEl, timeSec) =>
+    const captureAt = (videoEl, timeSec, fallbackDurationSec) =>
       new Promise((resolve) => {
         try {
-          const duration = Number(videoEl.duration || 0);
-          const t = clamp(Number(timeSec || 0), 0, Math.max(0, duration - 0.12));
+          const dur0 = Number(videoEl.duration || 0);
+          const duration =
+            Number.isFinite(dur0) && dur0 > 0 ? dur0 : Math.max(0.4, Number(fallbackDurationSec || 0) || 0.4);
+          const maxT = Math.max(0.05, duration - 0.12);
+          let t = clamp(Number(timeSec || 0), 0.05, maxT);
           let done = false;
           const finish = (v) => {
             if (done) return;
@@ -540,6 +543,15 @@ export const CreatePolitPage = () => {
           try {
             // Ensure data is available around the target time
             if (videoEl.readyState < 2) videoEl.load?.();
+          } catch {
+            // ignore
+          }
+          // If currentTime is already at `t`, some browsers won't fire `seeked`.
+          try {
+            if (Math.abs(Number(videoEl.currentTime || 0) - t) < 0.02) {
+              const bumped = clamp(t + 0.06, 0.05, maxT);
+              if (Math.abs(bumped - t) >= 0.02) t = bumped;
+            }
           } catch {
             // ignore
           }
@@ -594,15 +606,40 @@ export const CreatePolitPage = () => {
         const duration = Number(videoEl.duration || 0);
         const d = Number.isFinite(duration) && duration > 0 ? duration : Math.max(1, Number(mediaDurationSec || 0) || 1);
 
-        const rawTimes = [d * 0.2, d * 0.5, d * 0.8].map((t) => clamp(t, 0.1, Math.max(0.1, d - 0.12)));
-        const uniqTimes = Array.from(new Set(rawTimes.map((t) => Number(t.toFixed(2))))).slice(0, 3);
+        // Always TRY to produce 3 distinct thumbnails, even if metadata duration is missing.
+        const maxT = Math.max(0.05, d - 0.12);
+        const rawTimes = [Math.min(0.12, maxT), d * 0.45, d * 0.82].map((t) => clamp(t, 0.05, maxT));
+        // De-dupe, but keep enough by nudging with a tiny epsilon when needed.
+        const uniqTimes = [];
+        for (const rt of rawTimes) {
+          const base = Number(rt.toFixed(2));
+          if (!uniqTimes.some((x) => Math.abs(x - base) < 0.02)) {
+            uniqTimes.push(base);
+            continue;
+          }
+          const nudged = clamp(base + 0.08, 0.05, maxT);
+          if (!uniqTimes.some((x) => Math.abs(x - nudged) < 0.02)) uniqTimes.push(Number(nudged.toFixed(2)));
+        }
+        while (uniqTimes.length < 3) {
+          const last = uniqTimes.length ? uniqTimes[uniqTimes.length - 1] : 0.05;
+          const next = clamp(last + 0.12, 0.05, maxT);
+          if (Math.abs(next - last) < 0.02) break;
+          uniqTimes.push(Number(next.toFixed(2)));
+        }
+        uniqTimes.splice(3);
 
         const captured = [];
         for (const t of uniqTimes) {
           if (cancelled) break;
           // eslint-disable-next-line no-await-in-loop
-          const one = await captureAt(videoEl, t);
+          const one = await captureAt(videoEl, t, d);
           if (one) captured.push(one);
+        }
+        // If we couldn't seek for some reason (common on some mobile/webm combos),
+        // still show 3 thumbnails by reusing the first successful capture.
+        if (captured.length > 0 && captured.length < 3) {
+          const first = captured[0];
+          while (captured.length < 3) captured.push(first);
         }
         if (cancelled) {
           cleanupPrev(captured);
