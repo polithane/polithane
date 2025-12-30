@@ -15,13 +15,12 @@ export const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
-  const { unreadCount, notifications, loading: notifLoading, fetchNotifications, markAsRead, markAllAsRead, deleteNotification } =
+  const { unreadCount, notifications, loading: notifLoading, fetchNotifications, loadMore, hasMore, markAsRead, markAllAsRead, deleteNotification } =
     useNotifications();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef(null);
   const notifRef = useRef(null);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
-  const [notifLimit, setNotifLimit] = useState(10);
 
   const [q, setQ] = useState('');
   const [results, setResults] = useState({ users: [], posts: [], parties: [] });
@@ -82,10 +81,7 @@ export const Header = () => {
 
   // NOTE: Messages icon + compose modal removed from header (exists in ActionBar).
 
-  const notifItems = useMemo(() => {
-    const list = Array.isArray(notifications) ? notifications : [];
-    return list.slice(0, Math.max(1, notifLimit));
-  }, [notifications, notifLimit]);
+  const notifItems = useMemo(() => (Array.isArray(notifications) ? notifications : []), [notifications]);
 
   const getNotifTitle = (n) => {
     if (n?.title) return String(n.title);
@@ -116,10 +112,9 @@ export const Header = () => {
   };
   const onOpenNotif = async () => {
     setShowNotifMenu((v) => !v);
-    setNotifLimit(10);
     // only fetch when opening
     if (!showNotifMenu) {
-      await fetchNotifications?.();
+      await fetchNotifications?.({ limit: 10, offset: 0, reset: true });
     }
   };
   
@@ -260,7 +255,7 @@ export const Header = () => {
                 >
                   <Bell className="w-5 h-5 text-gray-600" />
                   {unreadCount > 0 && (
-                    <Badge variant="danger" size="small" className="absolute -top-1 -right-1">
+                    <Badge variant="danger" size="small" className="absolute -top-1 -right-1 animate-pulse">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </Badge>
                   )}
@@ -353,14 +348,16 @@ export const Header = () => {
                         })}
                     </div>
 
-                    {Array.isArray(notifications) && notifications.length > 10 && (
+                    {hasMore && (
                       <div className="p-3 border-t border-gray-100 bg-white">
                         <button
                           type="button"
-                          onClick={() => setNotifLimit((v) => (v >= 50 ? 10 : 50))}
+                          onClick={async () => {
+                            await loadMore?.({ limit: 10 });
+                          }}
                           className="w-full px-4 py-3 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-800 font-black"
                         >
-                          {notifLimit >= 50 ? 'Daha az göster' : 'Diğerlerini göster'}
+                          Diğerleri
                         </button>
                       </div>
                     )}

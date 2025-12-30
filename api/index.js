@@ -2607,14 +2607,28 @@ async function getFollowers(req, res, targetId) {
   const tid = String(targetId || '').trim();
   if (!tid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
   const { limit = 50, offset = 0 } = req.query || {};
+  // IMPORTANT:
+  // Some deployments do not have PostgREST FK relationships configured for embedded selects like `follower:users(*)`.
+  // That causes empty lists. So we fetch ids first, then load users by id.
+  const lim = Math.min(parseInt(limit, 10) || 50, 200);
+  const off = parseInt(offset, 10) || 0;
   const rows = await supabaseRestGet('follows', {
-    select: 'follower:users(*)',
+    select: 'follower_id,created_at',
     following_id: `eq.${tid}`,
     order: 'created_at.desc',
-    limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
-    offset: String(parseInt(offset, 10) || 0),
+    limit: String(lim),
+    offset: String(off),
   }).catch(() => []);
-  const list = (rows || []).map((r) => r.follower).filter(Boolean);
+  const ids = (rows || []).map((r) => String(r?.follower_id || '').trim()).filter(Boolean);
+  if (ids.length === 0) return res.json({ success: true, data: [] });
+
+  const urows = await supabaseRestGet('users', {
+    select: 'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata',
+    id: `in.(${ids.join(',')})`,
+    limit: String(Math.min(ids.length, 500)),
+  }).catch(() => []);
+  const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
+  const list = ids.map((id) => byId.get(id)).filter(Boolean);
   return res.json({ success: true, data: list });
 }
 
@@ -2622,14 +2636,25 @@ async function getFollowing(req, res, targetId) {
   const tid = String(targetId || '').trim();
   if (!tid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
   const { limit = 50, offset = 0 } = req.query || {};
+  const lim = Math.min(parseInt(limit, 10) || 50, 200);
+  const off = parseInt(offset, 10) || 0;
   const rows = await supabaseRestGet('follows', {
-    select: 'following:users(*)',
+    select: 'following_id,created_at',
     follower_id: `eq.${tid}`,
     order: 'created_at.desc',
-    limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
-    offset: String(parseInt(offset, 10) || 0),
+    limit: String(lim),
+    offset: String(off),
   }).catch(() => []);
-  const list = (rows || []).map((r) => r.following).filter(Boolean);
+  const ids = (rows || []).map((r) => String(r?.following_id || '').trim()).filter(Boolean);
+  if (ids.length === 0) return res.json({ success: true, data: [] });
+
+  const urows = await supabaseRestGet('users', {
+    select: 'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata',
+    id: `in.(${ids.join(',')})`,
+    limit: String(Math.min(ids.length, 500)),
+  }).catch(() => []);
+  const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
+  const list = ids.map((id) => byId.get(id)).filter(Boolean);
   return res.json({ success: true, data: list });
 }
 
@@ -7628,6 +7653,13 @@ async function getNotifications(req, res) {
   }
 }
 
+async function getUnreadNotificationCount(req, res) {
+  const auth = verifyJwtFromRequest(req);
+  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const count = await supabaseCount('notifications', { user_id: `eq.${auth.id}`, is_read: 'eq.false' }).catch(() => 0);
+  return res.json({ success: true, data: { unread: Number(count || 0) || 0 } });
+}
+
 async function markNotificationRead(req, res, id) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -8485,6 +8517,7 @@ export default async function handler(req, res) {
 
       // Notifications
       if (url === '/api/notifications' && req.method === 'GET') return await getNotifications(req, res);
+      if (url === '/api/notifications/unread-count' && req.method === 'GET') return await getUnreadNotificationCount(req, res);
       if (url === '/api/notifications/read-all' && req.method === 'POST') return await markAllNotificationsRead(req, res);
       if (url.startsWith('/api/notifications/') && req.method === 'POST') {
         const id = url.split('/api/notifications/')[1];

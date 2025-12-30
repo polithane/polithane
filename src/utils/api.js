@@ -284,9 +284,18 @@ export const users = {
     return apiCall(`/api/users/${username}/posts${query ? `?${query}` : ''}`);
   },
 
-  getFollowers: (userId) => apiCall(`/api/users/${userId}/followers`),
+  getFollowers: (userId, params = {}) => {
+    const query = new URLSearchParams(params || {}).toString();
+    return apiCall(`/api/users/${userId}/followers${query ? `?${query}` : ''}`);
+  },
 
-  getFollowing: (userId) => apiCall(`/api/users/${userId}/following`),
+  getFollowing: (userId, params = {}) => {
+    const query = new URLSearchParams(params || {}).toString();
+    return apiCall(`/api/users/${userId}/following${query ? `?${query}` : ''}`);
+  },
+
+  getFollowedByFriends: (targetUserId, { limit = 3 } = {}) =>
+    apiCall(`/api/users/${targetUserId}/followed-by-friends?limit=${encodeURIComponent(String(limit))}`),
 
   getLikes: (userId, params = {}) => {
     const query = new URLSearchParams(params).toString();
@@ -590,6 +599,7 @@ export const notifications = {
     const query = new URLSearchParams(params).toString();
     return apiCall(`/api/notifications${query ? `?${query}` : ''}`);
   },
+  unreadCount: () => apiCall('/api/notifications/unread-count'),
   markRead: (id) =>
     apiCall(`/api/notifications/${id}`, {
       method: 'POST',

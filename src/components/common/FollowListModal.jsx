@@ -15,6 +15,7 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
   const [loading, setLoading] = useState(false);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
+  const [friendsByUserId, setFriendsByUserId] = useState({});
   
   const resolvedUserId = (() => {
     const raw = String(userId || '').trim();
@@ -33,7 +34,10 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
     (async () => {
       setLoading(true);
       try {
-        const r = activeTab === 'followers' ? await usersApi.getFollowers(resolvedUserId) : await usersApi.getFollowing(resolvedUserId);
+        const r =
+          activeTab === 'followers'
+            ? await usersApi.getFollowers(resolvedUserId, { limit: 200, offset: 0 })
+            : await usersApi.getFollowing(resolvedUserId, { limit: 200, offset: 0 });
         const list = r?.data || r?.data?.data || r || [];
         if (activeTab === 'followers') setFollowers(Array.isArray(list) ? list : []);
         else setFollowing(Array.isArray(list) ? list : []);
@@ -47,6 +51,37 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
   }, [isOpen, resolvedUserId, activeTab]);
 
   const displayList = activeTab === 'followers' ? followers : following;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!me?.id) return;
+    const list = Array.isArray(displayList) ? displayList : [];
+    if (list.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // Fetch mutual "followed-by-friends" info for the first chunk (Instagram-like).
+        const slice = list.slice(0, 30);
+        const out = {};
+        for (const u of slice) {
+          const id = String(u?.user_id || u?.id || '').trim();
+          if (!id) continue;
+          // eslint-disable-next-line no-await-in-loop
+          const r = await usersApi.getFollowedByFriends(id, { limit: 3 }).catch(() => null);
+          const v = r?.data && typeof r.data === 'object' ? r.data : null;
+          const count = Number(v?.count || 0) || 0;
+          const friends = Array.isArray(v?.friends) ? v.friends : [];
+          out[id] = { count, friends };
+        }
+        if (!cancelled) setFriendsByUserId(out);
+      } catch {
+        if (!cancelled) setFriendsByUserId({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [displayList, isOpen, me?.id]);
   
   if (!isOpen) return null;
   
@@ -149,6 +184,30 @@ export const FollowListModal = ({ isOpen, onClose, userId, tab = 'followers' }) 
                     <p className="text-xs text-gray-500 truncate">
                       {getUserTitle(user, true)}
                     </p>
+                    {(() => {
+                      const id = String(user?.user_id || user?.id || '').trim();
+                      const info = id ? friendsByUserId?.[id] : null;
+                      const friends = Array.isArray(info?.friends) ? info.friends : [];
+                      const names = friends
+                        .map((f) => String(f?.full_name || f?.username || '').trim())
+                        .filter(Boolean)
+                        .slice(0, 2);
+                      const extra = Math.max(0, (Number(info?.count || 0) || 0) - friends.length);
+                      if (!info || (Number(info?.count || 0) || 0) <= 0) return null;
+                      return (
+                        <div className="text-[11px] text-gray-600 mt-0.5 line-clamp-1">
+                          {names.length > 0 ? (
+                            <>
+                              <span className="font-semibold">{names.join(', ')}</span>
+                              {extra > 0 ? <span className="font-semibold"> ve {extra} kişi daha</span> : null}
+                              <span className="font-semibold"> takip ediyor</span>
+                            </>
+                          ) : (
+                            <span className="font-semibold">{info.count} kişi takip ediyor</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   
                   <div className="flex-shrink-0">
