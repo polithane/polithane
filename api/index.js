@@ -8482,6 +8482,15 @@ export default async function handler(req, res) {
 
   try {
       const url = req.url.split('?')[0];
+      // Build/debug meta (safe: only commit + time).
+      if (url === '/api/meta' && req.method === 'GET') {
+        return res.json({
+          success: true,
+          rev: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_GITHUB_COMMIT_SHA || null,
+          ref: process.env.VERCEL_GIT_COMMIT_REF || null,
+          now: new Date().toISOString(),
+        });
+      }
       if (url === '/api/avatar' && req.method === 'GET') return await proxyAvatar(req, res);
 
       // Dynamic share/OG previews
