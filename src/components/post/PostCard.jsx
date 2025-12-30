@@ -253,8 +253,8 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
               className="w-full rounded-lg object-cover max-h-96"
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
-              <div className="bg-white rounded-full p-3">
-                <Video className="w-8 h-8 text-primary-blue" />
+              <div className="bg-white rounded-full p-2 md:p-3">
+                <Video className="w-5 h-5 md:w-8 md:h-8 text-primary-blue" />
               </div>
             </div>
             <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm">

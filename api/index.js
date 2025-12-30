@@ -5777,13 +5777,65 @@ async function adminUpdateUser(req, res, userId) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
+  const uid = String(userId || '').trim();
+  if (!uid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+
+  // Load previous state for side effects (email/notifications).
+  const beforeRows = await supabaseRestGet('users', { select: 'id,email,full_name,is_active,is_verified,user_type', id: `eq.${uid}`, limit: '1' }).catch(() => []);
+  const before = beforeRows?.[0] || null;
+
   const allowed = {};
   if (typeof body.is_verified === 'boolean') allowed.is_verified = body.is_verified;
   if (typeof body.is_active === 'boolean') allowed.is_active = body.is_active;
   if (typeof body.user_type === 'string') allowed.user_type = body.user_type;
   if (Object.keys(allowed).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
-  const updated = await supabaseRestPatch('users', { id: `eq.${userId}` }, allowed);
-  res.json({ success: true, data: updated?.[0] || null });
+  const updated = await supabaseRestPatch('users', { id: `eq.${uid}` }, allowed);
+  const after = updated?.[0] || null;
+
+  // If approval changed, also notify + email (best-effort).
+  try {
+    const beforeVerified = before?.is_verified === true;
+    const afterVerified = after?.is_verified === true;
+    if (Object.prototype.hasOwnProperty.call(allowed, 'is_verified') && before && beforeVerified !== afterVerified) {
+      if (afterVerified) {
+        await supabaseRestInsert('notifications', [
+          {
+            user_id: uid,
+            type: 'approval',
+            title: 'Üyeliğiniz onaylandı',
+            message: 'Artık Polit ve Fast paylaşabilirsiniz.',
+            is_read: false,
+          },
+        ]).catch(async (err) => {
+          const msg = String(err?.message || '');
+          if (msg.includes('title') || msg.includes('message')) {
+            await supabaseRestInsert('notifications', [{ user_id: uid, type: 'approval', is_read: false }]).catch(() => {});
+          }
+        });
+        sendNotificationEmail(req, { userId: uid, type: 'approval' }).catch(() => null);
+      } else {
+        await supabaseRestInsert('notifications', [
+          {
+            user_id: uid,
+            type: 'system',
+            title: 'Üyelik durumunuz güncellendi',
+            message: 'Üyelik durumunuz admin tarafından güncellendi.',
+            is_read: false,
+          },
+        ]).catch(async (err) => {
+          const msg = String(err?.message || '');
+          if (msg.includes('title') || msg.includes('message')) {
+            await supabaseRestInsert('notifications', [{ user_id: uid, type: 'system', is_read: false }]).catch(() => {});
+          }
+        });
+        sendNotificationEmail(req, { userId: uid, type: 'system' }).catch(() => null);
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  res.json({ success: true, data: after });
 }
 
 function normalizePersonKey(input) {
@@ -7121,11 +7173,33 @@ async function authRegister(req, res) {
           await supabaseRestInsert('notifications', [{ user_id: user.id, type: 'approval', is_read: false }]).catch(() => {});
         }
       });
+      // Email too (best-effort) so the user knows their request is pending.
+      sendNotificationEmail(req, { userId: user.id, type: 'approval' }).catch(() => null);
     }
 
     // Claim registrations always require manual admin review.
     const requiresApproval = user_type !== 'citizen' || isClaim;
     if (isClaim) {
+      // Also send email verification when enabled (claim users should still verify their email).
+      if (emailVerificationRequired) {
+        try {
+          // eslint-disable-next-line global-require
+          const crypto = require('crypto');
+          const tokenRaw = crypto.randomBytes(32).toString('base64url');
+          const expiresIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
+          const baseMeta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : (metadata && typeof metadata === 'object' ? metadata : {});
+          const nextMeta = {
+            ...baseMeta,
+            email_verification_token_hash: sha256Hex(tokenRaw),
+            email_verification_expires_at: expiresIso,
+            email_verified: false,
+          };
+          await safeUserPatch(user.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
+          await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw });
+        } catch {
+          // ignore
+        }
+      }
       const token = signJwt({ id: user.id, username: user.username, email: user.email, user_type: user.user_type, is_admin: !!user.is_admin });
       return res.status(201).json({
         success: true,

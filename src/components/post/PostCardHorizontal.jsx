@@ -425,7 +425,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
               {/* 3D Play Butonu */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="relative" style={{ filter: 'drop-shadow(4px 6px 12px rgba(0,0,0,0.4))' }}>
-                  <svg width="80" height="80" viewBox="0 0 100 100">
+                  <svg viewBox="0 0 100 100" className="w-10 h-10 md:w-20 md:h-20">
                     {/* Dış çember - shadow */}
                     <circle cx="50" cy="53" r="35" fill="rgba(0,0,0,0.2)"/>
                     {/* Ana çember - gradient */}
