@@ -1358,15 +1358,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white font-black flex items-center justify-center"
+                              className="relative w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
                               aria-label="Durdur"
                               title="Durdur"
                             >
-                              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-black tracking-wide text-white/95">
-                                BİTİR
-                              </span>
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative w-4 h-4 bg-white rounded-sm" />
+                              <span className="relative text-[11px] font-black tracking-wide">BİTİR</span>
+                              <span className="relative mt-1 w-4 h-4 bg-white rounded-sm" />
                             </button>
                           </div>
                         ) : null}
@@ -1439,15 +1437,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white font-black flex items-center justify-center"
+                              className="relative w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
                               aria-label="Durdur"
                               title="Durdur"
                             >
-                              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-black tracking-wide text-white/95">
-                                BİTİR
-                              </span>
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative w-4 h-4 bg-white rounded-sm" />
+                              <span className="relative text-[11px] font-black tracking-wide">BİTİR</span>
+                              <span className="relative mt-1 w-4 h-4 bg-white rounded-sm" />
                             </button>
                           </div>
                         ) : null}
