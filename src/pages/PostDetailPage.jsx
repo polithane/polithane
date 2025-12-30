@@ -14,7 +14,6 @@ import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 const SmartVideo = ({ src, autoPlay = false }) => {
-  const [rotate, setRotate] = useState(false);
   const videoRef = useRef(null);
   const url = String(src || '').trim();
   if (!url) return null;
@@ -55,17 +54,6 @@ const SmartVideo = ({ src, autoPlay = false }) => {
       autoPlay={autoPlay}
       preload="metadata"
       className="w-full max-h-[70vh] bg-black rounded-lg object-contain"
-      onLoadedMetadata={(e) => {
-        try {
-          const el = e?.currentTarget;
-          const w = Number(el?.videoWidth || 0);
-          const h = Number(el?.videoHeight || 0);
-          setRotate(w > 0 && h > 0 && w > h);
-        } catch {
-          setRotate(false);
-        }
-      }}
-      style={rotate ? { transform: 'rotate(90deg)' } : undefined}
     />
   );
 };

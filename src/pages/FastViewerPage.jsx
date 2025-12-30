@@ -88,7 +88,8 @@ export const FastViewerPage = () => {
   const progressCount = Math.max(items.length, 1);
   const audioRef = useRef(null);
   const videoRef = useRef(null);
-  const [videoRotate, setVideoRotate] = useState(false);
+  // NOTE: Do not force-rotate videos by width/height heuristics.
+  // It causes some landscape videos to appear sideways.
 
   const safeKey = useMemo(() => String(usernameOrId || '').trim(), [usernameOrId]);
 
@@ -384,7 +385,6 @@ export const FastViewerPage = () => {
     } catch {
       // ignore
     }
-    setVideoRotate(false);
     setMediaBlocked(false);
   }, [idx]);
 
@@ -988,17 +988,6 @@ export const FastViewerPage = () => {
                 muted={muted}
                 autoPlay
                 className="h-full w-full object-cover"
-                onLoadedMetadata={(e) => {
-                  try {
-                    const el = e?.currentTarget;
-                    const w = Number(el?.videoWidth || 0);
-                    const h = Number(el?.videoHeight || 0);
-                    setVideoRotate(w > 0 && h > 0 && w > h);
-                  } catch {
-                    setVideoRotate(false);
-                  }
-                }}
-                style={videoRotate ? { transform: 'rotate(90deg) scale(1.15)' } : undefined}
               />
             ) : current.content_type === 'audio' ? (
               <div className="h-full w-full flex items-center justify-center p-6">
