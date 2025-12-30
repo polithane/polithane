@@ -2612,19 +2612,31 @@ async function getFollowers(req, res, targetId) {
   // That causes empty lists. So we fetch ids first, then load users by id.
   const lim = Math.min(parseInt(limit, 10) || 50, 200);
   const off = parseInt(offset, 10) || 0;
-  const rows = await supabaseRestGet('follows', {
-    select: 'follower_id,created_at',
-    following_id: `eq.${tid}`,
-    order: 'created_at.desc',
-    limit: String(lim),
-    offset: String(off),
-  }).catch(() => []);
+  let rows = [];
+  try {
+    rows = await supabaseRestGet('follows', {
+      select: 'follower_id,created_at',
+      following_id: `eq.${tid}`,
+      order: 'created_at.desc',
+      limit: String(lim),
+      offset: String(off),
+    });
+  } catch {
+    // Fallback if follows table doesn't have created_at
+    rows = await supabaseRestGet('follows', {
+      select: 'follower_id',
+      following_id: `eq.${tid}`,
+      limit: String(lim),
+      offset: String(off),
+    }).catch(() => []);
+  }
   const ids = (rows || []).map((r) => String(r?.follower_id || '').trim()).filter(Boolean);
   if (ids.length === 0) return res.json({ success: true, data: [] });
+  const inList = ids.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
 
   const urows = await supabaseRestGet('users', {
     select: 'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata',
-    id: `in.(${ids.join(',')})`,
+    id: `in.(${inList})`,
     limit: String(Math.min(ids.length, 500)),
   }).catch(() => []);
   const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
@@ -2638,19 +2650,30 @@ async function getFollowing(req, res, targetId) {
   const { limit = 50, offset = 0 } = req.query || {};
   const lim = Math.min(parseInt(limit, 10) || 50, 200);
   const off = parseInt(offset, 10) || 0;
-  const rows = await supabaseRestGet('follows', {
-    select: 'following_id,created_at',
-    follower_id: `eq.${tid}`,
-    order: 'created_at.desc',
-    limit: String(lim),
-    offset: String(off),
-  }).catch(() => []);
+  let rows = [];
+  try {
+    rows = await supabaseRestGet('follows', {
+      select: 'following_id,created_at',
+      follower_id: `eq.${tid}`,
+      order: 'created_at.desc',
+      limit: String(lim),
+      offset: String(off),
+    });
+  } catch {
+    rows = await supabaseRestGet('follows', {
+      select: 'following_id',
+      follower_id: `eq.${tid}`,
+      limit: String(lim),
+      offset: String(off),
+    }).catch(() => []);
+  }
   const ids = (rows || []).map((r) => String(r?.following_id || '').trim()).filter(Boolean);
   if (ids.length === 0) return res.json({ success: true, data: [] });
+  const inList = ids.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
 
   const urows = await supabaseRestGet('users', {
     select: 'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata',
-    id: `in.(${ids.join(',')})`,
+    id: `in.(${inList})`,
     limit: String(Math.min(ids.length, 500)),
   }).catch(() => []);
   const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
@@ -2685,7 +2708,7 @@ async function getUserFollowedByFriends(req, res, targetId) {
   const followerRows = await supabaseRestGet('follows', {
     select: 'follower_id',
     following_id: `eq.${tid}`,
-    follower_id: `in.(${myFollowingIds.join(',')})`,
+    follower_id: `in.(${myFollowingIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',')})`,
     limit: '500',
   }).catch(() => []);
   const friendIds = Array.from(
@@ -2698,7 +2721,7 @@ async function getUserFollowedByFriends(req, res, targetId) {
   // 3) Fetch friend user objects (small payload)
   const usersRows = await supabaseRestGet('users', {
     select: 'id,username,full_name,avatar_url,profile_image,verification_badge,is_verified,is_active',
-    id: `in.(${friendIds.join(',')})`,
+    id: `in.(${friendIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',')})`,
     is_active: 'eq.true',
     limit: String(Math.min(friendIds.length, 50)),
   }).catch(() => []);

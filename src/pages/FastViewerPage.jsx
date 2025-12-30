@@ -8,6 +8,7 @@ import { apiCall, posts as postsApi } from '../utils/api';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { useAuth } from '../contexts/AuthContext';
 import { normalizeAvatarUrl } from '../utils/avatarUrl';
+import { getProfilePath } from '../utils/paths';
 
 const DEFAULT_DURATION_MS = 5000; // image/text
 const HOLD_TO_PAUSE_MS = 120;
@@ -52,17 +53,14 @@ export const FastViewerPage = () => {
   // UX: closing Fast should return to home.
   const closeToList = useCallback(() => navigate('/'), [navigate]);
   const goToProfile = useCallback(() => {
-    const uname = String(user?.username || '').trim();
-    const id = String(user?.id || '').trim();
     // Ensure close works even if gesture overlay has active pointer capture
     try {
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
     } catch {
       // ignore
     }
-    if (uname) navigate(`/@${encodeURIComponent(uname)}`);
-    else if (id) navigate(`/profile/${encodeURIComponent(id)}`);
-  }, [navigate, user?.id, user?.username]);
+    navigate(getProfilePath(user || {}));
+  }, [navigate, user]);
 
   const current = items[idx] || null;
   const prevUser = useMemo(() => (userIdx > 0 ? queue[userIdx - 1] : null), [userIdx, queue]);
@@ -1170,8 +1168,7 @@ export const FastViewerPage = () => {
                   className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-left"
                   onClick={() => {
                     setViewersOpen(false);
-                    if (u?.username) navigate(`/@${encodeURIComponent(String(u.username))}`);
-                    else if (u?.id) navigate(`/profile/${encodeURIComponent(String(u.id))}`);
+                    navigate(getProfilePath(u || {}));
                   }}
                 >
                   <Avatar src={u.avatar_url} size="36px" verified={isUiVerifiedUser(u)} />
