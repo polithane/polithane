@@ -6,6 +6,7 @@ import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { getPoliticianTitle, getUserTitle, isUiVerifiedUser } from '../utils/titleHelpers';
 import { getProfilePath } from '../utils/paths';
 import { normalizeUsername } from '../utils/validators';
+import { getUserHandle } from '../utils/userHandle';
 import { CITY_CODES } from '../utils/constants';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
@@ -753,7 +754,7 @@ export const PartyDetailPage = () => {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {list.map((u) => {
-                          const displayUsername = normalizeUsername(u.username);
+                          const displayUsername = getUserHandle(u);
                           const uPlateCode = getPlateCodeFromProvince(u.province);
                           const uPlateText = uPlateCode ? String(parseInt(uPlateCode, 10)) : null;
                           return (
@@ -825,7 +826,7 @@ export const PartyDetailPage = () => {
                         <Avatar src={u.avatar_url || u.profile_image} size="56px" verified={isUiVerifiedUser(u)} />
                         <div className="min-w-0 flex-1">
                           <div className="font-bold truncate">{u.full_name}</div>
-                          <div className="text-xs text-gray-600 truncate">@{normalizeUsername(u.username) || '-'}</div>
+                          <div className="text-xs text-gray-600 truncate">@{getUserHandle(u) || '-'}</div>
                           {getUserTitle(u) && (
                             <div className="text-[11px] font-semibold text-primary-blue mt-0.5 truncate">
                               {getUserTitle(u)}

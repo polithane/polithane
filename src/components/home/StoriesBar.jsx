@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { normalizeAvatarUrl } from '../../utils/avatarUrl';
+import { getUserHandle } from '../../utils/userHandle';
 
 export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
     const isFast = String(mode || 'polifest') === 'fast';
     return {
       isFast,
-      itemPath: (story) => `/${isFast ? 'fast' : 'polifest'}/${story.username || story.user_id}`,
+      itemPath: (story) => `/${isFast ? 'fast' : 'polifest'}/${encodeURIComponent(String(story?.user_id || getUserHandle(story) || '').trim())}`,
       rightActionPath: isFast ? '/fast-at' : '/polifest',
       rightActionTitle: isFast ? 'Fast At' : 'Tüm hikayeleri gör',
       ringClass: isFast
@@ -25,12 +26,12 @@ export const StoriesBar = ({ stories = [], mode = 'polifest' }) => {
   }, [mode]);
 
   const openFast = (story, index) => {
-    const keyOf = (s) => String(s?.username || s?.user_id || '').trim();
+    const keyOf = (s) => String(s?.user_id || s?.id || getUserHandle(s) || '').trim();
     const queue = (items || [])
       .map((s) => ({
         key: keyOf(s),
         user_id: s?.user_id,
-        username: s?.username,
+        username: getUserHandle(s),
         full_name: s?.full_name,
         avatar_url: s?.avatar_url || s?.profile_image,
         profile_image: s?.profile_image || s?.avatar_url,

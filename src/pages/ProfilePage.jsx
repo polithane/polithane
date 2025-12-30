@@ -17,6 +17,7 @@ import { CITY_CODES, FEATURE_FLAGS } from '../utils/constants';
 import { normalizeUsername } from '../utils/validators';
 import { getProfilePath } from '../utils/paths';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
+import { getUserHandle } from '../utils/userHandle';
 
 const normalizeCityName = (name) =>
   String(name || '')
@@ -161,7 +162,7 @@ export const ProfilePage = () => {
           return {
             ...u,
             user_id: u.user_id ?? u.id,
-            username: normalizeUsername(u.username || ''),
+            username: getUserHandle(u),
             verification_badge: u.verification_badge ?? u.is_verified ?? false,
             profile_image: u.profile_image ?? u.avatar_url,
             party: u.party
