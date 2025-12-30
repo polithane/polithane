@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { X, Heart, Pause, Play, Volume2, VolumeX } from 'lucide-react';
+import { X, Heart, Pause, Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Modal } from '../components/common/Modal';
 import { apiCall, posts as postsApi } from '../utils/api';
@@ -588,12 +588,12 @@ export const FastViewerPage = () => {
       return;
     }
 
-    // Swipe left/right to switch users
+    // Swipe left/right: navigate items (and naturally crosses to prev/next user at ends)
     if (absX > SWIPE_MIN_PX && absX > absY * 1.2) {
       setIsPaused(false);
       finishGesture();
-      if (dx < 0) goUser(1);
-      else goUser(-1);
+      if (dx < 0) goItem(1);
+      else goItem(-1);
       return;
     }
 
@@ -668,17 +668,27 @@ export const FastViewerPage = () => {
             'bg-[#0b0b0b] border border-white/10 shadow-[0_30px_120px_rgba(0,0,0,0.75)]',
           ].join(' ')}
         >
-          {/* progress */}
+          {/* progress (dashed segments + count) */}
           <div className="absolute top-0 left-0 right-0 px-3 pt-3 z-20">
-            <div className="flex gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1.5 flex-1 min-w-0">
               {Array.from({ length: progressCount }).map((_, i) => {
                 const w = i < idx ? 1 : i === idx ? progress : 0;
                 return (
-                  <div key={i} className="h-[2px] flex-1 bg-white/25 rounded-full overflow-hidden">
-                    <div className="h-full bg-white" style={{ width: `${Math.round(w * 100)}%` }} />
+                  <div
+                    key={i}
+                    className="h-[3px] flex-1 rounded-full overflow-hidden border border-sky-300/60"
+                    style={{ borderStyle: 'dashed' }}
+                    aria-label={`Fast ${i + 1}/${progressCount}`}
+                  >
+                    <div className="h-full bg-sky-400" style={{ width: `${Math.round(w * 100)}%` }} />
                   </div>
                 );
               })}
+              </div>
+              <div className="text-[11px] font-black text-sky-200/90 flex-shrink-0">
+                {idx + 1}/{progressCount}
+              </div>
             </div>
           </div>
 
@@ -738,6 +748,87 @@ export const FastViewerPage = () => {
                 onPointerMove={onPointerMoveZone}
                 onPointerUp={onPointerUpZone}
                 onPointerCancel={onPointerCancelZone}
+                onTouchStart={(e) => {
+                  const t = e.touches?.[0];
+                  if (!t) return;
+                  // emulate pointer down
+                  gestureRef.current.active = true;
+                  gestureRef.current.pointerId = 'touch';
+                  gestureRef.current.zoneDir = -1;
+                  gestureRef.current.startX = t.clientX;
+                  gestureRef.current.startY = t.clientY;
+                  gestureRef.current.lastX = t.clientX;
+                  gestureRef.current.lastY = t.clientY;
+                  gestureRef.current.moved = false;
+                  gestureRef.current.pausedByHold = false;
+                  if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+                  holdTimerRef.current = setTimeout(() => {
+                    gestureRef.current.pausedByHold = true;
+                    setIsPaused(true);
+                  }, HOLD_TO_PAUSE_MS);
+                }}
+                onTouchMove={(e) => {
+                  const t = e.touches?.[0];
+                  if (!t) return;
+                  const g = gestureRef.current;
+                  if (!g.active || g.pointerId !== 'touch') return;
+                  g.lastX = t.clientX;
+                  g.lastY = t.clientY;
+                  const dx = g.lastX - g.startX;
+                  const dy = g.lastY - g.startY;
+                  if (!g.moved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                    g.moved = true;
+                    if (holdTimerRef.current) {
+                      clearTimeout(holdTimerRef.current);
+                      holdTimerRef.current = null;
+                    }
+                    if (g.pausedByHold) {
+                      g.pausedByHold = false;
+                      setIsPaused(false);
+                    }
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  const g = gestureRef.current;
+                  if (!g.active || g.pointerId !== 'touch') return;
+                  if (holdTimerRef.current) {
+                    clearTimeout(holdTimerRef.current);
+                    holdTimerRef.current = null;
+                  }
+                  const t = e.changedTouches?.[0];
+                  const endX = t?.clientX ?? g.lastX;
+                  const endY = t?.clientY ?? g.lastY;
+                  const dx = endX - g.startX;
+                  const dy = endY - g.startY;
+                  const absX = Math.abs(dx);
+                  const absY = Math.abs(dy);
+                  if (dy > SWIPE_DOWN_MIN_PX && absY > absX * 1.2) {
+                    setIsPaused(false);
+                    finishGesture();
+                    closeToList();
+                    return;
+                  }
+                  if (absX > SWIPE_MIN_PX && absX > absY * 1.2) {
+                    setIsPaused(false);
+                    finishGesture();
+                    if (dx < 0) goItem(1);
+                    else goItem(-1);
+                    return;
+                  }
+                  if (!g.moved && !g.pausedByHold && !isPaused) goItem(-1);
+                  if (g.pausedByHold) setIsPaused(false);
+                  finishGesture();
+                }}
+                onTouchCancel={() => {
+                  const g = gestureRef.current;
+                  if (!g.active || g.pointerId !== 'touch') return;
+                  if (holdTimerRef.current) {
+                    clearTimeout(holdTimerRef.current);
+                    holdTimerRef.current = null;
+                  }
+                  if (g.pausedByHold) setIsPaused(false);
+                  finishGesture();
+                }}
               />
               <div
                 role="button"
@@ -748,9 +839,109 @@ export const FastViewerPage = () => {
                 onPointerMove={onPointerMoveZone}
                 onPointerUp={onPointerUpZone}
                 onPointerCancel={onPointerCancelZone}
+                onTouchStart={(e) => {
+                  const t = e.touches?.[0];
+                  if (!t) return;
+                  gestureRef.current.active = true;
+                  gestureRef.current.pointerId = 'touch';
+                  gestureRef.current.zoneDir = 1;
+                  gestureRef.current.startX = t.clientX;
+                  gestureRef.current.startY = t.clientY;
+                  gestureRef.current.lastX = t.clientX;
+                  gestureRef.current.lastY = t.clientY;
+                  gestureRef.current.moved = false;
+                  gestureRef.current.pausedByHold = false;
+                  if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+                  holdTimerRef.current = setTimeout(() => {
+                    gestureRef.current.pausedByHold = true;
+                    setIsPaused(true);
+                  }, HOLD_TO_PAUSE_MS);
+                }}
+                onTouchMove={(e) => {
+                  const t = e.touches?.[0];
+                  if (!t) return;
+                  const g = gestureRef.current;
+                  if (!g.active || g.pointerId !== 'touch') return;
+                  g.lastX = t.clientX;
+                  g.lastY = t.clientY;
+                  const dx = g.lastX - g.startX;
+                  const dy = g.lastY - g.startY;
+                  if (!g.moved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                    g.moved = true;
+                    if (holdTimerRef.current) {
+                      clearTimeout(holdTimerRef.current);
+                      holdTimerRef.current = null;
+                    }
+                    if (g.pausedByHold) {
+                      g.pausedByHold = false;
+                      setIsPaused(false);
+                    }
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  const g = gestureRef.current;
+                  if (!g.active || g.pointerId !== 'touch') return;
+                  if (holdTimerRef.current) {
+                    clearTimeout(holdTimerRef.current);
+                    holdTimerRef.current = null;
+                  }
+                  const t = e.changedTouches?.[0];
+                  const endX = t?.clientX ?? g.lastX;
+                  const endY = t?.clientY ?? g.lastY;
+                  const dx = endX - g.startX;
+                  const dy = endY - g.startY;
+                  const absX = Math.abs(dx);
+                  const absY = Math.abs(dy);
+                  if (dy > SWIPE_DOWN_MIN_PX && absY > absX * 1.2) {
+                    setIsPaused(false);
+                    finishGesture();
+                    closeToList();
+                    return;
+                  }
+                  if (absX > SWIPE_MIN_PX && absX > absY * 1.2) {
+                    setIsPaused(false);
+                    finishGesture();
+                    if (dx < 0) goItem(1);
+                    else goItem(-1);
+                    return;
+                  }
+                  if (!g.moved && !g.pausedByHold && !isPaused) goItem(1);
+                  if (g.pausedByHold) setIsPaused(false);
+                  finishGesture();
+                }}
+                onTouchCancel={() => {
+                  const g = gestureRef.current;
+                  if (!g.active || g.pointerId !== 'touch') return;
+                  if (holdTimerRef.current) {
+                    clearTimeout(holdTimerRef.current);
+                    holdTimerRef.current = null;
+                  }
+                  if (g.pausedByHold) setIsPaused(false);
+                  finishGesture();
+                }}
               />
             </div>
           </div>
+
+          {/* in-card arrows (desktop) */}
+          <button
+            type="button"
+            onClick={() => goItem(-1)}
+            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
+            aria-label="Önceki Fast"
+            title="Önceki"
+          >
+            <ChevronLeft className="w-7 h-7 text-sky-200" />
+          </button>
+          <button
+            type="button"
+            onClick={() => goItem(1)}
+            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
+            aria-label="Sonraki Fast"
+            title="Sonraki"
+          >
+            <ChevronRight className="w-7 h-7 text-sky-200" />
+          </button>
 
           {/* content */}
           <div className="absolute inset-0 z-0">

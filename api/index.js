@@ -3931,8 +3931,17 @@ async function storageUploadMedia(req, res) {
   const allowedBuckets = new Set(['uploads', 'politfest']);
   if (!allowedBuckets.has(bucket)) return res.status(400).json({ success: false, error: 'Geçersiz bucket.' });
 
-  const allowedFolders = new Set(['posts', 'avatars', 'politfest', 'messages']);
-  if (!allowedFolders.has(folder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+  // Allow nested folders under safe roots (e.g. posts/thumbnails).
+  const safeFolder = String(folder || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
+  if (!safeFolder) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+  if (safeFolder.includes('..')) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+  if (!/^[a-z0-9/_-]{1,80}$/i.test(safeFolder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+  const root = safeFolder.split('/')[0];
+  const allowedRoots = new Set(['posts', 'avatars', 'politfest', 'messages']);
+  if (!allowedRoots.has(root)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
 
   // Approval gate: pending accounts can browse/login but cannot upload post media yet.
   // (We still allow avatar uploads.)
@@ -4025,7 +4034,7 @@ async function storageUploadMedia(req, res) {
                 ? 'mp3'
                 : 'webm';
 
-  const objectPath = `${folder}/${auth.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const objectPath = `${safeFolder}/${auth.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   try {
     await supabaseStorageUploadObject(bucket, objectPath, buf, ct);
   } catch (e) {
@@ -4054,8 +4063,17 @@ async function storageCreateSignedUpload(req, res) {
   const allowedBuckets = new Set(['uploads', 'politfest']);
   if (!allowedBuckets.has(bucket)) return res.status(400).json({ success: false, error: 'Geçersiz bucket.' });
 
-  const allowedFolders = new Set(['posts', 'avatars', 'politfest', 'messages']);
-  if (!allowedFolders.has(folder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+  // Allow nested folders under safe roots (e.g. posts/thumbnails).
+  const safeFolder = String(folder || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
+  if (!safeFolder) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+  if (safeFolder.includes('..')) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+  if (!/^[a-z0-9/_-]{1,80}$/i.test(safeFolder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
+  const root = safeFolder.split('/')[0];
+  const allowedRoots = new Set(['posts', 'avatars', 'politfest', 'messages']);
+  if (!allowedRoots.has(root)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
 
   // Approval gate: pending accounts can browse/login but cannot upload post media yet.
   // (We still allow avatar uploads.)
@@ -4161,7 +4179,7 @@ async function storageCreateSignedUpload(req, res) {
                     ? 'aac'
                 : 'webm';
 
-  const objectPath = `${folder}/${auth.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const objectPath = `${safeFolder}/${auth.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
   try {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);

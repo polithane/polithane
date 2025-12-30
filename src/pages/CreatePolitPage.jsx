@@ -116,12 +116,33 @@ export const CreatePolitPage = () => {
   const [offerBusy, setOfferBusy] = useState(false);
   const [descTarget, setDescTarget] = useState('primary'); // primary | cross
 
+  const [isMobileLike, setIsMobileLike] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)')?.matches || window.innerWidth < 768)) || false;
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    const onResize = () => {
+      try {
+        setIsMobileLike(window.matchMedia?.('(pointer: coarse)')?.matches || window.innerWidth < 768);
+      } catch {
+        setIsMobileLike(false);
+      }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const previewRef = useRef(null);
   const recordTimeoutRef = useRef(null);
   const [videoFacingMode, setVideoFacingMode] = useState('user'); // user | environment
+  // NOTE: Mobile browsers often handle rotation metadata automatically.
+  // Applying a manual rotate(90deg) can cause sideways previews on some devices.
   const [videoRotate, setVideoRotate] = useState(false);
 
   const imageUploadRef = useRef(null);
@@ -155,6 +176,12 @@ export const CreatePolitPage = () => {
   }, [agendas]);
 
   const hasMedia = useMemo(() => files.length > 0 || !!recordedUrl, [files.length, recordedUrl]);
+  const canShowSubmitInMediaStep = useMemo(() => {
+    // Hide submit button during picking/recording; show only when we have a preview-ready media.
+    if (step !== 'media') return false;
+    if (isRecording) return false;
+    return hasMedia;
+  }, [hasMedia, isRecording, step]);
 
   const resetMedia = () => {
     setFiles([]);
@@ -1035,39 +1062,17 @@ export const CreatePolitPage = () => {
                         {isRecording ? (
                           <video
                             ref={previewRef}
-                            className={['w-full aspect-video bg-black', videoRotate ? 'object-contain' : 'object-cover'].join(' ')}
+                            className="w-full aspect-video bg-black object-cover"
                             playsInline
                             muted
                             autoPlay
-                            onLoadedMetadata={(e) => {
-                              try {
-                                const el = e?.currentTarget;
-                                const w = Number(el?.videoWidth || 0);
-                                const h = Number(el?.videoHeight || 0);
-                                setVideoRotate(w > 0 && h > 0 && w > h);
-                              } catch {
-                                setVideoRotate(false);
-                              }
-                            }}
-                            style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
                           />
                         ) : recordedUrl ? (
                           <video
                             src={recordedUrl}
                             controls
-                            className={['w-full aspect-video bg-black', videoRotate ? 'object-contain' : 'object-contain'].join(' ')}
+                            className="w-full aspect-video bg-black object-contain"
                             playsInline
-                            onLoadedMetadata={(e) => {
-                              try {
-                                const el = e?.currentTarget;
-                                const w = Number(el?.videoWidth || 0);
-                                const h = Number(el?.videoHeight || 0);
-                                setVideoRotate(w > 0 && h > 0 && w > h);
-                              } catch {
-                                setVideoRotate(false);
-                              }
-                            }}
-                            style={videoRotate ? { transform: 'rotate(90deg)' } : undefined}
                           />
                         ) : (
                           <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
@@ -1158,7 +1163,7 @@ export const CreatePolitPage = () => {
                           className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
                         >
                           <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
-                          <div>Video Yükle</div>
+                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
                         </button>
                         <button
                           type="button"
@@ -1185,7 +1190,7 @@ export const CreatePolitPage = () => {
                           className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
                         >
                           <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
-                          <div>Resim Yükle</div>
+                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
                         </button>
                       </>
                     ) : (
@@ -1207,7 +1212,7 @@ export const CreatePolitPage = () => {
                           className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
                         >
                           <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
-                          <div>Ses Yükle</div>
+                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
                         </button>
                       </>
                     )}
@@ -1286,28 +1291,40 @@ export const CreatePolitPage = () => {
                   ) : null}
 
                   {/* Continue / Publish */}
-                  {!isFastMode ? (
-                    <button
-                      type="button"
-                      disabled={!hasMedia}
-                      onClick={() => {
-                        setDescTarget('primary');
-                        setStep('desc');
-                      }}
-                      className={['w-full py-4 rounded-2xl text-white font-black disabled:opacity-60', theme.btnClass].join(' ')}
-                    >
-                      Devam
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={!hasMedia || loading}
-                      onClick={publishPrimary}
-                      className={['w-full py-4 rounded-2xl text-white font-black disabled:opacity-60', theme.btnClass].join(' ')}
-                    >
-                      {loading ? 'Gönderiliyor…' : 'Fast At'}
-                    </button>
-                  )}
+                  {canShowSubmitInMediaStep ? (
+                    !isFastMode ? (
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => {
+                          setDescTarget('primary');
+                          setStep('desc');
+                        }}
+                        className={[
+                          'w-full rounded-3xl text-white font-black disabled:opacity-60',
+                          'bg-emerald-600 hover:bg-emerald-700',
+                          'py-5',
+                        ].join(' ')}
+                      >
+                        <div className="text-lg leading-none">Devam</div>
+                        <div className="text-xs font-semibold opacity-90 mt-1">Önizleme hazır</div>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={publishPrimary}
+                        className={[
+                          'w-full rounded-3xl text-white font-black disabled:opacity-60',
+                          'bg-emerald-600 hover:bg-emerald-700',
+                          'py-5',
+                        ].join(' ')}
+                      >
+                        <div className="text-lg leading-none">{loading ? 'Gönderiliyor…' : 'Gönder'}</div>
+                        <div className="text-xs font-semibold opacity-90 mt-1">{isFastMode ? 'Fast paylaşımı' : 'Polit paylaşımı'}</div>
+                      </button>
+                    )
+                  ) : null}
                 </div>
               ) : null}
 
