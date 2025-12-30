@@ -970,16 +970,28 @@ export const FastViewerPage = () => {
                 style={videoRotate ? { transform: 'rotate(90deg) scale(1.15)' } : undefined}
               />
             ) : current.content_type === 'audio' ? (
-              <div className="h-full w-full flex items-center justify-center">
+              <div className="h-full w-full flex items-center justify-center p-6">
                 <audio ref={audioRef} src={itemSrc} autoPlay />
-                {/* Big mic icon (blue) */}
-                <div className="relative flex flex-col items-center">
-                  <div className="w-28 h-28 rounded-full bg-[#1D4ED8] shadow-[0_20px_70px_rgba(29,78,216,0.55)] flex items-center justify-center">
-                    <div className="w-10 h-16 rounded-2xl bg-white/95" />
-                  </div>
-                  <div className="mt-4 text-sm font-black text-white/90">Sesli Fast</div>
-                  <div className="mt-1 text-xs text-white/70 max-w-[260px] text-center px-4">
-                    {String(current?.content_text || current?.content || '').trim() ? 'Not: ' + String(current.content_text || current.content).slice(0, 90) : 'Dinliyorsun…'}
+                <div
+                  className="w-full max-w-[360px] rounded-[22px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden"
+                  style={{
+                    backgroundColor: '#0b1220',
+                    backgroundImage:
+                      'radial-gradient(circle at 20% 20%, rgba(29,78,216,0.35), transparent 55%),' +
+                      'radial-gradient(circle at 80% 30%, rgba(56,189,248,0.22), transparent 55%),' +
+                      'repeating-linear-gradient(to bottom, rgba(255,255,255,0) 0, rgba(255,255,255,0) 26px, rgba(59,130,246,0.22) 27px, rgba(59,130,246,0.22) 28px)',
+                  }}
+                >
+                  <div className="px-6 py-7 flex flex-col items-center">
+                    <div className="w-28 h-28 rounded-full bg-[#1D4ED8] shadow-[0_20px_70px_rgba(29,78,216,0.55)] flex items-center justify-center">
+                      <div className="w-10 h-16 rounded-2xl bg-white/95" />
+                    </div>
+                    <div className="mt-4 text-sm font-black text-white/90">Sesli Fast</div>
+                    <div className="mt-2 text-xs text-white/80 max-w-[260px] text-center">
+                      {String(current?.content_text || current?.content || '').trim()
+                        ? 'Not: ' + String(current.content_text || current.content).slice(0, 110)
+                        : 'Dinliyorsun…'}
+                    </div>
                   </div>
                 </div>
               </div>

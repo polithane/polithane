@@ -140,6 +140,11 @@ export const CreatePolitPage = () => {
   const chunksRef = useRef([]);
   const previewRef = useRef(null);
   const recordTimeoutRef = useRef(null);
+  const recordIntervalRef = useRef(null);
+  const recordStartTsRef = useRef(0);
+  const recordStopFiredRef = useRef(false);
+  const MAX_RECORD_SEC = 60;
+  const [recordSecLeft, setRecordSecLeft] = useState(60);
   const [videoFacingMode, setVideoFacingMode] = useState('user'); // user | environment
   // NOTE: Mobile browsers often handle rotation metadata automatically.
   // Applying a manual rotate(90deg) can cause sideways previews on some devices.
@@ -203,10 +208,22 @@ export const CreatePolitPage = () => {
     }
     setRecordedUrl('');
     setVideoRotate(false);
+    setRecordSecLeft(MAX_RECORD_SEC);
+    recordStopFiredRef.current = false;
+    if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+    recordIntervalRef.current = null;
     chunksRef.current = [];
     setIsRecording(false);
     if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
     recordTimeoutRef.current = null;
+    try {
+      if (videoUploadRef.current) videoUploadRef.current.value = '';
+      if (audioUploadRef.current) audioUploadRef.current.value = '';
+      if (imageUploadRef.current) imageUploadRef.current.value = '';
+      if (imageCaptureRef.current) imageCaptureRef.current.value = '';
+    } catch {
+      // ignore
+    }
     try {
       if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     } catch {
@@ -564,6 +581,48 @@ export const CreatePolitPage = () => {
       }
     });
 
+  const getAudioDurationSec = (file) =>
+    new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('audio');
+        let settled = false;
+        const cleanup = () => {
+          if (settled) return;
+          settled = true;
+          try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+        };
+        const finish = (d) => {
+          cleanup();
+          resolve(Number.isFinite(d) && d > 0 ? d : 0);
+        };
+        a.preload = 'metadata';
+        a.onloadedmetadata = () => {
+          const d0 = Number(a.duration);
+          if (Number.isFinite(d0) && d0 > 0) return finish(d0);
+          const onFix = () => {
+            a.removeEventListener('timeupdate', onFix);
+            finish(Number(a.duration));
+          };
+          a.addEventListener('timeupdate', onFix);
+          try {
+            a.currentTime = 1e101;
+          } catch {
+            a.removeEventListener('timeupdate', onFix);
+            finish(0);
+          }
+          setTimeout(() => {
+            try { a.removeEventListener('timeupdate', onFix); } catch { /* ignore */ }
+            finish(Number(a.duration));
+          }, 1200);
+        };
+        a.onerror = () => finish(0);
+        a.src = url;
+      } catch {
+        resolve(0);
+      }
+    });
+
   const startRecording = async () => {
     if (isRecording) return;
     resetMedia();
@@ -635,13 +694,32 @@ export const CreatePolitPage = () => {
 
       recorder.start();
       setIsRecording(true);
+      recordStartTsRef.current = Date.now();
+      setRecordSecLeft(MAX_RECORD_SEC);
+      recordStopFiredRef.current = false;
+      if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+      recordIntervalRef.current = setInterval(() => {
+        try {
+          const start = Number(recordStartTsRef.current || 0);
+          if (!start) return;
+          const elapsedSec = Math.floor((Date.now() - start) / 1000);
+          const left = Math.max(0, MAX_RECORD_SEC - elapsedSec);
+          setRecordSecLeft(left);
+          if (left <= 0 && !recordStopFiredRef.current) {
+            recordStopFiredRef.current = true;
+            stopRecording();
+          }
+        } catch {
+          // ignore
+        }
+      }, 200);
 
-      // Video limit: max 1 minute
-      if (contentType === 'video') {
-        recordTimeoutRef.current = setTimeout(() => {
-          stopRecording();
-        }, 60_000);
-      }
+      // Limit: max 1 minute (video + audio)
+      recordTimeoutRef.current = setTimeout(() => {
+        if (recordStopFiredRef.current) return;
+        recordStopFiredRef.current = true;
+        stopRecording();
+      }, MAX_RECORD_SEC * 1000 + 50);
     } catch {
       toast.error('Kayıt başlatılamadı. Tarayıcı izinlerini kontrol edin.');
     }
@@ -650,6 +728,9 @@ export const CreatePolitPage = () => {
   const stopRecording = () => {
     if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
     recordTimeoutRef.current = null;
+    if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+    recordIntervalRef.current = null;
+    setRecordSecLeft(MAX_RECORD_SEC);
     try {
       if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     } catch {
@@ -1055,8 +1136,35 @@ export const CreatePolitPage = () => {
                       <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden">
                         {isRecording ? (
                           <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
                             <span className="text-xs font-semibold text-white">Kayıt Yapıyor!</span>
+                          </div>
+                        ) : null}
+                        {isRecording ? (
+                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
+                            <div
+                              className={[
+                                'text-sky-300 font-black text-sm tabular-nums',
+                                recordSecLeft <= 9 ? 'animate-pulse' : '',
+                              ].join(' ')}
+                              aria-label="Kalan süre"
+                              title="Kalan süre"
+                            >
+                              {String(recordSecLeft).padStart(2, '0')}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                recordStopFiredRef.current = true;
+                                stopRecording();
+                              }}
+                              className="relative w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white font-black flex items-center justify-center"
+                              aria-label="Durdur"
+                              title="Durdur"
+                            >
+                              <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
+                              <span className="relative w-4 h-4 bg-white rounded-sm" />
+                            </button>
                           </div>
                         ) : null}
                         {isRecording ? (
@@ -1102,13 +1210,48 @@ export const CreatePolitPage = () => {
                       ) : null}
                     </div>
                   ) : contentType === 'audio' ? (
-                    <div className="relative rounded-2xl border border-gray-200 bg-white p-4">
-                      {isRecording ? (
-                        <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/10 border border-gray-200">
-                          <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
-                          <span className="text-xs font-semibold text-gray-900">Kayıt Yapıyor!</span>
+                    <div className="space-y-3">
+                      <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden">
+                        {isRecording ? (
+                          <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+                            <span className="text-xs font-semibold text-white">Kayıt Yapıyor!</span>
+                          </div>
+                        ) : null}
+                        {isRecording ? (
+                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
+                            <div
+                              className={[
+                                'text-sky-300 font-black text-sm tabular-nums',
+                                recordSecLeft <= 9 ? 'animate-pulse' : '',
+                              ].join(' ')}
+                              aria-label="Kalan süre"
+                              title="Kalan süre"
+                            >
+                              {String(recordSecLeft).padStart(2, '0')}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                recordStopFiredRef.current = true;
+                                stopRecording();
+                              }}
+                              className="relative w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white font-black flex items-center justify-center"
+                              aria-label="Durdur"
+                              title="Durdur"
+                            >
+                              <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
+                              <span className="relative w-4 h-4 bg-white rounded-sm" />
+                            </button>
+                          </div>
+                        ) : null}
+                        <div className="w-full aspect-video flex items-center justify-center">
+                          <div className="w-24 h-24 rounded-full bg-blue-600/25 border border-blue-300/30 flex items-center justify-center">
+                            <Mic className="w-12 h-12 text-blue-200" />
+                          </div>
                         </div>
-                      ) : null}
+                      </div>
+
                       {recordedUrl ? <audio src={recordedUrl} controls className="w-full" /> : <div className="text-sm text-gray-600">Ses önizleme burada.</div>}
                     </div>
                   ) : contentType === 'image' ? (
@@ -1140,19 +1283,20 @@ export const CreatePolitPage = () => {
                   ) : null}
 
                   {/* Action buttons */}
+                  {!hasMedia && !isRecording ? (
                   <div className="grid grid-cols-2 gap-3">
                     {contentType === 'video' ? (
                       <>
                         <button
                           type="button"
-                          onClick={isRecording ? stopRecording : startRecording}
+                          onClick={startRecording}
                           className={[
                             'rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black',
-                            isRecording ? 'bg-red-600 hover:bg-red-700' : theme.btnClass,
+                            theme.btnClass,
                           ].join(' ')}
                         >
-                          {isRecording ? <StopCircle className="w-14 h-14" /> : <Video className="w-14 h-14" />}
-                          <div>{isRecording ? 'Durdur' : 'Kayda Başla'}</div>
+                          <Video className="w-14 h-14" />
+                          <div>Kayda Başla</div>
                           <div className="text-[11px] font-semibold opacity-90">
                             Maximum <span className="font-black">1 Dk.</span> uzunluğunda olabilir
                           </div>
@@ -1197,14 +1341,14 @@ export const CreatePolitPage = () => {
                       <>
                         <button
                           type="button"
-                          onClick={isRecording ? stopRecording : startRecording}
+                          onClick={startRecording}
                           className={[
                             'rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black',
-                            isRecording ? 'bg-red-600 hover:bg-red-700' : theme.btnClass,
+                            theme.btnClass,
                           ].join(' ')}
                         >
-                          {isRecording ? <StopCircle className="w-14 h-14" /> : <Mic className="w-14 h-14" />}
-                          <div>{isRecording ? 'Durdur' : 'Kayda Başla'}</div>
+                          <Mic className="w-14 h-14" />
+                          <div>Kayda Başla</div>
                         </button>
                         <button
                           type="button"
@@ -1217,6 +1361,7 @@ export const CreatePolitPage = () => {
                       </>
                     )}
                   </div>
+                  ) : null}
 
                   <input
                     ref={videoUploadRef}
@@ -1250,9 +1395,19 @@ export const CreatePolitPage = () => {
                     type="file"
                     accept="audio/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const f = e.target.files?.[0];
                       if (!f) return;
+                      try {
+                        const duration = await getAudioDurationSec(f).catch(() => 0);
+                        if (duration && duration > 60.5) {
+                          toast.error('Ses maksimum 1 dakika olmalı.');
+                          e.target.value = '';
+                          return;
+                        }
+                      } catch {
+                        // ignore duration check
+                      }
                       resetMedia();
                       setFiles([f]);
                       try {
@@ -1306,8 +1461,8 @@ export const CreatePolitPage = () => {
                           'py-5',
                         ].join(' ')}
                       >
-                        <div className="text-lg leading-none">Devam</div>
-                        <div className="text-xs font-semibold opacity-90 mt-1">Önizleme hazır</div>
+                        <div className="text-lg leading-none">Gönder</div>
+                        <div className="text-xs font-semibold opacity-90 mt-1">Açıklama ekleyip paylaş</div>
                       </button>
                     ) : (
                       <button
