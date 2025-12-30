@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { notifications as notificationsApi } from '../utils/api';
 
@@ -19,21 +19,25 @@ export const NotificationProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  const notifSettings = (() => {
+  const notifSettings = useMemo(() => {
     const meta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
     return meta.notification_settings && typeof meta.notification_settings === 'object' ? meta.notification_settings : {};
-  })();
-  const typeAllowed = (n) => {
-    const t = String(n?.type || 'system');
-    if (t === 'like') return notifSettings.likes !== false;
-    if (t === 'comment_like') return notifSettings.likes !== false;
-    if (t === 'comment') return notifSettings.comments !== false;
-    if (t === 'follow') return notifSettings.follows !== false;
-    if (t === 'mention') return notifSettings.mentions !== false;
-    if (t === 'message') return notifSettings.messages !== false;
-    // system/unknown -> always show
-    return true;
-  };
+  }, [user]);
+
+  const typeAllowed = useCallback(
+    (n) => {
+      const t = String(n?.type || 'system');
+      if (t === 'like') return notifSettings.likes !== false;
+      if (t === 'comment_like') return notifSettings.likes !== false;
+      if (t === 'comment') return notifSettings.comments !== false;
+      if (t === 'follow') return notifSettings.follows !== false;
+      if (t === 'mention') return notifSettings.mentions !== false;
+      if (t === 'message') return notifSettings.messages !== false;
+      // system/unknown -> always show
+      return true;
+    },
+    [notifSettings]
+  );
 
   const refreshUnreadCount = useCallback(async () => {
     if (!isAuthenticated) return;
