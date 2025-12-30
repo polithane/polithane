@@ -1412,13 +1412,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-12 h-12 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
+                              className="relative w-14 h-14 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative text-[9px] md:text-[11px] font-black tracking-wide">BİTİR</span>
-                              <span className="relative mt-1 md:mt-2 w-3 h-3 md:w-5 md:h-5 bg-white rounded-sm" />
+                              <span className="relative text-[8px] md:text-[11px] font-black leading-none">BİTİR</span>
+                              <span className="relative mt-0.5 md:mt-2 w-3 h-3 md:w-5 md:h-5 bg-white rounded-sm" />
                             </button>
                           </div>
                         ) : null}
@@ -1492,13 +1492,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-12 h-12 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
+                              className="relative w-14 h-14 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative text-[9px] md:text-[11px] font-black tracking-wide">BİTİR</span>
-                              <span className="relative mt-1 md:mt-2 w-3 h-3 md:w-5 md:h-5 bg-white rounded-sm" />
+                              <span className="relative text-[8px] md:text-[11px] font-black leading-none">BİTİR</span>
+                              <span className="relative mt-0.5 md:mt-2 w-3 h-3 md:w-5 md:h-5 bg-white rounded-sm" />
                             </button>
                           </div>
                         ) : null}
