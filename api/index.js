@@ -2604,8 +2604,17 @@ async function toggleFollow(req, res, targetId) {
 }
 
 async function getFollowers(req, res, targetId) {
-  const tid = String(targetId || '').trim();
-  if (!tid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  const raw = String(targetId || '').trim();
+  if (!raw) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  const isValidId = /^\d+$/.test(raw) || /^[0-9a-fA-F-]{36}$/.test(raw);
+  let tid = raw;
+  if (!isValidId) {
+    // Keep parity with other endpoints: allow /api/users/:username/followers
+    const rows = await supabaseRestGet('users', { select: 'id', username: `eq.${raw}`, limit: '1' }).catch(() => []);
+    const id = rows?.[0]?.id ? String(rows[0].id) : '';
+    if (!id) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+    tid = id;
+  }
   const { limit = 50, offset = 0 } = req.query || {};
   // IMPORTANT:
   // Some deployments do not have PostgREST FK relationships configured for embedded selects like `follower:users(*)`.
@@ -2720,8 +2729,17 @@ async function getFollowers(req, res, targetId) {
 }
 
 async function getFollowing(req, res, targetId) {
-  const tid = String(targetId || '').trim();
-  if (!tid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  const raw = String(targetId || '').trim();
+  if (!raw) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  const isValidId = /^\d+$/.test(raw) || /^[0-9a-fA-F-]{36}$/.test(raw);
+  let tid = raw;
+  if (!isValidId) {
+    // Keep parity with other endpoints: allow /api/users/:username/following
+    const rows = await supabaseRestGet('users', { select: 'id', username: `eq.${raw}`, limit: '1' }).catch(() => []);
+    const id = rows?.[0]?.id ? String(rows[0].id) : '';
+    if (!id) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+    tid = id;
+  }
   const { limit = 50, offset = 0 } = req.query || {};
   const lim = Math.min(parseInt(limit, 10) || 50, 200);
   const off = parseInt(offset, 10) || 0;

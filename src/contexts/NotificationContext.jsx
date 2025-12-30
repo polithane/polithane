@@ -58,9 +58,19 @@ export const NotificationProvider = ({ children }) => {
       setLoading(true);
       try {
         const r = await notificationsApi.list({ limit, offset });
-        if (r?.success) {
-          const page = (r.data || []).filter(typeAllowed);
-          setHasMore(Array.isArray(page) && page.length >= limit);
+        // Be tolerant: backend should return {success:true,data:Array}, but some deployments may return Array directly
+        // or wrap differently. Unread count can still be correct while list parse fails.
+        const rawList = Array.isArray(r)
+          ? r
+          : Array.isArray(r?.data)
+            ? r.data
+            : Array.isArray(r?.data?.data)
+              ? r.data.data
+              : [];
+        if ((r && r.success) || Array.isArray(r)) {
+          const page = rawList.filter(typeAllowed);
+          // hasMore should reflect server pagination, not client-side filtering
+          setHasMore(Array.isArray(rawList) && rawList.length >= limit);
           setNotifications((prev) => {
             if (reset) return page;
             const prevList = Array.isArray(prev) ? prev : [];
