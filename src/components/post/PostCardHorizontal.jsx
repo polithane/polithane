@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, Heart, MessageCircle, Share2, Video, Image as ImageIcon, Music, FileText } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
@@ -44,6 +44,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   const [showScoreModal, setShowScoreModal] = useState(false);
   const { isAuthenticated } = useAuth();
   const postId = post?.post_id ?? post?.id;
+  const suppressClickRef = useRef(false);
 
   const [shareOpen, setShareOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -123,6 +124,43 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
     return <img src={safeSrc} alt="" className={className} onError={() => setFailed(true)} />;
   };
 
+  // --- Image carousel (replaces mosaic grids) ---
+  const images = useMemo(() => (post?.content_type === CONTENT_TYPES.IMAGE ? normalizeMediaList(post?.media_url) : []), [post?.content_type, post?.media_url]);
+  const imageCount = images.length;
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const dragRef = useRef({ active: false, startX: 0, startY: 0, lastX: 0, lastY: 0, moved: false });
+
+  useEffect(() => {
+    setActiveImageIdx(0);
+  }, [postId]);
+
+  useEffect(() => {
+    // Keep index in bounds if images change
+    setActiveImageIdx((prev) => Math.max(0, Math.min(prev, Math.max(0, imageCount - 1))));
+  }, [imageCount]);
+
+  useEffect(() => {
+    if (post?.content_type !== CONTENT_TYPES.IMAGE) return;
+    if (imageCount <= 1) return;
+    let cancelled = false;
+    const id = setInterval(() => {
+      if (cancelled) return;
+      setActiveImageIdx((prev) => (prev + 1) % imageCount);
+    }, 3200);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [imageCount, post?.content_type]);
+
+  const goImage = (dir) => {
+    if (imageCount <= 1) return;
+    setActiveImageIdx((prev) => {
+      const next = (prev + dir) % imageCount;
+      return next < 0 ? next + imageCount : next;
+    });
+  };
+
   const copyToClipboard = async (text) => {
     const t = String(text || '');
     if (!t) return false;
@@ -174,6 +212,10 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       className={`card-hover ${fullWidth ? 'p-3 w-full' : 'p-4'} flex-shrink-0 cursor-pointer flex flex-col min-h-[400px] relative`}
       style={fullWidth ? {} : { scrollSnapAlign: 'start', ...style }}
       onClick={() => {
+        if (suppressClickRef.current) {
+          suppressClickRef.current = false;
+          return;
+        }
         if (!postId) return;
         navigate(`/post/${postId}`);
       }}
@@ -303,82 +345,76 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
               </div>
             </div>
           )}
-          {post.content_type === CONTENT_TYPES.IMAGE && (() => {
-            const images = normalizeMediaList(post.media_url);
-            const imageCount = images.length;
-
-            // Medya yoksa: örnek/placeholder göstermeyelim
-            if (imageCount === 0) {
-              return (
+          {post.content_type === CONTENT_TYPES.IMAGE && (
+            <div
+              className="w-full h-full relative"
+              style={{ touchAction: 'pan-y' }}
+              onPointerDown={(e) => {
+                const t = dragRef.current;
+                t.active = true;
+                t.startX = e.clientX;
+                t.startY = e.clientY;
+                t.lastX = e.clientX;
+                t.lastY = e.clientY;
+                t.moved = false;
+                try {
+                  e.currentTarget?.setPointerCapture?.(e.pointerId);
+                } catch {
+                  // ignore
+                }
+              }}
+              onPointerMove={(e) => {
+                const t = dragRef.current;
+                if (!t.active) return;
+                t.lastX = e.clientX;
+                t.lastY = e.clientY;
+                const dx = t.lastX - t.startX;
+                const dy = t.lastY - t.startY;
+                if (!t.moved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) t.moved = true;
+              }}
+              onPointerUp={() => {
+                const t = dragRef.current;
+                if (!t.active) return;
+                t.active = false;
+                const dx = t.lastX - t.startX;
+                const dy = t.lastY - t.startY;
+                const absX = Math.abs(dx);
+                const absY = Math.abs(dy);
+                if (imageCount > 1 && absX > 30 && absX > absY * 1.2) {
+                  suppressClickRef.current = true;
+                  goImage(dx < 0 ? 1 : -1);
+                }
+              }}
+              onPointerCancel={() => {
+                dragRef.current.active = false;
+              }}
+            >
+              {imageCount === 0 ? (
                 <div className="w-full h-full bg-gray-100 flex items-center justify-center">
                   <div className="text-center">
                     <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                     <div className="text-xs text-gray-600 font-semibold">Resim yok</div>
                   </div>
                 </div>
-              );
-            }
-            
-            // 1 Resim - Tam alan
-            if (imageCount === 1) {
-              return (
-                <SafeImage src={images[0]} className="w-full h-full object-cover" />
-              );
-            }
-            
-            // 2 Resim - İkiye böl
-            if (imageCount === 2) {
-              return (
-                <div className="w-full h-full grid grid-cols-2 gap-0.5">
-                  {images.slice(0, 2).map((img, idx) => (
-                    <SafeImage key={idx} src={img} className="w-full h-full object-cover" />
+              ) : (
+                <SafeImage src={images[Math.max(0, Math.min(activeImageIdx, imageCount - 1))]} className="w-full h-full object-cover" />
+              )}
+
+              {imageCount > 1 ? (
+                <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1.5 pointer-events-none">
+                  {Array.from({ length: imageCount }).map((_, i) => (
+                    <span
+                      key={i}
+                      className={[
+                        'w-1.5 h-1.5 rounded-full',
+                        i === activeImageIdx ? 'bg-white' : 'bg-white/45',
+                      ].join(' ')}
+                    />
                   ))}
                 </div>
-              );
-            }
-            
-            // 3 Resim - Sol yarı 1 büyük, sağ yarı 2 küçük
-            if (imageCount === 3) {
-              return (
-                <div className="w-full h-full grid grid-cols-2 gap-0.5">
-                  <SafeImage src={images[0]} className="w-full h-full object-cover" />
-                  <div className="grid grid-rows-2 gap-0.5">
-                    {images.slice(1, 3).map((img, idx) => (
-                      <SafeImage key={idx} src={img} className="w-full h-full object-cover" />
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-            
-            // 4 Resim - 2x2 grid
-            if (imageCount === 4) {
-              return (
-                <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
-                  {images.slice(0, 4).map((img, idx) => (
-                    <SafeImage key={idx} src={img} className="w-full h-full object-cover" />
-                  ))}
-                </div>
-              );
-            }
-            
-            // 5+ Resim - İlk 3 resim + "Tümü" butonu
-            return (
-              <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
-                {images.slice(0, 3).map((img, idx) => (
-                  <SafeImage key={idx} src={img} className="w-full h-full object-cover" />
-                ))}
-                {/* Tümü Butonu */}
-                <div className="w-full h-full bg-black bg-opacity-60 flex items-center justify-center cursor-pointer hover:bg-opacity-70 transition-all">
-                  <div className="text-center">
-                    <div className="text-4xl text-white mb-1">+</div>
-                    <div className="text-white text-xs font-semibold">Tümü</div>
-                    <div className="text-white text-[10px]">({imageCount})</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+              ) : null}
+            </div>
+          )}
           {post.content_type === CONTENT_TYPES.VIDEO && (
             <>
               <SafeImage
