@@ -202,31 +202,11 @@ export const ProfilePage = () => {
         
         // /@username route'u kullanılmışsa
         if (username) {
-          try {
-            profileData = await users.getByUsername(username);
-          } catch (e) {
-            console.error('User fetch by username failed:', e);
-          }
-
-          if (!profileData) {
-            setError('Kullanıcı bulunamadı');
-            setLoading(false);
-            return;
-          }
-        } 
+          profileData = await users.getByUsername(username);
+        }
         // /profile/:userId route'u kullanılmışsa
         else if (userId) {
-          try {
-            profileData = await users.getById(userId);
-          } catch (e) {
-            console.error('User fetch by id failed:', e);
-          }
-
-          if (!profileData) {
-            setError('Kullanıcı bulunamadı');
-            setLoading(false);
-            return;
-          }
+          profileData = await users.getById(userId);
         }
         
         const resolvedProfileData = profileData?.data ? profileData.data : profileData;

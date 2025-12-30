@@ -5,6 +5,7 @@ import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { apiCall } from '../utils/api';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
+import { ApiNotice } from '../components/common/ApiNotice';
 
 export const AgendasPage = () => {
   const navigate = useNavigate();
@@ -13,6 +14,8 @@ export const AgendasPage = () => {
   const [agendas, setAgendas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
 
   const cacheKey = useMemo(() => 'agendas', []);
   const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
@@ -44,17 +47,35 @@ export const AgendasPage = () => {
       const hasCached = !!initialCache;
       if (hasCached) setRefreshing(true);
       else setLoading(true);
-      const agendaRes = await apiCall('/api/agendas?limit=120').catch(() => null);
-      const list = agendaRes?.data || [];
-      setAgendas(Array.isArray(list) ? list : []);
+      setError('');
+      setSchemaSql('');
+      try {
+        const agendaRes = await apiCall('/api/agendas?limit=120');
+        const list = agendaRes?.data || [];
+        setAgendas(Array.isArray(list) ? list : []);
+        if (agendaRes?.schemaMissing && agendaRes?.requiredSql) {
+          setSchemaSql(String(agendaRes.requiredSql || ''));
+          setError('Veritabanı şeması eksik. Gerekli SQL’i çalıştırmanız gerekiyor.');
+        }
 
-      const data = await api.posts.getAll({ limit: 250, order: 'polit_score.desc' }).catch(() => []);
-      // Agendas page is a Polit page; exclude Fast copies (is_trending).
-      const rows = (Array.isArray(data) ? data : []).filter((p) => !p?.is_trending);
-      setPosts(rows);
-
-      setLoading(false);
-      setRefreshing(false);
+        const data = await api.posts.getAll({ limit: 250, order: 'polit_score.desc' });
+        // Agendas page is a Polit page; exclude Fast copies (is_trending).
+        const rows = (Array.isArray(data) ? data : []).filter((p) => !p?.is_trending);
+        setPosts(rows);
+      } catch (e) {
+        const msg = e?.message || 'Gündemler yüklenemedi.';
+        setError(msg);
+        const p = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+        if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
+        // Keep cached content visible when we have it; otherwise clear.
+        if (!hasCached) {
+          setAgendas([]);
+          setPosts([]);
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -115,6 +136,23 @@ export const AgendasPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-6">
+        {error ? (
+          <div className="mb-5">
+            <ApiNotice
+              title={schemaSql ? 'Schema eksik' : 'Veriler yüklenemedi'}
+              message={error}
+              schemaSql={schemaSql}
+              onRetry={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+              compact={true}
+            />
+          </div>
+        ) : null}
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-2xl font-black text-gray-900">Tüm Gündem</div>

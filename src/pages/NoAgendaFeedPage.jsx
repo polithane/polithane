@@ -3,6 +3,7 @@ import { useNavigate, useNavigationType } from 'react-router-dom';
 import api from '../utils/api';
 import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
+import { ApiNotice } from '../components/common/ApiNotice';
 
 export const NoAgendaFeedPage = () => {
   const navigate = useNavigate();
@@ -10,6 +11,8 @@ export const NoAgendaFeedPage = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
@@ -17,6 +20,7 @@ export const NoAgendaFeedPage = () => {
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
   const loadingMoreRef = useRef(false);
+  const hasUserScrolledRef = useRef(false);
   const PAGE_SIZE = 24;
 
   const cacheKey = useMemo(() => 'noagenda', []);
@@ -46,14 +50,12 @@ export const NoAgendaFeedPage = () => {
   }, [cacheKey]);
 
   const fetchPage = async ({ nextOffset, replace }) => {
-    const rows = await api.posts
-      .getAll({
-        agenda_tag: '__null__',
-        limit: PAGE_SIZE,
-        offset: nextOffset,
-        order: 'polit_score.desc',
-      })
-      .catch(() => []);
+    const rows = await api.posts.getAll({
+      agenda_tag: '__null__',
+      limit: PAGE_SIZE,
+      offset: nextOffset,
+      order: 'polit_score.desc',
+    });
     const list = Array.isArray(rows) ? rows : [];
     setPosts((prev) => (replace ? list : [...(prev || []), ...list]));
     setHasMore(list.length >= PAGE_SIZE);
@@ -71,8 +73,16 @@ export const NoAgendaFeedPage = () => {
         setHasMore(true);
         setOffset(0);
       }
+      setError('');
+      setSchemaSql('');
       try {
         if (!cancelled) await fetchPage({ nextOffset: 0, replace: true });
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e?.message || 'Gönderiler yüklenemedi.';
+        setError(msg);
+        const p = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+        if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
       } finally {
         if (!cancelled) setLoading(false);
         if (!cancelled) setRefreshing(false);
@@ -91,6 +101,8 @@ export const NoAgendaFeedPage = () => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         const e = entries?.[0];
+        // Don't waste bandwidth unless user scrolls.
+        if (!hasUserScrolledRef.current) return;
         if (!e?.isIntersecting) return;
         if (loadingMoreRef.current) return;
         if (loading || loadingMore) return;
@@ -114,6 +126,15 @@ export const NoAgendaFeedPage = () => {
   }, [offset, hasMore, loading, loadingMore]);
 
   useEffect(() => {
+    const onScroll = () => {
+      if (hasUserScrolledRef.current) return;
+      hasUserScrolledRef.current = true;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
     const save = () => {
       writeSessionCache(cacheKey, {
         posts,
@@ -128,6 +149,23 @@ export const NoAgendaFeedPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-8">
+        {error ? (
+          <div className="mb-5">
+            <ApiNotice
+              title={schemaSql ? 'Schema eksik' : 'Veriler yüklenemedi'}
+              message={error}
+              schemaSql={schemaSql}
+              onRetry={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+              compact={true}
+            />
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-3 mb-6">
           <div className="min-w-0">
             <div className="text-2xl sm:text-3xl font-black text-gray-900 break-words">GÜNDEM DIŞI POLİTLER</div>

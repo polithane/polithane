@@ -8,6 +8,7 @@ import { formatPolitScore } from '../utils/formatters';
 import { getProfilePath } from '../utils/paths';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
+import { ApiNotice } from '../components/common/ApiNotice';
 
 export const HitFeedPage = () => {
   const navigate = useNavigate();
@@ -18,6 +19,8 @@ export const HitFeedPage = () => {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
@@ -25,6 +28,7 @@ export const HitFeedPage = () => {
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
   const loadingMoreRef = useRef(false);
+  const hasUserScrolledRef = useRef(false);
   const PAGE_SIZE = 120;
 
   const mode = useMemo(() => {
@@ -167,7 +171,7 @@ export const HitFeedPage = () => {
 
   const fetchProfilesPage = async ({ nextOffset, replace } = {}) => {
     const lim = 60;
-    const res = await api.users.getAll({ limit: lim, offset: nextOffset ?? 0, order: 'polit_score.desc' }).catch(() => []);
+    const res = await api.users.getAll({ limit: lim, offset: nextOffset ?? 0, order: 'polit_score.desc' });
     const list = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
 
     setProfiles((prev) => {
@@ -187,7 +191,7 @@ export const HitFeedPage = () => {
   };
 
   const fetchPage = async ({ nextOffset, replace, pm }) => {
-    const rows = await api.posts.getAll({ limit: PAGE_SIZE, offset: nextOffset, order: 'created_at.desc' }).catch(() => []);
+    const rows = await api.posts.getAll({ limit: PAGE_SIZE, offset: nextOffset, order: 'created_at.desc' });
     // Keep Hit feed as "Polit" content; Fast copies live in the Fast viewer.
     const list = (Array.isArray(rows) ? rows : []).filter((p) => !p?.is_trending);
     const mapperMap = pm instanceof Map ? pm : partyMap;
@@ -214,6 +218,10 @@ export const HitFeedPage = () => {
       const hasCached = !!initialCache;
       if (hasCached) setRefreshing(true);
       else setLoading(true);
+      if (!cancelled) {
+        setError('');
+        setSchemaSql('');
+      }
       setPool([]);
       setProfiles([]);
       setHasMore(true);
@@ -222,19 +230,19 @@ export const HitFeedPage = () => {
         if (isProfilesMode) {
           if (!cancelled) await fetchProfilesPage({ nextOffset: 0, replace: true });
         } else {
-          const partiesData = await api.parties.getAll().catch(() => []);
+          const partiesData = await api.parties.getAll();
           const nextParties = Array.isArray(partiesData) ? partiesData : [];
           const pm = new Map((nextParties || []).map((p) => [p.id, p]));
           if (!cancelled) setParties(nextParties);
           if (!cancelled) await fetchPage({ nextOffset: 0, replace: true, pm });
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) setParties([]);
-        if (isProfilesMode) {
-          if (!cancelled) await fetchProfilesPage({ nextOffset: 0, replace: true });
-        } else {
-          const pm = new Map();
-          if (!cancelled) await fetchPage({ nextOffset: 0, replace: true, pm });
+        if (!cancelled) {
+          const msg = e?.message || 'Veriler yüklenemedi.';
+          setError(msg);
+          const p = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+          if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -267,6 +275,8 @@ export const HitFeedPage = () => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         const e = entries?.[0];
+        // Don't waste bandwidth unless user scrolls.
+        if (!hasUserScrolledRef.current) return;
         if (!e?.isIntersecting) return;
         if (loadingMoreRef.current) return;
         if (loading || loadingMore) return;
@@ -293,9 +303,35 @@ export const HitFeedPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset, hasMore, loading, loadingMore, isProfilesMode]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      if (hasUserScrolledRef.current) return;
+      hasUserScrolledRef.current = true;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-8">
+        {error ? (
+          <div className="mb-5">
+            <ApiNotice
+              title={schemaSql ? 'Schema eksik' : 'Veriler yüklenemedi'}
+              message={error}
+              schemaSql={schemaSql}
+              onRetry={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+              compact={true}
+            />
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-3 mb-6">
           <div className="min-w-0">
             {isProfilesMode ? (

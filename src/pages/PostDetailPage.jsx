@@ -152,9 +152,14 @@ export const PostDetailPage = () => {
         const dbPost = detail?.data ? detail.data : detail;
         setPost(dbPost);
 
-        const c = await postsApi.getComments(postId).catch(() => null);
-        const rows = c?.data?.data || c?.data || c || [];
-        setComments(Array.isArray(rows) ? rows : []);
+        try {
+          const c = await postsApi.getComments(postId);
+          const rows = c?.data?.data || c?.data || c || [];
+          setComments(Array.isArray(rows) ? rows : []);
+        } catch (e) {
+          setComments([]);
+          setCommentNotice(e?.message || 'Yorumlar yüklenemedi.');
+        }
       } catch (e) {
         console.error(e);
         setError(e?.message || 'Paylaşım yüklenemedi.');

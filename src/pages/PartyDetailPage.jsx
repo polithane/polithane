@@ -10,6 +10,7 @@ import { CITY_CODES } from '../utils/constants';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
+import { ApiNotice } from '../components/common/ApiNotice';
 
 export const PartyDetailPage = () => {
   const { partyId } = useParams();
@@ -30,6 +31,7 @@ export const PartyDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
 
   const cacheKey = useMemo(() => `party:${String(partyId || '').trim() || '-'}`, [partyId]);
   const initialCache = useMemo(() => readSessionCache(cacheKey, { maxAgeMs: 10 * 60_000 }), [cacheKey]);
@@ -79,6 +81,7 @@ export const PartyDetailPage = () => {
       if (hasCached) setRefreshing(true);
       else setLoading(true);
       setError('');
+      setSchemaSql('');
 
       const normalizeParty = (p) => {
         if (!p) return null;
@@ -154,11 +157,12 @@ export const PartyDetailPage = () => {
           let out = [];
           for (let page = 0; page < maxPages; page++) {
             // eslint-disable-next-line no-await-in-loop
-            const chunk = await apiCall(
+            const chunkRes = await apiCall(
               `/api/users?party_id=${party_id}&user_type=${encodeURIComponent(user_type)}&limit=${pageSize}&offset=${page * pageSize}&order=${encodeURIComponent(order)}`
-            ).catch(() => []);
-            if (Array.isArray(chunk) && chunk.length > 0) out = out.concat(chunk);
-            if (!Array.isArray(chunk) || chunk.length < pageSize) break;
+            );
+            const chunk = Array.isArray(chunkRes) ? chunkRes : Array.isArray(chunkRes?.data) ? chunkRes.data : [];
+            if (chunk.length > 0) out = out.concat(chunk);
+            if (chunk.length < pageSize) break;
           }
           return out;
         };
@@ -178,13 +182,15 @@ export const PartyDetailPage = () => {
         setPartyMembers(members);
 
         // Posts in party (DB)
-        const dbPosts = await api.posts.getAll({ party_id: partyObj.party_id, limit: 50, order: 'polit_score.desc' }).catch(() => []);
+        const dbPosts = await api.posts.getAll({ party_id: partyObj.party_id, limit: 50, order: 'polit_score.desc' });
         // Party feeds show Polits; exclude Fast copies (is_trending).
         const rows = (dbPosts || []).filter((p) => !p?.is_trending);
         setPartyPosts(rows.map(mapDbPostToUi).filter(Boolean));
       } catch (e) {
         console.error(e);
-        setError('Parti verileri yüklenirken hata oluştu');
+        setError(e?.message || 'Parti verileri yüklenirken hata oluştu');
+        const p = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+        if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -508,8 +514,21 @@ export const PartyDetailPage = () => {
 
   if (error || !party) {
     return (
-      <div className="container-main py-8">
-        <div className="text-center text-gray-700">{error || 'Parti bulunamadı'}</div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container-main py-8">
+          <ApiNotice
+            title={schemaSql ? 'Schema eksik' : 'Veriler yüklenemedi'}
+            message={error || 'Parti bulunamadı'}
+            schemaSql={schemaSql}
+            onRetry={() => {
+              try {
+                window.location.reload();
+              } catch {
+                // ignore
+              }
+            }}
+          />
+        </div>
       </div>
     );
   }

@@ -16,6 +16,7 @@ import api from '../utils/api';
 import { apiCall } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
+import { ApiNotice } from '../components/common/ApiNotice';
 
 export const HomePage = () => {
   const { user, isAuthenticated } = useAuth();
@@ -40,6 +41,8 @@ export const HomePage = () => {
   const [desktopVisible, setDesktopVisible] = useState({ hit: 10, mp: 10, org: 10, citizen: 10 });
   const [loading, setLoading] = useState(() => !(initialCache?.posts && Array.isArray(initialCache.posts) && initialCache.posts.length > 0));
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [postsOffset, setPostsOffset] = useState(0);
@@ -230,14 +233,45 @@ export const HomePage = () => {
       const hasCached = Array.isArray(initialCache?.posts) && initialCache.posts.length > 0;
       if (hasCached) setRefreshing(true);
       else setLoading(true);
+      setLoadError('');
+      setSchemaSql('');
       try {
         // Partiler + postlar (paged) (tamamı DB - Vercel /api üzerinden)
-        const [partiesData, postsData, parliamentRes, publicSiteRes] = await Promise.all([
-          api.parties.getAll().catch(() => []),
-          api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: 0, order: 'created_at.desc' }).catch(() => []),
-          apiCall('/api/public/parliament', { method: 'GET' }).catch(() => null),
-          apiCall('/api/public/site', { method: 'GET' }).catch(() => null),
-        ]);
+        // IMPORTANT: do not silently swallow fetch errors (avoid "boş ekran").
+        const applyError = (e) => {
+          const msg = e?.message || 'Veriler yüklenemedi.';
+          setLoadError(msg);
+          const p = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+          if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
+        };
+
+        let partiesData = null;
+        let postsData = null;
+        let parliamentRes = null;
+        let publicSiteRes = null;
+
+        try {
+          partiesData = await api.parties.getAll();
+        } catch (e) {
+          applyError(e);
+          partiesData = Array.isArray(initialCache?.parties) ? initialCache.parties : [];
+        }
+        try {
+          postsData = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: 0, order: 'created_at.desc' });
+        } catch (e) {
+          applyError(e);
+          postsData = Array.isArray(initialCache?.posts) ? initialCache.posts : [];
+        }
+        try {
+          parliamentRes = await apiCall('/api/public/parliament', { method: 'GET' });
+        } catch {
+          parliamentRes = null;
+        }
+        try {
+          publicSiteRes = await apiCall('/api/public/site', { method: 'GET' });
+        } catch {
+          publicSiteRes = null;
+        }
 
         // Partiler (DB)
         setParties(Array.isArray(partiesData) ? partiesData : []);
@@ -346,7 +380,13 @@ export const HomePage = () => {
 
         while (!isEnough(countByType(initialPosts)) && extraPage < maxExtraPages) {
           // eslint-disable-next-line no-await-in-loop
-          const more = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset, order: 'created_at.desc' }).catch(() => []);
+          let more = [];
+          try {
+            more = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset, order: 'created_at.desc' });
+          } catch (e) {
+            applyError(e);
+            more = [];
+          }
           const moreRows = (more || []).filter((p) => !p?.is_trending);
           const nextBatch = moreRows.map(mapDbPostToUi);
           if (nextBatch.length === 0) break;
@@ -368,12 +408,16 @@ export const HomePage = () => {
 
         // Agendas: load from admin-managed list (no mock fallback in production)
         try {
-          const agendaRes = await apiCall('/api/agendas?limit=80').catch(() => null);
+          const agendaRes = await apiCall('/api/agendas?limit=80');
           const list = agendaRes?.data || [];
           const normalized = (Array.isArray(list) ? list : [])
             .filter((a) => a?.is_active !== false)
             .slice(0, 80);
           setAgendas(normalized);
+          if (agendaRes?.schemaMissing && agendaRes?.requiredSql) {
+            setSchemaSql(String(agendaRes.requiredSql || ''));
+            setLoadError('Veritabanı şeması eksik. Gerekli SQL’i çalıştırmanız gerekiyor.');
+          }
         } catch {
           setAgendas([]);
         }
@@ -382,7 +426,7 @@ export const HomePage = () => {
         // If not logged in -> global public fast (polit_score / popularity).
         try {
           const endpoint = isAuthenticated ? '/api/fast?limit=24' : '/api/fast/public?limit=24';
-          const r = await apiCall(endpoint).catch(() => null);
+          const r = await apiCall(endpoint);
           const list = r?.data || [];
           setPolifest(filterActiveFastUsers(list));
         } catch {
@@ -391,13 +435,20 @@ export const HomePage = () => {
 
       } catch (error) {
         console.error('Error loading data:', error);
-        setPosts([]);
-        setParties([]);
-        setParliamentDistribution(currentParliamentDistribution);
-        setAgendas([]);
-        setPolifest([]);
-        setPostsOffset(0);
-        setHasMorePosts(false);
+        // If we already have cached data, keep it visible; otherwise fall back to empty.
+        const msg = error?.message || 'Veriler yüklenemedi.';
+        setLoadError(msg);
+        const p = error?.payload && typeof error.payload === 'object' ? error.payload : null;
+        if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
+        if (!hasCached) {
+          setPosts([]);
+          setParties([]);
+          setParliamentDistribution(currentParliamentDistribution);
+          setAgendas([]);
+          setPolifest([]);
+          setPostsOffset(0);
+          setHasMorePosts(false);
+        }
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -486,6 +537,7 @@ export const HomePage = () => {
     if (loadingMorePostsRef.current || loadingMorePosts || !hasMorePosts) return;
     loadingMorePostsRef.current = true;
     setLoadingMorePosts(true);
+    setLoadError('');
     try {
       const partyMap = new Map((parties || []).map((p) => [p.id, p]));
       const normalizeMediaUrls = (value) => {
@@ -535,7 +587,7 @@ export const HomePage = () => {
           : null,
       });
 
-      const postsData = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: postsOffset, order: 'created_at.desc' }).catch(() => []);
+      const postsData = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset: postsOffset, order: 'created_at.desc' });
       // Do not append Fast copies into the Home feed.
       const rows = (postsData || []).filter((p) => !p?.is_trending);
       const nextBatch = rows.map(mapDbPostToUi);
@@ -553,6 +605,7 @@ export const HomePage = () => {
       setPostsOffset((prev) => prev + nextBatch.length);
       if (nextBatch.length < POSTS_PAGE_SIZE) setHasMorePosts(false);
     } catch {
+      setLoadError('Daha fazla içerik yüklenemedi. Lütfen tekrar deneyin.');
       setHasMorePosts(false);
     } finally {
       setLoadingMorePosts(false);
@@ -712,6 +765,23 @@ export const HomePage = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-6 lg:pr-0">
         {refreshing ? <div className="mb-2 text-[11px] text-gray-500 font-semibold">Güncelleniyor…</div> : null}
+        {loadError ? (
+          <div className="mb-4">
+            <ApiNotice
+              title={schemaSql ? 'Schema eksik' : 'Veriler yüklenemedi'}
+              message={loadError}
+              schemaSql={schemaSql}
+              onRetry={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+              compact={true}
+            />
+          </div>
+        ) : null}
         {/* Üst Tanıtım Slaytı */}
         <IntroSlider />
 

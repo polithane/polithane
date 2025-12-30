@@ -7,6 +7,7 @@ import { formatNumber, formatPolitScore } from '../utils/formatters';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
+import { ApiNotice } from '../components/common/ApiNotice';
 
 export const AgendaDetailPage = () => {
   const { agendaSlug } = useParams();
@@ -17,6 +18,8 @@ export const AgendaDetailPage = () => {
   const [category, setCategory] = useState('all');
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [schemaSql, setSchemaSql] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
@@ -24,6 +27,7 @@ export const AgendaDetailPage = () => {
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
   const loadingMoreRef = useRef(false);
+  const hasUserScrolledRef = useRef(false);
 
   const PAGE_SIZE = 24;
   const cacheKey = useMemo(() => `agenda:${String(agendaSlug || '').trim() || '-'}`, [agendaSlug]);
@@ -75,15 +79,35 @@ export const AgendaDetailPage = () => {
   useEffect(() => {
     (async () => {
       // Resolve agenda from admin list (by slug first, fallback to title)
-      const agendaRes = await apiCall('/api/agendas?limit=200').catch(() => null);
-      const list = agendaRes?.data || [];
-      const found =
-        (Array.isArray(list) ? list : []).find((a) => String(a?.slug || '') === String(agendaSlug || '')) ||
-        (Array.isArray(list) ? list : []).find((a) => String(a?.title || '').toLowerCase().replace(/\s+/g, '-') === String(agendaSlug || ''));
+      setError('');
+      setSchemaSql('');
+      try {
+        const agendaRes = await apiCall('/api/agendas?limit=200');
+        const list = agendaRes?.data || [];
+        const found =
+          (Array.isArray(list) ? list : []).find((a) => String(a?.slug || '') === String(agendaSlug || '')) ||
+          (Array.isArray(list) ? list : []).find(
+            (a) => String(a?.title || '').toLowerCase().replace(/\s+/g, '-') === String(agendaSlug || '')
+          );
 
-      setAgenda(found || null);
-      const title = String(found?.title || found?.agenda_title || '').trim();
-      setResolvedAgendaTitle(title);
+        setAgenda(found || null);
+        const title = String(found?.title || found?.agenda_title || '').trim();
+        setResolvedAgendaTitle(title);
+
+        if (agendaRes?.schemaMissing && agendaRes?.requiredSql) {
+          setSchemaSql(String(agendaRes.requiredSql || ''));
+          setError('Veritabanı şeması eksik. Gerekli SQL’i çalıştırmanız gerekiyor.');
+        } else if (!found && title === '') {
+          setError('Gündem bulunamadı.');
+        }
+      } catch (e) {
+        const msg = e?.message || 'Gündem yüklenemedi.';
+        setError(msg);
+        const p = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+        if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
+        setAgenda(null);
+        setResolvedAgendaTitle('');
+      }
     })();
   }, [agendaSlug]);
 
@@ -102,7 +126,7 @@ export const AgendaDetailPage = () => {
     };
     if (category && category !== 'all') params.category = category;
 
-    const dbPosts = await api.posts.getAll(params).catch(() => []);
+    const dbPosts = await api.posts.getAll(params);
     // Agenda feeds show Polits (topic posts). Fast copies live in the Fast viewer.
     const rows = (Array.isArray(dbPosts) ? dbPosts : []).filter((p) => !p?.is_trending);
     setAgendaPosts((prev) => (replace ? rows : [...(prev || []), ...rows]));
@@ -119,10 +143,19 @@ export const AgendaDetailPage = () => {
       const hasCached = !!initialCache;
       if (hasCached) setRefreshing(true);
       else setLoadingPosts(true);
+      setError('');
+      setSchemaSql('');
       setHasMore(true);
       setOffset(0);
       try {
         if (!cancelled) await fetchPostsPage({ nextOffset: 0, replace: true });
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e?.message || 'Paylaşımlar yüklenemedi.';
+        setError(msg);
+        const p = e?.payload && typeof e.payload === 'object' ? e.payload : null;
+        if (p?.schemaMissing && p?.requiredSql) setSchemaSql(String(p.requiredSql || ''));
+        if (!hasCached) setAgendaPosts([]);
       } finally {
         if (!cancelled) setLoadingPosts(false);
         if (!cancelled) setRefreshing(false);
@@ -142,6 +175,8 @@ export const AgendaDetailPage = () => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         const e = entries?.[0];
+        // Don't waste bandwidth unless user scrolls.
+        if (!hasUserScrolledRef.current) return;
         if (!e?.isIntersecting) return;
         if (loadingMoreRef.current) return;
         if (loadingPosts || loadingMore) return;
@@ -166,6 +201,15 @@ export const AgendaDetailPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset, hasMore, loadingPosts, loadingMore, resolvedAgendaTitle, category]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      if (hasUserScrolledRef.current) return;
+      hasUserScrolledRef.current = true;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   // Save to session cache (so returning to this page is instant).
   useEffect(() => {
     const save = () => {
@@ -184,8 +228,25 @@ export const AgendaDetailPage = () => {
   
   if (!agenda) {
     return (
-      <div className="container-main py-8">
-        <div className="text-center">Yükleniyor...</div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container-main py-8">
+          {error ? (
+            <ApiNotice
+              title={schemaSql ? 'Schema eksik' : 'Veriler yüklenemedi'}
+              message={error}
+              schemaSql={schemaSql}
+              onRetry={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+            />
+          ) : (
+            <div className="text-center text-sm text-gray-600">Yükleniyor...</div>
+          )}
+        </div>
       </div>
     );
   }
@@ -193,6 +254,23 @@ export const AgendaDetailPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-8">
+        {error ? (
+          <div className="mb-5">
+            <ApiNotice
+              title={schemaSql ? 'Schema eksik' : 'Veriler yüklenemedi'}
+              message={error}
+              schemaSql={schemaSql}
+              onRetry={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+              compact={true}
+            />
+          </div>
+        ) : null}
         {/* Gündem Header */}
         <div className="card mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
