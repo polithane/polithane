@@ -2641,8 +2641,11 @@ async function getFollowers(req, res, targetId) {
     try {
       // eslint-disable-next-line no-await-in-loop
       const part = await supabaseRestGet('users', { select, id: `in.(${chunk.join(',')})`, limit: String(chunk.length) });
-      if (Array.isArray(part)) urows.push(...part);
-      continue;
+      if (Array.isArray(part) && part.length > 0) {
+        urows.push(...part);
+        continue;
+      }
+      throw new Error('Empty in() result');
     } catch {
       // try quoted (uuid-safe in some PostgREST setups)
     }
@@ -2651,8 +2654,11 @@ async function getFollowers(req, res, targetId) {
       const quoted = chunk.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
       // eslint-disable-next-line no-await-in-loop
       const part = await supabaseRestGet('users', { select, id: `in.(${quoted})`, limit: String(chunk.length) });
-      if (Array.isArray(part)) urows.push(...part);
-      continue;
+      if (Array.isArray(part) && part.length > 0) {
+        urows.push(...part);
+        continue;
+      }
+      throw new Error('Empty in() result (quoted)');
     } catch {
       // fall back to per-id eq lookups (slow but reliable for small limits)
     }
@@ -2700,8 +2706,11 @@ async function getFollowing(req, res, targetId) {
     try {
       // eslint-disable-next-line no-await-in-loop
       const part = await supabaseRestGet('users', { select, id: `in.(${chunk.join(',')})`, limit: String(chunk.length) });
-      if (Array.isArray(part)) urows.push(...part);
-      continue;
+      if (Array.isArray(part) && part.length > 0) {
+        urows.push(...part);
+        continue;
+      }
+      throw new Error('Empty in() result');
     } catch {
       // ignore
     }
@@ -2709,8 +2718,11 @@ async function getFollowing(req, res, targetId) {
       const quoted = chunk.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
       // eslint-disable-next-line no-await-in-loop
       const part = await supabaseRestGet('users', { select, id: `in.(${quoted})`, limit: String(chunk.length) });
-      if (Array.isArray(part)) urows.push(...part);
-      continue;
+      if (Array.isArray(part) && part.length > 0) {
+        urows.push(...part);
+        continue;
+      }
+      throw new Error('Empty in() result (quoted)');
     } catch {
       // ignore
     }
