@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { X, Heart, Pause, Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Heart, Pause, Play, Volume2, VolumeX, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Avatar } from '../components/common/Avatar';
 import { Modal } from '../components/common/Modal';
 import { apiCall, posts as postsApi } from '../utils/api';
@@ -304,6 +305,36 @@ export const FastViewerPage = () => {
   };
 
   const itemSrc = useMemo(() => (current ? String(mediaUrl(current) || '') : ''), [current]);
+
+  const canDelete = useMemo(() => {
+    if (!current?.id) return false;
+    const ownerId = String(current?.user_id || '').trim();
+    const myId = String(me?.id || me?.user_id || '').trim();
+    return !!ownerId && !!myId && ownerId === myId;
+  }, [current?.id, current?.user_id, me?.id, me?.user_id]);
+
+  const deleteCurrent = useCallback(async () => {
+    if (!current?.id) return;
+    if (!canDelete) return;
+    const ok = window.confirm('Bu Fast silinsin mi?');
+    if (!ok) return;
+    try {
+      await postsApi.delete(String(current.id));
+      toast.success('Fast silindi.');
+      setItems((prev) => (Array.isArray(prev) ? prev.filter((it) => String(it?.id || '') !== String(current.id)) : []));
+      setIdx((prev) => Math.max(0, prev - 1));
+      setTimeout(() => {
+        try {
+          const left = (items || []).filter((it) => String(it?.id || '') !== String(current.id));
+          if (left.length === 0) goUser(1);
+        } catch {
+          // ignore
+        }
+      }, 0);
+    } catch (e) {
+      toast.error(String(e?.message || 'Fast silinemedi.'));
+    }
+  }, [canDelete, current?.id, goUser, items, setItems, setIdx]);
 
   const toggleLike = useCallback(async () => {
     if (!current?.id) return;
@@ -1041,25 +1072,38 @@ export const FastViewerPage = () => {
             ) : null}
           </div>
 
-          {/* bottom right like */}
+          {/* bottom right actions: delete (owner) + like */}
           {current?.id ? (
-            <button
-              type="button"
-              onClick={toggleLike}
-              className="absolute bottom-4 right-4 z-30 w-14 h-14 rounded-full bg-black/25 backdrop-blur-sm border border-white/15 flex flex-col items-center justify-center"
-              aria-label={currentLiked ? 'Beğeniyi kaldır' : 'Beğen'}
-              title={currentLiked ? 'Beğeniyi kaldır' : 'Beğen'}
-            >
-              <Heart
-                className="w-7 h-7"
-                style={{
-                  color: '#ffffff',
-                  fill: currentLiked ? '#E11D48' : 'transparent',
-                  opacity: currentLiked ? 1 : 0.92,
-                }}
-              />
-              <div className="mt-0.5 text-[10px] font-black text-white/90 leading-none">{currentLikeCount}</div>
-            </button>
+            <div className="absolute bottom-4 right-4 z-30 flex items-end gap-3">
+              {canDelete ? (
+                <button
+                  type="button"
+                  onClick={deleteCurrent}
+                  className="w-14 h-14 rounded-full bg-black/25 backdrop-blur-sm border border-white/15 flex items-center justify-center"
+                  aria-label="Sil"
+                  title="Sil"
+                >
+                  <Trash2 className="w-6 h-6 text-white/90" />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={toggleLike}
+                className="w-14 h-14 rounded-full bg-black/25 backdrop-blur-sm border border-white/15 flex flex-col items-center justify-center"
+                aria-label={currentLiked ? 'Beğeniyi kaldır' : 'Beğen'}
+                title={currentLiked ? 'Beğeniyi kaldır' : 'Beğen'}
+              >
+                <Heart
+                  className="w-7 h-7"
+                  style={{
+                    color: '#ffffff',
+                    fill: currentLiked ? '#E11D48' : 'transparent',
+                    opacity: currentLiked ? 1 : 0.92,
+                  }}
+                />
+                <div className="mt-0.5 text-[10px] font-black text-white/90 leading-none">{currentLikeCount}</div>
+              </button>
+            </div>
           ) : null}
 
           {/* viewers (owner only) */}

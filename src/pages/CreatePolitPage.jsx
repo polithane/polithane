@@ -475,37 +475,76 @@ export const CreatePolitPage = () => {
 
     const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
+    const waitForFrame = (videoEl) =>
+      new Promise((resolve) => {
+        try {
+          // Prefer requestVideoFrameCallback where available (more reliable on mobile)
+          if (typeof videoEl?.requestVideoFrameCallback === 'function') {
+            // eslint-disable-next-line no-unused-vars
+            return videoEl.requestVideoFrameCallback((_now, _meta) => resolve(true));
+          }
+        } catch {
+          // ignore
+        }
+        setTimeout(() => resolve(true), 160);
+      });
+
     const captureAt = (videoEl, timeSec) =>
       new Promise((resolve) => {
         try {
           const duration = Number(videoEl.duration || 0);
           const t = clamp(Number(timeSec || 0), 0, Math.max(0, duration - 0.12));
-          const onSeeked = () => {
-            videoEl.removeEventListener('seeked', onSeeked);
+          let done = false;
+          const finish = (v) => {
+            if (done) return;
+            done = true;
+            resolve(v);
+          };
+
+          const onSeeked = async () => {
             try {
-              const w = Number(videoEl.videoWidth || 0);
-              const h = Number(videoEl.videoHeight || 0);
-              if (!w || !h) return resolve(null);
+              videoEl.removeEventListener('seeked', onSeeked);
+            } catch {
+              // ignore
+            }
+            try {
+              // On some mobile browsers, seeked fires before the frame is actually ready to draw.
+              await waitForFrame(videoEl);
+
+              const vw = Number(videoEl.videoWidth || 0);
+              const vh = Number(videoEl.videoHeight || 0);
+              if (!vw || !vh) return finish(null);
+
               const canvas = document.createElement('canvas');
-              canvas.width = w;
-              canvas.height = h;
+              canvas.width = vw;
+              canvas.height = vh;
               const ctx = canvas.getContext('2d');
-              ctx.drawImage(videoEl, 0, 0, w, h);
+              if (!ctx) return finish(null);
+
+              ctx.drawImage(videoEl, 0, 0, vw, vh);
               canvas.toBlob(
                 (blob) => {
-                  if (!blob) return resolve(null);
+                  if (!blob) return finish(null);
                   const previewUrl = URL.createObjectURL(blob);
-                  resolve({ timeSec: t, previewUrl, blob });
+                  finish({ timeSec: t, previewUrl, blob });
                 },
                 'image/jpeg',
                 0.86
               );
             } catch {
-              resolve(null);
+              finish(null);
             }
           };
+
           videoEl.addEventListener('seeked', onSeeked);
+          try {
+            // Ensure data is available around the target time
+            if (videoEl.readyState < 2) videoEl.load?.();
+          } catch {
+            // ignore
+          }
           videoEl.currentTime = t;
+
           // safety timeout
           setTimeout(() => {
             try {
@@ -513,8 +552,8 @@ export const CreatePolitPage = () => {
             } catch {
               // ignore
             }
-            resolve(null);
-          }, 1400);
+            finish(null);
+          }, 2600);
         } catch {
           resolve(null);
         }
@@ -528,16 +567,30 @@ export const CreatePolitPage = () => {
 
       try {
         const videoEl = document.createElement('video');
-        videoEl.preload = 'metadata';
+        videoEl.preload = 'auto';
         videoEl.src = src;
         videoEl.muted = true;
         videoEl.playsInline = true;
+        try {
+          videoEl.setAttribute('playsinline', 'true');
+          videoEl.setAttribute('webkit-playsinline', 'true');
+        } catch {
+          // ignore
+        }
         await new Promise((resolve) => {
           const done = () => resolve();
           videoEl.onloadedmetadata = done;
+          videoEl.onloadeddata = done;
           videoEl.onerror = done;
           setTimeout(done, 1200);
         });
+        try {
+          // warm up decoder on mobile (helps avoid black canvas)
+          videoEl.currentTime = 0.1;
+          await waitForFrame(videoEl);
+        } catch {
+          // ignore
+        }
         const duration = Number(videoEl.duration || 0);
         const d = Number.isFinite(duration) && duration > 0 ? duration : Math.max(1, Number(mediaDurationSec || 0) || 1);
 
@@ -1344,6 +1397,7 @@ export const CreatePolitPage = () => {
                           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
                             <div
                               className={[
+                                'px-2 py-1 rounded-lg bg-gray-800/90 border border-white/10',
                                 'font-black text-sm tabular-nums',
                                 recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
                               ].join(' ')}
@@ -1358,13 +1412,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
+                              className="relative w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
                               <span className="relative text-[11px] font-black tracking-wide">BİTİR</span>
-                              <span className="relative mt-1 w-4 h-4 bg-white rounded-sm" />
+                              <span className="relative mt-2 w-5 h-5 bg-white rounded-sm" />
                             </button>
                           </div>
                         ) : null}
@@ -1423,6 +1477,7 @@ export const CreatePolitPage = () => {
                           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
                             <div
                               className={[
+                                'px-2 py-1 rounded-lg bg-gray-800/90 border border-white/10',
                                 'font-black text-sm tabular-nums',
                                 recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
                               ].join(' ')}
@@ -1437,13 +1492,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
+                              className="relative w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
                               <span className="relative text-[11px] font-black tracking-wide">BİTİR</span>
-                              <span className="relative mt-1 w-4 h-4 bg-white rounded-sm" />
+                              <span className="relative mt-2 w-5 h-5 bg-white rounded-sm" />
                             </button>
                           </div>
                         ) : null}
