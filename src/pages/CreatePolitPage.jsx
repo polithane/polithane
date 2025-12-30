@@ -1397,8 +1397,8 @@ export const CreatePolitPage = () => {
                           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
                             <div
                               className={[
-                                'px-2 py-1 rounded-lg bg-gray-800/90 border border-white/10',
-                                'font-black text-sm tabular-nums',
+                                'px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg bg-gray-800/90 border border-white/10',
+                                'font-black text-xs md:text-sm tabular-nums',
                                 recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
                               ].join(' ')}
                               aria-label="Kalan süre"
@@ -1412,13 +1412,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
+                              className="relative w-12 h-12 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative text-[11px] font-black tracking-wide">BİTİR</span>
-                              <span className="relative mt-2 w-5 h-5 bg-white rounded-sm" />
+                              <span className="relative text-[9px] md:text-[11px] font-black tracking-wide">BİTİR</span>
+                              <span className="relative mt-1 md:mt-2 w-3 h-3 md:w-5 md:h-5 bg-white rounded-sm" />
                             </button>
                           </div>
                         ) : null}
@@ -1477,8 +1477,8 @@ export const CreatePolitPage = () => {
                           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
                             <div
                               className={[
-                                'px-2 py-1 rounded-lg bg-gray-800/90 border border-white/10',
-                                'font-black text-sm tabular-nums',
+                                'px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg bg-gray-800/90 border border-white/10',
+                                'font-black text-xs md:text-sm tabular-nums',
                                 recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
                               ].join(' ')}
                               aria-label="Kalan süre"
@@ -1492,13 +1492,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
+                              className="relative w-12 h-12 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative text-[11px] font-black tracking-wide">BİTİR</span>
-                              <span className="relative mt-2 w-5 h-5 bg-white rounded-sm" />
+                              <span className="relative text-[9px] md:text-[11px] font-black tracking-wide">BİTİR</span>
+                              <span className="relative mt-1 md:mt-2 w-3 h-3 md:w-5 md:h-5 bg-white rounded-sm" />
                             </button>
                           </div>
                         ) : null}
