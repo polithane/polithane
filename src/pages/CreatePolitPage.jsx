@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Camera, Trash2, Video, Image as ImageIcon, Music, PenTool, UploadCloud, Mic, StopCircle } from 'lucide-react';
+import { Camera, Trash2, Video, Image as ImageIcon, Music, PenTool, UploadCloud, Mic, StopCircle, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
@@ -1477,6 +1477,11 @@ export const CreatePolitPage = () => {
                         ) : (
                           <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
                         )}
+                      </div>
+
+                      <div className="flex items-center justify-center gap-2 text-[11px] text-gray-600">
+                        <Smartphone className="w-4 h-4 text-gray-500" />
+                        <span>Telefonu dik tutunuz</span>
                       </div>
 
                       {videoThumbs.length > 0 ? (

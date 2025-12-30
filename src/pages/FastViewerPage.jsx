@@ -985,7 +985,7 @@ export const FastViewerPage = () => {
                 playsInline
                 muted={muted}
                 autoPlay
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
               />
             ) : current.content_type === 'audio' ? (
               <div className="h-full w-full flex items-center justify-center p-6">
