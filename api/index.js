@@ -2632,13 +2632,36 @@ async function getFollowers(req, res, targetId) {
   }
   const ids = (rows || []).map((r) => String(r?.follower_id || '').trim()).filter(Boolean);
   if (ids.length === 0) return res.json({ success: true, data: [] });
-  const inList = ids.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
-
-  const urows = await supabaseRestGet('users', {
-    select: 'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata',
-    id: `in.(${inList})`,
-    limit: String(Math.min(ids.length, 500)),
-  }).catch(() => []);
+  const select =
+    'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
+  const urows = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    // Try unquoted in.() (works for most id formats)
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const part = await supabaseRestGet('users', { select, id: `in.(${chunk.join(',')})`, limit: String(chunk.length) });
+      if (Array.isArray(part)) urows.push(...part);
+      continue;
+    } catch {
+      // try quoted (uuid-safe in some PostgREST setups)
+    }
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const quoted = chunk.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+      // eslint-disable-next-line no-await-in-loop
+      const part = await supabaseRestGet('users', { select, id: `in.(${quoted})`, limit: String(chunk.length) });
+      if (Array.isArray(part)) urows.push(...part);
+      continue;
+    } catch {
+      // fall back to per-id eq lookups (slow but reliable for small limits)
+    }
+    for (const id of chunk) {
+      // eslint-disable-next-line no-await-in-loop
+      const one = await supabaseRestGet('users', { select, id: `eq.${id}`, limit: '1' }).catch(() => []);
+      if (Array.isArray(one) && one[0]) urows.push(one[0]);
+    }
+  }
   const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
   const list = ids.map((id) => byId.get(id)).filter(Boolean);
   return res.json({ success: true, data: list });
@@ -2669,13 +2692,34 @@ async function getFollowing(req, res, targetId) {
   }
   const ids = (rows || []).map((r) => String(r?.following_id || '').trim()).filter(Boolean);
   if (ids.length === 0) return res.json({ success: true, data: [] });
-  const inList = ids.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
-
-  const urows = await supabaseRestGet('users', {
-    select: 'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata',
-    id: `in.(${inList})`,
-    limit: String(Math.min(ids.length, 500)),
-  }).catch(() => []);
+  const select =
+    'id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
+  const urows = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const part = await supabaseRestGet('users', { select, id: `in.(${chunk.join(',')})`, limit: String(chunk.length) });
+      if (Array.isArray(part)) urows.push(...part);
+      continue;
+    } catch {
+      // ignore
+    }
+    try {
+      const quoted = chunk.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+      // eslint-disable-next-line no-await-in-loop
+      const part = await supabaseRestGet('users', { select, id: `in.(${quoted})`, limit: String(chunk.length) });
+      if (Array.isArray(part)) urows.push(...part);
+      continue;
+    } catch {
+      // ignore
+    }
+    for (const id of chunk) {
+      // eslint-disable-next-line no-await-in-loop
+      const one = await supabaseRestGet('users', { select, id: `eq.${id}`, limit: '1' }).catch(() => []);
+      if (Array.isArray(one) && one[0]) urows.push(one[0]);
+    }
+  }
   const byId = new Map((urows || []).map((u) => [String(u?.id || ''), u]).filter(([k]) => k));
   const list = ids.map((id) => byId.get(id)).filter(Boolean);
   return res.json({ success: true, data: list });
@@ -2708,9 +2752,13 @@ async function getUserFollowedByFriends(req, res, targetId) {
   const followerRows = await supabaseRestGet('follows', {
     select: 'follower_id',
     following_id: `eq.${tid}`,
-    follower_id: `in.(${myFollowingIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',')})`,
+    follower_id: `in.(${myFollowingIds.join(',')})`,
     limit: '500',
-  }).catch(() => []);
+  }).catch(async () => {
+    // fallback for uuid / strict parsers
+    const quoted = myFollowingIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+    return await supabaseRestGet('follows', { select: 'follower_id', following_id: `eq.${tid}`, follower_id: `in.(${quoted})`, limit: '500' }).catch(() => []);
+  });
   const friendIds = Array.from(
     new Set((followerRows || []).map((r) => String(r?.follower_id || '').trim()).filter(Boolean))
   );
@@ -2721,10 +2769,13 @@ async function getUserFollowedByFriends(req, res, targetId) {
   // 3) Fetch friend user objects (small payload)
   const usersRows = await supabaseRestGet('users', {
     select: 'id,username,full_name,avatar_url,profile_image,verification_badge,is_verified,is_active',
-    id: `in.(${friendIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',')})`,
+    id: `in.(${friendIds.join(',')})`,
     is_active: 'eq.true',
     limit: String(Math.min(friendIds.length, 50)),
-  }).catch(() => []);
+  }).catch(async () => {
+    const quoted = friendIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+    return await supabaseRestGet('users', { select: 'id,username,full_name,avatar_url,profile_image,verification_badge,is_verified,is_active', id: `in.(${quoted})`, is_active: 'eq.true', limit: String(Math.min(friendIds.length, 50)) }).catch(() => []);
+  });
 
   const friends = (usersRows || [])
     .filter(Boolean)
