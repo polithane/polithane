@@ -76,16 +76,32 @@ export const CreatePolitPage = () => {
   const [brokenIcons, setBrokenIcons] = useState({});
   const [iconTryIndex, setIconTryIndex] = useState({});
 
-  const theme = useMemo(() => {
-    const primary = isFastMode ? '#E11D48' : '#0B3D91';
-    return {
-      primary,
-      borderClass: isFastMode ? 'border-rose-600' : 'border-primary-blue',
-      btnClass: isFastMode ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-blue hover:bg-blue-600',
-      btnAltClass: isFastMode ? 'border-rose-300 text-rose-700' : 'border-blue-300 text-primary-blue',
-      ringClass: isFastMode ? 'ring-rose-500/20' : 'ring-primary-blue/20',
-    };
-  }, [isFastMode]);
+  const themeFast = useMemo(
+    () => ({
+      primary: '#E11D48',
+      borderClass: 'border-rose-600',
+      btnClass: 'bg-rose-600 hover:bg-rose-700',
+      btnAltClass: 'border-rose-300 text-rose-700',
+      ringClass: 'ring-rose-500/20',
+    }),
+    []
+  );
+  const themePolit = useMemo(
+    () => ({
+      primary: '#0B3D91',
+      borderClass: 'border-primary-blue',
+      btnClass: 'bg-primary-blue hover:bg-blue-600',
+      btnAltClass: 'border-blue-300 text-primary-blue',
+      ringClass: 'ring-primary-blue/20',
+    }),
+    []
+  );
+  const baseTheme = useMemo(() => (isFastMode ? themeFast : themePolit), [isFastMode, themeFast, themePolit]);
+  // On the cross-post offer screen, use the TARGET's theme:
+  // - Polit → offer Fast => Fast (red)
+  // - Fast → offer Polit => Polit (blue)
+  const offerTheme = useMemo(() => (isFastMode ? themePolit : themeFast), [isFastMode, themeFast, themePolit]);
+  const theme = useMemo(() => (step === 'success' ? offerTheme : baseTheme), [baseTheme, offerTheme, step]);
 
   const approvalPending = useMemo(() => {
     if (!isAuthenticated) return false;
@@ -1144,8 +1160,8 @@ export const CreatePolitPage = () => {
                           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
                             <div
                               className={[
-                                'text-sky-300 font-black text-sm tabular-nums',
-                                recordSecLeft <= 9 ? 'animate-pulse' : '',
+                                'font-black text-sm tabular-nums',
+                                recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
                               ].join(' ')}
                               aria-label="Kalan süre"
                               title="Kalan süre"
@@ -1162,6 +1178,9 @@ export const CreatePolitPage = () => {
                               aria-label="Durdur"
                               title="Durdur"
                             >
+                              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-black tracking-wide text-white/95">
+                                BİTİR
+                              </span>
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
                               <span className="relative w-4 h-4 bg-white rounded-sm" />
                             </button>
@@ -1222,8 +1241,8 @@ export const CreatePolitPage = () => {
                           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
                             <div
                               className={[
-                                'text-sky-300 font-black text-sm tabular-nums',
-                                recordSecLeft <= 9 ? 'animate-pulse' : '',
+                                'font-black text-sm tabular-nums',
+                                recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
                               ].join(' ')}
                               aria-label="Kalan süre"
                               title="Kalan süre"
@@ -1240,6 +1259,9 @@ export const CreatePolitPage = () => {
                               aria-label="Durdur"
                               title="Durdur"
                             >
+                              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-black tracking-wide text-white/95">
+                                BİTİR
+                              </span>
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
                               <span className="relative w-4 h-4 bg-white rounded-sm" />
                             </button>
