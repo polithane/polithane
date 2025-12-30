@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, Video, Music, PenTool } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { formatPolitScore } from '../../utils/formatters';
@@ -9,6 +9,8 @@ import { CONTENT_TYPES } from '../../utils/constants';
 export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const navigate = useNavigate();
+  const gestureRef = useRef({ active: false, startX: 0, startY: 0, lastX: 0, lastY: 0 });
+  const suppressClickRef = useRef(false);
   
   useEffect(() => {
     if (!autoplay || posts.length <= 1) return;
@@ -24,6 +26,17 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
   
   const currentPost = posts[currentIndex];
   const currentPostId = currentPost?.post_id ?? currentPost?.id;
+
+  const go = (dir) => {
+    const len = Array.isArray(posts) ? posts.length : 0;
+    if (len <= 1) return;
+    setCurrentIndex((prev) => {
+      const next = (Number(prev) || 0) + dir;
+      if (next < 0) return len - 1;
+      if (next >= len) return 0;
+      return next;
+    });
+  };
   
   const parseHexColor = (value) => {
     const s = String(value || '').trim();
@@ -83,8 +96,50 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
     <div className="mb-4">
       <div 
         className="relative h-[100px] md:h-[120px] rounded-xl overflow-hidden cursor-pointer shadow-lg"
-        style={{ backgroundColor: bgColor }}
+        style={{ backgroundColor: bgColor, touchAction: 'pan-y' }}
+        onPointerDown={(e) => {
+          if (!posts || posts.length <= 1) return;
+          suppressClickRef.current = false;
+          gestureRef.current.active = true;
+          gestureRef.current.startX = e.clientX;
+          gestureRef.current.startY = e.clientY;
+          gestureRef.current.lastX = e.clientX;
+          gestureRef.current.lastY = e.clientY;
+          try {
+            e.currentTarget?.setPointerCapture?.(e.pointerId);
+          } catch {
+            // ignore
+          }
+        }}
+        onPointerMove={(e) => {
+          const g = gestureRef.current;
+          if (!g.active) return;
+          g.lastX = e.clientX;
+          g.lastY = e.clientY;
+        }}
+        onPointerUp={() => {
+          const g = gestureRef.current;
+          if (!g.active) return;
+          g.active = false;
+          const dx = (g.lastX || 0) - (g.startX || 0);
+          const dy = (g.lastY || 0) - (g.startY || 0);
+          const absX = Math.abs(dx);
+          const absY = Math.abs(dy);
+          if (absX > 45 && absX > absY * 1.2) {
+            suppressClickRef.current = true;
+            if (dx < 0) go(1);
+            else go(-1);
+            // release suppress after this frame so click doesn't fire
+            setTimeout(() => {
+              suppressClickRef.current = false;
+            }, 0);
+          }
+        }}
+        onPointerCancel={() => {
+          gestureRef.current.active = false;
+        }}
         onClick={() => {
+          if (suppressClickRef.current) return;
           if (!currentPostId) return;
           navigate(`/post/${currentPostId}`);
         }}

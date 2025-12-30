@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Users, Newspaper, Globe2, Flame, Landmark } from 'lucide-react';
 import { apiCall } from '../../utils/api';
@@ -6,6 +6,8 @@ import { apiCall } from '../../utils/api';
 export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
   const navigate = useNavigate();
   const [parliamentInfo, setParliamentInfo] = useState(null);
+  const gestureRef = useRef({ active: false, startX: 0, startY: 0, lastX: 0, lastY: 0 });
+  const suppressClickRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -108,13 +110,67 @@ export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
   const current = slides[currentIndex];
   if (!current) return null;
 
+  const go = (dir) => {
+    const len = Array.isArray(slides) ? slides.length : 0;
+    if (len <= 1) return;
+    setCurrentIndex((prev) => {
+      const next = (Number(prev) || 0) + dir;
+      if (next < 0) return len - 1;
+      if (next >= len) return 0;
+      return next;
+    });
+  };
+
   return (
     <div className="mb-4">
       <button
         type="button"
         className="relative w-full h-[104px] md:h-[120px] rounded-xl overflow-hidden shadow-lg text-left"
-        style={{ backgroundColor: current.bg }}
-        onClick={() => navigate(current.to)}
+        style={{ backgroundColor: current.bg, touchAction: 'pan-y' }}
+        onPointerDown={(e) => {
+          if (!slides || slides.length <= 1) return;
+          suppressClickRef.current = false;
+          gestureRef.current.active = true;
+          gestureRef.current.startX = e.clientX;
+          gestureRef.current.startY = e.clientY;
+          gestureRef.current.lastX = e.clientX;
+          gestureRef.current.lastY = e.clientY;
+          try {
+            e.currentTarget?.setPointerCapture?.(e.pointerId);
+          } catch {
+            // ignore
+          }
+        }}
+        onPointerMove={(e) => {
+          const g = gestureRef.current;
+          if (!g.active) return;
+          g.lastX = e.clientX;
+          g.lastY = e.clientY;
+        }}
+        onPointerUp={() => {
+          const g = gestureRef.current;
+          if (!g.active) return;
+          g.active = false;
+          const dx = (g.lastX || 0) - (g.startX || 0);
+          const dy = (g.lastY || 0) - (g.startY || 0);
+          const absX = Math.abs(dx);
+          const absY = Math.abs(dy);
+          if (absX > 45 && absX > absY * 1.2) {
+            suppressClickRef.current = true;
+            if (dx < 0) go(1);
+            else go(-1);
+            setTimeout(() => {
+              suppressClickRef.current = false;
+            }, 0);
+          }
+        }}
+        onPointerCancel={() => {
+          gestureRef.current.active = false;
+        }}
+        onClick={() => {
+          if (suppressClickRef.current) return;
+          navigate(current.to);
+        }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-black/25 to-transparent" />
         <div className="relative h-full flex items-center justify-between px-4 md:px-6 gap-3">
