@@ -2633,7 +2633,7 @@ async function getFollowers(req, res, targetId) {
   const ids = (rows || []).map((r) => String(r?.follower_id || '').trim()).filter(Boolean);
   if (ids.length === 0) return res.json({ success: true, data: [] });
   const select =
-    'id,auth_user_id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
+    'id,auth_user_id,username,full_name,avatar_url,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
   const urows = [];
   for (let i = 0; i < ids.length; i += 50) {
     const chunk = ids.slice(i, i + 50);
@@ -2745,7 +2745,7 @@ async function getFollowing(req, res, targetId) {
   const ids = (rows || []).map((r) => String(r?.following_id || '').trim()).filter(Boolean);
   if (ids.length === 0) return res.json({ success: true, data: [] });
   const select =
-    'id,auth_user_id,username,full_name,avatar_url,profile_image,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
+    'id,auth_user_id,username,full_name,avatar_url,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata';
   const urows = [];
   for (let i = 0; i < ids.length; i += 50) {
     const chunk = ids.slice(i, i + 50);
@@ -2868,7 +2868,7 @@ async function getUserFollowedByFriends(req, res, targetId) {
   }
 
   // 3) Fetch friend user objects (small payload)
-  const friendSelect = 'id,auth_user_id,username,full_name,avatar_url,profile_image,verification_badge,is_verified,is_active';
+  const friendSelect = 'id,auth_user_id,username,full_name,avatar_url,is_verified,is_active';
   const quoted = friendIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
   const limUsers = String(Math.min(friendIds.length, 50));
   let usersRows = await supabaseRestGet('users', {
@@ -2893,8 +2893,8 @@ async function getUserFollowedByFriends(req, res, targetId) {
       id: u.id,
       username: u.username,
       full_name: u.full_name,
-      avatar_url: u.avatar_url || u.profile_image || null,
-      verification_badge: u.verification_badge ?? u.is_verified ?? false,
+      avatar_url: u.avatar_url || null,
+      verification_badge: u.is_verified ?? false,
     }))
     .slice(0, lim);
 
