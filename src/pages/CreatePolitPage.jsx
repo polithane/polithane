@@ -984,16 +984,12 @@ export const CreatePolitPage = () => {
       }),
     });
     if (!sign?.success) throw new Error(sign?.error || 'Yükleme hazırlığı başarısız.');
-    const { bucket, path, token, publicUrl, signedUrl } = sign?.data || {};
-    if (!bucket || !path || !token || !publicUrl) throw new Error('Yükleme anahtarı alınamadı.');
+    const { publicUrl, signedUrl } = sign?.data || {};
+    if (!publicUrl || !signedUrl) throw new Error('Yükleme anahtarı alınamadı.');
 
     // Progress-capable signed upload (XHR PUT) to match Supabase's `uploadToSignedUrl` endpoint behavior.
     // Supabase expects a multipart/form-data body with cacheControl and the file under an empty field name.
-    const url =
-      String(signedUrl || '').trim() ||
-      `${String(import.meta.env?.VITE_SUPABASE_URL || '').replace(/\/+$/, '')}/storage/v1/object/upload/sign/${encodeURI(
-        `${bucket}/${path}`
-      )}?token=${encodeURIComponent(token)}`;
+    const url = String(signedUrl).trim();
     const fd = new FormData();
     fd.append('cacheControl', '3600');
     fd.append('', file);
