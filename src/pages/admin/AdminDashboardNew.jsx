@@ -3,6 +3,7 @@ import { Users, FileText, TrendingUp, Activity, Settings, Eye, Heart, MessageCir
 import { Link } from 'react-router-dom';
 import { admin as adminApi } from '../../utils/api';
 import { getUserTitle } from '../../utils/titleHelpers';
+import { Avatar } from '../../components/common/Avatar';
 
 export const AdminDashboardNew = () => {
   const [loading, setLoading] = useState(true);
@@ -165,7 +166,7 @@ export const AdminDashboardNew = () => {
             ) : (
               recentUsers.map(user => (
                 <div key={user.user_id || user.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                  <img src={user.avatar_url || user.profile_image} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
+                  <Avatar src={user.avatar_url || user.profile_image} alt={user.full_name} size="40px" />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-900 truncate">{user.full_name}</div>
                     <div className="text-xs text-gray-500">{getUserTitle(user, true) || 'Üye'}</div>
