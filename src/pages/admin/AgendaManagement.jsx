@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { admin as adminApi } from '../../utils/api';
 import { Save, Plus, Trash2, Search, Flame } from 'lucide-react';
 import { apiCall } from '../../utils/api';
+import toast from 'react-hot-toast';
 
 export const AgendaManagement = () => {
   const [rows, setRows] = useState([]);
@@ -94,8 +95,10 @@ export const AgendaManagement = () => {
       if (r?.success && r?.data) {
         updateRowLocal(id, r.data);
       }
+      toast.success('Kaydedildi.');
     } catch (e) {
       setError(e?.message || 'Kaydedilemedi.');
+      toast.error(String(e?.message || 'Kaydedilemedi.'));
     } finally {
       setSavingId(null);
     }

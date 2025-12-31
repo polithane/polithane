@@ -6493,8 +6493,10 @@ async function adminCreateAgenda(req, res) {
   };
 
   try {
-    const inserted = await supabaseRestInsert('agendas', [payload]).catch(() => []);
-    return res.status(201).json({ success: true, data: inserted?.[0] || null });
+    const inserted = await supabaseRestInsert('agendas', [payload]);
+    const row = Array.isArray(inserted) ? inserted?.[0] : null;
+    if (!row) return res.status(500).json({ success: false, error: 'Gündem oluşturulamadı.' });
+    return res.status(201).json({ success: true, data: row });
   } catch (e) {
     if (isMissingRelationError(e)) {
       return res.json({
@@ -6531,6 +6533,7 @@ create index if not exists agendas_is_active_idx on agendas (is_active);
 async function adminUpdateAgenda(req, res, agendaId) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
+  if (!isSafeId(agendaId)) return res.status(400).json({ success: false, error: 'Geçersiz gündem.' });
   const body = await readJsonBody(req);
   const allowed = {};
   const fields = ['title', 'slug', 'description', 'trending_score', 'post_count', 'total_polit_score'];
@@ -6542,9 +6545,34 @@ async function adminUpdateAgenda(req, res, agendaId) {
   allowed.updated_at = new Date().toISOString();
   if (Object.keys(allowed).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
 
+  // Normalize/validate to avoid silent DB constraint failures.
+  const slugify = (input) => String(input || '').trim().toLowerCase()
+    .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
+    .replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 200);
+  if (Object.prototype.hasOwnProperty.call(allowed, 'title')) {
+    const t = String(allowed.title || '').trim();
+    if (!t) return res.status(400).json({ success: false, error: 'Başlık boş olamaz.' });
+    allowed.title = t;
+    // If slug is missing/empty, auto-regenerate from title.
+    if (!Object.prototype.hasOwnProperty.call(allowed, 'slug') || !String(allowed.slug || '').trim()) {
+      allowed.slug = slugify(t);
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(allowed, 'slug')) {
+    const s = String(allowed.slug || '').trim();
+    if (!s) {
+      // Keep DB consistent: do not write empty slug.
+      delete allowed.slug;
+    } else {
+      allowed.slug = slugify(s);
+    }
+  }
+
   try {
-    const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, allowed).catch(() => []);
-    return res.json({ success: true, data: updated?.[0] || null });
+    const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, allowed);
+    const row = Array.isArray(updated) ? updated?.[0] : null;
+    if (!row) return res.status(500).json({ success: false, error: 'Gündem kaydedilemedi.' });
+    return res.json({ success: true, data: row });
   } catch (e) {
     if (isMissingRelationError(e)) {
       return res.json({
@@ -6574,7 +6602,7 @@ create index if not exists agendas_is_active_idx on agendas (is_active);
 `.trim(),
       });
     }
-    return res.status(500).json({ success: false, error: 'Gündem kaydedilemedi.' });
+    return res.status(500).json({ success: false, error: String(e?.message || 'Gündem kaydedilemedi.') });
   }
 }
 
