@@ -355,8 +355,8 @@ async function supabaseRestPatch(path, params, body) {
   return await supabaseRestRequest('PATCH', path, params, body);
 }
 
-async function supabaseRestDelete(path, params) {
-  return await supabaseRestRequest('DELETE', path, params, undefined);
+async function supabaseRestDelete(path, params, extraHeaders = {}) {
+  return await supabaseRestRequest('DELETE', path, params, undefined, extraHeaders);
 }
 
 // Notifications table schema differs between environments (some don't have title/message).
@@ -7970,6 +7970,17 @@ async function getNotifications(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
   const { limit = 50, offset = 0 } = req.query;
+  // Keep notifications for max 15 days. Best-effort cleanup per-user.
+  try {
+    const cutoffIso = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+    await supabaseRestDelete(
+      'notifications',
+      { user_id: `eq.${auth.id}`, created_at: `lt.${cutoffIso}` },
+      { Prefer: 'return=minimal' }
+    ).catch(() => null);
+  } catch {
+    // ignore cleanup errors
+  }
   const params = {
     select: '*,actor:users(*),post:posts(*),comment:comments(*)',
     user_id: `eq.${auth.id}`,
@@ -7984,21 +7995,73 @@ async function getNotifications(req, res) {
     const rows = await supabaseRestGet('notifications', params);
     return res.json({ success: true, data: rows || [] });
   } catch {
-    // Fallback: schema-agnostic (in case embedded relations/columns differ)
-    const rows = await supabaseRestGet('notifications', {
+    // Fallback: schema-agnostic (in case embedded relations/columns differ).
+    // Still attach actor/post objects (best-effort) so UI can render avatar + navigation.
+    const baseRows = await supabaseRestGet('notifications', {
       select: '*',
       user_id: `eq.${auth.id}`,
       order: 'created_at.desc',
       limit: String(Math.min(parseInt(limit, 10) || 50, 200)),
       offset: String(parseInt(offset, 10) || 0),
     }).catch(() => []);
-    return res.json({ success: true, data: rows || [] });
+    const rows = Array.isArray(baseRows) ? baseRows : [];
+
+    const actorIds = Array.from(new Set(rows.map((r) => r?.actor_id).filter(Boolean).map(String))).slice(0, 200);
+    const postIds = Array.from(new Set(rows.map((r) => r?.post_id).filter(Boolean).map(String))).slice(0, 200);
+
+    let actors = [];
+    if (actorIds.length) {
+      // Keep selection schema-agnostic (avoid non-existent columns).
+      actors = await supabaseRestGet('users', {
+        select:
+          'id,auth_user_id,username,full_name,avatar_url,is_verified,is_active,user_type,politician_type,party_id,province,polit_score,metadata',
+        id: `in.(${actorIds.join(',')})`,
+        limit: String(Math.min(actorIds.length, 200)),
+      }).catch(() => []);
+    }
+    const actorsById = new Map((Array.isArray(actors) ? actors : []).map((u) => [String(u?.id), u]));
+
+    let posts = [];
+    if (postIds.length) {
+      posts = await supabaseRestGet('posts', {
+        select: 'id,content,content_text,media_url,media_type,thumbnail_url,user_id',
+        id: `in.(${postIds.join(',')})`,
+        limit: String(Math.min(postIds.length, 200)),
+      }).catch(async () => {
+        // Some envs don't have content_text
+        return await supabaseRestGet('posts', {
+          select: 'id,content,media_url,media_type,thumbnail_url,user_id',
+          id: `in.(${postIds.join(',')})`,
+          limit: String(Math.min(postIds.length, 200)),
+        }).catch(() => []);
+      });
+    }
+    const postsById = new Map((Array.isArray(posts) ? posts : []).map((p) => [String(p?.id), p]));
+
+    const enriched = rows.map((n) => ({
+      ...n,
+      actor: n?.actor ? n.actor : actorsById.get(String(n?.actor_id)) || null,
+      post: n?.post ? n.post : postsById.get(String(n?.post_id)) || null,
+    }));
+
+    return res.json({ success: true, data: enriched });
   }
 }
 
 async function getUnreadNotificationCount(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  // Same retention cleanup (best-effort) to keep the bell count consistent.
+  try {
+    const cutoffIso = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+    await supabaseRestDelete(
+      'notifications',
+      { user_id: `eq.${auth.id}`, created_at: `lt.${cutoffIso}` },
+      { Prefer: 'return=minimal' }
+    ).catch(() => null);
+  } catch {
+    // ignore cleanup errors
+  }
   const count = await supabaseCount('notifications', { user_id: `eq.${auth.id}`, is_read: 'eq.false' }).catch(() => 0);
   return res.json({ success: true, data: { unread: Number(count || 0) || 0 } });
 }

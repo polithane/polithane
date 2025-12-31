@@ -317,31 +317,31 @@ export const Header = () => {
                                   navigate(getProfilePath(actor));
                                 }
                               }}
-                              className={`w-full px-4 py-3 flex items-start gap-3 text-left border-b border-gray-100 hover:bg-gray-50 ${
+                              className={`w-full px-4 py-2 flex items-center gap-2 text-left border-b border-gray-100 hover:bg-gray-50 ${
                                 isRead ? '' : 'bg-blue-50/60'
                               }`}
                             >
-                              <Avatar src={actor?.avatar_url} size="40px" verified={isUiVerifiedUser(actor)} />
+                              <Avatar src={actor?.avatar_url} size="32px" verified={isUiVerifiedUser(actor)} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
-                                  <div className={`text-sm ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
+                                  <div className={`text-xs ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
                                     {title}
                                   </div>
-                                  {!isRead && <span className="w-3 h-3 rounded-full bg-primary-blue flex-shrink-0" />}
+                                  {!isRead && <span className="w-2 h-2 rounded-full bg-primary-blue flex-shrink-0" />}
                                 </div>
-                                {msg && <div className="text-xs text-gray-600 line-clamp-2 mt-0.5">{msg}</div>}
+                                {msg && <div className="text-[11px] text-gray-600 line-clamp-1 mt-0.5">{msg}</div>}
                               </div>
 
                               <button
                                 type="button"
-                                className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-700"
+                                className="p-1 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-700"
                                 title="Sil"
                                 onClick={async (e) => {
                                   e.stopPropagation();
                                   if (id) await deleteNotification?.(id);
                                 }}
                               >
-                                <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
+                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                               </button>
                             </button>
                           );
