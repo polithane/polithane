@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, DollarSign, Check, X, Clock, TrendingUp, Plus, Trash2 } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
 
-export const PaymentSystem = () => {
+export const PaymentSystem = ({ embedded = false }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [schemaSql, setSchemaSql] = useState('');
@@ -80,12 +80,13 @@ export const PaymentSystem = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Ödeme Sistemi</h1>
-        <p className="text-gray-600">Plan ve işlem kayıtları. Sağlayıcı entegrasyonu sonraki faz.</p>
-      </div>
+    <div className={embedded ? '' : 'p-4 sm:p-6 lg:p-8'}>
+      {!embedded ? (
+        <div className="mb-8">
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Ödeme Sistemi</h1>
+          <p className="text-gray-600">Plan ve işlem kayıtları.</p>
+        </div>
+      ) : null}
 
       {error ? <div className="mb-4 text-sm text-red-600 font-semibold">{error}</div> : null}
       {loading ? <div className="mb-4 text-sm text-gray-600">Yükleniyor…</div> : null}

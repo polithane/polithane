@@ -7,9 +7,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        'primary-blue': '#009fd6',
-        'primary-green': '#87b433',
-        'accent-mustard': '#D4A017',
+        // Theme-aware colors (driven by ThemeContext CSS variables)
+        'primary-blue': 'var(--primary-color)',
+        'primary-green': 'var(--secondary-color)',
+        'accent-mustard': 'var(--accent-color)',
+        'danger-red': 'var(--danger-color)',
         'neutral-light-gray': '#E5E5E5',
         'neutral-anthracite': '#2B2B2B',
       },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Eye, Trash2, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Search, Eye, Trash2, CheckCircle, AlertTriangle, RefreshCw, Edit, X, Save } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
 import { Avatar } from '../../components/common/Avatar';
 
@@ -11,6 +11,13 @@ export const CommentModeration = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [comments, setComments] = useState([]);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [editDeleted, setEditDeleted] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -122,6 +129,47 @@ export const CommentModeration = () => {
       await adminApi.deleteComment(id).catch(() => null);
     }
     await load();
+  };
+
+  const openEdit = (comment) => {
+    if (!comment?.id) return;
+    setEditing(comment);
+    setEditText(String(comment?.content ?? ''));
+    setEditDeleted(!!comment?.is_deleted);
+    setEditError('');
+    setEditOpen(true);
+  };
+
+  const closeEdit = () => {
+    setEditOpen(false);
+    setEditing(null);
+    setEditText('');
+    setEditDeleted(false);
+    setEditSaving(false);
+    setEditError('');
+  };
+
+  const saveEdit = async () => {
+    const id = editing?.id;
+    if (!id) return;
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const payload = { content: editText, is_deleted: !!editDeleted };
+      const r = await adminApi.updateComment(id, payload).catch(() => null);
+      if (!r?.success) throw new Error(r?.error || 'Yorum güncellenemedi.');
+      const updated = r?.data || null;
+      if (updated) {
+        setComments((prev) => prev.map((c) => (String(c?.id) === String(id) ? { ...c, ...updated } : c)));
+      } else {
+        await load();
+      }
+      closeEdit();
+    } catch (e) {
+      setEditError(String(e?.message || 'Yorum güncellenemedi.'));
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   return (
@@ -279,6 +327,14 @@ export const CommentModeration = () => {
                       >
                         <Eye className="w-6 h-6 sm:w-5 sm:h-5 text-gray-600" />
                       </button>
+                      <button
+                        type="button"
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Düzenle"
+                        onClick={() => openEdit(comment)}
+                      >
+                        <Edit className="w-6 h-6 sm:w-5 sm:h-5 text-gray-700" />
+                      </button>
                       {comment?.is_deleted ? (
                         <button
                           type="button"
@@ -312,6 +368,67 @@ export const CommentModeration = () => {
           </table>
         </div>
       </div>
+
+      {editOpen && editing ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-5 border-b flex items-center justify-between sticky top-0 bg-white z-10">
+              <div>
+                <div className="text-lg font-black text-gray-900">Yorumu Düzenle</div>
+                <div className="text-xs text-gray-500">ID: {String(editing?.id)}</div>
+              </div>
+              <button type="button" onClick={closeEdit} className="p-2 hover:bg-gray-100 rounded-full" title="Kapat">
+                <X className="w-6 h-6 text-gray-600" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {editError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold">
+                  {editError}
+                </div>
+              ) : null}
+              <div>
+                <label className="text-xs font-black text-gray-600 uppercase">Yorum</label>
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="mt-1 w-full min-h-[140px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                  placeholder="Yorum…"
+                />
+                <div className="mt-1 text-xs text-gray-500">{String(editText || '').length}/500</div>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+                <input
+                  type="checkbox"
+                  checked={!!editDeleted}
+                  onChange={(e) => setEditDeleted(e.target.checked)}
+                  className="w-5 h-5 accent-primary-blue"
+                />
+                Bekleyen/Silinmiş (is_deleted)
+              </label>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeEdit}
+                  className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 font-black"
+                  disabled={editSaving}
+                >
+                  Vazgeç
+                </button>
+                <button
+                  type="button"
+                  onClick={saveEdit}
+                  className="px-4 py-2 rounded-xl bg-gray-900 hover:bg-black text-white font-black inline-flex items-center gap-2 disabled:opacity-60"
+                  disabled={editSaving}
+                >
+                  <Save className="w-5 h-5" />
+                  {editSaving ? 'Kaydediliyor…' : 'Kaydet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

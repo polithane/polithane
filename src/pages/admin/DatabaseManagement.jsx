@@ -147,7 +147,36 @@ export const DatabaseManagement = () => {
       {schema?.ok === false ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-900">
           <div className="font-black">Schema kontrolünde eksikler var</div>
-          <div className="text-sm mt-1">Eksik tablolar/sütunlar için `Admin → Veritabanı Yönetimi → Schema Check` ekranını kullanın.</div>
+          <div className="text-sm mt-1">Eksik tablolar/sütunlar aşağıda listelenir (schema-check çıktısı).</div>
+
+          {Array.isArray(schema?.missingTables) && schema.missingTables.length > 0 ? (
+            <div className="mt-4">
+              <div className="text-xs font-black uppercase text-amber-900 mb-2">Eksik tablolar</div>
+              <div className="flex flex-wrap gap-2">
+                {schema.missingTables.slice(0, 50).map((t) => (
+                  <span key={t} className="px-3 py-1 rounded-full bg-white border border-amber-200 text-xs font-bold text-amber-900">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {schema?.missingColumns && typeof schema.missingColumns === 'object' && Object.keys(schema.missingColumns).length > 0 ? (
+            <div className="mt-4">
+              <div className="text-xs font-black uppercase text-amber-900 mb-2">Eksik sütunlar</div>
+              <div className="space-y-2">
+                {Object.entries(schema.missingColumns).slice(0, 20).map(([table, cols]) => (
+                  <div key={table} className="bg-white border border-amber-200 rounded-lg p-3">
+                    <div className="font-mono text-sm font-black text-amber-900">{table}</div>
+                    <div className="mt-1 text-xs text-amber-900">
+                      {(Array.isArray(cols) ? cols : []).slice(0, 30).join(', ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

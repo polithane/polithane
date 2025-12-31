@@ -21,6 +21,25 @@ export const UserManagement = () => {
   // Modal State
   const [selectedUser, setSelectedUser] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    username: '',
+    email: '',
+    user_type: '',
+    politician_type: '',
+    party_id: '',
+    province: '',
+    district_name: '',
+    avatar_url: '',
+    is_active: true,
+    is_verified: false,
+    is_admin: false,
+    email_verified: false,
+    metadata_json: '',
+  });
 
   // Duplicate users (same name + avatar)
   const [dupLoading, setDupLoading] = useState(false);
@@ -59,12 +78,43 @@ export const UserManagement = () => {
 
   const handleOpenModal = (user) => {
     setSelectedUser(user);
+    setIsEditMode(false);
+    setEditError('');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (user) => {
+    const u = user || null;
+    if (!u) return;
+    const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : null;
+    setSelectedUser(u);
+    setEditForm({
+      full_name: String(u?.full_name || ''),
+      username: String(u?.username || ''),
+      email: String(u?.email || ''),
+      user_type: String(u?.user_type || ''),
+      politician_type: String(u?.politician_type || ''),
+      party_id: u?.party_id == null ? '' : String(u.party_id),
+      province: String(u?.province || u?.city_code || ''),
+      district_name: String(u?.district_name || ''),
+      avatar_url: String(u?.avatar_url || ''),
+      is_active: u?.is_active !== false,
+      is_verified: !!u?.is_verified,
+      is_admin: !!u?.is_admin,
+      email_verified: !!u?.email_verified,
+      metadata_json: meta ? JSON.stringify(meta, null, 2) : '',
+    });
+    setIsEditMode(true);
+    setEditError('');
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setSelectedUser(null);
     setIsModalOpen(false);
+    setIsEditMode(false);
+    setEditSaving(false);
+    setEditError('');
   };
 
   const handleBanUser = async (userId) => {
@@ -86,6 +136,54 @@ export const UserManagement = () => {
       } catch (error) {
         alert('İşlem başarısız: ' + error.message);
       }
+    }
+  };
+
+  const handleSaveUser = async () => {
+    if (!selectedUser?.id) return;
+    setEditSaving(true);
+    setEditError('');
+    try {
+      let metadata = undefined;
+      const metaStr = String(editForm.metadata_json || '').trim();
+      if (metaStr) {
+        try {
+          metadata = JSON.parse(metaStr);
+        } catch {
+          throw new Error('metadata JSON geçersiz.');
+        }
+      }
+      const payload = {
+        full_name: editForm.full_name,
+        username: editForm.username,
+        email: editForm.email,
+        user_type: editForm.user_type,
+        politician_type: editForm.politician_type || null,
+        party_id: String(editForm.party_id || '').trim() ? String(editForm.party_id).trim() : null,
+        province: String(editForm.province || '').trim() ? String(editForm.province).trim() : null,
+        district_name: String(editForm.district_name || '').trim() ? String(editForm.district_name).trim() : null,
+        avatar_url: String(editForm.avatar_url || '').trim() ? String(editForm.avatar_url).trim() : null,
+        is_active: !!editForm.is_active,
+        is_verified: !!editForm.is_verified,
+        is_admin: !!editForm.is_admin,
+        email_verified: !!editForm.email_verified,
+        ...(metadata !== undefined ? { metadata } : {}),
+      };
+      const r = await adminApi.updateUser(selectedUser.id, payload).catch(() => null);
+      if (!r?.success) throw new Error(r?.error || 'Kullanıcı güncellenemedi.');
+      const updated = r?.data || null;
+      if (updated) {
+        setUsers((prev) => prev.map((u) => (String(u?.id) === String(selectedUser.id) ? { ...u, ...updated } : u)));
+        setSelectedUser((p) => (p ? { ...p, ...updated } : p));
+      } else {
+        await fetchUsers();
+      }
+      setIsEditMode(false);
+      handleCloseModal();
+    } catch (e) {
+      setEditError(String(e?.message || 'Kullanıcı güncellenemedi.'));
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -294,6 +392,9 @@ export const UserManagement = () => {
                         <button onClick={() => handleOpenModal(user)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" title="Detaylar">
                           <Eye className="w-6 h-6 sm:w-5 sm:h-5" />
                         </button>
+                        <button onClick={() => handleOpenEdit(user)} className="p-2 text-gray-700 hover:bg-gray-100 rounded" title="Düzenle">
+                          <Edit className="w-6 h-6 sm:w-5 sm:h-5" />
+                        </button>
                         <button onClick={() => handleBanUser(user.id)} className="p-2 text-red-600 hover:bg-red-50 rounded" title="Sil/Yasakla">
                           <Ban className="w-6 h-6 sm:w-5 sm:h-5" />
                         </button>
@@ -333,13 +434,165 @@ export const UserManagement = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b flex items-center justify-between sticky top-0 bg-white z-10">
-              <h2 className="text-xl font-bold text-gray-900">Kullanıcı Detayı</h2>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{isEditMode ? 'Kullanıcıyı Düzenle' : 'Kullanıcı Detayı'}</h2>
+                {editError ? <div className="mt-1 text-sm text-red-600 font-semibold">{editError}</div> : null}
+              </div>
               <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-full">
                 <X className="w-6 h-6 text-gray-500" />
               </button>
             </div>
             
             <div className="p-6 space-y-6">
+              {isEditMode ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">Ad Soyad</label>
+                      <input
+                        value={editForm.full_name}
+                        onChange={(e) => setEditForm((p) => ({ ...p, full_name: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">Username</label>
+                      <input
+                        value={editForm.username}
+                        onChange={(e) => setEditForm((p) => ({ ...p, username: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">E-posta</label>
+                      <input
+                        value={editForm.email}
+                        onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">user_type</label>
+                      <input
+                        value={editForm.user_type}
+                        onChange={(e) => setEditForm((p) => ({ ...p, user_type: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                        placeholder="citizen / politician / mp / party_official / media / ..."
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">politician_type</label>
+                      <input
+                        value={editForm.politician_type}
+                        onChange={(e) => setEditForm((p) => ({ ...p, politician_type: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">party_id</label>
+                      <input
+                        value={editForm.party_id}
+                        onChange={(e) => setEditForm((p) => ({ ...p, party_id: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                        placeholder="(boş bırakılabilir)"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">İl</label>
+                      <input
+                        value={editForm.province}
+                        onChange={(e) => setEditForm((p) => ({ ...p, province: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">İlçe</label>
+                      <input
+                        value={editForm.district_name}
+                        onChange={(e) => setEditForm((p) => ({ ...p, district_name: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase">avatar_url</label>
+                      <input
+                        value={editForm.avatar_url}
+                        onChange={(e) => setEditForm((p) => ({ ...p, avatar_url: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                        placeholder="(boş bırakılabilir)"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase">metadata (JSON)</label>
+                      <textarea
+                        value={editForm.metadata_json}
+                        onChange={(e) => setEditForm((p) => ({ ...p, metadata_json: e.target.value }))}
+                        className="mt-1 w-full min-h-[140px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none font-mono text-xs"
+                        placeholder='{"key":"value"}'
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-4">
+                    <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={!!editForm.is_active}
+                        onChange={(e) => setEditForm((p) => ({ ...p, is_active: e.target.checked }))}
+                        className="w-5 h-5 accent-primary-blue"
+                      />
+                      Aktif (is_active)
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={!!editForm.is_verified}
+                        onChange={(e) => setEditForm((p) => ({ ...p, is_verified: e.target.checked }))}
+                        className="w-5 h-5 accent-primary-blue"
+                      />
+                      Onaylı (is_verified)
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={!!editForm.is_admin}
+                        onChange={(e) => setEditForm((p) => ({ ...p, is_admin: e.target.checked }))}
+                        className="w-5 h-5 accent-primary-blue"
+                      />
+                      Admin (is_admin)
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={!!editForm.email_verified}
+                        onChange={(e) => setEditForm((p) => ({ ...p, email_verified: e.target.checked }))}
+                        className="w-5 h-5 accent-primary-blue"
+                      />
+                      Email doğrulandı (email_verified)
+                    </label>
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditMode(false)}
+                      className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 font-black"
+                      disabled={editSaving}
+                    >
+                      Vazgeç
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveUser}
+                      className="px-4 py-2 rounded-xl bg-gray-900 hover:bg-black text-white font-black disabled:opacity-60"
+                      disabled={editSaving}
+                    >
+                      {editSaving ? 'Kaydediliyor…' : 'Kaydet'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               {/* Header Info */}
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">

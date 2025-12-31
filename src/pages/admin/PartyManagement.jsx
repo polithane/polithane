@@ -21,19 +21,6 @@ export const PartyManagement = () => {
     is_active: true,
   });
 
-  const [editParty, setEditParty] = useState(null);
-  const editForm = useMemo(() => {
-    if (!editParty) return null;
-    return {
-      id: editParty.id,
-      name: editParty.name || '',
-      short_name: editParty.short_name || '',
-      slug: editParty.slug || '',
-      color: editParty.color || '',
-      logo_url: editParty.logo_url || '',
-      is_active: !!editParty.is_active,
-    };
-  }, [editParty]);
   const [editDraft, setEditDraft] = useState(null);
 
   // Advanced hierarchy modal
@@ -60,6 +47,15 @@ export const PartyManagement = () => {
     setHierData(null);
     setChairUserId('');
     setError('');
+    setEditDraft({
+      id: party.id,
+      name: party.name || '',
+      short_name: party.short_name || '',
+      slug: party.slug || '',
+      color: party.color || '',
+      logo_url: party.logo_url || '',
+      is_active: !!party.is_active,
+    });
     try {
       const r = await adminApi.getPartyHierarchy(party.id);
       if (!r?.success) throw new Error(r?.error || 'Hiyerarşi yüklenemedi.');
@@ -102,14 +98,6 @@ export const PartyManagement = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!editParty) {
-      setEditDraft(null);
-      return;
-    }
-    setEditDraft(editForm);
-  }, [editParty, editForm]);
-
   const onCreate = async () => {
     setLoading(true);
     setError('');
@@ -149,7 +137,6 @@ export const PartyManagement = () => {
       };
       const res = await adminApi.updateParty(editDraft.id, payload);
       if (!res?.success) throw new Error(res?.error || 'Güncellenemedi.');
-      setEditParty(null);
       await load(pagination.page);
     } catch (e) {
       setError(e?.message || 'Bir hata oluştu.');
@@ -380,10 +367,10 @@ export const PartyManagement = () => {
                         title="Gelişmiş hiyerarşi / iletişim"
                       >
                         <Layers className="w-6 h-6 sm:w-5 sm:h-5" />
-                        Gelişmiş
+                        Yönet
                       </button>
                       <button
-                        onClick={() => setEditParty(p)}
+                        onClick={() => openHierarchy(p)}
                         className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 font-semibold"
                       >
                         Düzenle
@@ -412,83 +399,6 @@ export const PartyManagement = () => {
         </div>
       </div>
 
-      {editParty && editDraft && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-black text-gray-900">Parti Düzenle</h3>
-              <button onClick={() => setEditParty(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="text-sm font-semibold text-gray-700">Parti Adı</label>
-                <input
-                  value={editDraft.name}
-                  onChange={(e) => setEditDraft((p) => ({ ...p, name: e.target.value }))}
-                  className="w-full mt-1 border border-gray-300 rounded-xl p-3"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Kısa Ad</label>
-                <input
-                  value={editDraft.short_name}
-                  onChange={(e) => setEditDraft((p) => ({ ...p, short_name: e.target.value }))}
-                  className="w-full mt-1 border border-gray-300 rounded-xl p-3"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Kısa Adres</label>
-                <input
-                  value={editDraft.slug}
-                  onChange={(e) => setEditDraft((p) => ({ ...p, slug: e.target.value }))}
-                  className="w-full mt-1 border border-gray-300 rounded-xl p-3"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Renk</label>
-                <input
-                  value={editDraft.color}
-                  onChange={(e) => setEditDraft((p) => ({ ...p, color: e.target.value }))}
-                  className="w-full mt-1 border border-gray-300 rounded-xl p-3"
-                  placeholder="#RRGGBB"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Logo Bağlantısı</label>
-                <input
-                  value={editDraft.logo_url}
-                  onChange={(e) => setEditDraft((p) => ({ ...p, logo_url: e.target.value }))}
-                  className="w-full mt-1 border border-gray-300 rounded-xl p-3"
-                  placeholder="https://..."
-                />
-              </div>
-              <div className="md:col-span-2 flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={editDraft.is_active}
-                    onChange={(e) => setEditDraft((p) => ({ ...p, is_active: e.target.checked }))}
-                  className="w-5 h-5 accent-primary-blue cursor-pointer"
-                  />
-                  Aktif
-                </label>
-                <button
-                  onClick={onSave}
-                  disabled={loading || !editDraft.name.trim() || !editDraft.short_name.trim() || !editDraft.slug.trim()}
-                  className="bg-gray-900 hover:bg-black text-white font-bold px-5 py-3 rounded-xl inline-flex items-center gap-2 disabled:opacity-50"
-                >
-                  <Save className="w-5 h-5" />
-                  Kaydet
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {hierOpen && hierParty && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
@@ -505,6 +415,7 @@ export const PartyManagement = () => {
                   setHierOpen(false);
                   setHierParty(null);
                   setHierData(null);
+                  setEditDraft(null);
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
@@ -514,6 +425,83 @@ export const PartyManagement = () => {
 
             <div className="p-5 grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5">
               <div className="space-y-4">
+                {editDraft ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                    <div className="font-black text-gray-900 mb-2 flex items-center gap-2">
+                      <Flag className="w-5 h-5 text-primary-blue" />
+                      Parti Bilgileri
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-600">Parti Adı</label>
+                        <input
+                          value={editDraft.name}
+                          onChange={(e) => setEditDraft((p) => ({ ...p, name: e.target.value }))}
+                          className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-gray-600">Kısa Ad</label>
+                          <input
+                            value={editDraft.short_name}
+                            onChange={(e) => setEditDraft((p) => ({ ...p, short_name: e.target.value }))}
+                            className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600">Kısa Adres</label>
+                          <input
+                            value={editDraft.slug}
+                            onChange={(e) => setEditDraft((p) => ({ ...p, slug: e.target.value }))}
+                            className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-gray-600">Renk</label>
+                          <input
+                            value={editDraft.color}
+                            onChange={(e) => setEditDraft((p) => ({ ...p, color: e.target.value }))}
+                            className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                            placeholder="#RRGGBB"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600">Logo URL</label>
+                          <input
+                            value={editDraft.logo_url}
+                            onChange={(e) => setEditDraft((p) => ({ ...p, logo_url: e.target.value }))}
+                            className="mt-1 w-full border border-gray-300 rounded-xl p-3"
+                            placeholder="https://..."
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 pt-1">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={editDraft.is_active}
+                            onChange={(e) => setEditDraft((p) => ({ ...p, is_active: e.target.checked }))}
+                            className="w-5 h-5 accent-primary-blue cursor-pointer"
+                          />
+                          Aktif
+                        </label>
+                        <button
+                          type="button"
+                          onClick={onSave}
+                          disabled={loading || !editDraft.name.trim() || !editDraft.short_name.trim() || !editDraft.slug.trim()}
+                          className="bg-gray-900 hover:bg-black text-white font-bold px-4 py-3 rounded-xl inline-flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <Save className="w-5 h-5" />
+                          Kaydet
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
                   <div className="font-black text-gray-900 mb-2 flex items-center gap-2">
                     <Flag className="w-5 h-5 text-primary-blue" />

@@ -66,6 +66,28 @@ const ensureGtag = (gaId) => {
   return true;
 };
 
+const injectHtmlOnce = (target, html, markerId) => {
+  const doc = document;
+  if (!target || !doc) return;
+  const raw = String(html || '').trim();
+  // Remove existing injected nodes
+  const existing = doc.querySelectorAll(`[data-polithane-inject="${markerId}"]`);
+  existing.forEach((n) => n?.parentNode?.removeChild?.(n));
+  if (!raw) return;
+
+  const tpl = doc.createElement('template');
+  tpl.innerHTML = raw;
+  const nodes = Array.from(tpl.content.childNodes || []);
+  for (const node of nodes) {
+    try {
+      if (node && node.setAttribute) node.setAttribute('data-polithane-inject', markerId);
+    } catch {
+      // ignore
+    }
+    target.appendChild(node);
+  }
+};
+
 export const SiteHeadManager = () => {
   const [gaId, setGaId] = useState('');
   const fetchedRef = useRef(false);
@@ -90,6 +112,8 @@ export const SiteHeadManager = () => {
           const twCard = String(seo.twitterCard || '').trim();
           const twSite = String(seo.twitterSite || '').trim();
           const favicon = String(seo.favicon || '').trim();
+          const headHtml = String(seo.headHtml || '').trim();
+          const bodyHtml = String(seo.bodyHtml || '').trim();
 
           if (title) document.title = title;
           if (desc) upsertMeta('description', desc, 'name');
@@ -105,6 +129,10 @@ export const SiteHeadManager = () => {
 
           if (twCard) upsertMeta('twitter:card', twCard, 'name');
           if (twSite) upsertMeta('twitter:site', twSite, 'name');
+
+          // Custom injections (admin-controlled)
+          injectHtmlOnce(document.head, headHtml, 'head');
+          injectHtmlOnce(document.body, bodyHtml, 'body');
 
           const id = extractGaId(seo.googleAnalyticsID);
           if (id) setGaId(id);

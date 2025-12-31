@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, EyeOff } from 'lucide-react';
+import { Plus, Trash2, EyeOff, Save } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
 
 export const APISettings = () => {
@@ -11,6 +11,7 @@ export const APISettings = () => {
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
   const [newSecret, setNewSecret] = useState('');
+  const [savingId, setSavingId] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -65,6 +66,25 @@ export const APISettings = () => {
       return;
     }
     await load();
+  };
+
+  const updateKey = async (id, patch) => {
+    const rid = String(id || '');
+    if (!rid) return;
+    setSavingId(rid);
+    setError('');
+    try {
+      const r = await adminApi.updateApiKey(rid, patch).catch(() => null);
+      if (!r?.success) {
+        if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
+        throw new Error(r?.error || 'Güncellenemedi.');
+      }
+      await load();
+    } catch (e) {
+      setError(String(e?.message || 'Güncellenemedi.'));
+    } finally {
+      setSavingId('');
+    }
   };
 
   return (
@@ -124,8 +144,7 @@ export const APISettings = () => {
           </button>
         </div>
         <div className="mt-3 text-xs text-gray-500">
-          Not: Bu anahtarlar şu an API isteklerini otomatik doğrulamak için kullanılmıyor; bir sonraki aşamada “Mode 1” ile middleware seviyesinde
-          zorunlu hale getirilebilir.
+          Not: Secret değerleri sadece oluştururken 1 kez gösterilir. Sonrasında sadece prefix görüntülenir.
         </div>
       </div>
 
@@ -138,15 +157,45 @@ export const APISettings = () => {
             <div key={k.id} className="p-6 hover:bg-gray-50 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="font-bold text-gray-900 truncate">{k.name}</div>
+                  <div className="font-bold text-gray-900">Ad</div>
+                  <input
+                    defaultValue={k.name}
+                    onBlur={(e) => {
+                      const next = String(e.target.value || '').trim();
+                      if (next && next !== String(k.name || '')) updateKey(k.id, { name: next });
+                    }}
+                    className="mt-1 w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg"
+                  />
                   <div className="text-xs text-gray-500 mt-1">Prefix: {k.key_prefix}…</div>
-                  <div className="text-xs text-gray-500 mt-1">Durum: {k.status}</div>
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                    Durum:
+                    <select
+                      value={String(k.status || 'active')}
+                      onChange={(e) => updateKey(k.id, { status: e.target.value })}
+                      className="px-2 py-1 border border-gray-300 rounded-lg bg-white text-xs"
+                      disabled={savingId === String(k.id)}
+                    >
+                      <option value="active">active</option>
+                      <option value="disabled">disabled</option>
+                    </select>
+                    {savingId === String(k.id) ? <span className="text-xs text-gray-400">Kaydediliyor…</span> : null}
+                  </div>
                   <div className="text-xs text-gray-500 mt-1">İstek: {Number(k.requests_count || 0).toLocaleString('tr-TR')}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold inline-flex items-center gap-1">
                     <EyeOff className="w-5 h-5" /> Gizli
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => updateKey(k.id, { status: String(k.status || 'active') === 'active' ? 'disabled' : 'active' })}
+                    className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 text-xs font-black inline-flex items-center gap-2"
+                    title="Durumu değiştir"
+                    disabled={savingId === String(k.id)}
+                  >
+                    <Save className="w-5 h-5" />
+                    Kaydet
+                  </button>
                   <button type="button" onClick={() => deleteKey(k.id)} className="p-2 hover:bg-red-50 rounded-lg transition-colors" title="Sil">
                     <Trash2 className="w-6 h-6 sm:w-5 sm:h-5 text-red-600" />
                   </button>

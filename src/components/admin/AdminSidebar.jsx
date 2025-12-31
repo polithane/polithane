@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, FileText, TrendingUp, Settings, Palette, 
   Shield, Search, DollarSign, Megaphone, Bot, BarChart3, Mail, 
-  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark
+  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark, Wrench
 } from 'lucide-react';
 
 export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) => {
@@ -54,8 +54,7 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
       title: 'Gelir & Reklam',
       items: [
         { path: '/adminyonetim/ads', icon: Megaphone, label: 'Reklam Yönetimi' },
-        { path: '/adminyonetim/payments', icon: DollarSign, label: 'Ödeme Sistemi' },
-        { path: '/adminyonetim/revenue', icon: DollarSign, label: 'Gelir Analizi' },
+        { path: '/adminyonetim/payments', icon: DollarSign, label: 'Ödeme & Gelir' },
       ]
     },
     {
@@ -64,6 +63,7 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
         { path: '/adminyonetim/security', icon: Shield, label: 'Güvenlik' },
         { path: '/adminyonetim/database', icon: Database, label: 'Veritabanı Yönetimi' },
         { path: '/adminyonetim/api', icon: Code, label: 'API Ayarları' },
+        { path: '/adminyonetim/system', icon: Wrench, label: 'Sistem Dönüşümleri' },
       ]
     }
   ];

@@ -7,23 +7,33 @@ export const SecuritySettings = () => {
   const [envPresent, setEnvPresent] = useState(null);
   const [dbCounts, setDbCounts] = useState(null);
   const [schemaSql, setSchemaSql] = useState('');
+  const [securitySchemaSql, setSecuritySchemaSql] = useState('');
   const [settings, setSettings] = useState({
     admin_mfa_enabled: 'false',
     admin_mfa_require_new_device: 'false',
   });
+  const [events, setEvents] = useState([]);
+  const [devices, setDevices] = useState([]);
+  const [secError, setSecError] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
-        const [res, env, dbo] = await Promise.all([
+        const [res, env, dbo, ev, dv] = await Promise.all([
           api.admin.getSettings().catch(() => null),
           api.admin.envCheck().catch(() => null),
           api.admin.getDbOverview().catch(() => null),
+          api.admin.getSecurityEvents({ limit: 50 }).catch(() => null),
+          api.admin.getSecurityDevices({ limit: 50 }).catch(() => null),
         ]);
         if (res?.schemaMissing && res?.requiredSql) setSchemaSql(String(res.requiredSql || ''));
         if (res?.success && res?.data && typeof res.data === 'object') setSettings((prev) => ({ ...prev, ...res.data }));
         if (env?.success) setEnvPresent(env?.data?.present || null);
         if (dbo?.success) setDbCounts(dbo?.data?.counts || null);
+        if (ev?.schemaMissing && ev?.requiredSql) setSecuritySchemaSql(String(ev.requiredSql || ''));
+        if (dv?.schemaMissing && dv?.requiredSql) setSecuritySchemaSql(String(dv.requiredSql || ''));
+        if (ev?.success) setEvents(Array.isArray(ev.data) ? ev.data : []);
+        if (dv?.success) setDevices(Array.isArray(dv.data) ? dv.data : []);
       } catch (e) {
         console.error(e);
       } finally {
@@ -57,6 +67,21 @@ export const SecuritySettings = () => {
     }
   };
 
+  const toggleTrust = async (device) => {
+    const id = device?.id;
+    if (!id) return;
+    const next = !(device?.trusted === true);
+    setDevices((prev) => prev.map((d) => (String(d?.id) === String(id) ? { ...d, trusted: next } : d)));
+    setSecError('');
+    try {
+      const r = await api.admin.updateSecurityDevice(id, { trusted: next }).catch(() => null);
+      if (!r?.success) throw new Error(r?.error || 'Cihaz güncellenemedi.');
+    } catch (e) {
+      setSecError(String(e?.message || 'Cihaz güncellenemedi.'));
+      setDevices((prev) => prev.map((d) => (String(d?.id) === String(id) ? { ...d, trusted: !next } : d)));
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
@@ -70,6 +95,14 @@ export const SecuritySettings = () => {
           <div className="font-black">DB tablosu eksik: `site_settings`</div>
           <div className="text-sm mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
           <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{schemaSql}</pre>
+        </div>
+      ) : null}
+
+      {securitySchemaSql ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="font-black">DB tablosu eksik: güvenlik logları</div>
+          <div className="text-sm mt-1">Supabase SQL Editor’da şu SQL’i çalıştırın:</div>
+          <pre className="mt-3 p-3 rounded-lg bg-white border border-amber-200 overflow-auto text-xs text-gray-800">{securitySchemaSql}</pre>
         </div>
       ) : null}
 
@@ -248,19 +281,69 @@ export const SecuritySettings = () => {
       {/* Security Logs */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
         <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900">Son Güvenlik Olayları</h3>
+          <h3 className="text-lg font-bold text-gray-900">Son Admin Güvenlik Olayları</h3>
         </div>
         <div className="p-6">
-          <div className="text-sm text-gray-600">
-            Bu sürümde güvenlik olayları için ayrı bir log tablosu tutulmuyor. Detaylı izleme (WAF log, audit log, rate-limit metrikleri)
-            “Mode 1+” aşamasında eklenebilir.
-            {dbCounts && typeof dbCounts.users === 'number' ? (
-              <div className="mt-3 text-xs text-gray-500">
-                DB hızlı özet: users={dbCounts.users.toLocaleString('tr-TR')}, posts=
-                {typeof dbCounts.posts === 'number' ? dbCounts.posts.toLocaleString('tr-TR') : '—'}
+          {secError ? <div className="mb-3 text-sm text-red-600 font-semibold">{secError}</div> : null}
+          {events.length === 0 ? (
+            <div className="text-sm text-gray-600">Henüz olay yok (veya tablo yok).</div>
+          ) : (
+            <div className="space-y-2">
+              {events.slice(0, 30).map((e) => (
+                <div key={e.id} className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-black text-gray-900">{String(e.event_type || 'event')}</div>
+                    <div className="text-xs text-gray-500">{String(e.created_at || '').slice(0, 19)}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    user_id: <span className="font-mono">{String(e.user_id || '—')}</span> • ip: <span className="font-mono">{String(e.ip || '—')}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {dbCounts && typeof dbCounts.users === 'number' ? (
+            <div className="mt-4 text-xs text-gray-500">
+              DB hızlı özet: users={dbCounts.users.toLocaleString('tr-TR')}, posts=
+              {typeof dbCounts.posts === 'number' ? dbCounts.posts.toLocaleString('tr-TR') : '—'}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900">Admin Cihazları</h3>
+          <div className="text-sm text-gray-600 mt-1">Admin girişlerinde otomatik kaydedilir.</div>
+        </div>
+        <div className="p-6 space-y-3">
+          {devices.length === 0 ? (
+            <div className="text-sm text-gray-600">Henüz cihaz yok (veya tablo yok).</div>
+          ) : (
+            devices.slice(0, 50).map((d) => (
+              <div key={d.id} className="p-4 border border-gray-200 rounded-xl flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-gray-900">
+                    {d.trusted ? 'Güvenilir' : 'Yeni/Onaysız'} •{' '}
+                    <span className="font-mono text-xs text-gray-600">{String(d.device_key || '').slice(0, 12)}…</span>
+                  </div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    user_id: <span className="font-mono">{String(d.user_id || '—')}</span> • last_seen: {String(d.last_seen_at || '').slice(0, 19) || '—'}
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500 truncate">UA: {String(d.user_agent || '—')}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleTrust(d)}
+                  className={`px-4 py-2 rounded-xl font-black border ${
+                    d.trusted ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {d.trusted ? 'Güvenilir' : 'Güvenilir Yap'}
+                </button>
               </div>
-            ) : null}
-          </div>
+            ))
+          )}
         </div>
       </div>
 

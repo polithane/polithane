@@ -7,7 +7,7 @@ const formatMoneyTry = (cents) => {
   return `₺${v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-export const RevenueAnalysis = () => {
+export const RevenueAnalysis = ({ embedded = false }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [schemaSql, setSchemaSql] = useState('');
@@ -94,11 +94,13 @@ export const RevenueAnalysis = () => {
   }, [byCategory]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Gelir Analizi</h1>
-        <p className="text-gray-600">Veritabanı tabanlı gelir kayıtları</p>
-      </div>
+    <div className={embedded ? '' : 'p-4 sm:p-6 lg:p-8'}>
+      {!embedded ? (
+        <div className="mb-8">
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Gelir Analizi</h1>
+          <p className="text-gray-600">Veritabanı tabanlı gelir kayıtları</p>
+        </div>
+      ) : null}
 
       {error ? <div className="mb-4 text-sm text-red-600 font-semibold">{error}</div> : null}
       {loading ? <div className="mb-4 text-sm text-gray-600">Yükleniyor…</div> : null}

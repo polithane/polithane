@@ -62,11 +62,11 @@ import { MailTest } from './pages/admin/MailTest';
 import { NotificationRules } from './pages/admin/NotificationRules';
 import { ScrapingManagement } from './pages/admin/ScrapingManagement';
 import { SourceManagement } from './pages/admin/SourceManagement';
-import { PaymentSystem } from './pages/admin/PaymentSystem';
-import { RevenueAnalysis } from './pages/admin/RevenueAnalysis';
+import { PaymentsAndRevenue } from './pages/admin/PaymentsAndRevenue';
 import { SecuritySettings } from './pages/admin/SecuritySettings';
 import { DatabaseManagement } from './pages/admin/DatabaseManagement';
 import { APISettings } from './pages/admin/APISettings';
+import { SystemTransformation } from './pages/admin/SystemTransformation';
 import { PartyManagement } from './pages/admin/PartyManagement';
 import { AgendaManagement } from './pages/admin/AgendaManagement';
 import { ParliamentManagement } from './pages/admin/ParliamentManagement';
@@ -181,11 +181,12 @@ function App() {
           <Route path="scraping" element={<ScrapingManagement />} />
           <Route path="sources" element={<SourceManagement />} />
           <Route path="ads" element={<AdsManagement />} />
-          <Route path="payments" element={<PaymentSystem />} />
-          <Route path="revenue" element={<RevenueAnalysis />} />
+          <Route path="payments" element={<PaymentsAndRevenue />} />
+          <Route path="revenue" element={<PaymentsAndRevenue />} />
           <Route path="security" element={<SecuritySettings />} />
           <Route path="database" element={<DatabaseManagement />} />
           <Route path="api" element={<APISettings />} />
+          <Route path="system" element={<SystemTransformation />} />
         </Route>
       </Routes>
       

@@ -17,6 +17,8 @@ export const SEOSettings = () => {
     canonicalURL: 'https://polithane.com',
     googleAnalyticsID: '',
     googleAdsenseID: '',
+    headHtml: '',
+    bodyHtml: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -37,6 +39,8 @@ export const SEOSettings = () => {
     canonicalURL: 'seo_canonicalURL',
     googleAnalyticsID: 'seo_googleAnalyticsID',
     googleAdsenseID: 'seo_googleAdsenseID',
+    headHtml: 'seo_head_html',
+    bodyHtml: 'seo_body_html',
   };
 
   useEffect(() => {
@@ -226,6 +230,38 @@ export const SEOSettings = () => {
                 onChange={(e) => handleChange('googleAdsenseID', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
                 placeholder="ca-pub-XXXXXXXXXXXXXXXX"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Custom head/body injection */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Özel Kod (Head / Body)</h3>
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+            Uyarı: Buraya eklenen HTML/JS tüm ziyaretçilerde çalışır. Sadece güvenilir kod ekleyin (GA, GTM, doğrulama etiketleri vb.).
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Head içine eklenecek HTML/Script</label>
+              <textarea
+                value={seo.headHtml}
+                onChange={(e) => handleChange('headHtml', e.target.value)}
+                rows={6}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none font-mono text-xs"
+                placeholder={'<script>/* ... */</script>'}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Body sonuna eklenecek HTML/Script</label>
+              <textarea
+                value={seo.bodyHtml}
+                onChange={(e) => handleChange('bodyHtml', e.target.value)}
+                rows={6}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none font-mono text-xs"
+                placeholder={'<noscript>...</noscript>'}
               />
             </div>
           </div>

@@ -3455,6 +3455,8 @@ async function adminSchemaCheck(req, res) {
   await check('admin_email_templates', ['id', 'name', 'type', 'subject', 'content_html', 'is_active', 'usage_count', 'updated_at', 'created_at']);
   await check('admin_payment_plans', ['id', 'name', 'period', 'price_cents', 'currency', 'is_active', 'created_at', 'updated_at']);
   await check('admin_payment_transactions', ['id', 'occurred_at', 'user_id', 'user_email', 'plan_name', 'amount_cents', 'currency', 'payment_method', 'status', 'provider', 'provider_ref', 'note', 'created_at']);
+  await check('admin_security_events', ['id', 'user_id', 'event_type', 'ip', 'user_agent', 'metadata', 'created_at']);
+  await check('admin_trusted_devices', ['id', 'user_id', 'device_key', 'ip', 'user_agent', 'trusted', 'first_seen_at', 'last_seen_at']);
 
   const ok = missingTables.length === 0 && Object.keys(missingColumns).length === 0;
   return res.json({
@@ -5089,6 +5091,37 @@ create index if not exists admin_payment_transactions_occurred_at_idx on public.
 create index if not exists admin_payment_transactions_status_idx on public.admin_payment_transactions (status);
 `;
 
+// Security/audit tables (admin-visible, real data)
+const SQL_ADMIN_SECURITY_EVENTS = `
+create table if not exists public.admin_security_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid,
+  event_type text not null, -- login | admin_action | etc.
+  ip text,
+  user_agent text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_security_events_created_at_idx on public.admin_security_events (created_at desc);
+create index if not exists admin_security_events_user_id_idx on public.admin_security_events (user_id);
+create index if not exists admin_security_events_event_type_idx on public.admin_security_events (event_type);
+`;
+
+const SQL_ADMIN_TRUSTED_DEVICES = `
+create table if not exists public.admin_trusted_devices (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  device_key text not null,
+  ip text,
+  user_agent text,
+  trusted boolean not null default false,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+create unique index if not exists admin_trusted_devices_user_device_uniq on public.admin_trusted_devices (user_id, device_key);
+create index if not exists admin_trusted_devices_last_seen_at_idx on public.admin_trusted_devices (last_seen_at desc);
+`;
+
 async function adminGetAnalytics(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
@@ -5127,6 +5160,49 @@ async function adminGetAnalytics(req, res) {
     topAgendas = [];
   }
 
+  // Best-effort: top users by polit_score
+  let topUsers = [];
+  try {
+    const rows = await supabaseRestGet('users', {
+      select: 'id,username,full_name,avatar_url,user_type,polit_score',
+      order: 'polit_score.desc',
+      limit: '10',
+    });
+    topUsers = Array.isArray(rows) ? rows : [];
+  } catch {
+    topUsers = [];
+  }
+
+  // Posts by type (best-effort)
+  const postTypes = ['text', 'image', 'video', 'audio'];
+  const postTypeCountsArr = await Promise.all(
+    postTypes.map((t) => supabaseCount('posts', { select: 'id', is_deleted: 'eq.false', content_type: `eq.${t}` }).catch(() => 0))
+  );
+  const postTypeCounts = {};
+  for (let i = 0; i < postTypes.length; i += 1) postTypeCounts[postTypes[i]] = postTypeCountsArr[i] || 0;
+
+  // Approx totals (last N posts) to avoid full-table scan
+  let approx = { sampleSize: 0, totalViews: null, totalPolitScore: null };
+  try {
+    const sampleLimit = 5000;
+    const rows = await supabaseRestGet('posts', {
+      select: 'view_count,polit_score,is_deleted',
+      is_deleted: 'eq.false',
+      order: 'created_at.desc',
+      limit: String(sampleLimit),
+    });
+    const list = Array.isArray(rows) ? rows : [];
+    let viewSum = 0;
+    let scoreSum = 0;
+    for (const p of list) {
+      viewSum += Number(p?.view_count || 0) || 0;
+      scoreSum += Number(p?.polit_score || 0) || 0;
+    }
+    approx = { sampleSize: list.length, totalViews: viewSum, totalPolitScore: scoreSum };
+  } catch (e) {
+    approx = { sampleSize: 0, totalViews: null, totalPolitScore: null };
+  }
+
   return res.json({
     success: true,
     data: {
@@ -5136,6 +5212,9 @@ async function adminGetAnalytics(req, res) {
       window: { usersInRange, postsInRange },
       userTypeCounts,
       topAgendas,
+      topUsers,
+      postTypeCounts,
+      approx,
     },
   });
 }
@@ -6098,6 +6177,184 @@ async function adminGetDbOverview(req, res) {
   return res.json({ success: true, data: { counts, lastPostAt } });
 }
 
+function getUserAgent(req) {
+  return String(req?.headers?.['user-agent'] || '').slice(0, 500);
+}
+
+function makeDeviceKey(userId, userAgent) {
+  const base = `${String(userId || '').trim()}|${String(userAgent || '').trim()}`;
+  return crypto.createHash('sha256').update(base).digest('hex').slice(0, 32);
+}
+
+async function adminLogSecurityEvent({ user_id, event_type, ip, user_agent, metadata }) {
+  const payload = {
+    user_id: user_id || null,
+    event_type: String(event_type || '').trim() || 'event',
+    ip: ip ? String(ip).slice(0, 100) : null,
+    user_agent: user_agent ? String(user_agent).slice(0, 500) : null,
+    metadata: metadata && typeof metadata === 'object' ? metadata : {},
+    created_at: new Date().toISOString(),
+  };
+  try {
+    await supabaseRestInsert('admin_security_events', [payload]);
+  } catch (e) {
+    // Missing table or any other issues must not block auth flows.
+  }
+}
+
+async function adminUpsertTrustedDevice({ user_id, device_key, ip, user_agent }) {
+  if (!user_id || !device_key) return;
+  const nowIso = new Date().toISOString();
+  try {
+    const rows = await supabaseRestGet('admin_trusted_devices', {
+      select: 'id,trusted',
+      user_id: `eq.${user_id}`,
+      device_key: `eq.${device_key}`,
+      limit: '1',
+    }).catch(() => []);
+    const existing = rows?.[0] || null;
+    if (existing?.id) {
+      await supabaseRestPatch(
+        'admin_trusted_devices',
+        { id: `eq.${existing.id}` },
+        { last_seen_at: nowIso, ip: ip ? String(ip).slice(0, 100) : null, user_agent: user_agent ? String(user_agent).slice(0, 500) : null }
+      ).catch(() => null);
+      return;
+    }
+    await supabaseRestInsert('admin_trusted_devices', [
+      {
+        user_id,
+        device_key,
+        ip: ip ? String(ip).slice(0, 100) : null,
+        user_agent: user_agent ? String(user_agent).slice(0, 500) : null,
+        trusted: false,
+        first_seen_at: nowIso,
+        last_seen_at: nowIso,
+      },
+    ]).catch(() => null);
+  } catch {
+    // ignore
+  }
+}
+
+async function adminGetSecurityEvents(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const limit = Math.min(200, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
+  try {
+    const rows = await supabaseRestGet('admin_security_events', {
+      select: '*',
+      order: 'created_at.desc',
+      limit: String(limit),
+    });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      const sql = `${SQL_ADMIN_SECURITY_EVENTS.trim()}\n\n${SQL_ADMIN_TRUSTED_DEVICES.trim()}`.trim();
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: sql });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Güvenlik olayları yüklenemedi.') });
+  }
+}
+
+async function adminGetTrustedDevices(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const limit = Math.min(200, Math.max(1, parseInt(String(req.query?.limit || 200), 10) || 200));
+  try {
+    const rows = await supabaseRestGet('admin_trusted_devices', {
+      select: '*',
+      order: 'last_seen_at.desc',
+      limit: String(limit),
+    });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      const sql = `${SQL_ADMIN_SECURITY_EVENTS.trim()}\n\n${SQL_ADMIN_TRUSTED_DEVICES.trim()}`.trim();
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: sql });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Cihazlar yüklenemedi.') });
+  }
+}
+
+async function adminUpdateTrustedDevice(req, res, deviceId) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const id = String(deviceId || '').trim();
+  if (!id || !isSafeId(id)) return res.status(400).json({ success: false, error: 'Geçersiz cihaz.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (typeof body?.trusted === 'boolean') patch.trusted = body.trusted;
+  if (Object.keys(patch).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
+  try {
+    const updated = await supabaseRestPatch('admin_trusted_devices', { id: `eq.${id}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      const sql = `${SQL_ADMIN_SECURITY_EVENTS.trim()}\n\n${SQL_ADMIN_TRUSTED_DEVICES.trim()}`.trim();
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: sql });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Cihaz güncellenemedi.') });
+  }
+}
+
+async function adminSystemTransform(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const action = String(body?.action || '').trim();
+  const confirm = String(body?.confirm || '').trim();
+  if (confirm !== 'ONAYLIYORUM') {
+    return res.status(400).json({ success: false, error: 'Onay metni hatalı. Devam etmek için ONAYLIYORUM yazmalısınız.' });
+  }
+
+  try {
+    if (action === 'purge_archived_posts') {
+      const days = Math.max(1, Math.min(365, Number(body?.days || process.env.POST_ARCHIVE_DAYS || 3) || 3));
+      const limit = Math.max(1, Math.min(1000, Number(body?.limit || 200) || 200));
+      const out = await purgeArchivedPosts({ olderThanDays: days, limit });
+      await adminLogSecurityEvent({
+        user_id: auth.id,
+        event_type: 'admin_action',
+        ip: getClientIp(req),
+        user_agent: getUserAgent(req),
+        metadata: { action, days, limit, result: out },
+      });
+      return res.json({ success: true, data: out });
+    }
+
+    if (action === 'rebuild_agenda_post_counts') {
+      const maxAgendas = Math.max(1, Math.min(100, parseInt(String(body?.maxAgendas || 50), 10) || 50));
+      const agendas = await supabaseRestGet('agendas', { select: 'id,title', order: 'trending_score.desc', limit: String(maxAgendas) }).catch(() => []);
+      const list = Array.isArray(agendas) ? agendas : [];
+      const updated = [];
+      for (const a of list) {
+        const id = a?.id;
+        const title = String(a?.title || '').trim();
+        if (!id || !title) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const cnt = await supabaseCount('posts', { select: 'id', is_deleted: 'eq.false', agenda_tag: `eq.${title}` }).catch(() => null);
+        if (typeof cnt !== 'number') continue;
+        // eslint-disable-next-line no-await-in-loop
+        const rows = await supabaseRestPatch('agendas', { id: `eq.${id}` }, { post_count: cnt }).catch(() => []);
+        updated.push({ id, title, post_count: cnt, ok: !!rows?.[0] });
+      }
+      await adminLogSecurityEvent({
+        user_id: auth.id,
+        event_type: 'admin_action',
+        ip: getClientIp(req),
+        user_agent: getUserAgent(req),
+        metadata: { action, maxAgendas, updatedCount: updated.length },
+      });
+      return res.json({ success: true, data: { updated } });
+    }
+
+    return res.status(400).json({ success: false, error: 'Geçersiz işlem (action).' });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: String(e?.message || 'İşlem başarısız.') });
+  }
+}
+
 async function adminSeedDemoContent(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
@@ -6266,25 +6523,136 @@ async function adminUpdateUser(req, res, userId) {
   if (!auth) return;
   const body = await readJsonBody(req);
   const uid = String(userId || '').trim();
-  if (!uid) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+  if (!uid || !isSafeId(uid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
 
   // Load previous state for side effects (email/notifications).
-  const beforeRows = await supabaseRestGet('users', { select: 'id,email,full_name,is_active,is_verified,user_type', id: `eq.${uid}`, limit: '1' }).catch(() => []);
+  const beforeRows = await supabaseRestGet('users', {
+    select: 'id,email,username,full_name,is_active,is_verified,user_type,is_admin',
+    id: `eq.${uid}`,
+    limit: '1',
+  }).catch(() => []);
   const before = beforeRows?.[0] || null;
+  if (!before) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
 
-  const allowed = {};
-  if (typeof body.is_verified === 'boolean') allowed.is_verified = body.is_verified;
-  if (typeof body.is_active === 'boolean') allowed.is_active = body.is_active;
-  if (typeof body.user_type === 'string') allowed.user_type = body.user_type;
-  if (Object.keys(allowed).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
-  const updated = await supabaseRestPatch('users', { id: `eq.${uid}` }, allowed);
-  const after = updated?.[0] || null;
+  const patch = {};
+  const setStr = (key, { max = 500, nullable = true, lower = false } = {}) => {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) return;
+    const raw = body?.[key];
+    const s = raw === null ? '' : String(raw ?? '').trim();
+    if (!s) {
+      if (nullable) patch[key] = null;
+      return;
+    }
+    patch[key] = (lower ? s.toLowerCase() : s).slice(0, max);
+  };
+
+  // Core profile fields
+  setStr('full_name', { max: 120, nullable: false });
+  setStr('province', { max: 100, nullable: true });
+  setStr('district_name', { max: 100, nullable: true });
+  setStr('avatar_url', { max: 600, nullable: true });
+  setStr('politician_type', { max: 60, nullable: true });
+  setStr('user_type', { max: 40, nullable: true, lower: true });
+
+  // Email
+  if (Object.prototype.hasOwnProperty.call(body, 'email')) {
+    const email = String(body?.email ?? '').trim().toLowerCase();
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) return res.status(400).json({ success: false, error: 'Geçerli bir email adresi giriniz.' });
+      patch.email = email.slice(0, 255);
+      // Keep app expectations: when email changes, mark unverified unless explicitly set.
+      if (!Object.prototype.hasOwnProperty.call(body, 'email_verified')) {
+        patch.email_verified = false;
+      }
+    } else {
+      patch.email = null;
+    }
+  }
+  if (typeof body?.email_verified === 'boolean') patch.email_verified = body.email_verified;
+
+  // Username (keep same rules as registration)
+  if (Object.prototype.hasOwnProperty.call(body, 'username')) {
+    const candRaw = String(body?.username ?? '').trim();
+    if (!candRaw) {
+      return res.status(400).json({ success: false, error: 'Username boş olamaz.' });
+    }
+    const cand = normalizeUsernameCandidate(candRaw);
+    if (!cand) return res.status(400).json({ success: false, error: 'Geçersiz username.' });
+    if (isReservedUsername(cand)) return res.status(400).json({ success: false, error: 'Bu kullanıcı adı kullanılamaz.' });
+    const exists = await supabaseRestGet('users', { select: 'id', username: `eq.${cand}`, limit: '1' }).catch(() => []);
+    const other = (exists || []).find((r) => String(r?.id || '') !== String(uid));
+    if (other) return res.status(400).json({ success: false, error: 'Bu kullanıcı adı zaten kullanılıyor.' });
+    patch.username = cand;
+  }
+
+  // Party id (can be numeric or uuid depending on schema)
+  if (Object.prototype.hasOwnProperty.call(body, 'party_id')) {
+    const v = body?.party_id;
+    if (v === null || String(v).trim() === '') {
+      patch.party_id = null;
+    } else {
+      const pid = String(v).trim();
+      const ok = /^\d+$/.test(pid) || /^[0-9a-fA-F-]{36}$/.test(pid);
+      if (!ok) return res.status(400).json({ success: false, error: 'Geçersiz party_id.' });
+      patch.party_id = pid;
+    }
+  }
+
+  // Flags
+  if (typeof body?.is_verified === 'boolean') patch.is_verified = body.is_verified;
+  if (typeof body?.is_active === 'boolean') patch.is_active = body.is_active;
+  if (typeof body?.is_admin === 'boolean') {
+    // Safety: prevent self lock-out
+    if (String(uid) === String(auth.id) && body.is_admin === false) {
+      return res.status(400).json({ success: false, error: 'Kendinizi admin yetkisinden çıkaramazsınız.' });
+    }
+    patch.is_admin = body.is_admin;
+  }
+
+  // Metadata (advanced)
+  if (Object.prototype.hasOwnProperty.call(body, 'metadata')) {
+    if (body.metadata === null) {
+      patch.metadata = null;
+    } else if (body.metadata && typeof body.metadata === 'object') {
+      patch.metadata = body.metadata;
+    } else {
+      return res.status(400).json({ success: false, error: 'metadata alanı JSON object olmalı.' });
+    }
+  }
+
+  if (Object.keys(patch).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
+
+  const tryPatch = async (obj) => {
+    try {
+      const updated = await supabaseRestPatch('users', { id: `eq.${uid}` }, obj);
+      return updated?.[0] || null;
+    } catch (e) {
+      const msgRaw = String(e?.message || '');
+      const m = msgRaw.match(/Could not find the '([^']+)' column/i);
+      if (m && m[1] && Object.prototype.hasOwnProperty.call(obj, m[1])) {
+        const next = { ...obj };
+        delete next[m[1]];
+        return await tryPatch(next);
+      }
+      // Another common PostgREST shape: column "x" of relation "users" does not exist
+      const m2 = msgRaw.match(/column \"([a-zA-Z0-9_]+)\" of relation/i);
+      if (m2 && m2[1] && Object.prototype.hasOwnProperty.call(obj, m2[1])) {
+        const next = { ...obj };
+        delete next[m2[1]];
+        return await tryPatch(next);
+      }
+      throw e;
+    }
+  };
+
+  const after = await tryPatch(patch);
 
   // If approval changed, also notify + email (best-effort).
   try {
     const beforeVerified = before?.is_verified === true;
     const afterVerified = after?.is_verified === true;
-    if (Object.prototype.hasOwnProperty.call(allowed, 'is_verified') && before && beforeVerified !== afterVerified) {
+    if (Object.prototype.hasOwnProperty.call(patch, 'is_verified') && before && beforeVerified !== afterVerified) {
       if (afterVerified) {
         await supabaseRestInsert('notifications', [
           {
@@ -6324,6 +6692,121 @@ async function adminUpdateUser(req, res, userId) {
   }
 
   res.json({ success: true, data: after });
+}
+
+async function adminUpdatePost(req, res, postId) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const id = String(postId || '').trim();
+  if (!id || !isSafeId(id)) return res.status(400).json({ success: false, error: 'Geçersiz paylaşım.' });
+  const body = await readJsonBody(req);
+
+  const patch = {};
+  if (Object.prototype.hasOwnProperty.call(body, 'content')) patch.content = String(body.content ?? '').trim();
+  if (Object.prototype.hasOwnProperty.call(body, 'content_text')) patch.content_text = String(body.content_text ?? '').trim();
+  if (Object.prototype.hasOwnProperty.call(body, 'category')) patch.category = String(body.category ?? '').trim().slice(0, 40) || 'general';
+  if (Object.prototype.hasOwnProperty.call(body, 'agenda_tag')) {
+    const t = String(body.agenda_tag ?? '').trim();
+    patch.agenda_tag = t ? t.slice(0, 120) : null;
+  }
+  if (typeof body?.is_trending === 'boolean') patch.is_trending = body.is_trending;
+  if (typeof body?.is_deleted === 'boolean') patch.is_deleted = body.is_deleted;
+  if (Object.prototype.hasOwnProperty.call(body, 'thumbnail_url')) {
+    const u = String(body.thumbnail_url ?? '').trim();
+    patch.thumbnail_url = u ? u.slice(0, 600) : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'media_urls')) {
+    const arr = Array.isArray(body.media_urls) ? body.media_urls : [];
+    const urls = arr.map((u) => String(u || '').trim()).filter(Boolean).slice(0, 12);
+    patch.media_urls = urls;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'content_type')) {
+    const ct = String(body.content_type ?? '').trim();
+    if (ct) patch.content_type = ct.slice(0, 20);
+  }
+  patch.updated_at = new Date().toISOString();
+
+  if (Object.keys(patch).length === 1 && Object.prototype.hasOwnProperty.call(patch, 'updated_at')) {
+    return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
+  }
+
+  const tryPatch = async (obj) => {
+    try {
+      const updated = await supabaseRestPatch('posts', { id: `eq.${id}` }, obj);
+      return updated?.[0] || null;
+    } catch (e) {
+      const msgRaw = String(e?.message || '');
+      const m = msgRaw.match(/Could not find the '([^']+)' column/i);
+      if (m && m[1] && Object.prototype.hasOwnProperty.call(obj, m[1])) {
+        const next = { ...obj };
+        delete next[m[1]];
+        return await tryPatch(next);
+      }
+      const m2 = msgRaw.match(/column \"([a-zA-Z0-9_]+)\" of relation/i);
+      if (m2 && m2[1] && Object.prototype.hasOwnProperty.call(obj, m2[1])) {
+        const next = { ...obj };
+        delete next[m2[1]];
+        return await tryPatch(next);
+      }
+      throw e;
+    }
+  };
+
+  let row = null;
+  try {
+    row = await tryPatch(patch);
+  } catch (e) {
+    const msg = String(e?.message || 'Paylaşım güncellenemedi.');
+    return res.status(500).json({ success: false, error: msg });
+  }
+  if (!row) return res.status(500).json({ success: false, error: 'Paylaşım güncellenemedi.' });
+  return res.json({ success: true, data: row });
+}
+
+async function adminUpdateComment(req, res, commentId) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const id = String(commentId || '').trim();
+  if (!id || !isSafeId(id)) return res.status(400).json({ success: false, error: 'Geçersiz yorum.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (Object.prototype.hasOwnProperty.call(body, 'content')) {
+    const text = String(body.content ?? '').trim();
+    if (!text) return res.status(400).json({ success: false, error: 'Yorum boş olamaz.' });
+    if (text.length > 500) return res.status(400).json({ success: false, error: 'Yorum en fazla 500 karakter olabilir.' });
+    patch.content = text;
+  }
+  if (typeof body?.is_deleted === 'boolean') patch.is_deleted = body.is_deleted;
+  patch.updated_at = new Date().toISOString();
+  if (Object.keys(patch).length === 1 && Object.prototype.hasOwnProperty.call(patch, 'updated_at')) {
+    return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
+  }
+
+  const tryPatch = async (obj) => {
+    try {
+      const updated = await supabaseRestPatch('comments', { id: `eq.${id}` }, obj);
+      return updated?.[0] || null;
+    } catch (e) {
+      const msgRaw = String(e?.message || '');
+      const m = msgRaw.match(/Could not find the '([^']+)' column/i);
+      if (m && m[1] && Object.prototype.hasOwnProperty.call(obj, m[1])) {
+        const next = { ...obj };
+        delete next[m[1]];
+        return await tryPatch(next);
+      }
+      const m2 = msgRaw.match(/column \"([a-zA-Z0-9_]+)\" of relation/i);
+      if (m2 && m2[1] && Object.prototype.hasOwnProperty.call(obj, m2[1])) {
+        const next = { ...obj };
+        delete next[m2[1]];
+        return await tryPatch(next);
+      }
+      throw e;
+    }
+  };
+
+  const row = await tryPatch(patch).catch(() => null);
+  if (!row) return res.status(500).json({ success: false, error: 'Yorum güncellenemedi.' });
+  return res.json({ success: true, data: row });
 }
 
 function normalizePersonKey(input) {
@@ -7355,6 +7838,24 @@ async function authLogin(req, res) {
 
     const token = signJwt({ id: user.id, username: user.username, email: user.email, is_admin: !!user.is_admin });
     delete user.password_hash;
+
+    // Real admin security audit (best-effort; never blocks login)
+    try {
+      if (user?.is_admin === true) {
+        const ua = getUserAgent(req);
+        const deviceKey = makeDeviceKey(user.id, ua);
+        await adminLogSecurityEvent({
+          user_id: user.id,
+          event_type: 'login',
+          ip,
+          user_agent: ua,
+          metadata: { via: 'password' },
+        });
+        await adminUpsertTrustedDevice({ user_id: user.id, device_key: deviceKey, ip, user_agent: ua });
+      }
+    } catch {
+      // ignore
+    }
     
     res.json({ success: true, message: 'Giriş başarılı.', data: { user, token, claimPending } });
 }
@@ -9190,6 +9691,8 @@ async function getPublicSite(req, res) {
       canonicalURL: String(map.seo_canonicalURL || '').trim(),
       googleAnalyticsID: String(map.seo_googleAnalyticsID || '').trim(),
       googleAdsenseID: String(map.seo_googleAdsenseID || '').trim(),
+      headHtml: String(map.seo_head_html || '').trim(),
+      bodyHtml: String(map.seo_body_html || '').trim(),
     },
   };
 
@@ -9648,6 +10151,9 @@ export default async function handler(req, res) {
       if (url === '/api/admin/notification-channels' && req.method === 'GET') return await adminGetNotificationChannels(req, res);
       if (url === '/api/admin/notification-channels' && req.method === 'PUT') return await adminUpdateNotificationChannels(req, res);
       if (url === '/api/admin/db/overview' && req.method === 'GET') return await adminGetDbOverview(req, res);
+      if (url === '/api/admin/security/events' && req.method === 'GET') return await adminGetSecurityEvents(req, res);
+      if (url === '/api/admin/security/devices' && req.method === 'GET') return await adminGetTrustedDevices(req, res);
+      if (url === '/api/admin/system/transform' && req.method === 'POST') return await adminSystemTransform(req, res);
       if (url === '/api/admin/ads' && req.method === 'GET') return await adminGetAds(req, res);
       if (url === '/api/admin/ads' && req.method === 'POST') return await adminCreateAd(req, res);
       if (url === '/api/admin/workflows' && req.method === 'GET') return await adminGetWorkflows(req, res);
@@ -9716,6 +10222,10 @@ export default async function handler(req, res) {
         const keyId = url.split('/api/admin/api-keys/')[1];
         return await adminDeleteApiKey(req, res, keyId);
       }
+      if (url.startsWith('/api/admin/security/devices/') && req.method === 'PUT') {
+        const deviceId = url.split('/api/admin/security/devices/')[1];
+        return await adminUpdateTrustedDevice(req, res, deviceId);
+      }
       if (url.startsWith('/api/admin/sources/') && req.method === 'PUT') {
         const sourceId = url.split('/api/admin/sources/')[1];
         return await adminUpdateSource(req, res, sourceId);
@@ -9772,6 +10282,10 @@ export default async function handler(req, res) {
         const postId = url.split('/api/admin/posts/')[1];
         return await adminDeletePost(req, res, postId);
       }
+      if (url.startsWith('/api/admin/posts/') && req.method === 'PUT') {
+        const postId = url.split('/api/admin/posts/')[1];
+        return await adminUpdatePost(req, res, postId);
+      }
       if (url.startsWith('/api/admin/agendas/') && req.method === 'PUT') {
         const agendaId = url.split('/api/admin/agendas/')[1];
         return await adminUpdateAgenda(req, res, agendaId);
@@ -9798,6 +10312,10 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/admin/comments/') && req.method === 'DELETE') {
         const commentId = url.split('/api/admin/comments/')[1] || '';
         return await adminDeleteComment(req, res, commentId);
+      }
+      if (url.startsWith('/api/admin/comments/') && req.method === 'PUT') {
+        const commentId = url.split('/api/admin/comments/')[1] || '';
+        return await adminUpdateComment(req, res, commentId);
       }
 
       // Search

@@ -406,6 +406,18 @@ export const admin = {
   envCheck: () => apiCall('/api/admin/env-check'),
   schemaCheck: () => apiCall('/api/admin/schema-check'),
   getDbOverview: () => apiCall('/api/admin/db/overview'),
+  getSecurityEvents: (params = {}) => {
+    const query = toQueryString(params);
+    return apiCall(`/api/admin/security/events${query ? `?${query}` : ''}`);
+  },
+  getSecurityDevices: (params = {}) => {
+    const query = toQueryString(params);
+    return apiCall(`/api/admin/security/devices${query ? `?${query}` : ''}`);
+  },
+  updateSecurityDevice: (deviceId, data) =>
+    apiCall(`/api/admin/security/devices/${deviceId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  systemTransform: (payload) =>
+    apiCall('/api/admin/system/transform', { method: 'POST', body: JSON.stringify(payload || {}) }),
   getAds: () => apiCall('/api/admin/ads'),
   createAd: (data) => apiCall('/api/admin/ads', { method: 'POST', body: JSON.stringify(data || {}) }),
   updateAd: (adId, data) => apiCall(`/api/admin/ads/${adId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
@@ -524,9 +536,22 @@ export const admin = {
     return apiCall(`/api/admin/posts${query ? `?${query}` : ''}`);
   },
 
+  updatePost: (postId, data) =>
+    apiCall(`/api/admin/posts/${postId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data || {}),
+    }),
+
   deletePost: (postId) =>
     apiCall(`/api/admin/posts/${postId}`, {
       method: 'DELETE',
+    }),
+
+  // Comments
+  updateComment: (commentId, data) =>
+    apiCall(`/api/admin/comments/${commentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data || {}),
     }),
 
   // Agendas

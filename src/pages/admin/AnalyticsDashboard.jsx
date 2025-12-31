@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TrendingUp, Users, FileText, Eye } from 'lucide-react';
+import { TrendingUp, Users, FileText, Eye, Medal, PieChart } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
 import { formatPolitScore } from '../../utils/formatters';
 
@@ -32,6 +32,9 @@ export const AnalyticsDashboard = () => {
   const cards = useMemo(() => {
     const totals = data?.totals || {};
     const window = data?.window || {};
+    const approx = data?.approx || {};
+    const views = approx?.totalViews;
+    const score = approx?.totalPolitScore;
     return [
       {
         label: 'Toplam Kullanıcı',
@@ -48,16 +51,16 @@ export const AnalyticsDashboard = () => {
         color: 'text-green-600',
       },
       {
-        label: 'Toplam Görüntülenme (yaklaşık)',
-        value: '—',
-        sub: 'Dashboard istatistiklerinde mevcut',
+        label: 'Görüntülenme (yaklaşık)',
+        value: typeof views === 'number' ? views.toLocaleString('tr-TR') : '—',
+        sub: approx?.sampleSize ? `Son ${Number(approx.sampleSize).toLocaleString('tr-TR')} post örneği` : 'Veri yok',
         icon: Eye,
         color: 'text-purple-600',
       },
       {
-        label: 'Toplam Polit Puan (yaklaşık)',
-        value: '—',
-        sub: 'Dashboard istatistiklerinde mevcut',
+        label: 'Polit Puan (yaklaşık)',
+        value: typeof score === 'number' ? formatPolitScore(score) : '—',
+        sub: approx?.sampleSize ? `Son ${Number(approx.sampleSize).toLocaleString('tr-TR')} post örneği` : 'Veri yok',
         icon: TrendingUp,
         color: 'text-orange-600',
       },
@@ -137,6 +140,49 @@ export const AnalyticsDashboard = () => {
               <div key={t.key} className="flex items-center justify-between">
                 <span className="text-gray-700">{t.label}</span>
                 <span className="font-black text-gray-900">{t.count.toLocaleString('tr-TR')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-gray-900">En Yüksek Polit Puanlı Kullanıcılar</h3>
+            <Medal className="w-6 h-6 text-primary-blue" />
+          </div>
+          <div className="space-y-3">
+            {(Array.isArray(data?.topUsers) ? data.topUsers : []).slice(0, 10).map((u) => (
+              <div key={u.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="min-w-0">
+                  <div className="font-semibold text-gray-900 truncate">{u.full_name || '—'}</div>
+                  <div className="text-xs text-gray-500 truncate">@{u.username || u.id}</div>
+                </div>
+                <div className="text-primary-blue font-black">{formatPolitScore(u.polit_score || 0)}</div>
+              </div>
+            ))}
+            {!loading && (!data?.topUsers || data.topUsers.length === 0) ? (
+              <div className="text-sm text-gray-600">Kullanıcı verisi bulunamadı.</div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-gray-900">Paylaşım Tipleri</h3>
+            <PieChart className="w-6 h-6 text-primary-blue" />
+          </div>
+          <div className="space-y-3">
+            {[
+              { k: 'text', label: 'Metin' },
+              { k: 'image', label: 'Resim' },
+              { k: 'video', label: 'Video' },
+              { k: 'audio', label: 'Ses' },
+            ].map((it) => (
+              <div key={it.k} className="flex items-center justify-between">
+                <span className="text-gray-700">{it.label}</span>
+                <span className="font-black text-gray-900">{Number(data?.postTypeCounts?.[it.k] || 0).toLocaleString('tr-TR')}</span>
               </div>
             ))}
           </div>
