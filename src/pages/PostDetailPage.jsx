@@ -167,22 +167,23 @@ const SmartAudio = ({ src }) => {
             </div>
 
             <div className="mt-3">
-              <div className="h-2 rounded-full bg-white/15 overflow-hidden">
+              <div className="relative h-2 rounded-full bg-white/15 overflow-hidden">
                 <div className="h-full bg-white/70" style={{ width: `${Math.round(pct * 100)}%` }} />
+                {/* Invisible scrubber overlay (keeps UI as a single bar) */}
+                <input
+                  type="range"
+                  min={0}
+                  max={1000}
+                  value={Math.round(pct * 1000)}
+                  onChange={(e) => seekToPct(Number(e.target.value || 0) / 1000)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  aria-label="Ses ilerletme"
+                />
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-white/80 font-semibold tabular-nums">
                 <span>{formatDuration(safeT)}</span>
                 <span>{safeDur ? formatDuration(safeDur) : ''}</span>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1000}
-                value={Math.round(pct * 1000)}
-                onChange={(e) => seekToPct(Number(e.target.value || 0) / 1000)}
-                className="mt-2 w-full"
-                aria-label="Ses ilerletme"
-              />
             </div>
           </div>
         </div>
