@@ -6482,7 +6482,6 @@ async function adminCreateAgenda(req, res) {
   const payload = {
     title,
     slug: String(body?.slug || '').trim() || slugify(title),
-    description: body?.description ?? null,
     is_active: typeof body?.is_active === 'boolean' ? body.is_active : true,
     is_trending: typeof body?.is_trending === 'boolean' ? body.is_trending : true,
     trending_score: Number.isFinite(Number(body?.trending_score)) ? Number(body.trending_score) : 0,
@@ -6491,13 +6490,32 @@ async function adminCreateAgenda(req, res) {
     created_at: nowIso,
     updated_at: nowIso,
   };
+  if (Object.prototype.hasOwnProperty.call(body || {}, 'description')) {
+    payload.description = body?.description ?? null;
+  }
 
   try {
-    const inserted = await supabaseRestInsert('agendas', [payload]);
+    let inserted = await supabaseRestInsert('agendas', [payload]);
+    // If schema doesn't have optional columns (e.g. description), retry without them.
+    if (!Array.isArray(inserted) || inserted.length === 0) {
+      inserted = await supabaseRestInsert('agendas', [payload]).catch(() => []);
+    }
     const row = Array.isArray(inserted) ? inserted?.[0] : null;
     if (!row) return res.status(500).json({ success: false, error: 'Gündem oluşturulamadı.' });
     return res.status(201).json({ success: true, data: row });
   } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('description') && Object.prototype.hasOwnProperty.call(payload, 'description')) {
+      try {
+        // eslint-disable-next-line no-unused-vars
+        const { description, ...rest } = payload;
+        const inserted = await supabaseRestInsert('agendas', [rest]).catch(() => []);
+        const row = Array.isArray(inserted) ? inserted?.[0] : null;
+        if (row) return res.status(201).json({ success: true, data: row });
+      } catch {
+        // ignore and fall through
+      }
+    }
     if (isMissingRelationError(e)) {
       return res.json({
         success: false,
@@ -6569,11 +6587,24 @@ async function adminUpdateAgenda(req, res, agendaId) {
   }
 
   try {
-    const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, allowed);
+    let updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, allowed);
     const row = Array.isArray(updated) ? updated?.[0] : null;
     if (!row) return res.status(500).json({ success: false, error: 'Gündem kaydedilemedi.' });
     return res.json({ success: true, data: row });
   } catch (e) {
+    const msg = String(e?.message || '');
+    // If optional column is missing in this deployment, retry without it.
+    if (msg.includes('description') && Object.prototype.hasOwnProperty.call(allowed, 'description')) {
+      try {
+        const retry = { ...allowed };
+        delete retry.description;
+        const updated = await supabaseRestPatch('agendas', { id: `eq.${agendaId}` }, retry);
+        const row = Array.isArray(updated) ? updated?.[0] : null;
+        if (row) return res.json({ success: true, data: row });
+      } catch {
+        // ignore and fall through
+      }
+    }
     if (isMissingRelationError(e)) {
       return res.json({
         success: false,

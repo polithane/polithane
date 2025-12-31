@@ -80,7 +80,6 @@ export const AgendaManagement = () => {
       const payload = {
         title: String(row.title || '').trim(),
         slug: String(row.slug || '').trim(),
-        description: row.description ?? null,
         is_active: !!row.is_active,
         is_trending: !!row.is_trending,
         trending_score: Number(row.trending_score || 0),
