@@ -392,15 +392,6 @@ export const AgendaManagement = () => {
                           <Save className="w-6 h-6 sm:w-5 sm:h-5" />
                           Kaydet
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => removeRow(a)}
-                          disabled={String(savingId) === String(a.id)}
-                          className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-black inline-flex items-center gap-2 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-6 h-6 sm:w-5 sm:h-5" />
-                          Pasifleştir
-                        </button>
                       </div>
                     </td>
                   </tr>
