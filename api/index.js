@@ -174,7 +174,13 @@ async function readJsonBody(req) {
 
 function getSupabaseKeys() {
   const supabaseUrl = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const anonKey = String(process.env.SUPABASE_ANON_KEY || '').trim();
+  // IMPORTANT:
+  // In production we must use the service role key on the backend.
+  // Otherwise admin tables with RLS can silently return empty arrays (anon key) and the UI looks "broken but no error".
+  if (isProd() && !serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY is missing');
+  const key = serviceKey || anonKey;
   if (!supabaseUrl || !key) throw new Error('Supabase env missing');
   return { supabaseUrl, key };
 }
@@ -1375,15 +1381,16 @@ async function adminStorageList(req, res) {
     if (error) throw error;
     const items = Array.isArray(data) ? data : [];
     const out = items
-      // Supabase Storage list returns "folder" placeholders with no metadata;
-      // treat only real objects as media items.
-      .filter((it) => it && it.name && !it.name.endsWith('/') && it.metadata && typeof it.metadata === 'object')
+      // Supabase Storage list returns "folder" placeholders; keep real objects only.
+      // Some deployments return `metadata: null` even for files, but they still have a stable `id`.
+      .filter((it) => it && it.name && !it.name.endsWith('/') && (it.id || (it.metadata && typeof it.metadata === 'object')))
       .map((it) => {
         const path = prefix ? `${prefix}/${it.name}` : it.name;
         const pub = supabase.storage.from(bucket).getPublicUrl(path)?.data?.publicUrl || '';
         const size = Number(it?.metadata?.size || 0) || 0;
         const mimetype = String(it?.metadata?.mimetype || '').trim();
         return {
+          id: it.id || null,
           name: it.name,
           path,
           bucket,
