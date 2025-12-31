@@ -1375,33 +1375,76 @@ async function adminStorageList(req, res) {
       });
     }
     const supabase = createClient(supabaseUrl, serviceKey);
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .list(prefix, { limit, offset, sortBy: { column: 'updated_at', order: 'desc' } });
-    if (error) throw error;
-    const items = Array.isArray(data) ? data : [];
-    const out = items
-      // Supabase Storage list returns "folder" placeholders; keep real objects only.
-      // Some deployments return `metadata: null` even for files, but they still have a stable `id`.
-      .filter((it) => it && it.name && !it.name.endsWith('/') && (it.id || (it.metadata && typeof it.metadata === 'object')))
-      .map((it) => {
-        const path = prefix ? `${prefix}/${it.name}` : it.name;
-        const pub = supabase.storage.from(bucket).getPublicUrl(path)?.data?.publicUrl || '';
-        const size = Number(it?.metadata?.size || 0) || 0;
-        const mimetype = String(it?.metadata?.mimetype || '').trim();
-        return {
-          id: it.id || null,
-          name: it.name,
-          path,
-          bucket,
-          public_url: pub,
-          created_at: it.created_at || null,
-          updated_at: it.updated_at || null,
-          size,
-          mimetype,
-        };
-      });
-    return res.json({ success: true, data: out, meta: { bucket, prefix, limit, offset } });
+
+    // Supabase Storage list() is NOT recursive.
+    // Our app stores media under e.g. posts/<userId>/<file>, messages/<userId>/<file>, avatars/<userId>/<file>.
+    // So a shallow list of `posts` returns only folder placeholders (looks like "empty").
+    const listOne = async (pfx, lim, off) => {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .list(pfx, { limit: lim, offset: off, sortBy: { column: 'updated_at', order: 'desc' } });
+      if (error) throw error;
+      return Array.isArray(data) ? data : [];
+    };
+
+    const isFolderLike = (it) => {
+      if (!it || !it.name) return false;
+      // Folder placeholders generally have null metadata and no mimetype/size.
+      const meta = it?.metadata;
+      const hasMeta = meta && typeof meta === 'object';
+      const mt = hasMeta ? String(meta?.mimetype || '').trim() : '';
+      const sz = hasMeta ? Number(meta?.size || 0) : 0;
+      return !mt && !(Number.isFinite(sz) && sz > 0);
+    };
+
+    const toRow = (it, pfx) => {
+      const path = pfx ? `${pfx}/${it.name}` : it.name;
+      const pub = supabase.storage.from(bucket).getPublicUrl(path)?.data?.publicUrl || '';
+      const size = Number(it?.metadata?.size || 0) || 0;
+      const mimetype = String(it?.metadata?.mimetype || '').trim();
+      return {
+        id: it.id || null,
+        name: it.name,
+        path,
+        bucket,
+        public_url: pub,
+        created_at: it.created_at || null,
+        updated_at: it.updated_at || null,
+        size,
+        mimetype,
+      };
+    };
+
+    // Depth-2 recursive listing (enough for our storage layout):
+    // - prefix '' -> root folders (posts/messages/avatars/...)
+    // - prefix 'posts' -> userId subfolders -> files
+    // - prefix 'posts/<userId>' -> files
+    const first = await listOne(prefix, Math.max(limit, 100), offset);
+    const firstFiles = first.filter((it) => it && it.name && !it.name.endsWith('/') && !isFolderLike(it));
+    const firstFolders = first.filter((it) => it && it.name && !it.name.endsWith('/') && isFolderLike(it));
+
+    let rows = firstFiles.map((it) => toRow(it, prefix));
+
+    // If we didn't find files, try one more level down (folders -> files)
+    if (rows.length < limit && firstFolders.length > 0) {
+      for (const f of firstFolders) {
+        const childPrefix = prefix ? `${prefix}/${f.name}` : f.name;
+        // eslint-disable-next-line no-await-in-loop
+        const child = await listOne(childPrefix, Math.max(limit, 100), 0).catch(() => []);
+        const childFiles = (child || []).filter((it) => it && it.name && !it.name.endsWith('/') && !isFolderLike(it));
+        for (const it of childFiles) {
+          rows.push(toRow(it, childPrefix));
+          if (rows.length >= limit) break;
+        }
+        if (rows.length >= limit) break;
+      }
+    }
+
+    // Sort newest first (best-effort)
+    rows.sort((a, b) => String(b?.updated_at || '').localeCompare(String(a?.updated_at || '')));
+    rows = rows.slice(0, limit);
+
+    return res.json({ success: true, data: rows, meta: { bucket, prefix, limit, offset } });
   } catch (e) {
     return res.status(500).json({ success: false, error: String(e?.message || 'Storage listesi alınamadı.') });
   }
@@ -9227,11 +9270,77 @@ export default async function handler(req, res) {
       const url = req.url.split('?')[0];
       // Build/debug meta (safe: only commit + time).
       if (url === '/api/meta' && req.method === 'GET') {
+        const env = {
+          NODE_ENV: String(process.env.NODE_ENV || ''),
+          SUPABASE_URL: !!String(process.env.SUPABASE_URL || '').trim(),
+          SUPABASE_SERVICE_ROLE_KEY: !!String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(),
+          SUPABASE_ANON_KEY: !!String(process.env.SUPABASE_ANON_KEY || '').trim(),
+        };
+        // Safe diagnostics (booleans + error strings only; no secrets, no row data)
+        const diag = {
+          supabase_rest_ok: false,
+          supabase_rest_error: null,
+          admin_tables_read_ok: {},
+          admin_tables_read_error: {},
+          storage_sample_counts: {},
+          storage_sample_error: null,
+        };
+        try {
+          // Smoke test: can we call PostgREST at all?
+          await supabaseRestGet('users', { select: 'id', limit: '1' }).catch((e) => {
+            throw e;
+          });
+          diag.supabase_rest_ok = true;
+        } catch (e) {
+          diag.supabase_rest_ok = false;
+          diag.supabase_rest_error = String(e?.message || e || '').slice(0, 500);
+        }
+        try {
+          const tables = [
+            'admin_email_templates',
+            'admin_notification_rules',
+            'admin_workflows',
+            'admin_sources',
+            'admin_ads',
+          ];
+          for (const t of tables) {
+            // eslint-disable-next-line no-await-in-loop
+            await supabaseRestGet(t, { select: 'id', limit: '1' })
+              .then(() => {
+                diag.admin_tables_read_ok[t] = true;
+              })
+              .catch((e) => {
+                diag.admin_tables_read_ok[t] = false;
+                diag.admin_tables_read_error[t] = String(e?.message || e || '').slice(0, 500);
+              });
+          }
+        } catch {
+          // ignore
+        }
+        try {
+          const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
+          const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+          if (supabaseUrl && serviceKey) {
+            const supabase = createClient(supabaseUrl, serviceKey);
+            const bucket = 'uploads';
+            const samples = ['', 'posts', 'messages', 'avatars', 'documents'];
+            for (const pfx of samples) {
+              // eslint-disable-next-line no-await-in-loop
+              const { data, error } = await supabase.storage.from(bucket).list(pfx, { limit: 100, offset: 0 });
+              if (error) throw error;
+              diag.storage_sample_counts[pfx || '(root)'] = Array.isArray(data) ? data.length : 0;
+            }
+          }
+        } catch (e) {
+          diag.storage_sample_error = String(e?.message || e || '').slice(0, 500);
+        }
         return res.json({
           success: true,
           rev: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_GITHUB_COMMIT_SHA || null,
           ref: process.env.VERCEL_GIT_COMMIT_REF || null,
           now: new Date().toISOString(),
+          env,
+          diag,
         });
       }
       // Cron: purge archived posts (hard delete + storage cleanup)
