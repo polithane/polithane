@@ -189,14 +189,11 @@ export const MediaManagement = () => {
           {filteredMedia.map((media) => (
             <div key={media.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video bg-gray-100 flex items-center justify-center">
-                {media.type === 'image' ? (
-                  <img src={media.url} alt={media.filename} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    {getMediaIcon(media.type)}
-                    <span className="text-xs text-gray-500">{formatFileSize(media.sizeBytes)}</span>
-                  </div>
-                )}
+                {/* IMPORTANT: Do not auto-load media files here (performance/cost). Show only metadata + URL actions. */}
+                <div className="flex flex-col items-center gap-2">
+                  {getMediaIcon(media.type)}
+                  <span className="text-xs text-gray-500">{formatFileSize(media.sizeBytes)}</span>
+                </div>
               </div>
               <div className="p-4">
                 <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">{media.filename}</h3>

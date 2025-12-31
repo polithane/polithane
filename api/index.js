@@ -1375,7 +1375,9 @@ async function adminStorageList(req, res) {
     if (error) throw error;
     const items = Array.isArray(data) ? data : [];
     const out = items
-      .filter((it) => it && it.name && !it.name.endsWith('/'))
+      // Supabase Storage list returns "folder" placeholders with no metadata;
+      // treat only real objects as media items.
+      .filter((it) => it && it.name && !it.name.endsWith('/') && it.metadata && typeof it.metadata === 'object')
       .map((it) => {
         const path = prefix ? `${prefix}/${it.name}` : it.name;
         const pub = supabase.storage.from(bucket).getPublicUrl(path)?.data?.publicUrl || '';
