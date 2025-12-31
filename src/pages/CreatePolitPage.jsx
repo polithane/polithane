@@ -1277,15 +1277,68 @@ export const CreatePolitPage = () => {
     }
   };
 
+  const goToFastStream = async () => {
+    // After posting a Fast, jump directly into the same Fast viewer/feed surface
+    // that opens when tapping a Fast bubble on the homepage.
+    const myId = user?.id || user?.user_id || null;
+    const myKey = String(myId || user?.username || '').trim();
+    if (!myKey) return navigate('/');
+    try {
+      const r = await apiCall('/api/fast?limit=24').catch(() => null);
+      const list = Array.isArray(r?.data) ? r.data : Array.isArray(r) ? r : [];
+      const queue = (list || [])
+        .map((s) => ({
+          key: String(s?.user_id || s?.id || s?.username || '').trim(),
+          user_id: s?.user_id ?? s?.id,
+          username: s?.username,
+          full_name: s?.full_name,
+          avatar_url: s?.avatar_url || s?.profile_image,
+          profile_image: s?.profile_image || s?.avatar_url,
+          story_count: s?.story_count,
+          latest_created_at: s?.latest_created_at,
+        }))
+        .filter((x) => x.key);
+
+      // Ensure my Fast is included as a starting point even if API list doesn't contain it yet.
+      const hasMe = queue.some((x) => String(x.key) === String(myId || myKey));
+      if (!hasMe) {
+        queue.unshift({
+          key: String(myId || myKey),
+          user_id: myId,
+          username: user?.username,
+          full_name: user?.full_name,
+          avatar_url: user?.avatar_url || user?.profile_image,
+          profile_image: user?.profile_image || user?.avatar_url,
+          story_count: 1,
+          latest_created_at: new Date().toISOString(),
+        });
+      }
+
+      const startKey = String(myId || myKey);
+      const startIndex = Math.max(0, queue.findIndex((x) => String(x.key) === startKey));
+      try {
+        sessionStorage.setItem('fast_queue_v1', JSON.stringify({ ts: Date.now(), queue, startKey, startIndex }));
+      } catch {
+        // ignore
+      }
+      return navigate(`/fast/${encodeURIComponent(startKey)}`, {
+        state: { fastQueue: queue, fastStartKey: startKey, fastStartIndex: startIndex },
+      });
+    } catch {
+      // Minimal fallback: open viewer for my key only.
+      return navigate(`/fast/${encodeURIComponent(myKey)}`);
+    }
+  };
+
   const finishNo = () => {
-    if (isFastMode) navigate('/fast');
+    if (isFastMode) goToFastStream();
     else navigate(primaryPost?.id ? `/post/${primaryPost.id}` : '/');
   };
 
   const finishYes = async () => {
     if (offerBusy) return;
     await publishCross();
-    if (isFastMode) navigate('/fast');
+    if (isFastMode) goToFastStream();
     else navigate(primaryPost?.id ? `/post/${primaryPost.id}` : '/');
   };
 
