@@ -1254,6 +1254,10 @@ export const CreatePolitPage = () => {
         }
       }
 
+      // Final step: create the post row in DB
+      setUploadHint(isFastMode ? 'Fast kaydediliyor…' : 'Polit kaydediliyor…');
+      setUploadPct((p) => Math.max(Number(p || 0) || 0, 0.92));
+
       const payload = {
         content: trimmed,
         content_text: trimmed,
@@ -1269,6 +1273,7 @@ export const CreatePolitPage = () => {
       const r = await postsApi.create(payload);
       const ok = !!(r?.success && r?.data?.id);
       if (!ok) throw new Error(r?.error || 'Paylaşım oluşturulamadı.');
+      setUploadPct(1);
       setPrimaryPost(r.data);
       setStep('success');
     } catch (e) {
@@ -1955,13 +1960,23 @@ export const CreatePolitPage = () => {
                     onClick={descTarget === 'cross' ? publishCrossWithText : publishPrimary}
                     className={['w-full py-4 rounded-2xl text-white font-black disabled:opacity-60', theme.btnClass].join(' ')}
                   >
-                    {loading
-                      ? 'Gönderiliyor…'
-                      : descTarget === 'cross'
-                        ? 'Polit At'
-                        : isFastMode
-                          ? 'Fast At'
-                          : 'Polit At'}
+                    <div className="text-lg leading-none">
+                      {preparingMedia
+                        ? 'Hazırlanıyor…'
+                        : loading
+                          ? `Yükleniyor… %${Math.round(uploadPct * 100)}`
+                          : descTarget === 'cross'
+                            ? 'Polit At'
+                            : isFastMode
+                              ? 'Fast At'
+                              : 'Polit At'}
+                    </div>
+                    <div className="text-xs font-semibold opacity-90 mt-1">{uploadHint || (isFastMode ? 'Fast paylaşımı' : 'Polit paylaşımı')}</div>
+                    {loading ? (
+                      <div className="mt-3 w-full h-2 rounded-full bg-white/20 overflow-hidden">
+                        <div className="h-full bg-white/90" style={{ width: `${Math.round(uploadPct * 100)}%` }} />
+                      </div>
+                    ) : null}
                   </button>
                 </div>
               ) : null}
