@@ -3072,6 +3072,9 @@ async function adminEnvCheck(req, res) {
     'SMTP_TLS_REJECT_UNAUTHORIZED',
     'MAIL_RELAY_URL',
     'MAIL_RELAY_TOKEN',
+    'BREVO_API_KEY',
+    'BREVO_FROM_EMAIL',
+    'BREVO_FROM_NAME',
     'ADMIN_BOOTSTRAP_TOKEN',
     'ADMIN_BOOTSTRAP_ALLOW_RESET',
     'PUBLIC_APP_URL',
@@ -3086,6 +3089,7 @@ async function adminEnvCheck(req, res) {
   present.SUPABASE_KEY_OK = present.SUPABASE_SERVICE_ROLE_KEY || present.SUPABASE_ANON_KEY;
   present.SMTP_OK = present.SMTP_HOST && present.SMTP_USER && present.SMTP_PASS && present.SMTP_FROM;
   present.MAIL_RELAY_OK = present.MAIL_RELAY_URL && present.MAIL_RELAY_TOKEN;
+  present.BREVO_OK = present.BREVO_API_KEY && (present.BREVO_FROM_EMAIL || present.SMTP_FROM || present.EMAIL_FROM);
 
   return res.json({ success: true, data: { present } });
 }
@@ -3487,6 +3491,57 @@ function isMailRelayConfigured() {
   return !!(url && token);
 }
 
+function isBrevoConfigured() {
+  const key = String(process.env.BREVO_API_KEY || '').trim();
+  const fromEmail = String(process.env.BREVO_FROM_EMAIL || process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim();
+  return !!(key && fromEmail);
+}
+
+async function sendEmailViaBrevo({ to, subject, html, text, fromEmail, fromName }) {
+  const apiKey = String(process.env.BREVO_API_KEY || '').trim();
+  if (!apiKey) throw new Error('BREVO is not configured (BREVO_API_KEY missing).');
+
+  const senderEmail = String(fromEmail || '').trim();
+  if (!senderEmail) throw new Error('BREVO_FROM_EMAIL (or SMTP_FROM) is missing.');
+  const senderName = String(fromName || process.env.BREVO_FROM_NAME || 'Polithane').trim() || 'Polithane';
+
+  const payload = {
+    sender: { email: senderEmail, name: senderName },
+    to: [{ email: String(to || '').trim() }],
+    subject: String(subject || '').trim(),
+    ...(html ? { htmlContent: String(html) } : {}),
+    ...(text ? { textContent: String(text) } : {}),
+  };
+
+  const resp = await withTimeout(
+    fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': apiKey,
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }),
+    8_000,
+    'BREVO send'
+  );
+
+  const raw = await resp.text().catch(() => '');
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = {};
+  }
+  if (!resp.ok) {
+    // Brevo errors usually include {message, code}
+    const msg = String(data?.message || data?.error || raw || `BREVO error (${resp.status})`).slice(0, 900);
+    throw new Error(msg);
+  }
+  return true;
+}
+
 async function sendEmailViaRelay({ to, subject, html, text, fromEmail }) {
   const relayUrl = String(process.env.MAIL_RELAY_URL || '').trim();
   const relayToken = String(process.env.MAIL_RELAY_TOKEN || '').trim();
@@ -3524,6 +3579,15 @@ async function sendEmailViaRelay({ to, subject, html, text, fromEmail }) {
 async function sendEmail({ to, subject, html, text }) {
   const fromEmail = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim();
   if (!fromEmail) throw new Error('SMTP_FROM (or EMAIL_FROM) is missing.');
+  const fromName = String(process.env.BREVO_FROM_NAME || 'Polithane').trim() || 'Polithane';
+
+  // Prefer Brevo first when configured (Vercel SMTP is often blocked; relay may not exist).
+  const brevoConfigured = isBrevoConfigured();
+  if (brevoConfigured) {
+    await sendEmailViaBrevo({ to, subject, html, text, fromEmail: String(process.env.BREVO_FROM_EMAIL || fromEmail), fromName });
+    return;
+  }
+
   const mail = {
     from: `Polithane <${fromEmail}>`,
     to: String(to || '').trim(),
@@ -3600,7 +3664,7 @@ function emailLayout({ title, bodyHtml }) {
 
 async function safeSendEmail(payload) {
   try {
-    if (!isSmtpConfigured() && !isMailRelayConfigured()) return false;
+    if (!isBrevoConfigured() && !isSmtpConfigured() && !isMailRelayConfigured()) return false;
     // Keep this bounded so user-facing API endpoints don't stall.
     await withTimeout(sendEmail(payload), 12_000, 'SMTP send');
     return true;
@@ -8019,8 +8083,15 @@ async function adminSendTestEmail(req, res) {
   const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').trim().toLowerCase() !== 'false';
   const portCandidates = getSmtpPortCandidates();
   const relayConfigured = isMailRelayConfigured();
+  const brevoConfigured = isBrevoConfigured();
 
   const debug = {
+    brevo: {
+      configured: brevoConfigured,
+      keyPresent: !!String(process.env.BREVO_API_KEY || '').trim(),
+      fromEmailPresent: !!String(process.env.BREVO_FROM_EMAIL || '').trim() || !!String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '').trim(),
+      fromName: String(process.env.BREVO_FROM_NAME || 'Polithane').trim() || 'Polithane',
+    },
     smtp: {
       host: host || null,
       port,
@@ -8042,6 +8113,31 @@ async function adminSendTestEmail(req, res) {
 
   try {
     const attempts = [];
+
+    // 1) Brevo first (preferred on Vercel)
+    if (brevoConfigured) {
+      const a = { provider: 'brevo', sent: false, error: null };
+      try {
+        await sendEmailViaBrevo({
+          to,
+          subject,
+          html: html || undefined,
+          text: text || undefined,
+          fromEmail: String(process.env.BREVO_FROM_EMAIL || from).trim() || from,
+          fromName: String(process.env.BREVO_FROM_NAME || 'Polithane').trim() || 'Polithane',
+        });
+        a.sent = true;
+        attempts.push(a);
+        debug.attempts = attempts;
+        debug.usedProvider = 'brevo';
+        return res.json({ success: true, debug });
+      } catch (e) {
+        a.sent = false;
+        a.error = String(e?.message || e || '').slice(0, 900);
+        attempts.push(a);
+      }
+    }
+
     for (const p of portCandidates) {
       const attempt = { port: p, verified: null, verifyError: null, sent: false, sendError: null };
       try {
@@ -8071,6 +8167,7 @@ async function adminSendTestEmail(req, res) {
         attempts.push(attempt);
         debug.attempts = attempts;
         debug.usedPort = p;
+        debug.usedProvider = 'smtp';
         return res.json({ success: true, debug });
       } catch (e) {
         attempt.sendError = String(e?.message || e || '').slice(0, 900);
@@ -8084,6 +8181,7 @@ async function adminSendTestEmail(req, res) {
       try {
         await sendEmailViaRelay({ to, subject, html, text, fromEmail: from });
         debug.relay.sent = true;
+        debug.usedProvider = 'mail_relay';
         return res.json({ success: true, debug });
       } catch (e) {
         debug.relay.sent = false;
