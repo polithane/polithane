@@ -21,6 +21,24 @@ const getAuthHeader = () => {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
+// Build query string without undefined/null/"undefined"/empty values
+const toQueryString = (params = {}) => {
+  try {
+    if (!params || typeof params !== 'object') return '';
+    const entries = Object.entries(params).filter(([, v]) => {
+      if (v === undefined || v === null) return false;
+      const s = String(v).trim();
+      if (!s) return false;
+      if (s === 'undefined' || s === 'null') return false;
+      return true;
+    });
+    if (entries.length === 0) return '';
+    return new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+  } catch {
+    return '';
+  }
+};
+
 // Türkçe hata mesajları
 const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Sunucuya bağlanılamıyor. Lütfen backend serverın çalıştığından emin olun.',
@@ -183,7 +201,7 @@ export const auth = {
 export const posts = {
   getAll: async (params = {}) => {
     try {
-      const query = new URLSearchParams(params).toString();
+      const query = toQueryString(params);
       return await apiCall(`/api/posts${query ? `?${query}` : ''}`);
     } catch (error) {
       debugError('Posts API error:', error);
@@ -262,7 +280,7 @@ export const users = {
   getById: (id) => apiCall(`/api/users?id=${encodeURIComponent(id)}`),
 
   getAll: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/users${query ? `?${query}` : ''}`);
   },
 
@@ -280,17 +298,17 @@ export const users = {
   getFollowStats: (userId) => apiCall(`/api/users/${userId}/follow-stats`),
 
   getPosts: (username, params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/users/${username}/posts${query ? `?${query}` : ''}`);
   },
 
   getFollowers: (userId, params = {}) => {
-    const query = new URLSearchParams(params || {}).toString();
+    const query = toQueryString(params || {});
     return apiCall(`/api/users/${userId}/followers${query ? `?${query}` : ''}`);
   },
 
   getFollowing: (userId, params = {}) => {
-    const query = new URLSearchParams(params || {}).toString();
+    const query = toQueryString(params || {});
     return apiCall(`/api/users/${userId}/following${query ? `?${query}` : ''}`);
   },
 
@@ -298,15 +316,15 @@ export const users = {
     apiCall(`/api/users/${targetUserId}/followed-by-friends?limit=${encodeURIComponent(String(limit))}`),
 
   getLikes: (userId, params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/users/${userId}/likes${query ? `?${query}` : ''}`);
   },
   getComments: (userId, params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/users/${userId}/comments${query ? `?${query}` : ''}`);
   },
   getActivity: (userId = 'me', params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/users/${userId}/activity${query ? `?${query}` : ''}`);
   },
 
@@ -338,12 +356,12 @@ export const messages = {
   getMessages: (userId) => apiCall(`/api/messages/${userId}`),
 
   getContacts: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/messages/contacts${query ? `?${query}` : ''}`);
   },
 
   getSuggestions: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/messages/suggestions${query ? `?${query}` : ''}`);
   },
 
@@ -401,7 +419,7 @@ export const admin = {
 
   getRevenueSummary: () => apiCall('/api/admin/revenue/summary'),
   getRevenueEntries: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/revenue/entries${query ? `?${query}` : ''}`);
   },
   createRevenueEntry: (data) => apiCall('/api/admin/revenue/entries', { method: 'POST', body: JSON.stringify(data || {}) }),
@@ -424,14 +442,14 @@ export const admin = {
   deleteEmailTemplate: (templateId) => apiCall(`/api/admin/email-templates/${templateId}`, { method: 'DELETE' }),
 
   getComments: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/comments${query ? `?${query}` : ''}`);
   },
   approveComment: (commentId) => apiCall(`/api/admin/comments/${commentId}/approve`, { method: 'POST' }),
   deleteComment: (commentId) => apiCall(`/api/admin/comments/${commentId}`, { method: 'DELETE' }),
 
   storageList: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/storage/list${query ? `?${query}` : ''}`);
   },
   storageDelete: (payload) => apiCall('/api/admin/storage/delete', { method: 'POST', body: JSON.stringify(payload || {}) }),
@@ -443,7 +461,7 @@ export const admin = {
   deletePaymentPlan: (planId) => apiCall(`/api/admin/payments/plans/${planId}`, { method: 'DELETE' }),
 
   getPaymentTransactions: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/payments/transactions${query ? `?${query}` : ''}`);
   },
   createPaymentTransaction: (data) =>
@@ -451,7 +469,7 @@ export const admin = {
   deletePaymentTransaction: (txId) => apiCall(`/api/admin/payments/transactions/${txId}`, { method: 'DELETE' }),
 
   getAnalytics: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/analytics${query ? `?${query}` : ''}`);
   },
 
@@ -473,12 +491,12 @@ export const admin = {
 
   // Users
   getUsers: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/users${query ? `?${query}` : ''}`);
   },
 
   getDuplicateUsers: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/users/duplicates${query ? `?${query}` : ''}`);
   },
 
@@ -501,7 +519,7 @@ export const admin = {
 
   // Posts
   getPosts: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/posts${query ? `?${query}` : ''}`);
   },
 
@@ -512,7 +530,7 @@ export const admin = {
 
   // Agendas
   getAgendas: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/agendas${query ? `?${query}` : ''}`);
   },
   createAgenda: (data) =>
@@ -548,7 +566,7 @@ export const admin = {
 
   // Parties
   getParties: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/admin/parties${query ? `?${query}` : ''}`);
   },
   createParty: (data) =>
@@ -596,7 +614,7 @@ export const admin = {
 // ============================================
 export const notifications = {
   list: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = toQueryString(params);
     return apiCall(`/api/notifications${query ? `?${query}` : ''}`);
   },
   unreadCount: () => apiCall('/api/notifications/unread-count'),

@@ -183,7 +183,7 @@ export const NotificationRules = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Bildirim Kuralları</h1>
-          <p className="text-gray-600">Kurallar veritabanından yönetilir (mock yok)</p>
+          <p className="text-gray-600">Kurallar ve kanallar buradan yönetilir.</p>
         </div>
         <div className="flex items-center gap-2">
           <button

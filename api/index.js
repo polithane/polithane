@@ -5371,8 +5371,162 @@ async function adminGetEmailTemplates(req, res) {
   const auth = requireAdmin(req, res);
   if (!auth) return;
   try {
-    const rows = await supabaseRestGet('admin_email_templates', { select: '*', order: 'updated_at.desc', limit: '200' });
-    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+    let rows = await supabaseRestGet('admin_email_templates', { select: '*', order: 'updated_at.desc', limit: '200' });
+    rows = Array.isArray(rows) ? rows : [];
+
+    // If empty, seed a high-quality default set once (best-effort).
+    if (rows.length === 0) {
+      try {
+        const now = new Date().toISOString();
+        const base = (title, bodyHtml) => `
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${String(title || '')}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+    <div style="max-width:640px;margin:0 auto;padding:24px;">
+      <div style="background:#111827;border-radius:16px;padding:18px 20px;color:#fff;">
+        <div style="font-size:18px;font-weight:800;letter-spacing:.2px;">Polithane</div>
+        <div style="opacity:.9;font-size:12px;margin-top:6px;">Siyasetin nabzı</div>
+      </div>
+      <div style="background:#ffffff;border-radius:16px;margin-top:14px;padding:22px;border:1px solid #e5e7eb;">
+        ${bodyHtml}
+      </div>
+      <div style="margin-top:14px;font-size:12px;color:#6b7280;line-height:1.5;">
+        Bu e‑posta Polithane tarafından otomatik gönderilmiştir.
+      </div>
+    </div>
+  </body>
+</html>`.trim();
+
+        const DEFAULTS = [
+          {
+            name: 'Hoş Geldin',
+            type: 'welcome',
+            subject: 'Polithane’ye Hoş Geldin!',
+            content_html: base(
+              'Hoş Geldin',
+              `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Aramıza hoş geldin!</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Polithane’de gündemi takip edebilir, Polit paylaşabilir ve Fast akışında anlık gelişmeleri izleyebilirsin.
+</p>
+<div style="margin-top:16px;padding:14px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;">
+  <div style="font-weight:800;color:#111827;">İpucu</div>
+  <div style="margin-top:6px;color:#374151;">Bildirim ayarlarını dilediğin zaman güncelleyebilirsin.</div>
+</div>
+`.trim()
+            ),
+            is_active: true,
+            updated_at: now,
+          },
+          {
+            name: 'E‑posta Doğrulama',
+            type: 'email_verification',
+            subject: 'E‑posta adresini doğrula',
+            content_html: base(
+              'E‑posta doğrulama',
+              `
+<h2 style="margin:0 0 10px 0;font-size:20px;">E‑posta doğrulama</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Hesabını aktifleştirmek için e‑posta adresini doğrulaman gerekiyor.
+</p>
+<div style="margin-top:16px;padding:14px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;">
+  <div style="color:#1d4ed8;font-weight:800;">Doğrulama bağlantısı</div>
+  <div style="margin-top:6px;color:#1f2937;">{{verification_link}}</div>
+</div>
+`.trim()
+            ),
+            is_active: true,
+            updated_at: now,
+          },
+          {
+            name: 'Şifre Sıfırlama',
+            type: 'password_reset',
+            subject: 'Şifre sıfırlama isteği',
+            content_html: base(
+              'Şifre sıfırlama',
+              `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Şifre sıfırlama</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Şifre sıfırlama isteği aldık. Eğer bu isteği sen yapmadıysan bu e‑postayı yok sayabilirsin.
+</p>
+<div style="margin-top:16px;padding:14px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;">
+  <div style="color:#9a3412;font-weight:800;">Sıfırlama bağlantısı</div>
+  <div style="margin-top:6px;color:#1f2937;">{{reset_link}}</div>
+</div>
+`.trim()
+            ),
+            is_active: true,
+            updated_at: now,
+          },
+          {
+            name: 'Üyelik Onayı (Beklemede)',
+            type: 'approval_pending',
+            subject: 'Üyelik onayı bekleniyor',
+            content_html: base(
+              'Üyelik onayı',
+              `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Üyelik onayı bekleniyor</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Başvurunu aldık. Admin onayı tamamlanınca Polit/Fast paylaşımın aktif olacaktır.
+</p>
+`.trim()
+            ),
+            is_active: true,
+            updated_at: now,
+          },
+          {
+            name: 'Üyelik Onayı (Onaylandı)',
+            type: 'approval_approved',
+            subject: 'Üyeliğin onaylandı',
+            content_html: base(
+              'Üyelik onaylandı',
+              `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Üyeliğin onaylandı</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Artık Polithane’de Polit/Fast paylaşabilir ve etkileşim kurabilirsin.
+</p>
+`.trim()
+            ),
+            is_active: true,
+            updated_at: now,
+          },
+          {
+            name: 'Yeni Mesaj',
+            type: 'message',
+            subject: 'Yeni mesajın var',
+            content_html: base(
+              'Yeni mesaj',
+              `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Yeni mesaj</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+{{actor_name}} sana yeni bir mesaj gönderdi.
+</p>
+<div style="margin-top:16px;padding:14px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;">
+  <div style="font-weight:800;color:#111827;">Mesaj</div>
+  <div style="margin-top:6px;color:#374151;">{{message_excerpt}}</div>
+</div>
+`.trim()
+            ),
+            is_active: true,
+            updated_at: now,
+          },
+        ];
+
+        // best-effort insert; ignore if schema differs
+        await supabaseRestInsert('admin_email_templates', DEFAULTS).catch(() => null);
+        rows = await supabaseRestGet('admin_email_templates', { select: '*', order: 'updated_at.desc', limit: '200' }).catch(() => []);
+        rows = Array.isArray(rows) ? rows : [];
+      } catch {
+        // ignore seeding errors
+      }
+    }
+
+    return res.json({ success: true, data: rows });
   } catch (e) {
     if (isMissingRelationError(e)) {
       return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_EMAIL_TEMPLATES.trim() });
@@ -5590,12 +5744,35 @@ async function adminGetNotificationRules(req, res) {
   if (!auth) return;
 
   try {
-    const rows = await supabaseRestGet('admin_notification_rules', {
+    let rows = await supabaseRestGet('admin_notification_rules', {
       select: '*',
       order: 'created_at.desc',
       limit: '200',
     });
-    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+    rows = Array.isArray(rows) ? rows : [];
+
+    // Seed defaults once if empty (best-effort).
+    if (rows.length === 0) {
+      try {
+        const now = new Date().toISOString();
+        const DEFAULTS = [
+          { name: 'Beğeni', description: 'Birisi paylaşımınızı beğendiğinde', trigger: 'like', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
+          { name: 'Yorum', description: 'Birisi paylaşımınıza yorum yaptığında', trigger: 'comment', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
+          { name: 'Takip', description: 'Birisi sizi takip ettiğinde', trigger: 'follow', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
+          { name: 'Mesaj', description: 'Yeni mesaj aldığınızda', trigger: 'message', enabled: true, priority: 'high', channels: ['in_app', 'email'], created_at: now, updated_at: now },
+          { name: 'Bahsedilme', description: 'Birisi sizi etiketlediğinde', trigger: 'mention', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
+          { name: 'Paylaşım', description: 'Paylaşımınız paylaşıldığında', trigger: 'share', enabled: true, priority: 'low', channels: ['in_app'], created_at: now, updated_at: now },
+          { name: 'Üyelik Onayı', description: 'Üyelik onayıyla ilgili sistem bildirimi', trigger: 'approval', enabled: true, priority: 'high', channels: ['in_app', 'email'], created_at: now, updated_at: now },
+        ];
+        await supabaseRestInsert('admin_notification_rules', DEFAULTS).catch(() => null);
+        rows = await supabaseRestGet('admin_notification_rules', { select: '*', order: 'created_at.desc', limit: '200' }).catch(() => []);
+        rows = Array.isArray(rows) ? rows : [];
+      } catch {
+        // ignore
+      }
+    }
+
+    return res.json({ success: true, data: rows });
   } catch (e) {
     if (isMissingRelationError(e)) {
       return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_NOTIFICATION_RULES.trim() });
