@@ -6490,10 +6490,28 @@ async function adminCreateAgenda(req, res) {
     .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
     .replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 200);
 
+  const ensureUniqueSlug = async (base, excludeId) => {
+    const b0 = String(base || '').trim() || `gundem-${Date.now()}`;
+    const base200 = b0.slice(0, 200);
+    for (let i = 0; i < 50; i += 1) {
+      const suffix = i === 0 ? '' : `-${i + 1}`;
+      const maxBaseLen = 200 - suffix.length;
+      const cand = `${base200.slice(0, Math.max(1, maxBaseLen))}${suffix}`.slice(0, 200);
+      const params = { select: 'id', slug: `eq.${cand}`, limit: '1' };
+      if (excludeId) params.id = `neq.${excludeId}`;
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await supabaseRestGet('agendas', params).catch(() => []);
+      if (!Array.isArray(existing) || existing.length === 0) return cand;
+    }
+    return `${base200.slice(0, 180)}-${Date.now()}`.slice(0, 200);
+  };
+
   const nowIso = new Date().toISOString();
+  const baseSlug = slugify(title);
+  const slug = await ensureUniqueSlug(baseSlug, null);
   const payload = {
     title,
-    slug: String(body?.slug || '').trim() || slugify(title),
+    slug,
     is_active: typeof body?.is_active === 'boolean' ? body.is_active : true,
     is_trending: typeof body?.is_trending === 'boolean' ? body.is_trending : true,
     trending_score: Number.isFinite(Number(body?.trending_score)) ? Number(body.trending_score) : 0,
@@ -6566,7 +6584,8 @@ async function adminUpdateAgenda(req, res, agendaId) {
   if (!isSafeId(agendaId)) return res.status(400).json({ success: false, error: 'Geçersiz gündem.' });
   const body = await readJsonBody(req);
   const allowed = {};
-  const fields = ['title', 'slug', 'description', 'trending_score', 'post_count', 'total_polit_score'];
+  // slug is auto-generated from title on save; never accept manual slug edits.
+  const fields = ['title', 'description', 'trending_score', 'post_count', 'total_polit_score'];
   for (const f of fields) {
     if (Object.prototype.hasOwnProperty.call(body, f)) allowed[f] = body[f];
   }
@@ -6579,24 +6598,28 @@ async function adminUpdateAgenda(req, res, agendaId) {
   const slugify = (input) => String(input || '').trim().toLowerCase()
     .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
     .replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 200);
+  const ensureUniqueSlug = async (base, excludeId) => {
+    const b0 = String(base || '').trim() || `gundem-${Date.now()}`;
+    const base200 = b0.slice(0, 200);
+    for (let i = 0; i < 50; i += 1) {
+      const suffix = i === 0 ? '' : `-${i + 1}`;
+      const maxBaseLen = 200 - suffix.length;
+      const cand = `${base200.slice(0, Math.max(1, maxBaseLen))}${suffix}`.slice(0, 200);
+      const params = { select: 'id', slug: `eq.${cand}`, limit: '1' };
+      if (excludeId) params.id = `neq.${excludeId}`;
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await supabaseRestGet('agendas', params).catch(() => []);
+      if (!Array.isArray(existing) || existing.length === 0) return cand;
+    }
+    return `${base200.slice(0, 180)}-${Date.now()}`.slice(0, 200);
+  };
   if (Object.prototype.hasOwnProperty.call(allowed, 'title')) {
     const t = String(allowed.title || '').trim();
     if (!t) return res.status(400).json({ success: false, error: 'Başlık boş olamaz.' });
     if (t.length > 80) return res.status(400).json({ success: false, error: 'Başlık en fazla 80 karakter olmalı.' });
     allowed.title = t;
-    // If slug is missing/empty, auto-regenerate from title.
-    if (!Object.prototype.hasOwnProperty.call(allowed, 'slug') || !String(allowed.slug || '').trim()) {
-      allowed.slug = slugify(t);
-    }
-  }
-  if (Object.prototype.hasOwnProperty.call(allowed, 'slug')) {
-    const s = String(allowed.slug || '').trim();
-    if (!s) {
-      // Keep DB consistent: do not write empty slug.
-      delete allowed.slug;
-    } else {
-      allowed.slug = slugify(s);
-    }
+    // Always re-generate slug from title on save (URL-safe + unique).
+    allowed.slug = await ensureUniqueSlug(slugify(t), String(agendaId));
   }
 
   try {

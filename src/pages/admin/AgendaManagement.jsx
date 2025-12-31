@@ -6,6 +6,20 @@ import toast from 'react-hot-toast';
 
 export const AgendaManagement = () => {
   const TITLE_MAX = 80;
+  const slugifyAgenda = (input) =>
+    String(input || '')
+      .trim()
+      .toLowerCase()
+      .replace(/ç/g, 'c')
+      .replace(/ğ/g, 'g')
+      .replace(/ı/g, 'i')
+      .replace(/ö/g, 'o')
+      .replace(/ş/g, 's')
+      .replace(/ü/g, 'u')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 200);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
@@ -83,7 +97,6 @@ export const AgendaManagement = () => {
       if (title.length > TITLE_MAX) throw new Error(`Başlık en fazla ${TITLE_MAX} karakter olmalı.`);
       const payload = {
         title,
-        slug: String(row.slug || '').trim(),
         is_active: !!row.is_active,
         is_trending: !!row.is_trending,
         trending_score: Number(row.trending_score || 0),
@@ -333,11 +346,9 @@ export const AgendaManagement = () => {
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <input
-                        value={a.slug || ''}
-                        onChange={(e) => updateRowLocal(a.id, { slug: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono text-xs"
-                      />
+                      <div className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono text-xs bg-gray-50 text-gray-800">
+                        {String(a.slug || '').trim() || slugifyAgenda(a.title)}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <input
