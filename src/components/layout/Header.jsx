@@ -85,15 +85,18 @@ export const Header = () => {
 
   const getNotifTitle = (n) => {
     if (n?.title) return String(n.title);
-    const t = String(n?.type || 'system');
-    if (t === 'like') return 'Beğeni';
-    if (t === 'comment_like') return 'Yorum beğenisi';
-    if (t === 'comment') return 'Yorum';
-    if (t === 'share') return 'Paylaşım';
-    if (t === 'follow') return 'Takip';
-    if (t === 'mention') return 'Bahsedilme';
-    if (t === 'message') return 'Mesaj';
-    if (t === 'approval') return 'Üyelik Onayı';
+    const t0 = String(n?.type || 'system');
+    const t = t0.trim().toLowerCase();
+    // Be tolerant: deployments may use slightly different type strings.
+    if (t === 'approval' || t.includes('approval') || t.includes('verified')) return 'Üyelik Onayı';
+    if (t === 'message' || t.includes('message') || t.includes('dm')) return 'Mesaj';
+    if (t === 'follow' || t.includes('follow')) return 'Takip';
+    if (t === 'mention' || t.includes('mention') || t.includes('tag')) return 'Bahsedilme';
+    if (t === 'share' || t.includes('share') || t.includes('repost')) return 'Paylaşım';
+    // comment-like must be checked before comment
+    if (t === 'comment_like' || (t.includes('comment') && t.includes('like'))) return 'Yorum beğenisi';
+    if (t === 'comment' || t.includes('comment') || t.includes('reply')) return 'Yorum';
+    if (t === 'like' || t.includes('like') || t.includes('heart')) return 'Beğeni';
     return 'Bildirim';
   };
   const getNotifMessage = (n) => {
@@ -306,7 +309,8 @@ export const Header = () => {
                             if (fn) return fn;
                             return '';
                           })();
-                          const headerLine = actorLabel ? `${title} • ${actorLabel}` : title;
+                          const headerLine = title;
+                          const subLine = msg || actorLabel;
 
                           return (
                             <button
@@ -337,7 +341,7 @@ export const Header = () => {
                                   </div>
                                   {!isRead && <span className="w-2 h-2 rounded-full bg-primary-blue flex-shrink-0" />}
                                 </div>
-                                {msg && <div className="text-[11px] text-gray-600 line-clamp-1 mt-0.5">{msg}</div>}
+                                {subLine ? <div className="text-[11px] text-gray-600 line-clamp-1 mt-0.5">{subLine}</div> : null}
                               </div>
 
                               <button
