@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users, Play, Pause, Music, Volume2, VolumeX } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -55,6 +55,142 @@ const SmartVideo = ({ src, autoPlay = false }) => {
       preload="metadata"
       className="w-full max-h-[70vh] bg-black rounded-lg object-contain"
     />
+  );
+};
+
+const SmartAudio = ({ src }) => {
+  const audioRef = useRef(null);
+  const url = String(src || '').trim();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [t, setT] = useState(0);
+  const [dur, setDur] = useState(0);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnded = () => setIsPlaying(false);
+    const onTime = () => setT(Number(el.currentTime || 0) || 0);
+    const onMeta = () => setDur(Number(el.duration || 0) || 0);
+    el.addEventListener('play', onPlay);
+    el.addEventListener('pause', onPause);
+    el.addEventListener('ended', onEnded);
+    el.addEventListener('timeupdate', onTime);
+    el.addEventListener('loadedmetadata', onMeta);
+    el.addEventListener('durationchange', onMeta);
+    return () => {
+      el.removeEventListener('play', onPlay);
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('ended', onEnded);
+      el.removeEventListener('timeupdate', onTime);
+      el.removeEventListener('loadedmetadata', onMeta);
+      el.removeEventListener('durationchange', onMeta);
+    };
+  }, [url]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    try {
+      el.muted = !!muted;
+    } catch {
+      // ignore
+    }
+  }, [muted]);
+
+  if (!url) return null;
+
+  const safeDur = Number.isFinite(dur) && dur > 0 ? dur : 0;
+  const safeT = Number.isFinite(t) && t >= 0 ? t : 0;
+  const pct = safeDur > 0 ? Math.max(0, Math.min(1, safeT / safeDur)) : 0;
+
+  const togglePlay = async () => {
+    const el = audioRef.current;
+    if (!el) return;
+    try {
+      if (el.paused) await el.play();
+      else el.pause();
+    } catch {
+      // ignore
+    }
+  };
+
+  const seekToPct = (nextPct) => {
+    const el = audioRef.current;
+    if (!el) return;
+    const d = Number(el.duration || 0);
+    if (!Number.isFinite(d) || d <= 0) return;
+    try {
+      el.currentTime = Math.max(0, Math.min(d, d * nextPct));
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-gray-200 bg-gradient-to-br from-slate-900 via-slate-900 to-primary-blue/70">
+      <div className="relative p-6 sm:p-8">
+        {/* big icon backdrop */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute -right-10 -top-10 w-64 h-64 rounded-full bg-white/20 blur-2xl" />
+          <div className="absolute -left-10 -bottom-10 w-64 h-64 rounded-full bg-white/10 blur-2xl" />
+        </div>
+
+        <div className="relative flex items-center gap-4">
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center flex-shrink-0"
+            title={isPlaying ? 'Duraklat' : 'Oynat'}
+            aria-label={isPlaying ? 'Duraklat' : 'Oynat'}
+          >
+            {isPlaying ? <Pause className="w-10 h-10 text-white" /> : <Play className="w-10 h-10 text-white ml-1" />}
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Music className="w-5 h-5 text-white/90 flex-shrink-0" />
+                <div className="text-sm sm:text-base font-black text-white truncate">Sesli Polit</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMuted((v) => !v)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white flex-shrink-0"
+                title={muted ? 'Sesi aç' : 'Sesi kapat'}
+                aria-label={muted ? 'Sesi aç' : 'Sesi kapat'}
+              >
+                {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+            </div>
+
+            <div className="mt-3">
+              <div className="h-2 rounded-full bg-white/15 overflow-hidden">
+                <div className="h-full bg-white/70" style={{ width: `${Math.round(pct * 100)}%` }} />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs text-white/80 font-semibold tabular-nums">
+                <span>{formatDuration(safeT)}</span>
+                <span>{safeDur ? formatDuration(safeDur) : ''}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1000}
+                value={Math.round(pct * 1000)}
+                onChange={(e) => seekToPct(Number(e.target.value || 0) / 1000)}
+                className="mt-2 w-full"
+                aria-label="Ses ilerletme"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Hidden native element for actual playback */}
+        <audio ref={audioRef} src={url} preload="metadata" />
+      </div>
+    </div>
   );
 };
 
@@ -546,8 +682,8 @@ export const PostDetailPage = () => {
                   </div>
                 )}
                 {uiPost.content_type === 'audio' && (
-                  <div className="bg-gray-100 rounded-lg p-6">
-                    <audio src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} controls className="w-full" />
+                  <div className="space-y-3">
+                    <SmartAudio src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} />
                     {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
                   </div>
                 )}
