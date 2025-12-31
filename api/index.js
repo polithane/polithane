@@ -7677,7 +7677,18 @@ async function authMe(req, res) {
     const rows = await supabaseRestGet('users', { select: '*,party:parties(*)', id: `eq.${auth.id}`, limit: '1' });
     const user = rows?.[0];
     if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
-    res.json({ success: true, data: { user } });
+    // IMPORTANT:
+    // Admin authorization uses the JWT `is_admin` claim.
+    // If a user is promoted to admin after logging in, their old token may not include that.
+    // So, always return a refreshed token here to keep the client in sync.
+    const token = signJwt({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      user_type: user.user_type,
+      is_admin: !!user.is_admin,
+    });
+    res.json({ success: true, data: { user, token } });
 }
 
 async function authChangePassword(req, res) {

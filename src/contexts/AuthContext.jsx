@@ -52,6 +52,11 @@ export const AuthProvider = ({ children }) => {
           const data = await api.auth.me();
           const resolvedUser = data?.data?.user ?? data?.data ?? null;
           if (resolvedUser) {
+            // Refresh token too (server may upgrade claims like is_admin)
+            if (data?.data?.token) {
+              setToken(data.data.token);
+              localStorage.setItem('auth_token', data.data.token);
+            }
             setUser(resolvedUser);
             localStorage.setItem('user', JSON.stringify(resolvedUser));
             await ensureStorageBuckets();
@@ -153,6 +158,10 @@ export const AuthProvider = ({ children }) => {
       const data = await api.auth.me();
       const resolvedUser = data?.data?.user ?? data?.data ?? null;
       if (resolvedUser) {
+        if (data?.data?.token) {
+          setToken(data.data.token);
+          localStorage.setItem('auth_token', data.data.token);
+        }
         setUser(resolvedUser);
         localStorage.setItem('user', JSON.stringify(resolvedUser));
       }
