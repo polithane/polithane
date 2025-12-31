@@ -21,7 +21,23 @@ export const EmailTemplates = () => {
       const r = await adminApi.getEmailTemplates().catch(() => null);
       if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
       if (!r?.success) throw new Error(r?.error || 'Şablonlar yüklenemedi.');
-      setTemplates(Array.isArray(r.data) ? r.data : []);
+      const raw = Array.isArray(r?.data) ? r.data : [];
+      const normalize = (t) => {
+        const usage = Number(t?.usage_count ?? t?.usage ?? 0);
+        const updatedAt = t?.updated_at ?? t?.updatedAt ?? t?.last_updated ?? t?.created_at ?? t?.createdAt ?? null;
+        return {
+          ...t,
+          id: t?.id,
+          name: String(t?.name || t?.template_name || '').trim() || 'Şablon',
+          type: String(t?.type || 'other').trim() || 'other',
+          subject: String(t?.subject || '').trim(),
+          content_html: String(t?.content_html ?? t?.html ?? t?.content ?? '').trim(),
+          is_active: t?.is_active !== false,
+          usage_count: Number.isFinite(usage) && usage >= 0 ? usage : 0,
+          _lastUpdated: updatedAt ? String(updatedAt) : '',
+        };
+      };
+      setTemplates(raw.map(normalize));
     } catch (e) {
       setError(String(e?.message || 'Şablonlar yüklenemedi.'));
     } finally {
@@ -190,10 +206,12 @@ export const EmailTemplates = () => {
                 </td>
                 <td className="px-6 py-4">{getTypeBadge(template.type)}</td>
                 <td className="px-6 py-4">
-                  <span className="text-sm font-semibold text-gray-700">{template.usage_count.toLocaleString()}</span>
+                  <span className="text-sm font-semibold text-gray-700">
+                    {Number(template.usage_count || 0).toLocaleString('tr-TR')}
+                  </span>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="text-sm text-gray-500">{template.last_updated}</span>
+                  <span className="text-sm text-gray-500">{template._lastUpdated || '—'}</span>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">

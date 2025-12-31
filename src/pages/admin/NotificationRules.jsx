@@ -39,7 +39,32 @@ export const NotificationRules = () => {
       ]);
       if (rRules?.schemaMissing && rRules?.requiredSql) setSchemaSql(String(rRules.requiredSql || ''));
       if (!rRules?.success) throw new Error(rRules?.error || 'Kurallar yüklenemedi.');
-      setRules(Array.isArray(rRules.data) ? rRules.data : []);
+      const rawRules = Array.isArray(rRules?.data) ? rRules.data : [];
+      const normalizeChannels = (v) => {
+        if (Array.isArray(v)) return v.map((x) => String(x || '').trim()).filter(Boolean);
+        const s = String(v || '').trim();
+        if (!s) return [];
+        // Try JSON array first
+        try {
+          const parsed = JSON.parse(s);
+          if (Array.isArray(parsed)) return parsed.map((x) => String(x || '').trim()).filter(Boolean);
+        } catch {
+          // ignore
+        }
+        // Fallback: comma-separated
+        return s.split(',').map((x) => x.trim()).filter(Boolean);
+      };
+      const normalizedRules = rawRules.map((r) => ({
+        ...r,
+        id: r?.id,
+        name: String(r?.name || '').trim() || 'Kural',
+        description: String(r?.description || '').trim(),
+        trigger: String(r?.trigger || '').trim(),
+        enabled: r?.enabled !== false,
+        priority: String(r?.priority || 'normal').trim() || 'normal',
+        channels: normalizeChannels(r?.channels),
+      }));
+      setRules(normalizedRules);
 
       if (rChannels?.schemaMissing && rChannels?.requiredSql) setChannelsSql(String(rChannels.requiredSql || ''));
       if (rChannels?.success && rChannels?.data) {
@@ -93,7 +118,7 @@ export const NotificationRules = () => {
     };
     return (
       <div className="flex flex-wrap gap-2">
-        {(channels || []).map(channel => (
+        {(Array.isArray(channels) ? channels : []).map(channel => (
           <span key={channel} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
             {channelNames[channel]}
           </span>
