@@ -1449,7 +1449,7 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-14 h-14 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden"
+                              className="relative w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden"
                               aria-label="Durdur"
                               title="Durdur"
                             >
@@ -1534,7 +1534,7 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-14 h-14 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden"
+                              className="relative w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden"
                               aria-label="Durdur"
                               title="Durdur"
                             >
