@@ -299,6 +299,14 @@ export const Header = () => {
                           const title = getNotifTitle(n);
                           const msg = getNotifMessage(n);
                           const targetPostId = n?.post_id ?? n?.post?.id ?? null;
+                          const actorLabel = (() => {
+                            const un = String(actor?.username || '').trim();
+                            if (un) return `@${un}`;
+                            const fn = String(actor?.full_name || '').trim();
+                            if (fn) return fn;
+                            return '';
+                          })();
+                          const headerLine = actorLabel ? `${title} • ${actorLabel}` : title;
 
                           return (
                             <button
@@ -324,8 +332,8 @@ export const Header = () => {
                               <Avatar src={actor?.avatar_url} size="32px" verified={isUiVerifiedUser(actor)} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
-                                  <div className={`text-xs ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
-                                    {title}
+                                  <div className={`text-sm ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
+                                    {headerLine}
                                   </div>
                                   {!isRead && <span className="w-2 h-2 rounded-full bg-primary-blue flex-shrink-0" />}
                                 </div>
