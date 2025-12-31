@@ -7978,7 +7978,10 @@ async function getNotifications(req, res) {
     offset: String(parseInt(offset, 10) || 0),
   };
   try {
-    const rows = await supabaseRestGet('notifications', params).catch(() => []);
+    // IMPORTANT:
+    // If embedded relations are not configured (FK missing in PostgREST), this request fails.
+    // Do NOT swallow that error here; we need to fall back to a schema-agnostic select below.
+    const rows = await supabaseRestGet('notifications', params);
     return res.json({ success: true, data: rows || [] });
   } catch {
     // Fallback: schema-agnostic (in case embedded relations/columns differ)
