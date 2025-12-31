@@ -486,7 +486,14 @@ export const CreatePolitPage = () => {
         } catch {
           // ignore
         }
-        setTimeout(() => resolve(true), 160);
+        // Fallback: allow decoder/render pipeline to catch up (esp. desktop Firefox)
+        try {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+          return;
+        } catch {
+          // ignore
+        }
+        setTimeout(() => resolve(true), 220);
       });
 
     const captureAt = (videoEl, timeSec, fallbackDurationSec) =>
@@ -511,6 +518,41 @@ export const CreatePolitPage = () => {
               // ignore
             }
             try {
+              // Some desktop browsers won't decode frames for off-DOM video elements
+              // unless we force a brief play/pause (muted autoplay should be allowed).
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                await videoEl.play?.();
+                videoEl.pause?.();
+              } catch {
+                // ignore
+              }
+              // Ensure enough data is buffered/decoded for canvas draw
+              if (Number(videoEl.readyState || 0) < 2) {
+                await new Promise((resolve) => {
+                  let settled = false;
+                  const done = () => {
+                    if (settled) return;
+                    settled = true;
+                    try {
+                      videoEl.removeEventListener('loadeddata', done);
+                      videoEl.removeEventListener('canplay', done);
+                      videoEl.removeEventListener('timeupdate', done);
+                    } catch {
+                      // ignore
+                    }
+                    resolve(true);
+                  };
+                  try {
+                    videoEl.addEventListener('loadeddata', done, { once: true });
+                    videoEl.addEventListener('canplay', done, { once: true });
+                    videoEl.addEventListener('timeupdate', done, { once: true });
+                  } catch {
+                    // ignore
+                  }
+                  setTimeout(done, 380);
+                });
+              }
               // On some mobile browsers, seeked fires before the frame is actually ready to draw.
               await waitForFrame(videoEl);
 
@@ -583,6 +625,18 @@ export const CreatePolitPage = () => {
         videoEl.src = src;
         videoEl.muted = true;
         videoEl.playsInline = true;
+        // Attach offscreen to help desktop browsers decode frames reliably
+        try {
+          videoEl.style.position = 'fixed';
+          videoEl.style.left = '-9999px';
+          videoEl.style.top = '0';
+          videoEl.style.width = '1px';
+          videoEl.style.height = '1px';
+          videoEl.style.opacity = '0';
+          document.body.appendChild(videoEl);
+        } catch {
+          // ignore
+        }
         try {
           videoEl.setAttribute('playsinline', 'true');
           videoEl.setAttribute('webkit-playsinline', 'true');
@@ -596,6 +650,13 @@ export const CreatePolitPage = () => {
           videoEl.onerror = done;
           setTimeout(done, 1200);
         });
+        try {
+          // Warm up decode pipeline for desktop as well
+          await videoEl.play?.();
+          videoEl.pause?.();
+        } catch {
+          // ignore
+        }
         try {
           // warm up decoder on mobile (helps avoid black canvas)
           videoEl.currentTime = 0.1;
@@ -647,6 +708,14 @@ export const CreatePolitPage = () => {
         }
         setVideoThumbs(captured);
         setSelectedVideoThumbIdx(0);
+        try {
+          videoEl.pause?.();
+          videoEl.removeAttribute?.('src');
+          videoEl.load?.();
+          videoEl.remove?.();
+        } catch {
+          // ignore
+        }
       } catch {
         // ignore
       }
@@ -1532,10 +1601,12 @@ export const CreatePolitPage = () => {
                         )}
                       </div>
 
-                      <div className="flex items-center justify-center gap-2 text-[11px] text-gray-600">
-                        <Smartphone className="w-4 h-4 text-gray-500" />
-                        <span>Telefonu dik tutunuz</span>
-                      </div>
+                      {isMobileLike ? (
+                        <div className="flex items-center justify-center gap-2 text-[11px] text-gray-600">
+                          <Smartphone className="w-4 h-4 text-gray-500" />
+                          <span>Telefonu dik tutunuz</span>
+                        </div>
+                      ) : null}
 
                       {videoThumbs.length > 0 ? (
                         <div>
