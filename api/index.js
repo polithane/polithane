@@ -2021,34 +2021,118 @@ async function deletePost(req, res, postId) {
     return res.status(403).json({ success: false, error: 'Bu paylaşımı silemezsiniz.' });
   }
 
-  // Best-effort: also delete uploaded media objects from storage
-  try {
-    const urls = [];
-    if (Array.isArray(post?.media_urls)) urls.push(...post.media_urls);
-    if (post?.thumbnail_url) urls.push(post.thumbnail_url);
-    const objs = (urls || [])
-      .map((u) => parseSupabasePublicObjectUrl(u))
-      .filter(Boolean)
-      // Only delete from uploads bucket (avoid shared assets like avatars/logos)
-      .filter((p) => p.bucket === 'uploads' && p.objectPath);
-    const seen = new Set();
-    for (const o of objs) {
-      const key = `${o.bucket}/${o.objectPath}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      // eslint-disable-next-line no-await-in-loop
-      await supabaseStorageDeleteObject(o.bucket, o.objectPath).catch(() => null);
-    }
-  } catch {
-    // ignore
-  }
-
+  // Archive-first delete:
+  // - Immediately hide the post from the app (soft delete)
+  // - Do NOT delete media yet (so we can support a short "archive/grace" window)
+  // - A cron job will hard-delete rows + media after the archive window expires
   const updated = await supabaseRestPatch(
     'posts',
     { id: `eq.${id}`, user_id: `eq.${auth.id}` },
     { is_deleted: true, updated_at: new Date().toISOString() }
   ).catch(() => []);
   return res.json({ success: true, data: updated?.[0] || null });
+}
+
+async function purgeArchivedPosts({ olderThanDays = 3, limit = 200 } = {}) {
+  const days = Math.max(1, Math.min(30, Number(olderThanDays) || 3));
+  const lim = Math.max(1, Math.min(500, Number(limit) || 200));
+  const cutoffIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const candidates = await supabaseRestGet('posts', {
+    select: 'id,user_id,media_urls,thumbnail_url,updated_at,is_deleted',
+    is_deleted: 'eq.true',
+    updated_at: `lt.${cutoffIso}`,
+    order: 'updated_at.asc',
+    limit: String(lim),
+  }).catch(() => []);
+
+  const list = Array.isArray(candidates) ? candidates : [];
+  let deletedPosts = 0;
+  let deletedMediaObjects = 0;
+  let deletedLikes = 0;
+  let deletedComments = 0;
+  let deletedNotifications = 0;
+  const errors = [];
+
+  const safeId = (x) => String(x || '').trim();
+
+  for (const p of list) {
+    const pid = safeId(p?.id);
+    if (!pid) continue;
+    try {
+      // 1) Delete related rows (best-effort)
+      try {
+        const r = await supabaseRestDelete('likes', { post_id: `eq.${pid}` }, { Prefer: 'return=representation' }).catch(() => null);
+        if (Array.isArray(r)) deletedLikes += r.length;
+      } catch {
+        // ignore
+      }
+      try {
+        const r = await supabaseRestDelete('comments', { post_id: `eq.${pid}` }, { Prefer: 'return=representation' }).catch(() => null);
+        if (Array.isArray(r)) deletedComments += r.length;
+      } catch {
+        // ignore
+      }
+      try {
+        const r = await supabaseRestDelete('notifications', { post_id: `eq.${pid}` }, { Prefer: 'return=representation' }).catch(() => null);
+        if (Array.isArray(r)) deletedNotifications += r.length;
+      } catch {
+        // ignore
+      }
+
+      // 2) Delete media objects from storage (uploads bucket only)
+      try {
+        const urls = [];
+        if (Array.isArray(p?.media_urls)) urls.push(...p.media_urls);
+        if (p?.thumbnail_url) urls.push(p.thumbnail_url);
+        const objs = (urls || [])
+          .map((u) => parseSupabasePublicObjectUrl(u))
+          .filter(Boolean)
+          .filter((o) => o.bucket === 'uploads' && o.objectPath);
+        const seen = new Set();
+        for (const o of objs) {
+          const key = `${o.bucket}/${o.objectPath}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          // eslint-disable-next-line no-await-in-loop
+          await supabaseStorageDeleteObject(o.bucket, o.objectPath).catch(() => null);
+          deletedMediaObjects += 1;
+        }
+      } catch {
+        // ignore
+      }
+
+      // 3) Hard delete post row
+      await supabaseRestDelete('posts', { id: `eq.${pid}` }, { Prefer: 'return=minimal' });
+      deletedPosts += 1;
+    } catch (e) {
+      errors.push({ post_id: pid, error: String(e?.message || e) });
+    }
+  }
+
+  return {
+    days,
+    cutoffIso,
+    scanned: list.length,
+    deletedPosts,
+    deletedMediaObjects,
+    deletedLikes,
+    deletedComments,
+    deletedNotifications,
+    errors: errors.slice(0, 20),
+  };
+}
+
+async function cronPurgeArchivedPosts(req, res) {
+  const expected = String(process.env.CRON_SECRET || '').trim();
+  if (!expected) return res.status(404).json({ success: false, error: 'Not found' });
+  const provided = String(req.headers['x-cron-secret'] || '').trim();
+  if (!provided || provided !== expected) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+  const days = Number(req.query?.days || process.env.POST_ARCHIVE_DAYS || 3) || 3;
+  const limit = Number(req.query?.limit || 200) || 200;
+  const out = await purgeArchivedPosts({ olderThanDays: days, limit });
+  return res.json({ success: true, data: out });
 }
 
 async function getAgendas(req, res) {
@@ -8830,6 +8914,10 @@ export default async function handler(req, res) {
           ref: process.env.VERCEL_GIT_COMMIT_REF || null,
           now: new Date().toISOString(),
         });
+      }
+      // Cron: purge archived posts (hard delete + storage cleanup)
+      if (url === '/api/cron/purge-archived-posts' && req.method === 'POST') {
+        return await cronPurgeArchivedPosts(req, res);
       }
       if (url === '/api/avatar' && req.method === 'GET') return await proxyAvatar(req, res);
 
