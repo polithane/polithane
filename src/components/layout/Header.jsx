@@ -89,6 +89,8 @@ export const Header = () => {
     const t = t0.trim().toLowerCase();
     // Be tolerant: deployments may use slightly different type strings.
     if (t === 'approval' || t.includes('approval') || t.includes('verified')) return 'Üyelik Onayı';
+    if (t === 'welcome' || t.includes('welcome') || t.includes('hosgeldin') || t.includes('hoşgeldin')) return 'Hoş geldiniz';
+    if (t === 'profile_reminder' || (t.includes('profile') && t.includes('reminder')) || t.includes('profil')) return 'Profilinizi tamamlayın';
     if (t === 'message' || t.includes('message') || t.includes('dm')) return 'Mesaj';
     if (t === 'follow' || t.includes('follow')) return 'Takip';
     if (t === 'mention' || t.includes('mention') || t.includes('tag')) return 'Bahsedilme';
@@ -300,17 +302,8 @@ export const Header = () => {
                           const isRead = !!n?.is_read;
                           const actor = n?.actor || null;
                           const title = getNotifTitle(n);
-                          const msg = getNotifMessage(n);
                           const targetPostId = n?.post_id ?? n?.post?.id ?? null;
-                          const actorLabel = (() => {
-                            const un = String(actor?.username || '').trim();
-                            if (un) return `@${un}`;
-                            const fn = String(actor?.full_name || '').trim();
-                            if (fn) return fn;
-                            return '';
-                          })();
                           const headerLine = title;
-                          const subLine = msg || actorLabel;
 
                           return (
                             <button
@@ -339,9 +332,7 @@ export const Header = () => {
                                   <div className={`text-sm ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
                                     {headerLine}
                                   </div>
-                                  {!isRead && <span className="w-2 h-2 rounded-full bg-primary-blue flex-shrink-0" />}
                                 </div>
-                                {subLine ? <div className="text-[11px] text-gray-600 line-clamp-1 mt-0.5">{subLine}</div> : null}
                               </div>
 
                               <button

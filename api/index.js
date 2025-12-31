@@ -362,13 +362,24 @@ async function supabaseRestDelete(path, params, extraHeaders = {}) {
 // Notifications table schema differs between environments (some don't have title/message).
 // This helper tries inserting as-is, then falls back to minimal columns if needed.
 async function supabaseInsertNotifications(rows) {
+  const arr = Array.isArray(rows) ? rows : [];
+  // Global safety: never notify the actor about their own action.
+  // This prevents logic bugs where user_id/actor_id get mixed up in any endpoint.
+  const filtered = arr.filter((r) => {
+    if (!r || typeof r !== 'object') return false;
+    const uid = r.user_id != null ? String(r.user_id) : '';
+    const aid = r.actor_id != null ? String(r.actor_id) : '';
+    if (uid && aid && uid === aid) return false;
+    return true;
+  });
+  if (filtered.length === 0) return [];
   try {
-    return await supabaseRestInsert('notifications', rows);
+    return await supabaseRestInsert('notifications', filtered);
   } catch (e) {
     const msg = String(e?.message || '');
     const lower = msg.toLowerCase();
     if (lower.includes('title') || lower.includes('message')) {
-      const stripped = (rows || []).map((r) => {
+      const stripped = (filtered || []).map((r) => {
         if (!r || typeof r !== 'object') return r;
         // eslint-disable-next-line no-unused-vars
         const { title, message, ...rest } = r;
@@ -7517,31 +7528,27 @@ async function authRegister(req, res) {
 
     if (!user) throw new Error('Kullanıcı oluşturulamadı.');
 
-    // First-login notifications (try title/message schema, fallback to minimal)
-    await supabaseRestInsert('notifications', [
+    // First-login notifications (schema-agnostic insert helper)
+    await supabaseInsertNotifications([
       {
         user_id: user.id,
-        type: 'system',
-        title: 'Hoş geldiniz!',
-        message: 'Polithane ailesine katıldığınız için çok mutluyuz. Profilinizi tamamlayarak daha güçlü bir deneyim yaşayabilirsiniz.',
-        is_read: false
+        actor_id: null,
+        type: 'welcome',
+        title: 'Hoş geldiniz',
+        message:
+          'Polithane ailesine katıldığınız için çok mutluyuz. Profilinizi tamamlayarak daha güçlü bir deneyim yaşayabilirsiniz.',
+        is_read: false,
       },
       {
         user_id: user.id,
-        type: 'system',
+        actor_id: null,
+        type: 'profile_reminder',
         title: 'Profilinizi tamamlayın',
-        message: 'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
-        is_read: false
-      }
-    ]).catch(async (err) => {
-      const msg = String(err?.message || '');
-      if (msg.includes('title') || msg.includes('message')) {
-        await supabaseRestInsert('notifications', [
-          { user_id: user.id, type: 'system', is_read: false },
-          { user_id: user.id, type: 'system', is_read: false }
-        ]).catch(() => {});
-      }
-    });
+        message:
+          'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
+        is_read: false,
+      },
+    ]).catch(() => null);
 
     // Approval notification for non-citizen accounts (they can login, but cannot post until approved).
     if (user_type !== 'citizen') {
