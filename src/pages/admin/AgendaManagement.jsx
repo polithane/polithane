@@ -5,6 +5,7 @@ import { apiCall } from '../../utils/api';
 import toast from 'react-hot-toast';
 
 export const AgendaManagement = () => {
+  const TITLE_MAX = 80;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
@@ -77,8 +78,11 @@ export const AgendaManagement = () => {
     setError('');
     setSchemaSql('');
     try {
+      const title = String(row.title || '').trim();
+      if (!title) throw new Error('Başlık boş olamaz.');
+      if (title.length > TITLE_MAX) throw new Error(`Başlık en fazla ${TITLE_MAX} karakter olmalı.`);
       const payload = {
-        title: String(row.title || '').trim(),
+        title,
         slug: String(row.slug || '').trim(),
         is_active: !!row.is_active,
         is_trending: !!row.is_trending,
@@ -324,6 +328,7 @@ export const AgendaManagement = () => {
                       <input
                         value={a.title || ''}
                         onChange={(e) => updateRowLocal(a.id, { title: e.target.value })}
+                        maxLength={TITLE_MAX}
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg"
                       />
                     </td>
@@ -354,7 +359,12 @@ export const AgendaManagement = () => {
                       <input
                         type="checkbox"
                         checked={!!a.is_trending}
-                        onChange={(e) => updateRowLocal(a.id, { is_trending: e.target.checked })}
+                        onChange={async (e) => {
+                          const next = !!e.target.checked;
+                          const merged = { ...a, is_trending: next };
+                          updateRowLocal(a.id, { is_trending: next });
+                          await saveRow(merged);
+                        }}
                         className="w-5 h-5 accent-primary-blue cursor-pointer"
                       />
                     </td>
@@ -362,7 +372,12 @@ export const AgendaManagement = () => {
                       <input
                         type="checkbox"
                         checked={!!a.is_active}
-                        onChange={(e) => updateRowLocal(a.id, { is_active: e.target.checked })}
+                        onChange={async (e) => {
+                          const next = !!e.target.checked;
+                          const merged = { ...a, is_active: next };
+                          updateRowLocal(a.id, { is_active: next });
+                          await saveRow(merged);
+                        }}
                         className="w-5 h-5 accent-primary-blue cursor-pointer"
                       />
                     </td>

@@ -6472,6 +6472,7 @@ async function adminCreateAgenda(req, res) {
   if (!auth) return;
   const body = await readJsonBody(req);
   const title = String(body?.title || '').trim();
+  if (title.length > 80) return res.status(400).json({ success: false, error: 'Başlık en fazla 80 karakter olmalı.' });
   if (!title) return res.status(400).json({ success: false, error: 'title zorunludur.' });
 
   const slugify = (input) => String(input || '').trim().toLowerCase()
@@ -6570,6 +6571,7 @@ async function adminUpdateAgenda(req, res, agendaId) {
   if (Object.prototype.hasOwnProperty.call(allowed, 'title')) {
     const t = String(allowed.title || '').trim();
     if (!t) return res.status(400).json({ success: false, error: 'Başlık boş olamaz.' });
+    if (t.length > 80) return res.status(400).json({ success: false, error: 'Başlık en fazla 80 karakter olmalı.' });
     allowed.title = t;
     // If slug is missing/empty, auto-regenerate from title.
     if (!Object.prototype.hasOwnProperty.call(allowed, 'slug') || !String(allowed.slug || '').trim()) {
