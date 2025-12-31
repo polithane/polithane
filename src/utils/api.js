@@ -453,6 +453,7 @@ export const admin = {
     return apiCall(`/api/admin/storage/list${query ? `?${query}` : ''}`);
   },
   storageDelete: (payload) => apiCall('/api/admin/storage/delete', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  storageReplace: (payload) => apiCall('/api/admin/storage/replace', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
   getPaymentPlans: () => apiCall('/api/admin/payments/plans'),
   createPaymentPlan: (data) => apiCall('/api/admin/payments/plans', { method: 'POST', body: JSON.stringify(data || {}) }),

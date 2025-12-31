@@ -1500,6 +1500,53 @@ async function adminStorageDelete(req, res) {
   }
 }
 
+async function adminStorageReplace(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const bucket = String(body?.bucket || 'uploads').trim() || 'uploads';
+  const path = String(body?.path || '').trim().replace(/^\/+/, '');
+  const dataUrl = String(body?.dataUrl || '');
+  const contentType = String(body?.contentType || '').trim();
+
+  if (!path) return res.status(400).json({ success: false, error: 'Geçersiz dosya yolu.' });
+  if (path.includes('..')) return res.status(400).json({ success: false, error: 'Geçersiz dosya yolu.' });
+  if (path.length > 300) return res.status(400).json({ success: false, error: 'Dosya yolu çok uzun.' });
+
+  // Safety: only allow replacing inside uploads bucket (avoid accidental system bucket ops)
+  if (bucket !== 'uploads') {
+    return res.status(400).json({ success: false, error: 'Sadece uploads bucket destekleniyor.' });
+  }
+
+  if (!dataUrl.startsWith('data:') || !dataUrl.includes('base64,')) {
+    return res.status(400).json({ success: false, error: 'Geçersiz dosya verisi.' });
+  }
+  const base64 = dataUrl.split('base64,')[1] || '';
+  let buf;
+  try {
+    buf = Buffer.from(base64, 'base64');
+  } catch {
+    return res.status(400).json({ success: false, error: 'Dosya çözümlenemedi.' });
+  }
+  if (!buf || buf.length === 0) return res.status(400).json({ success: false, error: 'Dosya boş.' });
+  // Keep serverless safe
+  const maxBytes = 12 * 1024 * 1024; // 12MB
+  if (buf.length > maxBytes) return res.status(400).json({ success: false, error: 'Dosya çok büyük (max 12MB).' });
+
+  const ct = contentType || dataUrl.slice(5).split(';')[0];
+  if (!ct) return res.status(400).json({ success: false, error: 'Geçersiz dosya türü.' });
+
+  try {
+    await supabaseStorageUploadObject(bucket, path, buf, ct);
+  } catch (e) {
+    return res.status(500).json({ success: false, error: String(e?.message || 'Dosya güncellenemedi.') });
+  }
+
+  const { supabaseUrl } = getSupabaseKeys();
+  const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+  return res.json({ success: true, data: { bucket, path, publicUrl } });
+}
+
 async function togglePostLike(req, res, postId) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -9632,6 +9679,7 @@ export default async function handler(req, res) {
       if (url === '/api/admin/comments' && req.method === 'GET') return await adminGetComments(req, res);
       if (url === '/api/admin/storage/list' && req.method === 'GET') return await adminStorageList(req, res);
       if (url === '/api/admin/storage/delete' && req.method === 'POST') return await adminStorageDelete(req, res);
+      if (url === '/api/admin/storage/replace' && req.method === 'POST') return await adminStorageReplace(req, res);
       if (url.startsWith('/api/admin/notification-rules/') && req.method === 'PUT') {
         const ruleId = url.split('/api/admin/notification-rules/')[1];
         return await adminUpdateNotificationRule(req, res, ruleId);
