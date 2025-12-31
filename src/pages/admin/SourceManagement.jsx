@@ -118,7 +118,7 @@ export const SourceManagement = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Kaynak Yönetimi</h1>
-          <p className="text-gray-600">İçerik kaynaklarını DB’den yönetin (mock yok)</p>
+          <p className="text-gray-600">İçerik kaynaklarını yönetin</p>
         </div>
         <button type="button" onClick={load} className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 font-black">
           Yenile

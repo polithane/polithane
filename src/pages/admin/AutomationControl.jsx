@@ -86,7 +86,7 @@ export const AutomationControl = () => {
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Otomasyon Kontrolü</h1>
-          <p className="text-gray-600">İş akışlarını DB üzerinden yönetin (mock yok)</p>
+          <p className="text-gray-600">İş akışlarını yönetin</p>
         </div>
         <button
           type="button"

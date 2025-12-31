@@ -64,7 +64,7 @@ export const DatabaseManagement = () => {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Veritabanı Yönetimi</h1>
-        <p className="text-gray-600">Supabase Postgres özet görünümü (mock yok)</p>
+        <p className="text-gray-600">Supabase Postgres özet görünümü</p>
       </div>
 
       {error ? <div className="mb-4 text-sm text-red-600 font-semibold">{error}</div> : null}

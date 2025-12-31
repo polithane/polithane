@@ -130,7 +130,7 @@ export const CommentModeration = () => {
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Yorum Moderasyonu</h1>
-          <p className="text-gray-600">Kullanıcı yorumlarını yönetin (mock yok)</p>
+          <p className="text-gray-600">Kullanıcı yorumlarını yönetin</p>
         </div>
         <button
           type="button"

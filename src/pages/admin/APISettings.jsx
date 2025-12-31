@@ -72,7 +72,7 @@ export const APISettings = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">API Ayarları</h1>
-          <p className="text-gray-600">API anahtarlarını yönetin (mock yok)</p>
+          <p className="text-gray-600">API anahtarlarını yönetin</p>
         </div>
       </div>
 

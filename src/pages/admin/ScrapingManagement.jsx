@@ -58,7 +58,7 @@ export const ScrapingManagement = () => {
       <div className="flex items-start justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Tarama Yönetimi</h1>
-          <p className="text-gray-600">Kaynaklar üzerinden tarama durumunu yönetin (mock yok)</p>
+          <p className="text-gray-600">Kaynaklar üzerinden tarama durumunu yönetin</p>
         </div>
         <button
           type="button"

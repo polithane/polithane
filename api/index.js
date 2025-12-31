@@ -1298,7 +1298,7 @@ async function toggleCommentLike(req, res, commentId) {
 }
 
 async function adminListPendingComments(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const { limit = 50, offset = 0 } = req.query || {};
   const rows = await supabaseRestGet('comments', {
@@ -1312,14 +1312,14 @@ async function adminListPendingComments(req, res) {
 }
 
 async function adminApproveComment(req, res, commentId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const updated = await supabaseRestPatch('comments', { id: `eq.${commentId}` }, { is_deleted: false }).catch(() => []);
   return res.json({ success: true, data: updated?.[0] || null });
 }
 
 async function adminGetComments(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const { limit = 100, offset = 0, status = 'all' } = req.query || {};
   const lim = Math.min(200, Math.max(1, parseInt(String(limit), 10) || 100));
@@ -1339,7 +1339,7 @@ async function adminGetComments(req, res) {
 }
 
 async function adminDeleteComment(req, res, commentId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const cid = String(commentId || '').trim();
   if (!isSafeId(cid)) return res.status(400).json({ success: false, error: 'Geçersiz yorum.' });
@@ -1352,7 +1352,7 @@ async function adminDeleteComment(req, res, commentId) {
 }
 
 async function adminStorageList(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const bucket = String(req.query?.bucket || 'uploads').trim() || 'uploads';
   const prefix = String(req.query?.prefix || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
@@ -1401,7 +1401,7 @@ async function adminStorageList(req, res) {
 }
 
 async function adminStorageDelete(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const bucket = String(body?.bucket || 'uploads').trim() || 'uploads';
@@ -3143,17 +3143,28 @@ async function getUserActivity(req, res, userKey) {
   return res.json({ success: true, data: items.slice(0, lim) });
 }
 
-function requireAdmin(req, res) {
+async function requireAdmin(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) {
     res.status(401).json({ success: false, error: 'Unauthorized' });
     return null;
   }
-  if (!auth.is_admin) {
-    res.status(403).json({ success: false, error: 'Forbidden' });
-    return null;
+  // Primary gate: JWT claim
+  if (auth.is_admin) return auth;
+
+  // Fallback gate:
+  // Some users are promoted to admin after they already logged in, so their old JWT might not have `is_admin: true`.
+  // Since admin pages already require a valid JWT, we can safely re-check the admin flag from DB here.
+  try {
+    const rows = await supabaseRestGet('users', { select: 'id,is_admin', id: `eq.${auth.id}`, limit: '1' }).catch(() => []);
+    const u = rows?.[0] || null;
+    if (u?.is_admin === true) return { ...auth, is_admin: true };
+  } catch {
+    // ignore
   }
-  return auth;
+
+  res.status(403).json({ success: false, error: 'Forbidden' });
+  return null;
 }
 
 function requireAdminOrBootstrapToken(req, res) {
@@ -4690,7 +4701,7 @@ async function supabaseCount(table, params = {}) {
 // -----------------------
 
 async function adminGetStats(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   const now = Date.now();
@@ -4958,7 +4969,7 @@ create index if not exists admin_payment_transactions_status_idx on public.admin
 `;
 
 async function adminGetAnalytics(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   const range = String(req.query?.range || '7days').trim();
@@ -5009,7 +5020,7 @@ async function adminGetAnalytics(req, res) {
 }
 
 async function adminGetAds(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
     const rows = await supabaseRestGet('admin_ads', { select: '*', order: 'created_at.desc', limit: '200' });
@@ -5023,7 +5034,7 @@ async function adminGetAds(req, res) {
 }
 
 async function adminCreateAd(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const title = String(body?.title || '').trim();
@@ -5045,7 +5056,7 @@ async function adminCreateAd(req, res) {
 }
 
 async function adminUpdateAd(req, res, adId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(adId)) return res.status(400).json({ success: false, error: 'Geçersiz reklam.' });
   const body = await readJsonBody(req);
@@ -5069,7 +5080,7 @@ async function adminUpdateAd(req, res, adId) {
 }
 
 async function adminDeleteAd(req, res, adId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(adId)) return res.status(400).json({ success: false, error: 'Geçersiz reklam.' });
   try {
@@ -5084,7 +5095,7 @@ async function adminDeleteAd(req, res, adId) {
 }
 
 async function adminGetWorkflows(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
     const rows = await supabaseRestGet('admin_workflows', { select: '*', order: 'created_at.desc', limit: '200' });
@@ -5098,7 +5109,7 @@ async function adminGetWorkflows(req, res) {
 }
 
 async function adminCreateWorkflow(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const name = String(body?.name || '').trim();
@@ -5116,7 +5127,7 @@ async function adminCreateWorkflow(req, res) {
 }
 
 async function adminUpdateWorkflow(req, res, workflowId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(workflowId)) return res.status(400).json({ success: false, error: 'Geçersiz iş akışı.' });
   const body = await readJsonBody(req);
@@ -5139,7 +5150,7 @@ async function adminUpdateWorkflow(req, res, workflowId) {
 }
 
 async function adminDeleteWorkflow(req, res, workflowId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(workflowId)) return res.status(400).json({ success: false, error: 'Geçersiz iş akışı.' });
   try {
@@ -5154,7 +5165,7 @@ async function adminDeleteWorkflow(req, res, workflowId) {
 }
 
 async function adminGetRevenueEntries(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const limit = Math.min(500, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
   try {
@@ -5169,7 +5180,7 @@ async function adminGetRevenueEntries(req, res) {
 }
 
 async function adminCreateRevenueEntry(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const amount_cents = Math.max(0, parseInt(String(body?.amount_cents || 0), 10) || 0);
@@ -5194,7 +5205,7 @@ async function adminCreateRevenueEntry(req, res) {
 }
 
 async function adminDeleteRevenueEntry(req, res, entryId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(entryId)) return res.status(400).json({ success: false, error: 'Geçersiz kayıt.' });
   try {
@@ -5209,7 +5220,7 @@ async function adminDeleteRevenueEntry(req, res, entryId) {
 }
 
 async function adminGetRevenueSummary(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
     const rows = await supabaseRestGet('admin_revenue_entries', { select: '*', order: 'occurred_at.desc', limit: '5000' });
@@ -5246,7 +5257,7 @@ async function adminGetRevenueSummary(req, res) {
 }
 
 async function adminGetApiKeys(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
     const rows = await supabaseRestGet('admin_api_keys', {
@@ -5264,7 +5275,7 @@ async function adminGetApiKeys(req, res) {
 }
 
 async function adminCreateApiKey(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const name = String(body?.name || '').trim();
@@ -5286,7 +5297,7 @@ async function adminCreateApiKey(req, res) {
 }
 
 async function adminUpdateApiKey(req, res, keyId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(keyId)) return res.status(400).json({ success: false, error: 'Geçersiz anahtar.' });
   const body = await readJsonBody(req);
@@ -5305,7 +5316,7 @@ async function adminUpdateApiKey(req, res, keyId) {
 }
 
 async function adminDeleteApiKey(req, res, keyId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(keyId)) return res.status(400).json({ success: false, error: 'Geçersiz anahtar.' });
   try {
@@ -5320,7 +5331,7 @@ async function adminDeleteApiKey(req, res, keyId) {
 }
 
 async function adminGetSources(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
     const rows = await supabaseRestGet('admin_sources', { select: '*', order: 'created_at.desc', limit: '500' });
@@ -5334,7 +5345,7 @@ async function adminGetSources(req, res) {
 }
 
 async function adminCreateSource(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const name = String(body?.name || '').trim();
@@ -5358,7 +5369,7 @@ async function adminCreateSource(req, res) {
 }
 
 async function adminUpdateSource(req, res, sourceId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(sourceId)) return res.status(400).json({ success: false, error: 'Geçersiz kaynak.' });
   const body = await readJsonBody(req);
@@ -5384,7 +5395,7 @@ async function adminUpdateSource(req, res, sourceId) {
 }
 
 async function adminDeleteSource(req, res, sourceId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(sourceId)) return res.status(400).json({ success: false, error: 'Geçersiz kaynak.' });
   try {
@@ -5399,7 +5410,7 @@ async function adminDeleteSource(req, res, sourceId) {
 }
 
 async function adminGetEmailTemplates(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
     let rows = await supabaseRestGet('admin_email_templates', { select: '*', order: 'updated_at.desc', limit: '200' });
@@ -5567,7 +5578,7 @@ Artık Polithane’de Polit/Fast paylaşabilir ve etkileşim kurabilirsin.
 }
 
 async function adminCreateEmailTemplate(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const name = String(body?.name || '').trim();
@@ -5589,7 +5600,7 @@ async function adminCreateEmailTemplate(req, res) {
 }
 
 async function adminUpdateEmailTemplate(req, res, templateId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(templateId)) return res.status(400).json({ success: false, error: 'Geçersiz şablon.' });
   const body = await readJsonBody(req);
@@ -5612,7 +5623,7 @@ async function adminUpdateEmailTemplate(req, res, templateId) {
 }
 
 async function adminDeleteEmailTemplate(req, res, templateId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(templateId)) return res.status(400).json({ success: false, error: 'Geçersiz şablon.' });
   try {
@@ -5627,7 +5638,7 @@ async function adminDeleteEmailTemplate(req, res, templateId) {
 }
 
 async function adminGetPaymentPlans(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
     const rows = await supabaseRestGet('admin_payment_plans', { select: '*', order: 'created_at.desc', limit: '200' });
@@ -5641,7 +5652,7 @@ async function adminGetPaymentPlans(req, res) {
 }
 
 async function adminCreatePaymentPlan(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const name = String(body?.name || '').trim();
@@ -5663,7 +5674,7 @@ async function adminCreatePaymentPlan(req, res) {
 }
 
 async function adminUpdatePaymentPlan(req, res, planId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(planId)) return res.status(400).json({ success: false, error: 'Geçersiz plan.' });
   const body = await readJsonBody(req);
@@ -5686,7 +5697,7 @@ async function adminUpdatePaymentPlan(req, res, planId) {
 }
 
 async function adminDeletePaymentPlan(req, res, planId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(planId)) return res.status(400).json({ success: false, error: 'Geçersiz plan.' });
   try {
@@ -5701,7 +5712,7 @@ async function adminDeletePaymentPlan(req, res, planId) {
 }
 
 async function adminGetPaymentTransactions(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const limit = Math.min(200, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
   try {
@@ -5716,7 +5727,7 @@ async function adminGetPaymentTransactions(req, res) {
 }
 
 async function adminCreatePaymentTransaction(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const occurred_at = body?.occurred_at ? String(body.occurred_at) : new Date().toISOString();
@@ -5756,7 +5767,7 @@ async function adminCreatePaymentTransaction(req, res) {
 }
 
 async function adminDeletePaymentTransaction(req, res, txId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(txId)) return res.status(400).json({ success: false, error: 'Geçersiz işlem.' });
   try {
@@ -5771,7 +5782,7 @@ async function adminDeletePaymentTransaction(req, res, txId) {
 }
 
 async function adminGetNotificationRules(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   try {
@@ -5813,7 +5824,7 @@ async function adminGetNotificationRules(req, res) {
 }
 
 async function adminCreateNotificationRule(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   const body = await readJsonBody(req);
@@ -5841,7 +5852,7 @@ async function adminCreateNotificationRule(req, res) {
 }
 
 async function adminUpdateNotificationRule(req, res, ruleId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(ruleId)) return res.status(400).json({ success: false, error: 'Geçersiz kural.' });
 
@@ -5869,7 +5880,7 @@ async function adminUpdateNotificationRule(req, res, ruleId) {
 }
 
 async function adminDeleteNotificationRule(req, res, ruleId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(ruleId)) return res.status(400).json({ success: false, error: 'Geçersiz kural.' });
 
@@ -5885,7 +5896,7 @@ async function adminDeleteNotificationRule(req, res, ruleId) {
 }
 
 async function adminGetNotificationChannels(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   try {
@@ -5906,7 +5917,7 @@ async function adminGetNotificationChannels(req, res) {
 }
 
 async function adminUpdateNotificationChannels(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   const body = await readJsonBody(req);
@@ -5930,7 +5941,7 @@ async function adminUpdateNotificationChannels(req, res) {
 }
 
 async function adminGetDbOverview(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   const tables = [
@@ -5967,7 +5978,7 @@ async function adminGetDbOverview(req, res) {
 }
 
 async function adminSeedDemoContent(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const clampInt = (v, { min, max, def }) => {
@@ -6092,7 +6103,7 @@ async function adminSeedDemoContent(req, res) {
 }
 
 async function adminGetUsers(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const { page = 1, limit = 20, search, user_type, is_verified } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -6130,7 +6141,7 @@ async function adminGetUsers(req, res) {
 }
 
 async function adminUpdateUser(req, res, userId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const uid = String(userId || '').trim();
@@ -6215,7 +6226,7 @@ function normalizeAvatarKey(url) {
 }
 
 async function adminFindDuplicateUsers(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const { limit = 5000 } = req.query || {};
   const lim = Math.min(Math.max(parseInt(limit, 10) || 5000, 200), 5000);
@@ -6251,7 +6262,7 @@ async function adminFindDuplicateUsers(req, res) {
 }
 
 async function adminDedupeUsers(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const primaryId = String(body?.primaryId || '').trim();
@@ -6311,14 +6322,14 @@ async function adminDedupeUsers(req, res) {
 }
 
 async function adminDeleteUser(req, res, userId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const updated = await supabaseRestPatch('users', { id: `eq.${userId}` }, { is_active: false });
   res.json({ success: true, data: updated?.[0] || null });
 }
 
 async function adminGetPosts(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const { page = 1, limit = 20, search, include_deleted, is_deleted } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -6388,7 +6399,7 @@ async function adminGetPosts(req, res) {
 }
 
 async function adminDeletePost(req, res, postId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const id = String(postId || '').trim();
   if (!id) return res.status(400).json({ success: false, error: 'Geçersiz paylaşım.' });
@@ -6422,7 +6433,7 @@ async function adminDeletePost(req, res, postId) {
 }
 
 async function adminGetAgendas(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const { page = 1, limit = 50, search, is_active, is_trending } = req.query || {};
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -6499,7 +6510,7 @@ create index if not exists agendas_is_active_idx on agendas (is_active);
 }
 
 async function adminCreateAgenda(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const title = String(body?.title || '').trim();
@@ -6599,7 +6610,7 @@ create index if not exists agendas_is_active_idx on agendas (is_active);
 }
 
 async function adminUpdateAgenda(req, res, agendaId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   if (!isSafeId(agendaId)) return res.status(400).json({ success: false, error: 'Geçersiz gündem.' });
   const body = await readJsonBody(req);
@@ -6694,7 +6705,7 @@ create index if not exists agendas_is_active_idx on agendas (is_active);
 }
 
 async function adminDeleteAgenda(req, res, agendaId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
     const updated = await supabaseRestPatch(
@@ -6750,7 +6761,7 @@ function slugifyParty(input) {
 }
 
 async function adminGetParties(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const { page = 1, limit = 20, search, is_active } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -6791,7 +6802,7 @@ async function adminGetParties(req, res) {
 }
 
 async function adminCreateParty(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const name = String(body?.name || '').trim();
@@ -6815,7 +6826,7 @@ async function adminCreateParty(req, res) {
 }
 
 async function adminUpdateParty(req, res, partyId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const allowed = {};
@@ -6835,7 +6846,7 @@ async function adminUpdateParty(req, res, partyId) {
 }
 
 async function adminDeleteParty(req, res, partyId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const updated = await supabaseRestPatch('parties', { id: `eq.${partyId}` }, { is_active: false });
   res.json({ success: true, data: updated?.[0] || null });
@@ -6900,7 +6911,7 @@ function groupBy(list, keyFn) {
 }
 
 async function adminGetPartyHierarchy(req, res, partyId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const pid = String(partyId || '').trim();
   if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
@@ -6957,7 +6968,8 @@ async function adminGetPartyHierarchy(req, res, partyId) {
 }
 
 async function adminAssignPartyUnit(req, res, partyId) {
-  requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
   const pid = String(partyId || '').trim();
   if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
 
@@ -7029,7 +7041,8 @@ async function adminAssignPartyUnit(req, res, partyId) {
 }
 
 async function adminUnassignPartyUnit(req, res, partyId) {
-  requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
   const pid = String(partyId || '').trim();
   if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
 
@@ -7066,7 +7079,7 @@ async function adminUnassignPartyUnit(req, res, partyId) {
 }
 
 async function adminSetPartyChair(req, res, partyId) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const pid = String(partyId || '').trim();
   if (!/^\d+$/.test(pid)) return res.status(400).json({ success: false, error: 'Geçersiz parti.' });
@@ -8475,7 +8488,7 @@ async function deleteNotification(req, res, id) {
 
 // Admin: send notification to a user, or broadcast
 async function adminSendNotification(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const body = await readJsonBody(req);
   const { user_id, type = 'system', title, message, broadcast } = body || {};
@@ -8512,7 +8525,7 @@ async function adminSendNotification(req, res) {
 
 // Admin: send a one-off SMTP test email (debug-safe)
 async function adminSendTestEmail(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   const body = await readJsonBody(req);
@@ -8870,7 +8883,7 @@ function isMissingRelationError(e, relationName) {
 }
 
 async function getSiteSettings(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   let rows;
@@ -8897,7 +8910,7 @@ async function getSiteSettings(req, res) {
 }
 
 async function updateSiteSettings(req, res) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
 
   const body = await readJsonBody(req);

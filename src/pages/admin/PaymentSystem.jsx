@@ -84,7 +84,7 @@ export const PaymentSystem = () => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 mb-2">Ödeme Sistemi</h1>
-        <p className="text-gray-600">Plan ve işlem kayıtları (mock yok). Sağlayıcı entegrasyonu sonraki faz.</p>
+        <p className="text-gray-600">Plan ve işlem kayıtları. Sağlayıcı entegrasyonu sonraki faz.</p>
       </div>
 
       {error ? <div className="mb-4 text-sm text-red-600 font-semibold">{error}</div> : null}
