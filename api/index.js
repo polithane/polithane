@@ -1425,19 +1425,41 @@ async function adminStorageList(req, res) {
 
     let rows = firstFiles.map((it) => toRow(it, prefix));
 
-    // If we didn't find files, try one more level down (folders -> files)
+    // If we didn't find files, try deeper.
+    // - When prefix is empty: root -> posts -> <userId> -> <file> (2 levels down)
+    // - When prefix is "posts": posts -> <userId> -> <file> (1 more level down)
     if (rows.length < limit && firstFolders.length > 0) {
-      for (const f of firstFolders) {
-        const childPrefix = prefix ? `${prefix}/${f.name}` : f.name;
-        // eslint-disable-next-line no-await-in-loop
-        const child = await listOne(childPrefix, Math.max(limit, 100), 0).catch(() => []);
-        const childFiles = (child || []).filter((it) => it && it.name && !it.name.endsWith('/') && !isFolderLike(it));
-        for (const it of childFiles) {
-          rows.push(toRow(it, childPrefix));
-          if (rows.length >= limit) break;
+      const walkOneLevel = async (basePrefix, folderItems) => {
+        for (const f of folderItems) {
+          const childPrefix = basePrefix ? `${basePrefix}/${f.name}` : f.name;
+          // eslint-disable-next-line no-await-in-loop
+          const child = await listOne(childPrefix, Math.max(limit, 100), 0).catch(() => []);
+          const childFiles = (child || []).filter((it) => it && it.name && !it.name.endsWith('/') && !isFolderLike(it));
+          const childFolders = (child || []).filter((it) => it && it.name && !it.name.endsWith('/') && isFolderLike(it));
+          for (const it of childFiles) {
+            rows.push(toRow(it, childPrefix));
+            if (rows.length >= limit) return;
+          }
+          // If we are at root (basePrefix === '' and childPrefix is like 'posts'),
+          // we need one more level (posts/<userId>/file).
+          if (!basePrefix && childFolders.length > 0) {
+            for (const ff of childFolders) {
+              const grandPrefix = `${childPrefix}/${ff.name}`;
+              // eslint-disable-next-line no-await-in-loop
+              const grand = await listOne(grandPrefix, Math.max(limit, 100), 0).catch(() => []);
+              const grandFiles = (grand || []).filter((it) => it && it.name && !it.name.endsWith('/') && !isFolderLike(it));
+              for (const it of grandFiles) {
+                rows.push(toRow(it, grandPrefix));
+                if (rows.length >= limit) return;
+              }
+              if (rows.length >= limit) return;
+            }
+          }
+          if (rows.length >= limit) return;
         }
-        if (rows.length >= limit) break;
-      }
+      };
+      // eslint-disable-next-line no-await-in-loop
+      await walkOneLevel(prefix, firstFolders);
     }
 
     // Sort newest first (best-effort)
@@ -8910,6 +8932,14 @@ function isMissingRelationError(e, relationName) {
   const msg = msgRaw.toLowerCase();
   const rel = String(relationName || '').trim();
 
+  // PostgREST schema-cache miss (common in Supabase):
+  // {"code":"PGRST205","message":"Could not find the table 'public.xxx' in the schema cache"}
+  if (msg.includes('pgrst205') || (msg.includes('could not find the table') && msg.includes('schema cache'))) {
+    if (!rel) return true;
+    // Match either raw 'public.rel' hint or the rel name itself.
+    return msgRaw.includes(`'public.${rel}'`) || msgRaw.includes(`public.${rel}`) || msg.includes(rel.toLowerCase());
+  }
+
   // Generic (schema-agnostic) check used by most admin endpoints.
   if (!rel) {
     return (
@@ -8918,6 +8948,7 @@ function isMissingRelationError(e, relationName) {
       msg.includes('table') && msg.includes('does not exist') ||
       // PostgREST common shapes
       msg.includes('could not find the relation') ||
+      msg.includes('could not find the table') ||
       msg.includes('unknown table') ||
       msg.includes('not found') && msg.includes('relation')
     );
