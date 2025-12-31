@@ -60,6 +60,12 @@
 }
 
 @layer utilities {
+  /* Admin: lucide icons were reported "dot-sized" on some pages. Force a sane default size. */
+  .admin-shell .lucide {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
   .animate-fade-in {
     animation: fadeIn 0.4s ease-out;
   }

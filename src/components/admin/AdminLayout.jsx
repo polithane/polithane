@@ -34,7 +34,7 @@ export const AdminLayout = () => {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 lg:flex">
+    <div className="min-h-screen bg-gray-50 lg:flex admin-shell">
       {/* Mobile overlay */}
       {sidebarOpen ? (
         <button

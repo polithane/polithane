@@ -1360,6 +1360,15 @@ async function adminStorageList(req, res) {
   const offset = Math.max(0, parseInt(String(req.query?.offset || 0), 10) || 0);
 
   try {
+    const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
+    const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+    if (!supabaseUrl || !serviceKey) {
+      return res.status(500).json({
+        success: false,
+        error: 'Storage listesi alınamadı: sunucu depolama anahtarı eksik (SUPABASE_SERVICE_ROLE_KEY).',
+      });
+    }
+    const supabase = createClient(supabaseUrl, serviceKey);
     const { data, error } = await supabase.storage
       .from(bucket)
       .list(prefix, { limit, offset, sortBy: { column: 'updated_at', order: 'desc' } });
@@ -1398,6 +1407,15 @@ async function adminStorageDelete(req, res) {
   if (paths.length === 0) return res.status(400).json({ success: false, error: 'Silinecek dosya seçin.' });
   if (paths.length > 50) return res.status(400).json({ success: false, error: 'Tek seferde en fazla 50 dosya silinebilir.' });
   try {
+    const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
+    const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+    if (!supabaseUrl || !serviceKey) {
+      return res.status(500).json({
+        success: false,
+        error: 'Dosya silinemedi: sunucu depolama anahtarı eksik (SUPABASE_SERVICE_ROLE_KEY).',
+      });
+    }
+    const supabase = createClient(supabaseUrl, serviceKey);
     const { error } = await supabase.storage.from(bucket).remove(paths);
     if (error) throw error;
     return res.json({ success: true });
