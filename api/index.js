@@ -1389,6 +1389,8 @@ async function adminStorageList(req, res) {
 
     const isFolderLike = (it) => {
       if (!it || !it.name) return false;
+      // In Supabase Storage, real objects typically have an `id`.
+      if (it.id) return false;
       // Folder placeholders generally have null metadata and no mimetype/size.
       const meta = it?.metadata;
       const hasMeta = meta && typeof meta === 'object';
@@ -9360,6 +9362,42 @@ export default async function handler(req, res) {
               const { data, error } = await supabase.storage.from(bucket).list(pfx, { limit: 100, offset: 0 });
               if (error) throw error;
               diag.storage_sample_counts[pfx || '(root)'] = Array.isArray(data) ? data.length : 0;
+            }
+
+            // Depth-2 file counts (no names) to diagnose "media empty" reports.
+            const countFilesDepth2 = async (rootPrefix) => {
+              const { data: lvl1, error: e1 } = await supabase.storage.from(bucket).list(rootPrefix, { limit: 200, offset: 0 });
+              if (e1) throw e1;
+              const one = Array.isArray(lvl1) ? lvl1 : [];
+              let files = 0;
+              let folders = 0;
+              for (const it of one) {
+                if (!it || !it.name || it.name.endsWith('/')) continue;
+                if (it.id) {
+                  files += 1;
+                  continue;
+                }
+                folders += 1;
+                // eslint-disable-next-line no-await-in-loop
+                const { data: lvl2, error: e2 } = await supabase.storage.from(bucket).list(`${rootPrefix}/${it.name}`, { limit: 200, offset: 0 });
+                if (e2) continue;
+                const two = Array.isArray(lvl2) ? lvl2 : [];
+                for (const it2 of two) {
+                  if (!it2 || !it2.name || it2.name.endsWith('/')) continue;
+                  if (it2.id) files += 1;
+                }
+                if (files > 5000) break;
+              }
+              return { folders, files };
+            };
+            try {
+              diag.storage_depth2 = {
+                posts: await countFilesDepth2('posts'),
+                messages: await countFilesDepth2('messages'),
+                avatars: await countFilesDepth2('avatars'),
+              };
+            } catch {
+              // ignore
             }
           }
         } catch (e) {
