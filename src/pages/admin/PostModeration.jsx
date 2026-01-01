@@ -13,6 +13,9 @@ export const PostModeration = () => {
     content_text: '',
     category: 'general',
     agenda_tag: '',
+    content_type: 'text',
+    thumbnail_url: '',
+    media_urls_text: '',
     is_trending: false,
     is_deleted: false,
   });
@@ -72,11 +75,15 @@ export const PostModeration = () => {
     setEditingPost(post);
     const content = String(post?.content ?? '').trim();
     const contentText = String(post?.content_text ?? post?.content ?? '').trim();
+    const mediaUrls = Array.isArray(post?.media_urls) ? post.media_urls : [];
     setEditDraft({
       content,
       content_text: contentText,
       category: String(post?.category || 'general'),
       agenda_tag: String(post?.agenda_tag || ''),
+      content_type: String(post?.content_type || 'text'),
+      thumbnail_url: String(post?.thumbnail_url || ''),
+      media_urls_text: (mediaUrls || []).map((u) => String(u || '').trim()).filter(Boolean).join('\n'),
       is_trending: !!post?.is_trending,
       is_deleted: !!post?.is_deleted,
     });
@@ -97,11 +104,19 @@ export const PostModeration = () => {
     setEditSaving(true);
     setEditError('');
     try {
+      const media_urls = String(editDraft.media_urls_text || '')
+        .split('\n')
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+        .slice(0, 12);
       const payload = {
         content: editDraft.content,
         content_text: editDraft.content_text,
         category: editDraft.category,
         agenda_tag: editDraft.agenda_tag ? editDraft.agenda_tag : null,
+        content_type: String(editDraft.content_type || '').trim() || 'text',
+        thumbnail_url: String(editDraft.thumbnail_url || '').trim() ? String(editDraft.thumbnail_url).trim() : null,
+        ...(media_urls.length > 0 ? { media_urls } : { media_urls: [] }),
         is_trending: !!editDraft.is_trending,
         is_deleted: !!editDraft.is_deleted,
       };
@@ -286,6 +301,31 @@ export const PostModeration = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-black text-gray-600 uppercase">İçerik tipi (content_type)</label>
+                  <select
+                    value={editDraft.content_type}
+                    onChange={(e) => setEditDraft((p) => ({ ...p, content_type: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none bg-white"
+                  >
+                    <option value="text">text</option>
+                    <option value="image">image</option>
+                    <option value="video">video</option>
+                    <option value="audio">audio</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-600 uppercase">Thumbnail URL (ops.)</label>
+                  <input
+                    value={editDraft.thumbnail_url}
+                    onChange={(e) => setEditDraft((p) => ({ ...p, thumbnail_url: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-black text-gray-600 uppercase">İçerik</label>
                 <textarea
@@ -294,6 +334,17 @@ export const PostModeration = () => {
                   className="mt-1 w-full min-h-[140px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
                   placeholder="Paylaşım metni…"
                 />
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-gray-600 uppercase">Medya URL’leri (media_urls) — satır satır</label>
+                <textarea
+                  value={editDraft.media_urls_text}
+                  onChange={(e) => setEditDraft((p) => ({ ...p, media_urls_text: e.target.value }))}
+                  className="mt-1 w-full min-h-[110px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none font-mono text-xs"
+                  placeholder="https://...\nhttps://..."
+                />
+                <div className="mt-1 text-xs text-gray-500">Maks 12 URL.</div>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">

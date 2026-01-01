@@ -370,12 +370,6 @@ export const PartyManagement = () => {
                         Yönet
                       </button>
                       <button
-                        onClick={() => openHierarchy(p)}
-                        className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 font-semibold"
-                      >
-                        Düzenle
-                      </button>
-                      <button
                         onClick={() => onDelete(p.id)}
                         className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold inline-flex items-center gap-2"
                       >
@@ -404,7 +398,7 @@ export const PartyManagement = () => {
           <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
             <div className="p-5 border-b flex items-center justify-between">
               <div>
-                <div className="text-xs text-gray-500 font-semibold">Gelişmiş Yönetim</div>
+                <div className="text-xs text-gray-500 font-semibold">Parti Yönetimi</div>
                 <div className="text-xl font-black text-gray-900 flex items-center gap-2">
                   <Layers className="w-6 h-6 text-primary-blue" />
                   {hierParty.name}
