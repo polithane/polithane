@@ -6639,6 +6639,242 @@ async function adminUpdateJob(req, res, jobId) {
   }
 }
 
+function stripCdata(s) {
+  return String(s || '').replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '').trim();
+}
+
+function decodeXmlEntities(s) {
+  return String(s || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+function extractTag(text, tag) {
+  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+  const m = String(text || '').match(re);
+  if (!m) return '';
+  return decodeXmlEntities(stripCdata(m[1] || ''));
+}
+
+function parseRssItems(xml, { limit = 30 } = {}) {
+  const raw = String(xml || '');
+  const out = [];
+  // RSS <item>
+  const itemRe = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+  let m;
+  while ((m = itemRe.exec(raw)) && out.length < limit) {
+    const block = m[1] || '';
+    const title = extractTag(block, 'title');
+    const link = extractTag(block, 'link');
+    const desc = extractTag(block, 'description') || extractTag(block, 'content:encoded');
+    if (!title && !link) continue;
+    out.push({ title, link, desc });
+  }
+  if (out.length > 0) return out;
+  // Atom <entry>
+  const entryRe = /<entry\b[^>]*>([\s\S]*?)<\/entry>/gi;
+  while ((m = entryRe.exec(raw)) && out.length < limit) {
+    const block = m[1] || '';
+    const title = extractTag(block, 'title');
+    // atom links: <link href="..."/>
+    let link = '';
+    const lm = block.match(/<link[^>]+href="([^"]+)"[^>]*\/?>/i);
+    if (lm && lm[1]) link = decodeXmlEntities(lm[1]);
+    const desc = extractTag(block, 'summary') || extractTag(block, 'content');
+    if (!title && !link) continue;
+    out.push({ title, link, desc });
+  }
+  return out;
+}
+
+async function pickAdminUserId() {
+  const rows = await supabaseRestGet('users', { select: 'id,is_admin,is_active', is_admin: 'eq.true', is_active: 'eq.true', limit: '1' }).catch(() => []);
+  return rows?.[0]?.id || null;
+}
+
+async function bestEffortInsertPost(payload) {
+  try {
+    const inserted = await supabaseRestInsert('posts', [payload]);
+    return inserted?.[0] || null;
+  } catch (e) {
+    const msg = String(e?.message || '');
+    // Retry without optional columns if schema lacks them
+    if (msg.includes('source_url') || msg.includes('source_title') || msg.includes('source_type')) {
+      const retry = { ...payload };
+      delete retry.source_url;
+      delete retry.source_title;
+      delete retry.source_type;
+      const inserted = await supabaseRestInsert('posts', [retry]).catch(() => []);
+      return inserted?.[0] || null;
+    }
+    if (msg.includes('content_text') || msg.includes('content_type')) {
+      const retry = { ...payload };
+      // fallback to legacy schemas with 'content'
+      if (retry.content_text && !retry.content) retry.content = retry.content_text;
+      delete retry.content_text;
+      delete retry.content_type;
+      const inserted = await supabaseRestInsert('posts', [retry]).catch(() => []);
+      return inserted?.[0] || null;
+    }
+    throw e;
+  }
+}
+
+async function processJob(job) {
+  const id = String(job?.id || '').trim();
+  const type = String(job?.job_type || '').trim();
+  const payload = job?.payload && typeof job.payload === 'object' ? job.payload : {};
+  const nowIso = new Date().toISOString();
+
+  if (!id || !type) return { ok: false, error: 'Geçersiz job.' };
+
+  if (type === 'run_workflow') {
+    const wid = String(payload?.workflow_id || '').trim();
+    if (!wid) return { ok: false, error: 'workflow_id gerekli.' };
+    try {
+      const wfRows = await supabaseRestGet('admin_workflows', { select: 'id,success_count,fail_count', id: `eq.${wid}`, limit: '1' }).catch(() => []);
+      const wf = wfRows?.[0] || null;
+      if (!wf?.id) return { ok: false, error: 'Workflow bulunamadı.' };
+      await supabaseRestPatch('admin_workflows', { id: `eq.${wid}` }, { last_run_at: nowIso, success_count: Math.max(0, Number(wf.success_count || 0) + 1) }).catch(() => null);
+      return { ok: true, result: { workflow_id: wid, ran_at: nowIso } };
+    } catch (e) {
+      return { ok: false, error: String(e?.message || 'Workflow çalıştırılamadı.') };
+    }
+  }
+
+  if (type === 'scrape_source') {
+    const sid = String(payload?.source_id || '').trim();
+    if (!sid) return { ok: false, error: 'source_id gerekli.' };
+    const sourceRows = await supabaseRestGet('admin_sources', { select: '*', id: `eq.${sid}`, limit: '1' }).catch(() => []);
+    const s = sourceRows?.[0] || null;
+    if (!s?.id) return { ok: false, error: 'Kaynak bulunamadı.' };
+    const feedUrl = String(s.rss_feed || s.url || '').trim();
+    if (!feedUrl) return { ok: false, error: 'Kaynak URL/RSS boş.' };
+
+    const resp = await fetch(feedUrl, { method: 'GET', headers: { 'user-agent': 'PolithaneBot/1.0 (+https://polithane.com)' } }).catch(() => null);
+    if (!resp || !resp.ok) return { ok: false, error: `RSS çekilemedi (${resp?.status || 'no_response'})` };
+    const xml = await resp.text();
+    const items = parseRssItems(xml, { limit: 25 });
+    if (!items.length) return { ok: false, error: 'RSS içinde item bulunamadı.' };
+
+    const authorId = await pickAdminUserId();
+    if (!authorId) return { ok: false, error: 'Post yazacak admin kullanıcı bulunamadı.' };
+
+    let insertedCount = 0;
+    let skipped = 0;
+    for (const it of items) {
+      const link = String(it.link || '').trim();
+      const title = String(it.title || '').trim();
+      const desc = String(it.desc || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      const content = title ? (desc ? `${title}\n\n${desc}` : title) : desc;
+      if (!content) continue;
+
+      // best-effort dedupe by source_url if column exists
+      let exists = false;
+      if (link) {
+        try {
+          const ex = await supabaseRestGet('posts', { select: 'id', source_url: `eq.${link}`, limit: '1' }).catch(() => []);
+          exists = Array.isArray(ex) && ex.length > 0;
+        } catch {
+          exists = false;
+        }
+      }
+      if (exists) {
+        skipped += 1;
+        continue;
+      }
+
+      const payloadPost = {
+        user_id: authorId,
+        content_type: 'text',
+        content_text: content.slice(0, 5000),
+        category: 'general',
+        agenda_tag: null,
+        media_urls: [],
+        is_deleted: false,
+        is_trending: false,
+        source_url: link || null,
+        source_title: String(s.name || '').trim() || null,
+        source_type: String(s.type || '').trim() || null,
+        created_at: nowIso,
+      };
+
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const row = await bestEffortInsertPost(payloadPost);
+        if (row) insertedCount += 1;
+      } catch {
+        // ignore individual item failures
+      }
+    }
+
+    // Update source stats (best-effort)
+    try {
+      const nextItems = Math.max(0, Number(s.items_collected || 0) + insertedCount);
+      await supabaseRestPatch('admin_sources', { id: `eq.${sid}` }, { items_collected: nextItems, last_fetch_at: nowIso, updated_at: nowIso }).catch(() => null);
+    } catch {
+      // ignore
+    }
+
+    return { ok: true, result: { source_id: sid, fetched: items.length, inserted: insertedCount, skipped, fetched_at: nowIso } };
+  }
+
+  if (type === 'send_sms') {
+    return { ok: false, error: 'SMS provider yapılandırılmadı (send_sms).' };
+  }
+
+  return { ok: false, error: `Bilinmeyen job_type: ${type}` };
+}
+
+async function adminProcessJobs(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const limit = Math.min(50, Math.max(1, parseInt(String(req.query?.limit || 10), 10) || 10));
+  try {
+    const queued = await supabaseRestGet('admin_jobs', { select: '*', status: 'eq.queued', order: 'requested_at.asc', limit: String(limit) });
+    const list = Array.isArray(queued) ? queued : [];
+    const results = [];
+    for (const j of list) {
+      const id = String(j?.id || '').trim();
+      if (!id) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await supabaseRestPatch('admin_jobs', { id: `eq.${id}` }, { status: 'running', started_at: new Date().toISOString() }).catch(() => null);
+      // eslint-disable-next-line no-await-in-loop
+      const r = await processJob(j);
+      const finishedIso = new Date().toISOString();
+      if (r.ok) {
+        // eslint-disable-next-line no-await-in-loop
+        await supabaseRestPatch('admin_jobs', { id: `eq.${id}` }, { status: 'success', result: r.result || {}, finished_at: finishedIso }).catch(() => null);
+        results.push({ id, ok: true });
+      } else {
+        // eslint-disable-next-line no-await-in-loop
+        await supabaseRestPatch('admin_jobs', { id: `eq.${id}` }, { status: 'failed', result: { error: r.error || 'failed' }, finished_at: finishedIso }).catch(() => null);
+        results.push({ id, ok: false, error: r.error || 'failed' });
+      }
+    }
+    return res.json({ success: true, data: { processed: results.length, results } });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_JOBS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Job işlenemedi.') });
+  }
+}
+
+async function cronProcessAdminJobs(req, res) {
+  const expected = String(process.env.CRON_SECRET || '').trim();
+  if (!expected) return res.status(404).json({ success: false, error: 'Not found' });
+  const provided = String(req.headers['x-cron-secret'] || '').trim();
+  if (!provided || provided !== expected) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  // Reuse processor but without requiring admin token; process as system
+  req.query = req.query || {};
+  return await adminProcessJobs(req, res);
+}
+
 async function adminSeedDemoContent(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
@@ -10250,6 +10486,9 @@ export default async function handler(req, res) {
       if (url === '/api/cron/purge-archived-posts' && req.method === 'POST') {
         return await cronPurgeArchivedPosts(req, res);
       }
+      if (url === '/api/cron/process-admin-jobs' && req.method === 'POST') {
+        return await cronProcessAdminJobs(req, res);
+      }
       if (url === '/api/avatar' && req.method === 'GET') return await proxyAvatar(req, res);
 
       // Dynamic share/OG previews
@@ -10441,6 +10680,7 @@ export default async function handler(req, res) {
       if (url === '/api/admin/system/transform' && req.method === 'POST') return await adminSystemTransform(req, res);
       if (url === '/api/admin/jobs' && req.method === 'GET') return await adminListJobs(req, res);
       if (url === '/api/admin/jobs' && req.method === 'POST') return await adminEnqueueJob(req, res);
+      if (url === '/api/admin/jobs/process' && req.method === 'POST') return await adminProcessJobs(req, res);
       if (url === '/api/admin/ads' && req.method === 'GET') return await adminGetAds(req, res);
       if (url === '/api/admin/ads' && req.method === 'POST') return await adminCreateAd(req, res);
       if (url === '/api/admin/workflows' && req.method === 'GET') return await adminGetWorkflows(req, res);

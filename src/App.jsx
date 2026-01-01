@@ -67,6 +67,7 @@ import { SecuritySettings } from './pages/admin/SecuritySettings';
 import { DatabaseManagement } from './pages/admin/DatabaseManagement';
 import { APISettings } from './pages/admin/APISettings';
 import { SystemTransformation } from './pages/admin/SystemTransformation';
+import { JobQueue } from './pages/admin/JobQueue';
 import { PartyManagement } from './pages/admin/PartyManagement';
 import { AgendaManagement } from './pages/admin/AgendaManagement';
 import { ParliamentManagement } from './pages/admin/ParliamentManagement';
@@ -187,6 +188,7 @@ function App() {
           <Route path="database" element={<DatabaseManagement />} />
           <Route path="api" element={<APISettings />} />
           <Route path="system" element={<SystemTransformation />} />
+          <Route path="jobs" element={<JobQueue />} />
         </Route>
       </Routes>
       

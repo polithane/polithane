@@ -426,6 +426,10 @@ export const admin = {
   },
   enqueueJob: (payload) => apiCall('/api/admin/jobs', { method: 'POST', body: JSON.stringify(payload || {}) }),
   updateJob: (jobId, payload) => apiCall(`/api/admin/jobs/${jobId}`, { method: 'PUT', body: JSON.stringify(payload || {}) }),
+  processJobs: (params = {}) => {
+    const query = toQueryString(params);
+    return apiCall(`/api/admin/jobs/process${query ? `?${query}` : ''}`, { method: 'POST' });
+  },
   getAds: () => apiCall('/api/admin/ads'),
   createAd: (data) => apiCall('/api/admin/ads', { method: 'POST', body: JSON.stringify(data || {}) }),
   updateAd: (adId, data) => apiCall(`/api/admin/ads/${adId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),

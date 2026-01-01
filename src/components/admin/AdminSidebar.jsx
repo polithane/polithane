@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, FileText, TrendingUp, Settings, Palette, 
   Shield, Search, DollarSign, Megaphone, Bot, BarChart3, Mail, 
-  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark, Wrench
+  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark, Wrench, ListChecks
 } from 'lucide-react';
 
 export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) => {
@@ -63,6 +63,7 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
         { path: '/adminyonetim/security', icon: Shield, label: 'Güvenlik' },
         { path: '/adminyonetim/database', icon: Database, label: 'Veritabanı Yönetimi' },
         { path: '/adminyonetim/api', icon: Code, label: 'API Ayarları' },
+        { path: '/adminyonetim/jobs', icon: ListChecks, label: 'Job Kuyruğu' },
         { path: '/adminyonetim/system', icon: Wrench, label: 'Sistem Dönüşümleri' },
       ]
     }
