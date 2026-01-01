@@ -5,6 +5,7 @@ import { formatFileSize } from '../../utils/formatters';
 
 export const MediaManagement = () => {
   // IMPORTANT: Do not auto-load media binaries on this page. Only show URLs + metadata.
+  const [bucket, setBucket] = useState('uploads');
   const [filterType, setFilterType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [folder, setFolder] = useState('');
@@ -19,9 +20,11 @@ export const MediaManagement = () => {
     setLoading(true);
     setError('');
     try {
-      const r = await adminApi.storageList({ bucket: 'uploads', prefix: folder, limit: 200, offset: 0 }).catch(() => null);
+      const r = await adminApi.storageList({ bucket, prefix: folder, limit: 200, offset: 0 }).catch(() => null);
       if (!r?.success) throw new Error(r?.error || 'Storage listesi alınamadı.');
       setItems(Array.isArray(r.data) ? r.data : []);
+      const resolvedBucket = String(r?.meta?.bucket || '').trim();
+      if (resolvedBucket && resolvedBucket !== bucket) setBucket(resolvedBucket);
     } catch (e) {
       setError(String(e?.message || 'Storage listesi alınamadı.'));
     } finally {
@@ -46,6 +49,7 @@ export const MediaManagement = () => {
         id: it.path,
         filename: it.name,
         path: it.path,
+        bucket: it.bucket,
         url: it.public_url,
         type,
         sizeBytes: Number(it.size || 0) || 0,
@@ -78,7 +82,8 @@ export const MediaManagement = () => {
     if (!path) return;
     // eslint-disable-next-line no-alert
     if (!window.confirm(`Silinsin mi?\n${path}`)) return;
-    const r = await adminApi.storageDelete({ bucket: 'uploads', paths: [path] }).catch(() => null);
+    const b = String(media?.bucket || bucket || 'uploads').trim() || 'uploads';
+    const r = await adminApi.storageDelete({ bucket: b, paths: [path] }).catch(() => null);
     if (!r?.success) {
       setError(r?.error || 'Silinemedi.');
       return;
@@ -131,7 +136,7 @@ export const MediaManagement = () => {
       });
       const r = await adminApi
         .storageReplace({
-          bucket: 'uploads',
+          bucket: String(replaceTarget?.bucket || bucket || 'uploads').trim() || 'uploads',
           path: replaceTarget.path,
           dataUrl,
           contentType: String(file.type || '').trim(),
@@ -173,6 +178,10 @@ export const MediaManagement = () => {
 
       {error ? <div className="mb-4 text-sm text-red-600 font-semibold">{error}</div> : null}
       {loading ? <div className="mb-4 text-sm text-gray-600">Yükleniyor…</div> : null}
+
+      <div className="mb-4 text-xs text-gray-500">
+        Bucket: <span className="font-mono text-gray-700">{bucket}</span>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
