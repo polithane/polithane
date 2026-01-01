@@ -21,9 +21,9 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   const [t, setT] = useState(0);
   const [dur, setDur] = useState(0);
   const [blocked, setBlocked] = useState(false);
-  if (!url) return null;
 
   useEffect(() => {
+    if (!url) return;
     const el = videoRef.current;
     if (!el) return;
     const onPlay = () => setIsPlaying(true);
@@ -48,6 +48,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   }, [url]);
 
   useEffect(() => {
+    if (!url) return;
     const el = videoRef.current;
     if (!el) return;
     try {
@@ -58,6 +59,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   }, [muted]);
 
   useEffect(() => {
+    if (!url) return;
     if (!autoPlay) return;
     const el = videoRef.current;
     if (!el) return;
@@ -132,6 +134,8 @@ const SmartVideo = ({ src, autoPlay = false }) => {
       // ignore
     }
   };
+
+  if (!url) return null;
 
   return (
     <div className="w-full">
