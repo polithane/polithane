@@ -268,6 +268,8 @@ export const posts = {
       method: 'POST',
       body: JSON.stringify({ reason, details }),
     }),
+
+  getPolitScoreBreakdown: (postId) => apiCall(`/api/posts/${postId}/polit-score-breakdown`),
 };
 
 // ============================================

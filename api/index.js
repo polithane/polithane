@@ -530,6 +530,170 @@ async function getPostById(req, res, id) {
     res.json({ success: true, data: post });
 }
 
+function getPolitUserType(user) {
+  if (!user) return 'visitor';
+  const ut = String(user?.user_type || '').trim();
+  const pt = String(user?.politician_type || '').trim();
+  if (ut === 'politician' && pt === 'mp') return 'mp';
+  if (ut === 'mp') return 'mp';
+  if (ut === 'politician') return 'politician';
+  if (ut === 'media') return 'media';
+  if (ut === 'party_member') return 'party_member';
+  const verified = user?.is_verified === true || user?.verification_badge === true;
+  if (verified) return 'verified_member';
+  return 'unverified_member';
+}
+
+function isSamePartyUser(a, b) {
+  const pa = a?.party_id;
+  const pb = b?.party_id;
+  if (!pa || !pb) return false;
+  return String(pa) === String(pb);
+}
+
+function isRivalPartyUser(a, b) {
+  const pa = a?.party_id;
+  const pb = b?.party_id;
+  if (!pa || !pb) return false;
+  return String(pa) !== String(pb);
+}
+
+function likeScoreRule(liker, owner) {
+  const likerType = getPolitUserType(liker);
+  const ownerType = getPolitUserType(owner);
+
+  if (likerType === 'unverified_member') return { rule: 'unverified_member_like', unitScore: 3, label: 'Üye (onaysız) beğeni' };
+  if (likerType === 'verified_member') return { rule: 'verified_member_like', unitScore: 6, label: 'Üye (onaylı) beğeni' };
+
+  if (isSamePartyUser(liker, owner)) return { rule: 'same_party_like', unitScore: 4, label: 'Aynı parti beğeni' };
+  if (isRivalPartyUser(liker, owner) && likerType === 'party_member') return { rule: 'rival_party_like', unitScore: 15, label: 'Rakip parti üye beğeni' };
+
+  if (likerType === 'mp' && ownerType === 'verified_member') return { rule: 'mp_to_citizen_like', unitScore: 20, label: 'Milletvekili → üye beğeni' };
+  if (likerType === 'mp' && ownerType === 'politician' && isSamePartyUser(liker, owner)) {
+    return { rule: 'mp_to_same_politician_like', unitScore: 15, label: 'Milletvekili → aynı siyasi beğeni' };
+  }
+  if (likerType === 'mp' && ownerType === 'mp') return { rule: 'mp_to_mp_like', unitScore: 5, label: 'Milletvekili → milletvekili beğeni' };
+  if (likerType === 'mp' && ownerType === 'politician' && isRivalPartyUser(liker, owner)) {
+    return { rule: 'mp_to_rival_politician_like', unitScore: 40, label: 'Milletvekili → rakip siyasi beğeni' };
+  }
+  if (likerType === 'mp' && ownerType === 'mp' && isRivalPartyUser(liker, owner)) {
+    return { rule: 'mp_to_rival_mp_like', unitScore: 30, label: 'Milletvekili → rakip milletvekili beğeni' };
+  }
+  return { rule: 'verified_member_like', unitScore: 6, label: 'Varsayılan beğeni' };
+}
+
+function commentScoreRule(commenter, owner) {
+  const commenterType = getPolitUserType(commenter);
+  const ownerType = getPolitUserType(owner);
+
+  if (commenterType === 'unverified_member') return { rule: 'unverified_member_comment', unitScore: 6, label: 'Üye (onaysız) yorum' };
+  if (commenterType === 'verified_member') return { rule: 'verified_member_comment', unitScore: 24, label: 'Üye (onaylı) yorum' };
+
+  if (isSamePartyUser(commenter, owner)) return { rule: 'same_party_comment', unitScore: 8, label: 'Aynı parti yorum' };
+  if (isRivalPartyUser(commenter, owner) && commenterType === 'party_member') {
+    return { rule: 'rival_party_comment', unitScore: 30, label: 'Rakip parti üye yorum' };
+  }
+
+  if (commenterType === 'mp' && ownerType === 'verified_member') return { rule: 'mp_to_citizen_comment', unitScore: 50, label: 'Milletvekili → üye yorum' };
+  if (commenterType === 'mp' && ownerType === 'politician' && isSamePartyUser(commenter, owner)) {
+    return { rule: 'mp_to_same_politician_comment', unitScore: 30, label: 'Milletvekili → aynı siyasi yorum' };
+  }
+  if (commenterType === 'mp' && ownerType === 'mp') return { rule: 'mp_to_mp_comment', unitScore: 10, label: 'Milletvekili → milletvekili yorum' };
+  if (commenterType === 'mp' && ownerType === 'politician' && isRivalPartyUser(commenter, owner)) {
+    return { rule: 'mp_to_rival_politician_comment', unitScore: 80, label: 'Milletvekili → rakip siyasi yorum' };
+  }
+  if (commenterType === 'mp' && ownerType === 'mp' && isRivalPartyUser(commenter, owner)) {
+    return { rule: 'mp_to_rival_mp_comment', unitScore: 60, label: 'Milletvekili → rakip milletvekili yorum' };
+  }
+  return { rule: 'verified_member_comment', unitScore: 24, label: 'Varsayılan yorum' };
+}
+
+async function getPostPolitScoreBreakdown(req, res, postId) {
+  const id = String(postId || '').trim();
+  if (!id) return res.status(400).json({ success: false, error: 'Geçersiz paylaşım.' });
+
+  const postRows = await supabaseRestGet('posts', { select: 'id,user_id,view_count,like_count,comment_count,polit_score', id: `eq.${id}`, limit: '1' }).catch(() => []);
+  const post = postRows?.[0] || null;
+  if (!post?.id || !post?.user_id) return res.status(404).json({ success: false, error: 'Paylaşım bulunamadı.' });
+
+  const ownerRows = await supabaseRestGet('users', { select: 'id,user_type,politician_type,party_id,is_verified', id: `eq.${post.user_id}`, limit: '1' }).catch(() => []);
+  const owner = ownerRows?.[0] || null;
+
+  const MAX = 2000;
+  let truncated = false;
+
+  // Likes
+  const likeRows = await supabaseRestGet('likes', { select: 'user_id', post_id: `eq.${id}`, limit: String(MAX + 1) }).catch(() => []);
+  const likesList = Array.isArray(likeRows) ? likeRows : [];
+  const likesTrim = likesList.slice(0, MAX);
+  if (likesList.length > MAX) truncated = true;
+  const likerIds = Array.from(new Set(likesTrim.map((r) => String(r?.user_id || '').trim()).filter(Boolean)));
+
+  // Comments (approved only)
+  const commentRows = await supabaseRestGet('comments', { select: 'user_id,is_deleted', post_id: `eq.${id}`, is_deleted: 'eq.false', limit: String(MAX + 1) }).catch(() => []);
+  const commentList = Array.isArray(commentRows) ? commentRows : [];
+  const commentTrim = commentList.slice(0, MAX);
+  if (commentList.length > MAX) truncated = true;
+  const commenterIds = Array.from(new Set(commentTrim.map((r) => String(r?.user_id || '').trim()).filter(Boolean)));
+
+  // Fetch involved users (chunked)
+  const ids = Array.from(new Set([...likerIds, ...commenterIds]));
+  const userMap = new Map();
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    // eslint-disable-next-line no-await-in-loop
+    const rows = await supabaseRestGet('users', { select: 'id,user_type,politician_type,party_id,is_verified', id: `in.(${chunk.join(',')})`, limit: String(chunk.length) }).catch(() => []);
+    for (const u of rows || []) {
+      const uid = String(u?.id || '').trim();
+      if (uid) userMap.set(uid, u);
+    }
+  }
+
+  const sumByRule = (items, ruleFn) => {
+    const m = new Map(); // rule -> {rule,label,unitScore,count,totalScore}
+    for (const it of items) {
+      const uid = String(it?.user_id || '').trim();
+      if (!uid) continue;
+      const u = userMap.get(uid) || null;
+      const r = ruleFn(u, owner);
+      const key = r.rule;
+      if (!m.has(key)) m.set(key, { rule: key, label: r.label, unitScore: r.unitScore, count: 0, totalScore: 0 });
+      const cur = m.get(key);
+      cur.count += 1;
+      cur.totalScore += Number(r.unitScore || 0) || 0;
+    }
+    const arr = Array.from(m.values());
+    arr.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+    const totalScore = arr.reduce((acc, x) => acc + (Number(x.totalScore || 0) || 0), 0);
+    return { byRule: arr, totalScore };
+  };
+
+  const likes = sumByRule(likesTrim, likeScoreRule);
+  const comments = sumByRule(commentTrim, commentScoreRule);
+
+  return res.json({
+    success: true,
+    data: {
+      postId: String(post.id),
+      truncated,
+      totalScore: (Number(likes.totalScore || 0) || 0) + (Number(comments.totalScore || 0) || 0),
+      views: {
+        count: Number(post.view_count || 0) || 0,
+        score: null,
+        note: 'Görüntüleme kırılımı (kim izledi) DB’de tutulmadığı için hesaplanamaz.',
+      },
+      likes: {
+        count: Number(post.like_count || 0) || 0,
+        ...likes,
+      },
+      comments: {
+        count: Number(post.comment_count || 0) || 0,
+        ...comments,
+      },
+    },
+  });
+}
+
 async function getPostComments(req, res, postId) {
     // If authenticated, allow returning the user's own "pending" comments as well.
     // We currently model "pending moderation" as is_deleted=true to hide from others.
@@ -10064,6 +10228,7 @@ export default async function handler(req, res) {
           if (postId && tail === 'share' && req.method === 'POST') return await trackPostShare(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'GET') return await getPostComments(req, res, postId);
           if (postId && tail === 'comments' && req.method === 'POST') return await addPostComment(req, res, postId);
+          if (postId && tail === 'polit-score-breakdown' && req.method === 'GET') return await getPostPolitScoreBreakdown(req, res, postId);
           if (postId && tail === 'report' && req.method === 'POST') return await reportPost(req, res, postId);
       }
 
