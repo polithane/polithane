@@ -13,9 +13,11 @@ import { apiCall } from '../utils/api';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProfilePath } from '../utils/paths';
 import { supabase } from '../services/supabase';
+import { usePublicSite } from '../contexts/PublicSiteContext';
 
 export const MessagesPage = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { allowMessages } = usePublicSite();
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedConv, setSelectedConv] = useState(null);
@@ -448,6 +450,10 @@ export const MessagesPage = () => {
   // Send message
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConv) return;
+    if (!allowMessages) {
+      setError('Mesajlaşma şu anda kapalı.');
+      return;
+    }
     
     try {
       setError(null);
@@ -501,11 +507,19 @@ export const MessagesPage = () => {
 
   const handlePickImage = () => {
     setError(null);
+    if (!allowMessages) {
+      setError('Mesajlaşma şu anda kapalı.');
+      return;
+    }
     fileRef.current?.click();
   };
 
   const handleSendImage = async (file) => {
     if (!file || !selectedConv) return;
+    if (!allowMessages) {
+      setError('Mesajlaşma şu anda kapalı.');
+      return;
+    }
     try {
       setError(null);
       const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -940,6 +954,13 @@ export const MessagesPage = () => {
                       </button>
                     </div>
                   )}
+
+                  {!allowMessages ? (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900">
+                      <div className="font-black">Mesajlaşma kapalı</div>
+                      <div className="text-sm mt-1">Site ayarları üzerinden mesajlaşma geçici olarak kapatıldı.</div>
+                    </div>
+                  ) : null}
                   
                   {loading ? (
                     <div className="flex items-center justify-center h-full">
@@ -1059,11 +1080,13 @@ export const MessagesPage = () => {
                         (() => {
                           const rid = getReceiverId(selectedConv);
                           const isBlockedByMe = rid && blockedIds instanceof Set ? blockedIds.has(String(rid)) : false;
+                          if (!allowMessages) return 'Mesajlaşma şu anda kapalı.';
                           return isBlockedByMe ? 'Engellediğiniz kullanıcıya mesaj gönderemezsiniz.' : 'Mesajınızı yazın...';
                         })()
                       }
                       disabled={(() => {
                         const rid = getReceiverId(selectedConv);
+                        if (!allowMessages) return true;
                         return rid && blockedIds instanceof Set ? blockedIds.has(String(rid)) : false;
                       })()}
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
@@ -1073,6 +1096,7 @@ export const MessagesPage = () => {
                       onClick={handlePickImage}
                       disabled={(() => {
                         const rid = getReceiverId(selectedConv);
+                        if (!allowMessages) return true;
                         return rid && blockedIds instanceof Set ? blockedIds.has(String(rid)) : false;
                       })()}
                       className="bg-white border border-gray-300 text-gray-800 rounded-lg p-2 hover:bg-gray-50 transition-colors"
@@ -1083,6 +1107,7 @@ export const MessagesPage = () => {
                     <button
                       onClick={handleSendMessage}
                       disabled={
+                        !allowMessages ||
                         !newMessage.trim() ||
                         (() => {
                           const rid = getReceiverId(selectedConv);

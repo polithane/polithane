@@ -8,6 +8,7 @@ import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { NotificationProvider } from './contexts/NotificationContext'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { PublicSiteProvider } from './contexts/PublicSiteContext'
 
 // Error Boundary
 import ErrorBoundary from './components/common/ErrorBoundary'
@@ -17,11 +18,13 @@ createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <BrowserRouter>
         <ThemeProvider>
-          <AuthProvider>
-            <NotificationProvider>
-              <App />
-            </NotificationProvider>
-          </AuthProvider>
+          <PublicSiteProvider>
+            <AuthProvider>
+              <NotificationProvider>
+                <App />
+              </NotificationProvider>
+            </AuthProvider>
+          </PublicSiteProvider>
         </ThemeProvider>
       </BrowserRouter>
     </ErrorBoundary>

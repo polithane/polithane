@@ -13,6 +13,7 @@ import { getProfilePath } from '../utils/paths';
 import { FollowButton } from '../components/common/FollowButton';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
+import { usePublicSite } from '../contexts/PublicSiteContext';
 
 const SmartVideo = ({ src, autoPlay = false }) => {
   const videoRef = useRef(null);
@@ -362,6 +363,7 @@ export const PostDetailPage = () => {
   const location = useLocation();
   const navType = useNavigationType();
   const { user: currentUser, isAuthenticated } = useAuth();
+  const { allowComments } = usePublicSite();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [showScoreModal, setShowScoreModal] = useState(false);
@@ -668,6 +670,10 @@ export const PostDetailPage = () => {
     if (!uiPost.post_id) return;
     if (!isAuthenticated) {
       navigate('/login-new');
+      return;
+    }
+    if (!allowComments) {
+      setCommentError('Yorumlar şu anda kapalı.');
       return;
     }
     if (commentSubmitting) return;

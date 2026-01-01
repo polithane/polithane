@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
@@ -82,8 +82,36 @@ import { ParliamentInfoPage } from './pages/ParliamentInfoPage';
 import { PartiesDirectoryPage } from './pages/PartiesDirectoryPage';
 import { SiteHeadManager } from './components/system/SiteHeadManager';
 import { ScrollToTop } from './components/system/ScrollToTop';
+import { MaintenancePage } from './pages/MaintenancePage';
+import { usePublicSite } from './contexts/PublicSiteContext';
+import { useAuth } from './contexts/AuthContext';
 
 function App() {
+  const location = useLocation();
+  const { maintenanceMode } = usePublicSite();
+  const { isAdmin } = useAuth();
+
+  const path = String(location?.pathname || '/');
+  const isAuthRoute =
+    path.startsWith('/login') ||
+    path.startsWith('/register') ||
+    path.startsWith('/forgot-password') ||
+    path.startsWith('/reset-password') ||
+    path.startsWith('/verify-email');
+  const isAdminRoute = path.startsWith('/adminyonetim');
+  const bypass = isAdmin?.() === true || isAdminRoute || isAuthRoute;
+
+  if (maintenanceMode && !bypass) {
+    return (
+      <div className="min-h-screen flex flex-col app-shell">
+        <SiteHeadManager />
+        <ScrollToTop />
+        <MaintenancePage />
+        <Toaster position="top-right" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col app-shell">
       <SiteHeadManager />
@@ -135,6 +163,7 @@ function App() {
         <Route path="/terms" element={<><Header /><TermsPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/privacy-policy" element={<><Header /><PrivacyPolicyPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/cookie-policy" element={<><Header /><CookiePolicyPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/maintenance" element={<MaintenancePage />} />
         {/* Backward-compatible legacy routes */}
         <Route path="/stories" element={<><Header /><PoliFestPage /><Footer /><ActionBar /></>} />
         <Route path="/stories/:usernameOrId" element={<PoliFestViewerPage />} />

@@ -7,6 +7,7 @@ import {
 import { Button } from '../../components/common/Button';
 import { Avatar } from '../../components/common/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePublicSite } from '../../contexts/PublicSiteContext';
 import { parties as partiesApi, users as usersApi } from '../../utils/api';
 import { CITY_CODES } from '../../utils/constants';
 import { isValidEmail, isValidPhone, isValidFileSize, isValidFileType } from '../../utils/validators';
@@ -74,6 +75,7 @@ export const RegisterPageNew = () => {
   const [logoFailed, setLogoFailed] = useState(false);
   const [searchParams] = useSearchParams();
   const { register } = useAuth();
+  const { allowRegistration } = usePublicSite();
   
   // URL Params
   const initialMode = searchParams.get('mode'); // 'claim'
@@ -264,6 +266,11 @@ export const RegisterPageNew = () => {
   // Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!allowRegistration) {
+      setGlobalError('Kayıt alımı şu anda kapalı. Lütfen daha sonra tekrar deneyin.');
+      return;
+    }
     
     // Honeypot Check
     if (honeypot) {
