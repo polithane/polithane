@@ -4264,6 +4264,102 @@ function shouldEmailFromMeta(meta, type) {
   return true;
 }
 
+// Email templates (admin_email_templates) – best-effort runtime usage with safe fallbacks.
+let emailTemplateCache = new Map();
+let emailTemplateCacheAt = 0;
+const EMAIL_TEMPLATE_CACHE_MS = 30_000;
+
+function escapeHtmlEmailTemplate(s) {
+  return String(s ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function applyTemplateVars(input, vars) {
+  let out = String(input ?? '');
+  const entries = vars && typeof vars === 'object' ? Object.entries(vars) : [];
+  for (const [kRaw, vRaw] of entries) {
+    const k = String(kRaw || '').trim();
+    if (!k) continue;
+    const token = `{{${k}}}`;
+    const v = vRaw == null ? '' : String(vRaw);
+    out = out.split(token).join(v);
+  }
+  return out;
+}
+
+async function getActiveEmailTemplateByType(type) {
+  const t = String(type || '').trim();
+  if (!t) return null;
+
+  const now = Date.now();
+  if (emailTemplateCache && (now - emailTemplateCacheAt) < EMAIL_TEMPLATE_CACHE_MS) {
+    return emailTemplateCache.get(t) || null;
+  }
+
+  const next = new Map();
+  try {
+    let rows = [];
+    try {
+      rows = await supabaseRestGetWithOrderFallback(
+        'admin_email_templates',
+        { select: 'id,type,subject,content_html,is_active,usage_count,updated_at,created_at', type: `eq.${t}`, is_active: 'eq.true', limit: '1' },
+        ['updated_at.desc', 'created_at.desc', 'id.desc']
+      );
+    } catch (e) {
+      // Some deployments may be missing `is_active` – retry without it.
+      if (isMissingColumnError(e, 'is_active')) {
+        rows = await supabaseRestGetWithOrderFallback(
+          'admin_email_templates',
+          { select: 'id,type,subject,content_html,usage_count,updated_at,created_at', type: `eq.${t}`, limit: '1' },
+          ['updated_at.desc', 'created_at.desc', 'id.desc']
+        );
+      } else {
+        throw e;
+      }
+    }
+    const tpl = Array.isArray(rows) ? rows?.[0] || null : null;
+    // Cache only the requested key (others remain null).
+    next.set(t, tpl);
+  } catch {
+    next.set(t, null);
+  }
+
+  emailTemplateCache = next;
+  emailTemplateCacheAt = now;
+  return next.get(t) || null;
+}
+
+async function renderEmailTemplate(req, { type, vars, fallbackSubject = '', fallbackHtml = '', fallbackText = '' }) {
+  const tpl = await getActiveEmailTemplateByType(type).catch(() => null);
+  if (!tpl?.content_html && !tpl?.subject) return null;
+
+  const safeVars = {};
+  const raw = vars && typeof vars === 'object' ? vars : {};
+  for (const [k, v] of Object.entries(raw)) {
+    safeVars[k] = escapeHtmlEmailTemplate(v);
+  }
+
+  const subject = String(applyTemplateVars(tpl?.subject || '', safeVars) || '').trim() || String(fallbackSubject || '').trim();
+  const html = String(applyTemplateVars(tpl?.content_html || '', safeVars) || '').trim() || String(fallbackHtml || '').trim();
+  const text = String(fallbackText || '').trim();
+
+  // Best-effort usage_count bump (safe to ignore failures).
+  try {
+    if (tpl?.id) {
+      const usage = Math.max(0, parseInt(String(tpl?.usage_count ?? 0), 10) || 0);
+      await supabaseRestPatch('admin_email_templates', { id: `eq.${tpl.id}` }, { usage_count: usage + 1, updated_at: new Date().toISOString() }).catch(() => null);
+    }
+  } catch {
+    // ignore
+  }
+
+  return { subject, html, text };
+}
+
 async function sendVerificationEmailForUser(req, { toEmail, token }) {
   const appUrl = getPublicAppUrl(req);
   const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(token)}`;
@@ -4284,7 +4380,14 @@ async function sendVerificationEmailForUser(req, { toEmail, token }) {
       <p style="font-size:12px;color:#6b7280;">Link çalışmazsa: <span style="color:#009fd6;word-break:break-all;">${verifyUrl}</span></p>
     `,
   });
-  await safeSendEmail({ to: toEmail, subject, html, text });
+  const rendered = await renderEmailTemplate(req, {
+    type: 'email_verification',
+    vars: { verification_link: verifyUrl, app_url: appUrl },
+    fallbackSubject: subject,
+    fallbackHtml: html,
+    fallbackText: text,
+  }).catch(() => null);
+  await safeSendEmail({ to: toEmail, subject: rendered?.subject || subject, html: rendered?.html || html, text });
 }
 
 async function sendWelcomeEmailToUser(req, { toEmail, fullName }) {
@@ -4299,7 +4402,14 @@ async function sendWelcomeEmailToUser(req, { toEmail, fullName }) {
     `,
   });
   const text = `Merhaba ${String(fullName || '').trim() || 'kullanıcı'},\n\nPolithane ailesine hoş geldiniz.\n${appUrl}\n`;
-  await safeSendEmail({ to: toEmail, subject, html, text });
+  const rendered = await renderEmailTemplate(req, {
+    type: 'welcome',
+    vars: { full_name: String(fullName || '').trim() || 'kullanıcı', app_url: appUrl },
+    fallbackSubject: subject,
+    fallbackHtml: html,
+    fallbackText: text,
+  }).catch(() => null);
+  await safeSendEmail({ to: toEmail, subject: rendered?.subject || subject, html: rendered?.html || html, text });
 }
 
 async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
@@ -4363,7 +4473,14 @@ async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
       `,
     });
     const text = `${ttl}\n\n${actorName ? actorName + ' ' : ''}${detail.replace(/<[^>]+>/g, '')}\n${link}\n`;
-    await safeSendEmail({ to: u.email, subject, html, text });
+    const rendered = await renderEmailTemplate(req, {
+      type: String(type || 'system').trim() || 'system',
+      vars: { actor_name: actorName, link, app_url: appUrl },
+      fallbackSubject: subject,
+      fallbackHtml: html,
+      fallbackText: text,
+    }).catch(() => null);
+    await safeSendEmail({ to: u.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
   } catch {
     // best-effort
   }
@@ -4399,7 +4516,14 @@ async function sendMessageEmail(req, { receiverId, senderId, messagePreview }) {
       `,
     });
     const text = `Yeni mesajınız var.\nGönderen: ${senderName}\n\n${safePreview}\n\n${link}\n`;
-    await safeSendEmail({ to: recv.email, subject, html, text });
+    const rendered = await renderEmailTemplate(req, {
+      type: 'message',
+      vars: { actor_name: senderName, message_excerpt: safePreview, link, app_url: appUrl },
+      fallbackSubject: subject,
+      fallbackHtml: html,
+      fallbackText: text,
+    }).catch(() => null);
+    await safeSendEmail({ to: recv.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
   } catch {
     // best-effort
   }
@@ -6077,6 +6201,309 @@ async function adminGetEmailTemplates(req, res) {
       ['updated_at.desc', 'created_at.desc', 'id.desc']
     );
     rows = Array.isArray(rows) ? rows : [];
+
+    // Ensure a rich default set exists (insert only missing types; never overwrite).
+    try {
+      const now = new Date().toISOString();
+      const base = (title, bodyHtml) => `
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${String(title || '')}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+    <div style="max-width:640px;margin:0 auto;padding:24px;">
+      <div style="background:#111827;border-radius:16px;padding:18px 20px;color:#fff;">
+        <div style="font-size:18px;font-weight:800;letter-spacing:.2px;">Polithane</div>
+        <div style="opacity:.9;font-size:12px;margin-top:6px;">Siyasetin nabzı</div>
+      </div>
+      <div style="background:#ffffff;border-radius:16px;margin-top:14px;padding:22px;border:1px solid #e5e7eb;">
+        ${bodyHtml}
+      </div>
+      <div style="margin-top:14px;font-size:12px;color:#6b7280;line-height:1.5;">
+        Bu e‑posta Polithane tarafından otomatik gönderilmiştir.
+      </div>
+    </div>
+  </body>
+</html>`.trim();
+
+      const REQUIRED = [
+        {
+          name: 'Hoş Geldin',
+          type: 'welcome',
+          subject: 'Polithane’ye Hoş Geldin!',
+          content_html: base(
+            'Hoş Geldin',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Aramıza hoş geldin!</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Polithane’de gündemi takip edebilir, Polit paylaşabilir ve Fast akışında anlık gelişmeleri izleyebilirsin.
+</p>
+<div style="margin-top:16px;padding:14px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;">
+  <div style="font-weight:800;color:#111827;">Başlangıç</div>
+  <div style="margin-top:6px;color:#374151;">Ana sayfadan gündemi seç, Polit’leri keşfet.</div>
+</div>
+<div style="margin-top:14px;">
+  <a href="{{app_url}}" style="display:inline-block;padding:10px 14px;background:#009fd6;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Polithane’ye git
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'E‑posta Doğrulama',
+          type: 'email_verification',
+          subject: 'E‑posta adresini doğrula',
+          content_html: base(
+            'E‑posta doğrulama',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">E‑posta doğrulama</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Hesabını aktifleştirmek için e‑posta adresini doğrulaman gerekiyor.
+</p>
+<div style="margin-top:16px;padding:14px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;">
+  <div style="color:#1d4ed8;font-weight:800;">Doğrulama bağlantısı</div>
+  <div style="margin-top:6px;color:#1f2937;word-break:break-all;">{{verification_link}}</div>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Şifre Sıfırlama',
+          type: 'password_reset',
+          subject: 'Şifre sıfırlama isteği',
+          content_html: base(
+            'Şifre sıfırlama',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Şifre sıfırlama</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Şifre sıfırlama isteği aldık. Eğer bu isteği sen yapmadıysan bu e‑postayı yok sayabilirsin.
+</p>
+<div style="margin-top:16px;padding:14px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;">
+  <div style="color:#9a3412;font-weight:800;">Sıfırlama bağlantısı</div>
+  <div style="margin-top:6px;color:#1f2937;word-break:break-all;">{{reset_link}}</div>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Yeni Mesaj',
+          type: 'message',
+          subject: 'Yeni mesajın var',
+          content_html: base(
+            'Yeni mesaj',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Yeni mesaj</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+{{actor_name}} sana yeni bir mesaj gönderdi.
+</p>
+<div style="margin-top:16px;padding:14px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;">
+  <div style="font-weight:800;color:#111827;">Mesaj</div>
+  <div style="margin-top:6px;color:#374151;white-space:pre-wrap;">{{message_excerpt}}</div>
+</div>
+<div style="margin-top:14px;">
+  <a href="{{link}}" style="display:inline-block;padding:10px 14px;background:#009fd6;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Mesajı aç
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Beğeni Bildirimi',
+          type: 'like',
+          subject: 'Paylaşımın beğenildi',
+          content_html: base(
+            'Beğeni',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Paylaşımın beğenildi</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+{{actor_name}} paylaşımını beğendi.
+</p>
+<div style="margin-top:14px;">
+  <a href="{{link}}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Görüntüle
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Yorum Bildirimi',
+          type: 'comment',
+          subject: 'Paylaşımına yeni yorum',
+          content_html: base(
+            'Yorum',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Paylaşımına yeni yorum</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+{{actor_name}} paylaşımına yorum yaptı.
+</p>
+<div style="margin-top:14px;">
+  <a href="{{link}}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Görüntüle
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Yorum Beğenisi Bildirimi',
+          type: 'comment_like',
+          subject: 'Yorumun beğenildi',
+          content_html: base(
+            'Yorum beğenisi',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Yorumun beğenildi</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+{{actor_name}} yorumunu beğendi.
+</p>
+<div style="margin-top:14px;">
+  <a href="{{link}}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Görüntüle
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Paylaşım Bildirimi',
+          type: 'share',
+          subject: 'Paylaşımın paylaşıldı',
+          content_html: base(
+            'Paylaşım',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Paylaşımın paylaşıldı</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+{{actor_name}} paylaşımını paylaştı.
+</p>
+<div style="margin-top:14px;">
+  <a href="{{link}}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Görüntüle
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Takip Bildirimi',
+          type: 'follow',
+          subject: 'Yeni takipçin var',
+          content_html: base(
+            'Yeni takip',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Yeni takipçin var</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+{{actor_name}} seni takip etmeye başladı.
+</p>
+<div style="margin-top:14px;">
+  <a href="{{link}}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Profili aç
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Etiketlenme Bildirimi',
+          type: 'mention',
+          subject: 'Bir içerikte etiketlendin',
+          content_html: base(
+            'Bahsedilme',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Bir içerikte etiketlendin</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+{{actor_name}} seni bir içerikte etiketledi.
+</p>
+<div style="margin-top:14px;">
+  <a href="{{link}}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Görüntüle
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Üyelik Durumu',
+          type: 'approval',
+          subject: 'Üyelik durumunda güncelleme',
+          content_html: base(
+            'Üyelik durumu',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Üyelik durumunda güncelleme</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Üyeliğiniz ile ilgili bir güncelleme var.
+</p>
+<div style="margin-top:14px;">
+  <a href="{{app_url}}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Polithane’ye git
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          name: 'Sistem Bildirimi',
+          type: 'system',
+          subject: 'Yeni bildirimin var',
+          content_html: base(
+            'Bildirim',
+            `
+<h2 style="margin:0 0 10px 0;font-size:20px;">Yeni bildirimin var</h2>
+<p style="margin:0;color:#374151;line-height:1.7;">
+Hesabın için yeni bir bildirim var.
+</p>
+<div style="margin-top:14px;">
+  <a href="{{link}}" style="display:inline-block;padding:10px 14px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;font-weight:900;">
+    Görüntüle
+  </a>
+</div>
+`.trim()
+          ),
+          is_active: true,
+          updated_at: now,
+        },
+      ];
+
+      const have = new Set((rows || []).map((r) => String(r?.type || '').trim()).filter(Boolean));
+      const missing = REQUIRED.filter((t) => t?.type && !have.has(String(t.type)));
+      if (missing.length > 0) {
+        await supabaseRestInsert('admin_email_templates', missing).catch(() => null);
+        rows = await supabaseRestGetWithOrderFallback(
+          'admin_email_templates',
+          { select: '*', limit: '200' },
+          ['updated_at.desc', 'created_at.desc', 'id.desc']
+        );
+        rows = Array.isArray(rows) ? rows : [];
+      }
+    } catch {
+      // ignore seeding errors
+    }
 
     // If empty, seed a high-quality default set once (best-effort).
     if (rows.length === 0) {
@@ -8726,7 +9153,14 @@ async function authForgotPassword(req, res) {
             <p style="font-size:12px;color:#6b7280;">Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>
           </div>
         `;
-        await sendEmail({ to: u.email, subject, html, text }).catch(() => null);
+        const rendered = await renderEmailTemplate(req, {
+          type: 'password_reset',
+          vars: { reset_link: resetUrl, app_url: appUrl },
+          fallbackSubject: subject,
+          fallbackHtml: html,
+          fallbackText: text,
+        }).catch(() => null);
+        await safeSendEmail({ to: u.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
       }
     } catch {
       // best-effort only
