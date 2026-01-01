@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Camera, Trash2, Video, Image as ImageIcon, Music, PenTool, UploadCloud, Mic, StopCircle, Smartphone } from 'lucide-react';
+import { Camera, Trash2, Video, Image as ImageIcon, Music, PenTool, UploadCloud, Mic, StopCircle, Smartphone, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
@@ -124,6 +124,8 @@ export const CreatePolitPage = () => {
   const [mediaDurationSec, setMediaDurationSec] = useState(0);
   const [videoThumbs, setVideoThumbs] = useState([]); // [{ timeSec, previewUrl, blob }]
   const [selectedVideoThumbIdx, setSelectedVideoThumbIdx] = useState(0);
+  const [videoThumbRefreshCount, setVideoThumbRefreshCount] = useState(0);
+  const [videoThumbGenSeed, setVideoThumbGenSeed] = useState(0);
 
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -158,6 +160,9 @@ export const CreatePolitPage = () => {
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const previewRef = useRef(null);
+  const recordCanvasRef = useRef(null);
+  const recordCanvasRafRef = useRef(null);
+  const recordOutStreamRef = useRef(null);
   const recordTimeoutRef = useRef(null);
   const recordIntervalRef = useRef(null);
   const recordStartTsRef = useRef(0);
@@ -347,6 +352,8 @@ export const CreatePolitPage = () => {
     }
     setVideoThumbs([]);
     setSelectedVideoThumbIdx(0);
+    setVideoThumbRefreshCount(0);
+    setVideoThumbGenSeed(0);
     if (recordedUrl) {
       try {
         URL.revokeObjectURL(recordedUrl);
@@ -668,8 +675,10 @@ export const CreatePolitPage = () => {
         const d = Number.isFinite(duration) && duration > 0 ? duration : Math.max(1, Number(mediaDurationSec || 0) || 1);
 
         // Always TRY to produce 3 distinct thumbnails, even if metadata duration is missing.
+        // Apply small deterministic jitter so "Yenile" generates different frames.
         const maxT = Math.max(0.05, d - 0.12);
-        const rawTimes = [Math.min(0.12, maxT), d * 0.45, d * 0.82].map((t) => clamp(t, 0.05, maxT));
+        const jitter = (Number(videoThumbGenSeed || 0) % 7) * 0.07; // 0..0.42s
+        const rawTimes = [Math.min(0.12 + jitter, maxT), d * 0.45 + jitter, d * 0.82 + jitter].map((t) => clamp(t, 0.05, maxT));
         // De-dupe, but keep enough by nudging with a tiny epsilon when needed.
         const uniqTimes = [];
         for (const rt of rawTimes) {
@@ -690,23 +699,29 @@ export const CreatePolitPage = () => {
         uniqTimes.splice(3);
 
         const captured = [];
-        for (const t of uniqTimes) {
+        // Try more candidate times if seeking fails (mobile/webm combos).
+        const candidates = uniqTimes.slice();
+        for (const pct of [0.18, 0.28, 0.6, 0.72, 0.9]) {
+          candidates.push(clamp(d * pct + jitter, 0.05, maxT));
+        }
+        const uniqueCandidates = [];
+        for (const t of candidates) {
+          const tt = Number(Number(t).toFixed(2));
+          if (!uniqueCandidates.some((x) => Math.abs(x - tt) < 0.02)) uniqueCandidates.push(tt);
+        }
+        for (const t of uniqueCandidates) {
           if (cancelled) break;
           // eslint-disable-next-line no-await-in-loop
           const one = await captureAt(videoEl, t, d);
           if (one) captured.push(one);
+          if (captured.length >= 3) break;
         }
-        // If we couldn't seek for some reason (common on some mobile/webm combos),
-        // still show 3 thumbnails by reusing the first successful capture.
-        if (captured.length > 0 && captured.length < 3) {
-          const first = captured[0];
-          while (captured.length < 3) captured.push(first);
-        }
+        // IMPORTANT: Do NOT duplicate the same frame; if seeking fails, show fewer thumbs.
         if (cancelled) {
           cleanupPrev(captured);
           return;
         }
-        setVideoThumbs(captured);
+        setVideoThumbs(captured.slice(0, 3));
         setSelectedVideoThumbIdx(0);
         try {
           videoEl.pause?.();
@@ -725,7 +740,7 @@ export const CreatePolitPage = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentType, recordedUrl, isRecording]);
+  }, [contentType, recordedUrl, isRecording, videoThumbGenSeed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -973,6 +988,71 @@ export const CreatePolitPage = () => {
         }
       }
 
+      // Force portrait output for videos by recording a 9:16 canvas stream (center-crop cover).
+      // This makes the *saved file* vertical even if the camera stream is delivered as landscape.
+      let outStream = stream;
+      if (contentType === 'video') {
+        try {
+          const v = previewRef.current;
+          const canvas = recordCanvasRef.current;
+          if (v && canvas && canvas.getContext) {
+            // Wait a tick for metadata (videoWidth/videoHeight)
+            await new Promise((resolve) => setTimeout(resolve, 120));
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              const CW = 720;
+              const CH = 1280;
+              canvas.width = CW;
+              canvas.height = CH;
+              const targetRatio = CW / CH; // 9/16
+              let cancelled = false;
+              const draw = () => {
+                if (cancelled) return;
+                try {
+                  const vw = Number(v.videoWidth || 0) || 0;
+                  const vh = Number(v.videoHeight || 0) || 0;
+                  if (vw > 0 && vh > 0) {
+                    const srcRatio = vw / vh;
+                    let sw = vw;
+                    let sh = vh;
+                    let sx = 0;
+                    let sy = 0;
+                    // Center-crop so output fills 9:16 without letterboxing.
+                    if (srcRatio > targetRatio) {
+                      // Source is wider -> crop sides
+                      sw = Math.max(1, Math.round(vh * targetRatio));
+                      sh = vh;
+                      sx = Math.round((vw - sw) / 2);
+                      sy = 0;
+                    } else if (srcRatio < targetRatio) {
+                      // Source is taller -> crop top/bottom
+                      sw = vw;
+                      sh = Math.max(1, Math.round(vw / targetRatio));
+                      sx = 0;
+                      sy = Math.round((vh - sh) / 2);
+                    }
+                    ctx.drawImage(v, sx, sy, sw, sh, 0, 0, CW, CH);
+                  }
+                } catch {
+                  // ignore draw errors (we keep trying)
+                }
+                recordCanvasRafRef.current = requestAnimationFrame(draw);
+              };
+              draw();
+              const canvasStream = canvas.captureStream?.(30);
+              if (canvasStream) {
+                const audioTracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
+                outStream = new MediaStream([...(canvasStream.getVideoTracks() || []), ...(audioTracks || [])]);
+                recordOutStreamRef.current = { canvasStream, stop: () => { cancelled = true; } };
+              }
+            }
+          }
+        } catch {
+          // If canvas capture fails, fall back to raw stream
+          outStream = stream;
+        }
+      }
+
       const mimeType =
         contentType === 'audio'
           ? MediaRecorder.isTypeSupported('audio/webm')
@@ -996,9 +1076,9 @@ export const CreatePolitPage = () => {
             };
       let recorder;
       try {
-        recorder = new MediaRecorder(stream, recorderOptions);
+        recorder = new MediaRecorder(outStream, recorderOptions);
       } catch {
-        recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        recorder = new MediaRecorder(outStream, mimeType ? { mimeType } : undefined);
       }
       recorderRef.current = recorder;
       chunksRef.current = [];
@@ -1064,6 +1144,22 @@ export const CreatePolitPage = () => {
     } catch {
       // ignore
     }
+    // Stop canvas capture loop + stream (if used)
+    try {
+      if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
+      recordCanvasRafRef.current = null;
+    } catch {
+      // ignore
+    }
+    try {
+      const out = recordOutStreamRef.current;
+      out?.stop?.();
+      const cs = out?.canvasStream;
+      cs?.getTracks?.()?.forEach?.((t) => t.stop());
+    } catch {
+      // ignore
+    }
+    recordOutStreamRef.current = null;
     if (streamRef.current) {
       try {
         streamRef.current.getTracks().forEach((t) => t.stop());
@@ -1589,7 +1685,7 @@ export const CreatePolitPage = () => {
                         {isRecording ? (
                           <video
                             ref={previewRef}
-                            className="w-full aspect-video bg-black object-cover"
+                            className="w-full aspect-[9/16] bg-black object-cover"
                             playsInline
                             muted
                             autoPlay
@@ -1598,7 +1694,7 @@ export const CreatePolitPage = () => {
                           <video
                             src={recordedUrl}
                             controls
-                            className="w-full aspect-video bg-black object-contain"
+                            className="w-full aspect-[9/16] bg-black object-contain"
                             playsInline
                           />
                         ) : (
@@ -1614,7 +1710,7 @@ export const CreatePolitPage = () => {
                       ) : null}
 
                       {videoThumbs.length > 0 ? (
-                        <div>
+                        <div className="relative">
                           <div className="text-xs font-black text-gray-900 mb-2">Önizleme seçin</div>
                           <div className="grid grid-cols-3 gap-2">
                             {videoThumbs.map((t, i) => (
@@ -1632,6 +1728,21 @@ export const CreatePolitPage = () => {
                               </button>
                             ))}
                           </div>
+                          {videoThumbRefreshCount < 3 ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (videoThumbRefreshCount >= 3) return;
+                                setVideoThumbRefreshCount((c) => c + 1);
+                                setVideoThumbGenSeed((s) => Number(s || 0) + 1);
+                              }}
+                              className="absolute -bottom-1 -right-1 w-11 h-11 rounded-full bg-white border border-gray-200 shadow-sm hover:bg-gray-50 flex items-center justify-center"
+                              aria-label="Önizlemeleri yenile"
+                              title={`Önizlemeleri yenile (${3 - videoThumbRefreshCount} hak kaldı)`}
+                            >
+                              <RotateCcw className="w-5 h-5 text-gray-800" />
+                            </button>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

@@ -541,6 +541,8 @@ export const FastViewerPage = () => {
   const videoSafeDur = Number.isFinite(vDur) && vDur > 0 ? vDur : 0;
   const videoSafeT = Number.isFinite(vT) && vT >= 0 ? vT : 0;
   const videoPct = videoSafeDur > 0 ? Math.max(0, Math.min(1, videoSafeT / videoSafeDur)) : 0;
+  const videoRatio = vMeta?.w > 0 && vMeta?.h > 0 ? vMeta.w / vMeta.h : 0;
+  const isPortraitVideo = videoRatio > 0 && videoRatio < 0.95;
 
   const seekVideoPct = (p) => {
     const el = videoRef.current;
@@ -1094,7 +1096,7 @@ export const FastViewerPage = () => {
                   muted={muted}
                   autoPlay
                   controls={false}
-                  className="h-full w-full object-contain"
+                  className={['h-full w-full', isPortraitVideo ? 'object-cover' : 'object-contain'].join(' ')}
                 />
               </div>
             ) : current.content_type === 'audio' ? (
