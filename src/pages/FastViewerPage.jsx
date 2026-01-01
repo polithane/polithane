@@ -53,6 +53,7 @@ export const FastViewerPage = () => {
   const [muted, setMuted] = useState(false);
   const [vT, setVT] = useState(0);
   const [vDur, setVDur] = useState(0);
+  const [vMeta, setVMeta] = useState({ w: 0, h: 0 });
 
   // UX: closing Fast should return to home.
   const closeToList = useCallback(() => navigate('/'), [navigate]);
@@ -402,6 +403,7 @@ export const FastViewerPage = () => {
     setMediaBlocked(false);
     setVT(0);
     setVDur(0);
+    setVMeta({ w: 0, h: 0 });
   }, [idx]);
 
   useEffect(() => {
@@ -409,7 +411,10 @@ export const FastViewerPage = () => {
     const el = videoRef.current;
     if (!el) return;
     const onTime = () => setVT(Number(el.currentTime || 0) || 0);
-    const onMeta = () => setVDur(Number(el.duration || 0) || 0);
+    const onMeta = () => {
+      setVDur(Number(el.duration || 0) || 0);
+      setVMeta({ w: Number(el.videoWidth || 0) || 0, h: Number(el.videoHeight || 0) || 0 });
+    };
     el.addEventListener('timeupdate', onTime);
     el.addEventListener('loadedmetadata', onMeta);
     el.addEventListener('durationchange', onMeta);
@@ -913,8 +918,8 @@ export const FastViewerPage = () => {
                   if (absX > SWIPE_MIN_PX && absX > absY * 1.2) {
                     setIsPaused(false);
                     finishGesture();
-                    if (dx < 0) goItem(1);
-                    else goItem(-1);
+                    if (dx < 0) goUser(1);
+                    else goUser(-1);
                     return;
                   }
                   if (!g.moved && !g.pausedByHold && !isPaused) goItem(-1);
@@ -1032,8 +1037,8 @@ export const FastViewerPage = () => {
                   if (absX > SWIPE_MIN_PX && absX > absY * 1.2) {
                     setIsPaused(false);
                     finishGesture();
-                    if (dx < 0) goItem(1);
-                    else goItem(-1);
+                    if (dx < 0) goUser(1);
+                    else goUser(-1);
                     return;
                   }
                   if (!g.moved && !g.pausedByHold && !isPaused) goItem(1);
