@@ -640,7 +640,15 @@ export const MessagesPage = () => {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="bg-gray-50 h-[calc(100dvh-96px)] lg:h-[100dvh] overflow-hidden">
+    <div
+      className={[
+        'bg-gray-50 overflow-hidden',
+        // Header is rendered above this page. On mobile/tablet, also reserve space for the fixed ActionBar.
+        'h-[calc(100dvh-96px-86px)]',
+        // On desktop, keep it almost full-height but not flush to the OS taskbar edge.
+        'lg:h-[calc(100dvh-16px)]',
+      ].join(' ')}
+    >
       <div className="container-main py-4 md:py-6 h-full flex flex-col min-h-0">
         <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0 overflow-hidden">
           {/* Konuşma Listesi */}
