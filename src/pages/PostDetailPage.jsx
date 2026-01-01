@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users, Play, Pause, Music, Volume2, VolumeX } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users, Play, Pause, Music, Volume2, VolumeX, Rewind, FastForward } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -23,6 +23,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   const [t, setT] = useState(0);
   const [dur, setDur] = useState(0);
   const [blocked, setBlocked] = useState(false);
+  const [meta, setMeta] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
     if (!url) return;
@@ -32,7 +33,10 @@ const SmartVideo = ({ src, autoPlay = false }) => {
     const onPause = () => setIsPlaying(false);
     const onEnded = () => setIsPlaying(false);
     const onTime = () => setT(Number(el.currentTime || 0) || 0);
-    const onMeta = () => setDur(Number(el.duration || 0) || 0);
+    const onMeta = () => {
+      setDur(Number(el.duration || 0) || 0);
+      setMeta({ w: Number(el.videoWidth || 0) || 0, h: Number(el.videoHeight || 0) || 0 });
+    };
     el.addEventListener('play', onPlay);
     el.addEventListener('pause', onPause);
     el.addEventListener('ended', onEnded);
@@ -94,6 +98,8 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   const safeDur = Number.isFinite(dur) && dur > 0 ? dur : 0;
   const safeT = Number.isFinite(t) && t >= 0 ? t : 0;
   const pct = safeDur > 0 ? Math.max(0, Math.min(1, safeT / safeDur)) : 0;
+  const ratio = meta?.w > 0 && meta?.h > 0 ? meta.w / meta.h : 0;
+  const isPortrait = ratio > 0 && ratio < 0.95;
 
   const togglePlay = async () => {
     const el = videoRef.current;
@@ -140,7 +146,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   if (!url) return null;
 
   return (
-    <div className="w-full">
+    <div className={['w-full', isPortrait ? 'max-w-[520px] mx-auto' : ''].join(' ').trim()}>
       <video
         ref={videoRef}
         src={url}
@@ -150,7 +156,8 @@ const SmartVideo = ({ src, autoPlay = false }) => {
         controls={false}
         autoPlay={autoPlay}
         preload="metadata"
-        className="w-full max-h-[70vh] bg-black rounded-lg object-contain"
+        className="w-full bg-black rounded-lg object-contain"
+        style={{ maxHeight: '80vh' }}
         onClick={togglePlay}
       />
 
@@ -159,11 +166,11 @@ const SmartVideo = ({ src, autoPlay = false }) => {
           <button
             type="button"
             onClick={() => seekBySec(-10)}
-            className="px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-black text-gray-900"
+            className="w-11 h-11 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-900"
             aria-label="10 saniye geri"
             title="10 saniye geri"
           >
-            -10
+            <Rewind className="w-5 h-5" />
           </button>
 
           <button
@@ -179,11 +186,11 @@ const SmartVideo = ({ src, autoPlay = false }) => {
           <button
             type="button"
             onClick={() => seekBySec(10)}
-            className="px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-black text-gray-900"
+            className="w-11 h-11 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-900"
             aria-label="10 saniye ileri"
             title="10 saniye ileri"
           >
-            +10
+            <FastForward className="w-5 h-5" />
           </button>
 
           <div className="flex-1 px-2">

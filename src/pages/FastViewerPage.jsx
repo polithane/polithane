@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { X, Heart, Pause, Play, Volume2, VolumeX, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { X, Heart, Volume2, VolumeX, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Avatar } from '../components/common/Avatar';
 import { LikeBurstHeart } from '../components/common/LikeBurstHeart';
@@ -118,11 +118,17 @@ export const FastViewerPage = () => {
   const goUser = useCallback(
     (dir) => {
       const next = userIdx + dir;
-      if (next < 0) return;
-      if (next >= (queue || []).length) return;
+      if (next < 0) {
+        closeToList();
+        return;
+      }
+      if (next >= (queue || []).length) {
+        closeToList();
+        return;
+      }
       navigateToUserIndex(next, { replace: true });
     },
-    [navigateToUserIndex, queue, userIdx]
+    [closeToList, navigateToUserIndex, queue, userIdx]
   );
 
   const goItem = useCallback(
@@ -431,14 +437,23 @@ export const FastViewerPage = () => {
     }
     let cancelled = false;
     (async () => {
-      const r = await apiCall(`/api/fast/items/${encodeURIComponent(String(current.id))}/viewers?limit=50`, { method: 'GET' }).catch(() => null);
+      let r = null;
+      try {
+        r = await apiCall(`/api/fast/items/${encodeURIComponent(String(current.id))}/viewers?limit=50`, { method: 'GET' });
+      } catch (e) {
+        // If this fails, keep a helpful signal instead of silently showing "Bakan yok".
+        setViewersSchemaSql('');
+        setViewers([]);
+        return;
+      }
       if (cancelled) return;
       if (r?.schemaMissing) {
         setViewersSchemaSql(String(r?.requiredSql || ''));
         setViewers([]);
         return;
       }
-      const list = r?.data || [];
+      // api returns { success, data: [...] }
+      const list = r?.data?.data || r?.data || [];
       setViewers(Array.isArray(list) ? list : []);
       setViewersSchemaSql('');
     })();
@@ -676,12 +691,12 @@ export const FastViewerPage = () => {
       return;
     }
 
-    // Swipe left/right: navigate items (and naturally crosses to prev/next user at ends)
+    // Swipe left/right: navigate USERS (profiles)
     if (absX > SWIPE_MIN_PX && absX > absY * 1.2) {
       setIsPaused(false);
       finishGesture();
-      if (dx < 0) goItem(1);
-      else goItem(-1);
+      if (dx < 0) goUser(1); // swipe left => next profile
+      else goUser(-1); // swipe right => previous profile
       return;
     }
 
@@ -802,15 +817,6 @@ export const FastViewerPage = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setIsPaused((v) => !v)}
-                className="w-10 h-10 rounded-full bg-black/35 hover:bg-black/55 border border-white/10 flex items-center justify-center"
-                aria-label={isPaused ? 'Devam et' : 'Durdur'}
-                title={isPaused ? 'Devam et' : 'Durdur'}
-              >
-                {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-              </button>
-              <button
-                type="button"
                 onClick={closeToList}
                 className="w-10 h-10 rounded-full bg-black/35 hover:bg-black/55 border border-white/10 flex items-center justify-center"
                 aria-label="Kapat"
@@ -826,15 +832,19 @@ export const FastViewerPage = () => {
             className="absolute inset-0 z-10"
             style={{
               touchAction: 'none',
-              // For video, we reserve space for the bottom control bar.
-              bottom: current?.content_type === 'video' ? '72px' : '0px',
+              bottom: '0px',
             }}
           >
-            <div className="absolute inset-0 grid grid-cols-2">
+            <div
+              className={[
+                'absolute inset-0 grid',
+                current?.content_type === 'video' ? 'grid-cols-3' : 'grid-cols-2',
+              ].join(' ')}
+            >
               <div
                 role="button"
                 tabIndex={-1}
-                aria-label="Önceki"
+                aria-label="Önceki Fast"
                 className="w-full h-full"
                 onPointerDown={(e) => onPointerDownZone(e, -1)}
                 onPointerMove={onPointerMoveZone}
@@ -922,10 +932,39 @@ export const FastViewerPage = () => {
                   finishGesture();
                 }}
               />
+              {current?.content_type === 'video' ? (
+                <div
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={isPaused ? 'Devam et' : 'Durdur'}
+                  className="w-full h-full"
+                  onPointerDown={(e) => onPointerDownZone(e, 0)}
+                  onPointerMove={onPointerMoveZone}
+                  onPointerUp={(e) => {
+                    // Tap center toggles play/pause (no visible controls)
+                    const g = gestureRef.current;
+                    if (holdTimerRef.current) {
+                      clearTimeout(holdTimerRef.current);
+                      holdTimerRef.current = null;
+                    }
+                    const dx = (g.lastX || e.clientX) - g.startX;
+                    const dy = (g.lastY || e.clientY) - g.startY;
+                    const absX = Math.abs(dx);
+                    const absY = Math.abs(dy);
+                    // swipe behaviors are handled by the left/right zones; center only toggles on tap
+                    if (absX <= SWIPE_MIN_PX && absY <= SWIPE_MIN_PX && !g.moved) {
+                      setIsPaused((v) => !v);
+                    }
+                    if (g.pausedByHold) setIsPaused(false);
+                    finishGesture();
+                  }}
+                  onPointerCancel={onPointerCancelZone}
+                />
+              ) : null}
               <div
                 role="button"
                 tabIndex={-1}
-                aria-label="Sonraki"
+                aria-label="Sonraki Fast"
                 className="w-full h-full"
                 onPointerDown={(e) => onPointerDownZone(e, 1)}
                 onPointerMove={onPointerMoveZone}
@@ -1043,77 +1082,15 @@ export const FastViewerPage = () => {
               <img src={itemSrc} alt="" className="h-full w-full object-cover" draggable={false} />
             ) : current.content_type === 'video' ? (
               <div className="absolute inset-0">
-                <div className="absolute inset-x-0 top-0 bottom-[72px]">
-                  <video
-                    ref={videoRef}
-                    src={itemSrc}
-                    playsInline
-                    muted={muted}
-                    autoPlay
-                    controls={false}
-                    className="h-full w-full object-contain"
-                    onClick={() => setIsPaused((v) => !v)}
-                  />
-                </div>
-                <div className="absolute inset-x-0 bottom-0 h-[72px] px-3 pb-3 z-30">
-                  <div className="h-full rounded-2xl bg-black/55 border border-white/15 backdrop-blur-sm px-3 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => seekVideoBySec(-10)}
-                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-black text-white"
-                      aria-label="10 saniye geri"
-                      title="10 saniye geri"
-                    >
-                      -10
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (mediaBlocked) {
-                          try {
-                            const el = videoRef.current;
-                            if (!el) return;
-                            el.muted = !!muted;
-                            el.play?.().then(() => setMediaBlocked(false)).catch(() => setMediaBlocked(true));
-                          } catch {
-                            setMediaBlocked(true);
-                          }
-                          return;
-                        }
-                        setIsPaused((v) => !v);
-                      }}
-                      className="w-11 h-11 rounded-full bg-white/15 hover:bg-white/20 border border-white/15 flex items-center justify-center"
-                      aria-label={isPaused ? 'Devam et' : mediaBlocked ? 'Oynat' : 'Durdur'}
-                      title={isPaused ? 'Devam et' : 'Durdur'}
-                    >
-                      {isPaused || mediaBlocked ? <Play className="w-5 h-5 text-white" /> : <Pause className="w-5 h-5 text-white" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => seekVideoBySec(10)}
-                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-black text-white"
-                      aria-label="10 saniye ileri"
-                      title="10 saniye ileri"
-                    >
-                      +10
-                    </button>
-                    <div className="flex-1 px-1">
-                      <input
-                        type="range"
-                        min="0"
-                        max="1000"
-                        value={Math.round(videoPct * 1000)}
-                        onChange={(e) => seekVideoPct(Number(e.target.value) / 1000)}
-                        className="w-full"
-                        aria-label="Zaman çizelgesi"
-                      />
-                      <div className="mt-0.5 text-[10px] font-mono text-white/75 flex items-center justify-between">
-                        <span>{Math.round(videoSafeT)}s</span>
-                        <span>{videoSafeDur ? Math.round(videoSafeDur) + 's' : '—'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <video
+                  ref={videoRef}
+                  src={itemSrc}
+                  playsInline
+                  muted={muted}
+                  autoPlay
+                  controls={false}
+                  className="h-full w-full object-contain"
+                />
               </div>
             ) : current.content_type === 'audio' ? (
               <div className="h-full w-full flex items-center justify-center p-6">
@@ -1162,8 +1139,7 @@ export const FastViewerPage = () => {
               </div>
             )}
 
-            {/* Note: autoplay may be blocked on mobile. We intentionally avoid a dark full-screen overlay;
-               the Play button is provided in the bottom control bar (video) or native audio UI (audio). */}
+            {/* Note: autoplay may be blocked on mobile. We intentionally avoid any dark overlay or play controls. */}
           </div>
 
           {/* bottom right actions: delete (owner) + like */}

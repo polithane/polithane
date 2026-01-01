@@ -145,6 +145,7 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  z-index: 20;
 }
 
 .like-burst-heart {
@@ -156,22 +157,22 @@
 @keyframes polithaneLikeBurst {
   0% {
     opacity: 0;
-    transform: translateY(10px) scale(0.2);
-    color: rgba(225, 29, 72, 0.2);
+    transform: translateY(12px) scale(0.6); /* ~3x bigger */
+    color: rgba(255, 34, 102, 0.25);
   }
   20% {
     opacity: 1;
-    transform: translateY(0px) scale(1.25);
-    color: rgba(236, 72, 153, 1);
+    transform: translateY(0px) scale(3.75); /* ~3x bigger */
+    color: rgba(255, 45, 85, 1);
   }
   60% {
     opacity: 1;
-    transform: translateY(-12px) scale(1);
-    color: rgba(225, 29, 72, 1);
+    transform: translateY(-14px) scale(3); /* ~3x bigger */
+    color: rgba(255, 0, 76, 1);
   }
   100% {
     opacity: 0;
-    transform: translateY(-22px) scale(0.9);
-    color: rgba(225, 29, 72, 1);
+    transform: translateY(-26px) scale(2.7); /* ~3x bigger */
+    color: rgba(255, 0, 76, 1);
   }
 }
