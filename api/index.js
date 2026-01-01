@@ -2712,7 +2712,45 @@ async function getAgendas(req, res) {
         throw e;
       }
     }
-    res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+    let out = Array.isArray(rows) ? rows : [];
+
+    // Home agenda configuration (admin-controlled via site_settings).
+    // Keeps "ana sayfa gündemleri" fully admin-managed without schema changes.
+    if (off === 0 && !search) {
+      try {
+        const cfg = await getSiteSettingJson('home_agenda_config_v1').catch(() => null);
+        const pinned = Array.isArray(cfg?.pinned) ? cfg.pinned : [];
+        const pinnedIds = pinned
+          .map((p) => String(p?.id || '').trim())
+          .filter(Boolean)
+          .slice(0, 10);
+        if (pinnedIds.length > 0) {
+          const byId = new Map(out.map((a) => [String(a?.id || '').trim(), a]));
+          const pinnedRows = [];
+          for (let i = 0; i < pinnedIds.length; i += 1) {
+            const id = pinnedIds[i];
+            const row = byId.get(id);
+            if (!row) continue;
+            const meta = pinned.find((p) => String(p?.id || '').trim() === id) || null;
+            pinnedRows.push({
+              ...row,
+              _home_pin_rank: i + 1,
+              _home_label: meta?.label ? String(meta.label).slice(0, 20) : null,
+              _home_color: meta?.color ? String(meta.color).slice(0, 20) : null,
+            });
+          }
+          const pinnedSet = new Set(pinnedRows.map((r) => String(r?.id || '').trim()));
+          const rest = out
+            .filter((r) => !pinnedSet.has(String(r?.id || '').trim()))
+            .map((r) => ({ ...r, _home_pin_rank: null, _home_label: null, _home_color: null }));
+          out = [...pinnedRows, ...rest];
+        }
+      } catch {
+        // ignore – agendas should still load
+      }
+    }
+
+    res.json({ success: true, data: out });
 }
 
 async function getParties(req, res) {
@@ -10280,6 +10318,36 @@ function safeParseJsonString(input) {
   } catch {
     return null;
   }
+}
+
+// Lightweight site_settings cache for public endpoints that need a single key.
+let siteSettingsMapCache = null;
+let siteSettingsMapCacheAt = 0;
+const SITE_SETTINGS_MAP_CACHE_MS = 30_000;
+
+async function getSiteSettingsMapCached() {
+  const now = Date.now();
+  if (siteSettingsMapCache && (now - siteSettingsMapCacheAt) < SITE_SETTINGS_MAP_CACHE_MS) return siteSettingsMapCache;
+  const rows = await supabaseRestGet('site_settings', { select: 'key,value', limit: '2000' }).catch(() => []);
+  const map = {};
+  for (const r of rows || []) {
+    const k = String(r?.key || '').trim();
+    if (!k) continue;
+    map[k] = normalizeSiteSettingValue(r?.value);
+  }
+  siteSettingsMapCache = map;
+  siteSettingsMapCacheAt = now;
+  return map;
+}
+
+async function getSiteSettingJson(key) {
+  const k = String(key || '').trim();
+  if (!k) return null;
+  const map = await getSiteSettingsMapCached().catch(() => ({}));
+  const raw = map?.[k];
+  if (raw && typeof raw === 'object') return raw;
+  if (typeof raw === 'string') return safeParseJsonString(raw);
+  return null;
 }
 
 async function getPublicSite(req, res) {

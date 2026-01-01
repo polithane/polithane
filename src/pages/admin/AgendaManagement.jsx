@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 
 export const AgendaManagement = () => {
   const TITLE_MAX = 80;
+  const HOME_CFG_KEY = 'home_agenda_config_v1';
   const slugifyAgenda = (input) =>
     String(input || '')
       .trim()
@@ -39,6 +40,16 @@ export const AgendaManagement = () => {
     is_active: true,
   });
 
+  const [homeCfgLoading, setHomeCfgLoading] = useState(false);
+  const [homeCfgError, setHomeCfgError] = useState('');
+  const [homeCfg, setHomeCfg] = useState({
+    pinned: [
+      { id: '', label: '1', color: 'red' },
+      { id: '', label: '2', color: 'orange' },
+      { id: '', label: '3', color: 'amber' },
+    ],
+  });
+
   const fetchList = async () => {
     setLoading(true);
     setError('');
@@ -68,6 +79,54 @@ export const AgendaManagement = () => {
     fetchList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInactive]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setHomeCfgLoading(true);
+      setHomeCfgError('');
+      try {
+        const r = await adminApi.getSettings().catch(() => null);
+        const map = r?.success ? r?.data : null;
+        const raw = map && typeof map === 'object' ? map[HOME_CFG_KEY] : null;
+        const parsed =
+          raw && typeof raw === 'object'
+            ? raw
+            : typeof raw === 'string'
+              ? (() => {
+                  try {
+                    return JSON.parse(raw);
+                  } catch {
+                    return null;
+                  }
+                })()
+              : null;
+        const pinned = Array.isArray(parsed?.pinned) ? parsed.pinned : null;
+        if (!cancelled && pinned) {
+          const norm = pinned.slice(0, 10).map((p) => ({
+            id: String(p?.id || '').trim(),
+            label: p?.label ? String(p.label).trim().slice(0, 20) : '',
+            color: p?.color ? String(p.color).trim().slice(0, 20) : '',
+          }));
+          const defaults = [
+            { id: '', label: '1', color: 'red' },
+            { id: '', label: '2', color: 'orange' },
+            { id: '', label: '3', color: 'amber' },
+          ];
+          while (norm.length < 3) norm.push(defaults[norm.length] || { id: '', label: '', color: '' });
+          setHomeCfg({ pinned: norm });
+        }
+      } catch (e) {
+        if (!cancelled) setHomeCfgError(String(e?.message || 'Ana sayfa gündem ayarları yüklenemedi.'));
+      } finally {
+        if (!cancelled) setHomeCfgLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -194,7 +253,9 @@ export const AgendaManagement = () => {
             <Flame className="w-7 h-7 sm:w-6 sm:h-6 text-orange-500" />
             Gündem Yönetimi
           </h1>
-          <p className="text-gray-600">Ana sayfa gündem sıralaması için trend skoru kullanılır (yüksek skor üstte).</p>
+          <p className="text-gray-600">
+            Ana sayfadaki ilk gündemler buradan belirlenir. (Pinli olanlar en üstte görünür.)
+          </p>
         </div>
         <button
           type="button"
@@ -261,6 +322,113 @@ export const AgendaManagement = () => {
           </div>
         </div>
       )}
+
+      {/* Home pinned agendas (site_settings) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="font-black text-gray-900">Ana Sayfa Gündem Slotları (1–3)</div>
+          <button
+            type="button"
+            disabled={homeCfgLoading}
+            onClick={async () => {
+              setHomeCfgLoading(true);
+              setHomeCfgError('');
+              try {
+                const payload = { ...homeCfg };
+                // Remove empty pins so DB stays clean
+                payload.pinned = (Array.isArray(payload.pinned) ? payload.pinned : [])
+                  .map((p) => ({
+                    id: String(p?.id || '').trim(),
+                    label: p?.label ? String(p.label).trim().slice(0, 20) : '',
+                    color: p?.color ? String(p.color).trim().slice(0, 20) : '',
+                  }))
+                  .filter((p) => p.id);
+                const r = await adminApi.updateSettings({ [HOME_CFG_KEY]: payload }).catch(() => null);
+                if (!r?.success) throw new Error(r?.error || 'Kaydedilemedi.');
+                toast.success('Ana sayfa gündem slotları kaydedildi.');
+              } catch (e) {
+                setHomeCfgError(String(e?.message || 'Kaydedilemedi.'));
+              } finally {
+                setHomeCfgLoading(false);
+              }
+            }}
+            className="px-4 py-2 rounded-lg bg-gray-900 text-white font-black disabled:opacity-60"
+          >
+            {homeCfgLoading ? 'Kaydediliyor…' : 'Kaydet'}
+          </button>
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          Not: İlk 3 gündem AgendaBar’da “ateş” efektleriyle öne çıkar. Buradan sabitleyebilirsin.
+        </div>
+        {homeCfgError ? <div className="mt-2 text-sm text-red-600 font-semibold">{homeCfgError}</div> : null}
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          {(homeCfg.pinned || []).slice(0, 3).map((p, i) => (
+            <div key={i} className="rounded-xl border border-gray-200 p-4">
+              <div className="text-xs font-black text-gray-700 mb-2">Slot {i + 1}</div>
+              <select
+                value={String(p?.id || '')}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setHomeCfg((prev) => {
+                    const arr = Array.isArray(prev?.pinned) ? [...prev.pinned] : [];
+                    while (arr.length < 3) arr.push({ id: '', label: '', color: '' });
+                    arr[i] = { ...(arr[i] || {}), id };
+                    return { ...prev, pinned: arr };
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">(boş)</option>
+                {sorted.slice(0, 200).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {String(a.title || '').slice(0, 80)}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <input
+                  value={String(p?.label || '')}
+                  onChange={(e) => {
+                    const label = e.target.value;
+                    setHomeCfg((prev) => {
+                      const arr = Array.isArray(prev?.pinned) ? [...prev.pinned] : [];
+                      while (arr.length < 3) arr.push({ id: '', label: '', color: '' });
+                      arr[i] = { ...(arr[i] || {}), label };
+                      return { ...prev, pinned: arr };
+                    });
+                  }}
+                  placeholder="Etiket (ops.)"
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                />
+                <select
+                  value={String(p?.color || '')}
+                  onChange={(e) => {
+                    const color = e.target.value;
+                    setHomeCfg((prev) => {
+                      const arr = Array.isArray(prev?.pinned) ? [...prev.pinned] : [];
+                      while (arr.length < 3) arr.push({ id: '', label: '', color: '' });
+                      arr[i] = { ...(arr[i] || {}), color };
+                      return { ...prev, pinned: arr };
+                    });
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                  title="Etiket rengi"
+                >
+                  <option value="">(varsayılan)</option>
+                  <option value="red">red</option>
+                  <option value="orange">orange</option>
+                  <option value="amber">amber</option>
+                  <option value="green">green</option>
+                  <option value="blue">blue</option>
+                  <option value="purple">purple</option>
+                  <option value="gray">gray</option>
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {schemaSql ? (
         <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">

@@ -24,6 +24,19 @@ export const AgendaBar = ({ agendas = [] }) => {
   const getAgendaTitle = (a) => a?.agenda_title ?? a?.title ?? '';
   const getAgendaSlug = (a) => a?.agenda_slug ?? a?.slug ?? '';
   const getAgendaScore = (a) => a?.total_polit_score ?? a?.polit_score ?? a?.trending_score ?? 0;
+  const getAgendaLabel = (a) => a?._home_label ?? a?.home_label ?? null;
+  const getAgendaLabelColor = (a) => a?._home_color ?? a?.home_color ?? null;
+
+  const labelClass = (color) => {
+    const c = String(color || '').trim().toLowerCase();
+    if (c === 'red') return 'bg-red-100 text-red-700 border-red-200';
+    if (c === 'orange') return 'bg-orange-100 text-orange-700 border-orange-200';
+    if (c === 'amber' || c === 'yellow') return 'bg-amber-100 text-amber-800 border-amber-200';
+    if (c === 'green') return 'bg-green-100 text-green-700 border-green-200';
+    if (c === 'blue') return 'bg-blue-100 text-blue-700 border-blue-200';
+    if (c === 'purple') return 'bg-purple-100 text-purple-700 border-purple-200';
+    return 'bg-gray-100 text-gray-700 border-gray-200';
+  };
 
   const inlineAgendas = useMemo(() => {
     const base = Array.isArray(agendas) ? agendas : [];
@@ -50,6 +63,9 @@ export const AgendaBar = ({ agendas = [] }) => {
       fireIcon = <Flame className="w-5 h-5 text-yellow-500" fill="currentColor" style={{animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />;
     }
     
+    const label = getAgendaLabel(agenda);
+    const labelColor = getAgendaLabelColor(agenda);
+
     return (
       <button
         key={getAgendaId(agenda)}
@@ -57,6 +73,18 @@ export const AgendaBar = ({ agendas = [] }) => {
         className="group flex items-center gap-2 px-2.5 py-1 bg-white border-2 border-gray-300 hover:border-primary-blue hover:bg-primary-blue hover:text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex-1 min-w-0 h-[28px]"
       >
         {fireIcon && <span className="flex-shrink-0">{fireIcon}</span>}
+        {label ? (
+          <span
+            className={[
+              'hidden sm:inline-flex flex-shrink-0 px-2 py-0.5 rounded-full border text-[9px] font-black leading-none',
+              labelClass(labelColor),
+              'group-hover:bg-white group-hover:text-primary-blue group-hover:border-white/70',
+            ].join(' ')}
+            title={String(label)}
+          >
+            {String(label).slice(0, 12)}
+          </span>
+        ) : null}
         <span className="text-[11px] font-semibold truncate text-left flex-1">
           {getAgendaTitle(agenda)}
         </span>
