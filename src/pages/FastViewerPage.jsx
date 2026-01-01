@@ -49,6 +49,8 @@ export const FastViewerPage = () => {
   const [progress, setProgress] = useState(0); // 0..1 for current item
   const [mediaBlocked, setMediaBlocked] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [vT, setVT] = useState(0);
+  const [vDur, setVDur] = useState(0);
 
   // UX: closing Fast should return to home.
   const closeToList = useCallback(() => navigate('/'), [navigate]);
@@ -384,7 +386,25 @@ export const FastViewerPage = () => {
       // ignore
     }
     setMediaBlocked(false);
+    setVT(0);
+    setVDur(0);
   }, [idx]);
+
+  useEffect(() => {
+    // Track time/duration for video controls (best-effort).
+    const el = videoRef.current;
+    if (!el) return;
+    const onTime = () => setVT(Number(el.currentTime || 0) || 0);
+    const onMeta = () => setVDur(Number(el.duration || 0) || 0);
+    el.addEventListener('timeupdate', onTime);
+    el.addEventListener('loadedmetadata', onMeta);
+    el.addEventListener('durationchange', onMeta);
+    return () => {
+      el.removeEventListener('timeupdate', onTime);
+      el.removeEventListener('loadedmetadata', onMeta);
+      el.removeEventListener('durationchange', onMeta);
+    };
+  }, [current?.id]);
 
   useEffect(() => {
     // Track view for active fast item (best-effort).
@@ -489,6 +509,37 @@ export const FastViewerPage = () => {
       // ignore
     }
   }, [current?.id, current?.content_type, isPaused, mediaBlocked]);
+
+  const videoSafeDur = Number.isFinite(vDur) && vDur > 0 ? vDur : 0;
+  const videoSafeT = Number.isFinite(vT) && vT >= 0 ? vT : 0;
+  const videoPct = videoSafeDur > 0 ? Math.max(0, Math.min(1, videoSafeT / videoSafeDur)) : 0;
+
+  const seekVideoPct = (p) => {
+    const el = videoRef.current;
+    if (!el) return;
+    const d = Number(el.duration || 0) || 0;
+    if (!(d > 0)) return;
+    const next = Math.max(0, Math.min(1, Number(p) || 0));
+    try {
+      el.currentTime = next * d;
+    } catch {
+      // ignore
+    }
+  };
+
+  const seekVideoBySec = (deltaSec) => {
+    const el = videoRef.current;
+    if (!el) return;
+    const d = Number(el.duration || 0) || 0;
+    if (!(d > 0)) return;
+    const cur = Number(el.currentTime || 0) || 0;
+    const next = Math.max(0, Math.min(d, cur + (Number(deltaSec) || 0)));
+    try {
+      el.currentTime = next;
+    } catch {
+      // ignore
+    }
+  };
 
   // For video/audio, drive progress from media time
   useEffect(() => {
@@ -765,7 +816,11 @@ export const FastViewerPage = () => {
           {/* tap zones + hold-to-pause */}
           <div
             className="absolute inset-0 z-10"
-            style={{ touchAction: 'none' }}
+            style={{
+              touchAction: 'none',
+              // For video, we reserve space for the bottom control bar.
+              bottom: current?.content_type === 'video' ? '72px' : '0px',
+            }}
           >
             <div className="absolute inset-0 grid grid-cols-2">
               <div
@@ -979,14 +1034,79 @@ export const FastViewerPage = () => {
             ) : current.content_type === 'image' ? (
               <img src={itemSrc} alt="" className="h-full w-full object-cover" draggable={false} />
             ) : current.content_type === 'video' ? (
-              <video
-                ref={videoRef}
-                src={itemSrc}
-                playsInline
-                muted={muted}
-                autoPlay
-                className="h-full w-full object-contain"
-              />
+              <div className="absolute inset-0">
+                <div className="absolute inset-x-0 top-0 bottom-[72px]">
+                  <video
+                    ref={videoRef}
+                    src={itemSrc}
+                    playsInline
+                    muted={muted}
+                    autoPlay
+                    controls={false}
+                    className="h-full w-full object-contain"
+                    onClick={() => setIsPaused((v) => !v)}
+                  />
+                </div>
+                <div className="absolute inset-x-0 bottom-0 h-[72px] px-3 pb-3 z-30">
+                  <div className="h-full rounded-2xl bg-black/55 border border-white/15 backdrop-blur-sm px-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => seekVideoBySec(-10)}
+                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-black text-white"
+                      aria-label="10 saniye geri"
+                      title="10 saniye geri"
+                    >
+                      -10
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (mediaBlocked) {
+                          try {
+                            const el = videoRef.current;
+                            if (!el) return;
+                            el.muted = !!muted;
+                            el.play?.().then(() => setMediaBlocked(false)).catch(() => setMediaBlocked(true));
+                          } catch {
+                            setMediaBlocked(true);
+                          }
+                          return;
+                        }
+                        setIsPaused((v) => !v);
+                      }}
+                      className="w-11 h-11 rounded-full bg-white/15 hover:bg-white/20 border border-white/15 flex items-center justify-center"
+                      aria-label={isPaused ? 'Devam et' : mediaBlocked ? 'Oynat' : 'Durdur'}
+                      title={isPaused ? 'Devam et' : 'Durdur'}
+                    >
+                      {isPaused || mediaBlocked ? <Play className="w-5 h-5 text-white" /> : <Pause className="w-5 h-5 text-white" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => seekVideoBySec(10)}
+                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-black text-white"
+                      aria-label="10 saniye ileri"
+                      title="10 saniye ileri"
+                    >
+                      +10
+                    </button>
+                    <div className="flex-1 px-1">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1000"
+                        value={Math.round(videoPct * 1000)}
+                        onChange={(e) => seekVideoPct(Number(e.target.value) / 1000)}
+                        className="w-full"
+                        aria-label="Zaman çizelgesi"
+                      />
+                      <div className="mt-0.5 text-[10px] font-mono text-white/75 flex items-center justify-between">
+                        <span>{Math.round(videoSafeT)}s</span>
+                        <span>{videoSafeDur ? Math.round(videoSafeDur) + 's' : '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : current.content_type === 'audio' ? (
               <div className="h-full w-full flex items-center justify-center p-6">
                 <audio ref={audioRef} src={itemSrc} autoPlay />
@@ -1034,29 +1154,8 @@ export const FastViewerPage = () => {
               </div>
             )}
 
-            {/* autoplay blocked overlay */}
-            {mediaBlocked && (current?.content_type === 'video' || current?.content_type === 'audio') ? (
-              <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/35">
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      const el = current.content_type === 'video' ? videoRef.current : audioRef.current;
-                      if (!el) return;
-                      el.muted = !!muted;
-                      el.play?.().then(() => setMediaBlocked(false)).catch(() => setMediaBlocked(true));
-                    } catch {
-                      setMediaBlocked(true);
-                    }
-                  }}
-                  className="w-16 h-16 rounded-full bg-white/15 border border-white/25 backdrop-blur-sm flex items-center justify-center"
-                  aria-label="Oynat"
-                  title="Oynat"
-                >
-                  <Play className="w-7 h-7 text-white" />
-                </button>
-              </div>
-            ) : null}
+            {/* Note: autoplay may be blocked on mobile. We intentionally avoid a dark full-screen overlay;
+               the Play button is provided in the bottom control bar (video) or native audio UI (audio). */}
           </div>
 
           {/* bottom right actions: delete (owner) + like */}

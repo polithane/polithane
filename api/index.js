@@ -2580,7 +2580,6 @@ async function getAgendas(req, res) {
       select: '*',
       limit: String(lim),
       offset: String(off),
-      order: ord,
     };
     if (String(is_active || 'true') === 'true') params.is_active = 'eq.true';
     if (String(is_trending || '') === 'true') params.is_trending = 'eq.true';
@@ -2690,12 +2689,27 @@ async function getAgendas(req, res) {
     // retry with the safe default order.
     let rows;
     try {
-      rows = await supabaseRestGet('agendas', params);
-    } catch {
-      if (ord !== 'trending_score.desc') {
-        rows = await supabaseRestGet('agendas', { ...params, order: 'trending_score.desc' }).catch(() => []);
+      rows = await supabaseRestGetWithOrderFallback(
+        'agendas',
+        params,
+        [
+          ord,
+          ord.startsWith('trending_score') ? 'created_at.desc' : 'trending_score.desc',
+          'created_at.desc',
+          'id.desc',
+          'title.asc',
+        ]
+      );
+    } catch (e) {
+      // Some environments may have an older agendas schema (missing is_active/is_trending/trending_score).
+      // Retry by dropping filters and using a safe order.
+      if (isMissingColumnError(e, 'is_active') || isMissingColumnError(e, 'is_trending') || isMissingColumnError(e, 'trending_score')) {
+        const retry = { ...params };
+        delete retry.is_active;
+        delete retry.is_trending;
+        rows = await supabaseRestGetWithOrderFallback('agendas', retry, ['created_at.desc', 'id.desc', 'title.asc']).catch(() => []);
       } else {
-        rows = [];
+        throw e;
       }
     }
     res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
@@ -7651,7 +7665,6 @@ async function adminGetAgendas(req, res) {
 
   const params = {
     select: '*',
-    order: 'trending_score.desc',
     limit: String(limitNum),
     offset: String(offset),
   };
@@ -7693,13 +7706,37 @@ create index if not exists agendas_is_active_idx on agendas (is_active);
   let total = 0;
   let rows = [];
   try {
-    const r = await Promise.all([
-      supabaseCount('agendas', countParams).catch(() => 0),
-      supabaseRestGet('agendas', params),
-    ]);
-    total = Number(r?.[0] || 0) || 0;
-    rows = Array.isArray(r?.[1]) ? r[1] : [];
+    const orderCandidates = ['trending_score.desc', 'updated_at.desc', 'created_at.desc', 'id.desc', 'title.asc'];
+    total = await supabaseCount('agendas', countParams).catch(() => 0);
+    rows = await supabaseRestGetWithOrderFallback('agendas', params, orderCandidates);
+    rows = Array.isArray(rows) ? rows : [];
   } catch (e) {
+    // Older schemas might not have slug/is_active/is_trending/trending_score.
+    // Retry with progressively simpler queries so admin can still see/manage existing data.
+    try {
+      const orderCandidates = ['trending_score.desc', 'updated_at.desc', 'created_at.desc', 'id.desc', 'title.asc'];
+      const retry = { ...params };
+      if (isMissingColumnError(e, 'slug')) delete retry.or;
+      if (isMissingColumnError(e, 'is_active')) delete retry.is_active;
+      if (isMissingColumnError(e, 'is_trending')) delete retry.is_trending;
+      rows = await supabaseRestGetWithOrderFallback('agendas', retry, orderCandidates).catch(() => []);
+      rows = Array.isArray(rows) ? rows : [];
+      total = await supabaseCount('agendas', { select: 'id' }).catch(() => 0);
+      if (rows.length > 0) {
+        return res.json({
+          success: true,
+          data: rows,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total,
+            totalPages: Math.max(1, Math.ceil((total || 0) / limitNum)),
+          },
+        });
+      }
+    } catch {
+      // ignore fallback errors and continue to normal error handling
+    }
     if (isMissingRelationError(e)) {
       return res.json({ success: false, schemaMissing: true, requiredSql: agendasRequiredSql() });
     }

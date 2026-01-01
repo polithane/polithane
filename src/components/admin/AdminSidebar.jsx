@@ -120,7 +120,7 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
                   }`}
                   onClick={() => onNavigate?.()}
                 >
-                  <item.icon className="w-5 h-5" />
+                  <item.icon className="w-6 h-6" />
                   <span className="text-sm">{item.label}</span>
                 </Link>
               ))}

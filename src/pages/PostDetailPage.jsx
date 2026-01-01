@@ -16,7 +16,46 @@ import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 const SmartVideo = ({ src, autoPlay = false }) => {
   const videoRef = useRef(null);
   const url = String(src || '').trim();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [t, setT] = useState(0);
+  const [dur, setDur] = useState(0);
+  const [blocked, setBlocked] = useState(false);
   if (!url) return null;
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnded = () => setIsPlaying(false);
+    const onTime = () => setT(Number(el.currentTime || 0) || 0);
+    const onMeta = () => setDur(Number(el.duration || 0) || 0);
+    el.addEventListener('play', onPlay);
+    el.addEventListener('pause', onPause);
+    el.addEventListener('ended', onEnded);
+    el.addEventListener('timeupdate', onTime);
+    el.addEventListener('loadedmetadata', onMeta);
+    el.addEventListener('durationchange', onMeta);
+    return () => {
+      el.removeEventListener('play', onPlay);
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('ended', onEnded);
+      el.removeEventListener('timeupdate', onTime);
+      el.removeEventListener('loadedmetadata', onMeta);
+      el.removeEventListener('durationchange', onMeta);
+    };
+  }, [url]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    try {
+      el.muted = !!muted;
+    } catch {
+      // ignore
+    }
+  }, [muted]);
 
   useEffect(() => {
     if (!autoPlay) return;
@@ -25,14 +64,17 @@ const SmartVideo = ({ src, autoPlay = false }) => {
     let cancelled = false;
     const tryPlay = async () => {
       try {
-        el.muted = false;
+        el.muted = !!muted;
         await el.play();
+        setBlocked(false);
       } catch {
         try {
           el.muted = true; // mobile autoplay fallback
           await el.play();
+          setBlocked(false);
+          setMuted(true);
         } catch {
-          // ignore
+          setBlocked(true);
         }
       }
     };
@@ -43,18 +85,132 @@ const SmartVideo = ({ src, autoPlay = false }) => {
     return () => {
       cancelled = true;
     };
-  }, [autoPlay, url]);
+  }, [autoPlay, muted, url]);
+
+  const safeDur = Number.isFinite(dur) && dur > 0 ? dur : 0;
+  const safeT = Number.isFinite(t) && t >= 0 ? t : 0;
+  const pct = safeDur > 0 ? Math.max(0, Math.min(1, safeT / safeDur)) : 0;
+
+  const togglePlay = async () => {
+    const el = videoRef.current;
+    if (!el) return;
+    try {
+      if (el.paused) {
+        await el.play();
+        setBlocked(false);
+      } else {
+        el.pause();
+      }
+    } catch {
+      setBlocked(true);
+    }
+  };
+
+  const seekToPct = (nextPct) => {
+    const el = videoRef.current;
+    if (!el) return;
+    const d = Number(el.duration || 0) || 0;
+    if (!(d > 0)) return;
+    const p = Math.max(0, Math.min(1, Number(nextPct) || 0));
+    try {
+      el.currentTime = p * d;
+    } catch {
+      // ignore
+    }
+  };
+
+  const seekBySec = (deltaSec) => {
+    const el = videoRef.current;
+    if (!el) return;
+    const d = Number(el.duration || 0) || 0;
+    if (!(d > 0)) return;
+    const cur = Number(el.currentTime || 0) || 0;
+    const next = Math.max(0, Math.min(d, cur + (Number(deltaSec) || 0)));
+    try {
+      el.currentTime = next;
+    } catch {
+      // ignore
+    }
+  };
 
   return (
-    <video
-      ref={videoRef}
-      src={url}
-      controls
-      playsInline
-      autoPlay={autoPlay}
-      preload="metadata"
-      className="w-full max-h-[70vh] bg-black rounded-lg object-contain"
-    />
+    <div className="w-full">
+      <video
+        ref={videoRef}
+        src={url}
+        playsInline
+        // IMPORTANT: native controls create the "dark overlay + controls on top"
+        // effect on many mobile browsers. We use our own control bar below.
+        controls={false}
+        autoPlay={autoPlay}
+        preload="metadata"
+        className="w-full max-h-[70vh] bg-black rounded-lg object-contain"
+        onClick={togglePlay}
+      />
+
+      <div className="mt-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => seekBySec(-10)}
+            className="px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-black text-gray-900"
+            aria-label="10 saniye geri"
+            title="10 saniye geri"
+          >
+            -10
+          </button>
+
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="w-11 h-11 rounded-full bg-gray-900 text-white flex items-center justify-center"
+            aria-label={isPlaying ? 'Durdur' : blocked ? 'Oynat (izin gerekli olabilir)' : 'Oynat'}
+            title={isPlaying ? 'Durdur' : 'Oynat'}
+          >
+            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => seekBySec(10)}
+            className="px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-black text-gray-900"
+            aria-label="10 saniye ileri"
+            title="10 saniye ileri"
+          >
+            +10
+          </button>
+
+          <div className="flex-1 px-2">
+            <input
+              type="range"
+              min="0"
+              max="1000"
+              value={Math.round(pct * 1000)}
+              onChange={(e) => seekToPct(Number(e.target.value) / 1000)}
+              className="w-full"
+              aria-label="Zaman çizelgesi"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMuted((v) => !v)}
+            className="w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center"
+            aria-label={muted ? 'Sesi aç' : 'Sesi kapat'}
+            title={muted ? 'Sesi aç' : 'Sesi kapat'}
+          >
+            {muted ? <VolumeX className="w-5 h-5 text-gray-700" /> : <Volume2 className="w-5 h-5 text-gray-700" />}
+          </button>
+        </div>
+
+        <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+          <div className="font-mono">
+            {formatDuration(safeT)} / {formatDuration(safeDur)}
+          </div>
+          {blocked ? <div className="font-semibold text-amber-700">Oynatma için dokunmanız gerekebilir.</div> : <div />}
+        </div>
+      </div>
+    </div>
   );
 };
 
