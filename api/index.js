@@ -1762,8 +1762,44 @@ async function createPost(req, res) {
           return 1;
         };
         const delta = agendaDeltaForUserType(ut);
-        const rows = await supabaseRestGet('agendas', { select: 'id,title,trending_score,total_polit_score,post_count', title: `eq.${agendaTitle}`, limit: '1' }).catch(() => []);
-        const a = rows?.[0] || null;
+        const rows = await supabaseRestGet('agendas', { select: 'id,title,slug,trending_score,total_polit_score,post_count', title: `eq.${agendaTitle}`, limit: '1' }).catch(() => []);
+        let a = rows?.[0] || null;
+
+        // If agenda doesn't exist yet, auto-create it (no manual slug; URL-safe + unique).
+        if (!a?.id) {
+          const slugify = (input) => String(input || '').trim().toLowerCase()
+            .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
+            .replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 200);
+          const ensureUniqueSlug = async (base) => {
+            const b0 = String(base || '').trim() || `gundem-${Date.now()}`;
+            const base200 = b0.slice(0, 200);
+            for (let i = 0; i < 50; i += 1) {
+              const suffix = i === 0 ? '' : `-${i + 1}`;
+              const maxBaseLen = 200 - suffix.length;
+              const cand = `${base200.slice(0, Math.max(1, maxBaseLen))}${suffix}`.slice(0, 200);
+              // eslint-disable-next-line no-await-in-loop
+              const existing = await supabaseRestGet('agendas', { select: 'id', slug: `eq.${cand}`, limit: '1' }).catch(() => []);
+              if (!Array.isArray(existing) || existing.length === 0) return cand;
+            }
+            return `${base200.slice(0, 180)}-${Date.now()}`.slice(0, 200);
+          };
+
+          const nowIso = new Date().toISOString();
+          const slug = await ensureUniqueSlug(slugify(agendaTitle));
+          const created = await supabaseRestInsert('agendas', [{
+            title: agendaTitle,
+            slug,
+            is_active: true,
+            is_trending: true,
+            trending_score: Math.max(0, delta),
+            total_polit_score: Math.max(0, delta),
+            post_count: 1,
+            created_at: nowIso,
+            updated_at: nowIso,
+          }]).catch(() => []);
+          a = Array.isArray(created) ? created?.[0] : null;
+        }
+
         if (a?.id) {
           const next = {
             updated_at: new Date().toISOString(),

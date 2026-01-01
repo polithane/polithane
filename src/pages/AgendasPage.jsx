@@ -88,7 +88,7 @@ export const AgendasPage = () => {
     return m;
   }, [posts]);
 
-  // Use admin-managed agendas as ordered list of topics, but fill with real posts
+  // Use admin-managed agendas as ordered list of topics, and fill with real posts
   const agendaSections = useMemo(() => {
     const seen = new Set();
     const out = [];
@@ -98,15 +98,8 @@ export const AgendasPage = () => {
       const title = a?.title || '';
       if (!title || seen.has(title)) continue;
       const list = postsByAgenda.get(title) || [];
-      out.push({ title, slug: a?.slug || String(title).toLowerCase().replace(/\s+/g, '-'), posts: list.slice(0, 12) });
+      out.push({ title, slug: a?.slug || String(title).toLowerCase().replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u').replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''), posts: list.slice(0, 12) });
       seen.add(title);
-    }
-
-    // 2) append any real agenda tags not in mock
-    for (const [tag, list] of postsByAgenda.entries()) {
-      if (seen.has(tag)) continue;
-      out.push({ title: tag, slug: String(tag).toLowerCase().replace(/\s+/g, '-'), posts: list.slice(0, 12) });
-      seen.add(tag);
     }
 
     return out.filter((s) => (s.posts || []).length > 0);

@@ -1,69 +1,56 @@
 import { X, Eye, Heart, MessageCircle, Share2, Users, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 import { formatPolitScore } from '../../utils/formatters';
+import { viewScores, likeScores, commentScores, previousPostsBonus } from '../../utils/politScore';
 
 export const PolitScoreDetailModal = ({ post, onClose }) => {
   const [expandedCategory, setExpandedCategory] = useState(null);
   
   if (!post) return null;
   
-  // Mock puan detayları - Şeffaf algoritma gösterimi
   const scoreBreakdown = {
     views: {
-      title: 'Görüntüleme Puanları',
+      title: 'Görüntüleme',
       icon: <Eye className="w-5 h-5" />,
-      total: Math.floor(post.view_count * 0.1),
+      total: null,
       details: [
-        { label: 'Üye Olmayanların Görüntülemesi', count: Math.floor(post.view_count * 0.4), points: Math.floor(post.view_count * 0.4 * 0.05), unitPoint: '0,05 P.' },
-        { label: 'Parti Üyelerinin Görüntülemesi', count: Math.floor(post.view_count * 0.3), points: Math.floor(post.view_count * 0.3 * 0.1), unitPoint: '0,1 P.' },
-        { label: 'Rakip Parti Üyelerinin Görüntülemesi', count: Math.floor(post.view_count * 0.2), points: Math.floor(post.view_count * 0.2 * 0.15), unitPoint: '0,15 P.' },
-        { label: 'Siyasetçilerin Görüntülemesi', count: Math.floor(post.view_count * 0.1), points: Math.floor(post.view_count * 0.1 * 0.5), unitPoint: '0,5 P.' },
-      ]
+        { label: 'Toplam görüntülenme', count: Number(post.view_count || 0) || 0, points: null, unitPoint: '—' },
+      ],
     },
     likes: {
-      title: 'Beğeni Puanları',
+      title: 'Beğeni',
       icon: <Heart className="w-5 h-5" />,
-      total: Math.floor(post.like_count * 2),
+      total: null,
       details: [
-        { label: 'Üye Olmayanların Beğenisi', count: Math.floor(post.like_count * 0.3), points: Math.floor(post.like_count * 0.3 * 1), unitPoint: '1 P.' },
-        { label: 'Parti Üyelerinin Beğenisi', count: Math.floor(post.like_count * 0.35), points: Math.floor(post.like_count * 0.35 * 2), unitPoint: '2 P.' },
-        { label: 'Rakip Parti Üyelerinin Beğenisi', count: Math.floor(post.like_count * 0.25), points: Math.floor(post.like_count * 0.25 * 3), unitPoint: '3 P.' },
-        { label: 'Siyasetçilerin Beğenisi', count: Math.floor(post.like_count * 0.1), points: Math.floor(post.like_count * 0.1 * 10), unitPoint: '10 P.' },
-      ]
+        { label: 'Toplam beğeni', count: Number(post.like_count || 0) || 0, points: null, unitPoint: '—' },
+      ],
     },
     comments: {
-      title: 'Yorum Puanları',
+      title: 'Yorum',
       icon: <MessageCircle className="w-5 h-5" />,
-      total: Math.floor(post.comment_count * 5),
+      total: null,
       details: [
-        { label: 'Üye Olmayanların Yorumu', count: Math.floor(post.comment_count * 0.2), points: Math.floor(post.comment_count * 0.2 * 2), unitPoint: '2 P.' },
-        { label: 'Parti Üyelerinin Yorumu', count: Math.floor(post.comment_count * 0.4), points: Math.floor(post.comment_count * 0.4 * 5), unitPoint: '5 P.' },
-        { label: 'Rakip Parti Üyelerinin Yorumu', count: Math.floor(post.comment_count * 0.3), points: Math.floor(post.comment_count * 0.3 * 8), unitPoint: '8 P.' },
-        { label: 'Siyasetçilerin Yorumu', count: Math.floor(post.comment_count * 0.1), points: Math.floor(post.comment_count * 0.1 * 20), unitPoint: '20 P.' },
-      ]
+        { label: 'Toplam yorum', count: Number(post.comment_count || 0) || 0, points: null, unitPoint: '—' },
+      ],
     },
     shares: {
-      title: 'Paylaşım Puanları',
+      title: 'Paylaşım',
       icon: <Share2 className="w-5 h-5" />,
-      total: Math.floor(post.polit_score * 0.15),
-      details: [
-        { label: 'Sosyal Medya Paylaşımları', count: Math.floor(post.view_count * 0.05), points: Math.floor(post.view_count * 0.05 * 5), unitPoint: '5 P.' },
-        { label: 'Platform İçi Paylaşımlar', count: Math.floor(post.view_count * 0.03), points: Math.floor(post.view_count * 0.03 * 3), unitPoint: '3 P.' },
-      ]
+      total: null,
+      details: [{ label: 'Not', count: 1, points: null, unitPoint: 'Paylaşım kırılımı şu an tutulmuyor' }],
     },
     engagement: {
-      title: 'Etkileşim Bonusu',
+      title: 'Algoritma katsayıları',
       icon: <TrendingUp className="w-5 h-5" />,
-      total: Math.floor(post.polit_score * 0.1),
+      total: null,
       details: [
-        { label: 'Gündem Oluşturma Bonusu', count: 1, points: Math.floor(post.polit_score * 0.05), unitPoint: `${Math.floor(post.polit_score * 0.05)} P.` },
-        { label: 'Hızlı Etkileşim Bonusu', count: 1, points: Math.floor(post.polit_score * 0.03), unitPoint: `${Math.floor(post.polit_score * 0.03)} P.` },
-        { label: 'Çeşitli Kitleden Etkileşim', count: 1, points: Math.floor(post.polit_score * 0.02), unitPoint: `${Math.floor(post.polit_score * 0.02)} P.` },
-      ]
-    }
+        { label: 'viewScores', count: Object.keys(viewScores || {}).length, points: null, unitPoint: 'kural' },
+        { label: 'likeScores', count: Object.keys(likeScores || {}).length, points: null, unitPoint: 'kural' },
+        { label: 'commentScores', count: Object.keys(commentScores || {}).length, points: null, unitPoint: 'kural' },
+        { label: 'previousPostsBonus', count: Object.keys(previousPostsBonus || {}).length, points: null, unitPoint: 'kural' },
+      ],
+    },
   };
-  
-  const totalCalculated = Object.values(scoreBreakdown).reduce((sum, cat) => sum + cat.total, 0);
   
   return (
     <>
@@ -81,7 +68,7 @@ export const PolitScoreDetailModal = ({ post, onClose }) => {
           <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between z-10">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Polit Puan Detayı</h2>
-              <p className="text-sm text-gray-500 mt-1">Şeffaf ve açık algoritma - Her puan hesaplanabilir</p>
+              <p className="text-sm text-gray-500 mt-1">Polit puan sunucuda hesaplanır; etkileşim kırılımı DB’de tutulmuyorsa burada tahmin gösterilmez.</p>
             </div>
             <button 
               onClick={onClose}
@@ -96,7 +83,6 @@ export const PolitScoreDetailModal = ({ post, onClose }) => {
             <div className="text-center">
               <p className="text-sm font-medium mb-2">TOPLAM POLİT PUAN</p>
               <p className="text-5xl font-bold">{formatPolitScore(post.polit_score)}</p>
-              <p className="text-sm mt-2 opacity-90">Hesaplanan: {formatPolitScore(totalCalculated)}</p>
             </div>
           </div>
           
@@ -117,7 +103,7 @@ export const PolitScoreDetailModal = ({ post, onClose }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-bold text-primary-blue">{formatPolitScore(category.total)}</p>
+                    <p className="text-xl font-bold text-primary-blue">{category.total == null ? '—' : formatPolitScore(category.total)}</p>
                     <p className="text-xs text-gray-500">
                       {expandedCategory === key ? 'Gizle ▲' : 'Detay ▼'}
                     </p>
@@ -139,7 +125,7 @@ export const PolitScoreDetailModal = ({ post, onClose }) => {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-bold text-primary-blue">{formatPolitScore(detail.points)}</p>
+                          <p className="text-lg font-bold text-primary-blue">{detail.points == null ? '—' : formatPolitScore(detail.points)}</p>
                         </div>
                       </div>
                     ))}
@@ -160,9 +146,8 @@ export const PolitScoreDetailModal = ({ post, onClose }) => {
                   Polithane'nin Şeffaflık İlkesi
                 </h4>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  Her bir etkileşimin puanı açık ve net. Tüm hesaplamalar şeffaf. 
-                  Herhangi bir etkileşime tıklayarak o puanı kimin nasıl oluşturduğunu görebilirsiniz.
-                  Rakip parti üyelerinin etkileşimleri daha değerlidir çünkü objektif ilgiyi gösterir.
+                  Bu ekranda “mock/tahmin” hesap göstermiyoruz. Şeffaflık için katsayılar (kural seti) açık; ancak tekil etkileşim logları ve
+                  kullanıcı tipi kırılımları DB’de tutulmadığı sürece post bazında tam puan dökümü gösterilemez.
                 </p>
               </div>
             </div>

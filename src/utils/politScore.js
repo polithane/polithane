@@ -1,7 +1,7 @@
 // Polit Puan hesaplama algoritması
 
 // Görüntülenme puanları
-const viewScores = {
+export const viewScores = {
   visitor_view: 1,
   unverified_member_view: 2,
   verified_member_view: 3,
@@ -17,7 +17,7 @@ const viewScores = {
 };
 
 // Beğeni puanları
-const likeScores = {
+export const likeScores = {
   unverified_member_like: 3,
   verified_member_like: 6,
   same_party_like: 4,
@@ -30,7 +30,7 @@ const likeScores = {
 };
 
 // Yorum puanları
-const commentScores = {
+export const commentScores = {
   unverified_member_comment: 6,
   verified_member_comment: 24,
   same_party_comment: 8,
@@ -43,7 +43,7 @@ const commentScores = {
 };
 
 // Geçmiş paylaşım bonus sistemi
-const previousPostsBonus = {
+export const previousPostsBonus = {
   last_post: 0.25,
   second_last: 0.20,
   third_last: 0.15,
@@ -162,16 +162,41 @@ const calculateCommentScore = (commenter, postOwner) => {
   return commentScores.verified_member_comment;
 };
 
-// Geçmiş paylaşım bonusu hesaplama (mock - gerçekte postOwner'ın son 5 postuna bakılır)
-const calculatePreviousPostsBonus = (postOwner, baseScore) => {
-  // Mock: Rastgele bir bonus döndür (gerçekte son 5 post kontrol edilir)
-  const bonusMultiplier = Math.random() * 0.25; // 0-25% arası
-  return Math.floor(baseScore * bonusMultiplier);
+// Geçmiş paylaşım bonusu hesaplama (mock yok).
+//
+// Not:
+// - Bu bonusu hesaplamak için post sahibinin son 5 postunun sıralaması gerekir.
+// - Bu veri verilmezse bonus = 0 olur (rastgelelik yok).
+const calculatePreviousPostsBonus = ({ recentPosts, targetPostId }, baseScore) => {
+  const list = Array.isArray(recentPosts) ? recentPosts : [];
+  const pid = String(targetPostId || '').trim();
+  if (!pid || list.length === 0) return 0;
+
+  // recentPosts ideally newest->oldest; best-effort sort if timestamps exist.
+  const sorted = [...list].sort((a, b) => {
+    const at = String(a?.created_at || a?.createdAt || '');
+    const bt = String(b?.created_at || b?.createdAt || '');
+    if (!at && !bt) return 0;
+    return bt.localeCompare(at);
+  });
+
+  const idx = sorted.findIndex((p) => String(p?.id || p?.post_id || p?.postId || '').trim() === pid);
+  if (idx < 0 || idx > 4) return 0;
+
+  const multipliers = [
+    previousPostsBonus.last_post,
+    previousPostsBonus.second_last,
+    previousPostsBonus.third_last,
+    previousPostsBonus.fourth_last,
+    previousPostsBonus.fifth_last,
+  ];
+  const m = Number(multipliers[idx] || 0) || 0;
+  return Math.floor((Number(baseScore || 0) || 0) * m);
 };
 
 // Ana Polit Puan hesaplama fonksiyonu
 export const calculatePolitScore = (post, interaction) => {
-  const { user, targetUser, actionType, targetPost } = interaction;
+  const { user, targetUser, actionType, targetPost, recentPosts } = interaction;
   
   let baseScore = 0;
   const calculationSteps = [];
@@ -201,7 +226,8 @@ export const calculatePolitScore = (post, interaction) => {
   }
   
   // 2. Geçmiş paylaşımlardan bonus
-  const previousBonus = calculatePreviousPostsBonus(targetUser, baseScore);
+  const targetPostId = targetPost?.id || targetPost?.post_id || post?.id || post?.post_id || null;
+  const previousBonus = calculatePreviousPostsBonus({ recentPosts, targetPostId }, baseScore);
   if (previousBonus > 0) {
     calculationSteps.push({
       step: 'Geçmiş Paylaşım Bonusu',
