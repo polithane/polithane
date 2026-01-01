@@ -374,6 +374,22 @@ export const CreatePolitPage = () => {
     setIsRecording(false);
     if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
     recordTimeoutRef.current = null;
+    // Stop canvas capture loop + stream (if used)
+    try {
+      if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
+      recordCanvasRafRef.current = null;
+    } catch {
+      // ignore
+    }
+    try {
+      const out = recordOutStreamRef.current;
+      out?.stop?.();
+      const cs = out?.canvasStream;
+      cs?.getTracks?.()?.forEach?.((t) => t.stop());
+    } catch {
+      // ignore
+    }
+    recordOutStreamRef.current = null;
     try {
       if (videoUploadRef.current) videoUploadRef.current.value = '';
       if (audioUploadRef.current) audioUploadRef.current.value = '';
@@ -1748,7 +1764,15 @@ export const CreatePolitPage = () => {
                     </div>
                   ) : contentType === 'audio' ? (
                     <div className="space-y-3">
-                      <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden">
+                      <div
+                        className="relative rounded-2xl border border-gray-200 overflow-hidden"
+                        style={{
+                          background:
+                            'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.35), transparent 55%),' +
+                            'radial-gradient(circle at 80% 30%, rgba(99,102,241,0.28), transparent 55%),' +
+                            'linear-gradient(135deg, rgba(17,24,39,1), rgba(2,6,23,1))',
+                        }}
+                      >
                         {isRecording ? (
                           <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
                             <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
@@ -1784,9 +1808,17 @@ export const CreatePolitPage = () => {
                             </button>
                           </div>
                         ) : null}
-                        <div className="w-full aspect-video flex items-center justify-center">
-                          <div className="w-24 h-24 rounded-full bg-blue-600/25 border border-blue-300/30 flex items-center justify-center">
-                            <Mic className="w-12 h-12 text-blue-200" />
+                        <div className="w-full aspect-[9/16] flex items-center justify-center p-6">
+                          <div className="w-full max-w-[320px] rounded-[26px] border border-white/15 bg-white/10 backdrop-blur-sm shadow-[0_30px_90px_rgba(0,0,0,0.55)] overflow-hidden">
+                            <div className="px-6 py-7 flex flex-col items-center">
+                              <div className="w-28 h-28 rounded-full bg-sky-500/25 border border-sky-200/30 shadow-[0_18px_70px_rgba(56,189,248,0.25)] flex items-center justify-center">
+                                <Mic className="w-12 h-12 text-white" />
+                              </div>
+                              <div className="mt-4 text-sm font-black text-white/95">Sesli paylaşım</div>
+                              <div className="mt-2 text-xs text-white/80 max-w-[260px] text-center">
+                                {recordedUrl ? 'Kayıt hazır.' : 'Ses dosyan hazırlanıyor…'}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1820,6 +1852,8 @@ export const CreatePolitPage = () => {
                       )}
                     </div>
                   ) : null}
+                  {/* hidden canvas used to force portrait recording output */}
+                  <canvas ref={recordCanvasRef} className="hidden" />
 
                   {/* Action buttons */}
                   {!hasMedia && !isRecording ? (

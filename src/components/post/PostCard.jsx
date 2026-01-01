@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Eye, Heart, MessageCircle, Share2, Video, Image as ImageIcon, Music, FileText } from 'lucide-react';
+import { Eye, Heart, MessageCircle, Share2, Video, Image as ImageIcon, Music, FileText, PenTool } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
@@ -249,7 +249,27 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
       {/* İçerik */}
       <div className="mb-3">
         {post.content_type === CONTENT_TYPES.TEXT && (
-          <p className="text-gray-800">{truncate(post.content_text, 150)}</p>
+          <div
+            className="rounded-lg border border-gray-200 overflow-hidden"
+            style={{
+              backgroundColor: '#fff7dc',
+              backgroundImage:
+                'linear-gradient(to right, rgba(220,38,38,0.18) 0, rgba(220,38,38,0.18) 2px, transparent 2px),' +
+                'repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 22px, rgba(59,130,246,0.18) 23px, rgba(59,130,246,0.18) 24px)',
+            }}
+          >
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-9 h-9 rounded-xl bg-white/80 border border-black/10 flex items-center justify-center">
+                  <PenTool className="w-5 h-5 text-amber-700" />
+                </div>
+                <div className="text-xs font-black text-gray-900">Yazı</div>
+              </div>
+              <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">
+                {truncate(String(post.content_text || post.content || '').trim(), 180)}
+              </div>
+            </div>
+          </div>
         )}
         {post.content_type === CONTENT_TYPES.IMAGE && (
           <div className="relative">
@@ -284,15 +304,27 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           </div>
         )}
         {post.content_type === CONTENT_TYPES.AUDIO && (
-          <div className="bg-gray-100 rounded-lg p-4 flex items-center gap-4">
-            <div className="bg-primary-blue rounded-full p-3">
-              <Music className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <div className="h-2 bg-gray-300 rounded-full mb-2"></div>
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>{formatDuration(post.media_duration)}</span>
-                <span>Ses Dosyası</span>
+          <div
+            className="rounded-lg border border-gray-200 overflow-hidden"
+            style={{
+              background:
+                'radial-gradient(circle at 25% 20%, rgba(14,165,233,0.25), transparent 55%),' +
+                'radial-gradient(circle at 85% 35%, rgba(99,102,241,0.22), transparent 60%),' +
+                'linear-gradient(135deg, rgba(17,24,39,1), rgba(2,6,23,1))',
+            }}
+          >
+            <div className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center shadow-sm">
+                <Music className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-black text-white/95 truncate">Sesli paylaşım</div>
+                  <div className="text-xs font-mono text-white/75 whitespace-nowrap">{formatDuration(post.media_duration)}</div>
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full w-[55%] bg-gradient-to-r from-sky-400 to-indigo-400" />
+                </div>
               </div>
             </div>
           </div>
