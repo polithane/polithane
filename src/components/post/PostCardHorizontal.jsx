@@ -5,6 +5,7 @@ import { Badge } from '../common/Badge';
 import { PolitScoreDetailModal } from '../common/PolitScoreDetailModal';
 import { Tooltip } from '../common/Tooltip';
 import { Modal } from '../common/Modal';
+import { LikeBurstHeart } from '../common/LikeBurstHeart';
 import { formatNumber, formatPolitScore, formatTimeAgo, truncate, formatDuration, getSourceDomain } from '../../utils/formatters';
 import { getUserTitle, isUiVerifiedUser } from '../../utils/titleHelpers';
 import { useNavigate, Link } from 'react-router-dom';
@@ -51,6 +52,7 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   const [shareTextCopied, setShareTextCopied] = useState(false);
   const [likeCount, setLikeCount] = useState(Number(post?.like_count || 0));
   const [isLiked, setIsLiked] = useState(Boolean(post?.is_liked));
+  const [likeBurstTick, setLikeBurstTick] = useState(0);
 
   const postUrl = useMemo(() => {
     try {
@@ -195,15 +197,31 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
       navigate('/login-new');
       return;
     }
+    const prevLiked = !!isLiked;
+    const prevCount = Number(likeCount || 0) || 0;
+    const optimistic = !prevLiked;
+    setIsLiked(optimistic);
+    setLikeCount(Math.max(0, prevCount + (optimistic ? 1 : -1)));
+    if (optimistic) setLikeBurstTick((t) => t + 1);
     try {
       const r = await postsApi.like(postId);
       if (r?.success) {
-        const nextLiked = r?.action === 'liked' ? true : r?.action === 'unliked' ? false : !isLiked;
-        setIsLiked(nextLiked);
-        setLikeCount((prev) => Math.max(0, Number(prev || 0) + (nextLiked ? 1 : -1)));
+        const action = String(r?.action || '').toLowerCase();
+        if (action === 'liked') {
+          if (!optimistic) setLikeBurstTick((t) => t + 1);
+          setIsLiked(true);
+          setLikeCount(Math.max(0, prevCount + 1));
+        } else if (action === 'unliked') {
+          setIsLiked(false);
+          setLikeCount(Math.max(0, prevCount - 1));
+        } else {
+          // unknown: keep optimistic state
+        }
       }
     } catch {
-      // ignore (best-effort)
+      // revert on failure
+      setIsLiked(prevLiked);
+      setLikeCount(Math.max(0, prevCount));
     }
   };
 
@@ -568,10 +586,11 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
           </button>
           <button
             type="button"
-            className="flex flex-col items-center gap-0.5 text-red-600 hover:text-red-700"
+            className="relative flex flex-col items-center gap-0.5 text-red-600 hover:text-red-700"
             onClick={handleToggleLike}
             title={isLiked ? 'Beğeniyi geri al' : 'Beğen'}
           >
+            <LikeBurstHeart trigger={likeBurstTick} sizeClass="w-8 h-8" />
             <Heart className="w-5 h-5" fill={isLiked ? 'currentColor' : 'none'} />
             <span className="text-xs font-black text-gray-800 leading-4">{formatNumber(likeCount)}</span>
           </button>

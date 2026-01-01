@@ -5,6 +5,7 @@ import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
+import { LikeBurstHeart } from '../components/common/LikeBurstHeart';
 import { formatNumber, formatPolitScore, formatTimeAgo, formatDate, formatDuration, getSourceDomain } from '../utils/formatters';
 import { posts as postsApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -382,6 +383,7 @@ export const PostDetailPage = () => {
 
   const [showShare, setShowShare] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [likeBurstTick, setLikeBurstTick] = useState(0);
 
   const [reportingPost, setReportingPost] = useState(false);
   const [postReportReason, setPostReportReason] = useState('spam');
@@ -649,6 +651,7 @@ export const PostDetailPage = () => {
       navigate('/login-new');
       return;
     }
+    setLikeBurstTick((t) => t + 1);
     try {
       const r = await postsApi.like(uiPost.post_id);
       if (r?.success) {
@@ -875,7 +878,11 @@ export const PostDetailPage = () => {
             {/* Etkileşim Butonları - Büyük ikonlar (mobil öncelikli) */}
             <div className="grid grid-cols-3 gap-2 pt-4 border-t">
               {/* BEĞEN - Özel Vurgulu */}
-              <button onClick={handleToggleLike} className="flex items-center justify-center gap-2 bg-gradient-to-br from-red-500 via-pink-500 to-red-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <button
+                onClick={handleToggleLike}
+                className="relative flex items-center justify-center gap-2 bg-gradient-to-br from-red-500 via-pink-500 to-red-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700 text-white py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <LikeBurstHeart trigger={likeBurstTick} sizeClass="w-12 h-12" />
                 <Heart className="w-7 h-7 md:w-6 md:h-6" fill="currentColor" />
                 <span className="text-base md:text-sm font-black tracking-tight">BEĞEN ({formatNumber(uiPost.like_count)})</span>
               </button>

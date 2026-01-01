@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { X, Heart, Pause, Play, Volume2, VolumeX, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Avatar } from '../components/common/Avatar';
+import { LikeBurstHeart } from '../components/common/LikeBurstHeart';
 import { Modal } from '../components/common/Modal';
 import { apiCall, posts as postsApi } from '../utils/api';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
@@ -27,6 +28,7 @@ export const FastViewerPage = () => {
   const [idx, setIdx] = useState(0);
   const [likedById, setLikedById] = useState({});
   const [likeCountById, setLikeCountById] = useState({});
+  const [likeBurstTickById, setLikeBurstTickById] = useState({});
   const [viewers, setViewers] = useState([]);
   const [viewersOpen, setViewersOpen] = useState(false);
   const [viewersSchemaSql, setViewersSchemaSql] = useState('');
@@ -349,6 +351,9 @@ export const FastViewerPage = () => {
       likeCountById && Object.prototype.hasOwnProperty.call(likeCountById, id) ? likeCountById[id] : current?.like_count
     );
     const safePrevCount = Number.isFinite(prevCount) ? prevCount : 0;
+    if (!prev) {
+      setLikeBurstTickById((p) => ({ ...(p || {}), [id]: Number((p || {})[id] || 0) + 1 }));
+    }
     // optimistic UI: toggle immediately
     setLikedById((p) => ({ ...(p || {}), [id]: !prev }));
     setLikeCountById((p) => ({ ...(p || {}), [id]: Math.max(0, safePrevCount + (prev ? -1 : 1)) }));
@@ -356,6 +361,9 @@ export const FastViewerPage = () => {
       const r = await postsApi.like(id).catch(() => null);
       const action = String(r?.action || r?.data?.action || '').toLowerCase();
       if (action === 'liked') {
+        if (prev) {
+          setLikeBurstTickById((p) => ({ ...(p || {}), [id]: Number((p || {})[id] || 0) + 1 }));
+        }
         setLikedById((p) => ({ ...(p || {}), [id]: true }));
         setLikeCountById((p) => ({ ...(p || {}), [id]: Math.max(0, safePrevCount + 1) }));
       } else if (action === 'unliked') {
@@ -1175,10 +1183,14 @@ export const FastViewerPage = () => {
               <button
                 type="button"
                 onClick={toggleLike}
-                className="w-14 h-14 rounded-full bg-black/25 backdrop-blur-sm border border-white/15 flex flex-col items-center justify-center"
+                className="relative w-14 h-14 rounded-full bg-black/25 backdrop-blur-sm border border-white/15 flex flex-col items-center justify-center"
                 aria-label={currentLiked ? 'Beğeniyi kaldır' : 'Beğen'}
                 title={currentLiked ? 'Beğeniyi kaldır' : 'Beğen'}
               >
+                <LikeBurstHeart
+                  trigger={Number(likeBurstTickById?.[String(current?.id || '')] || 0)}
+                  sizeClass="w-10 h-10"
+                />
                 <Heart
                   className="w-7 h-7"
                   style={{
