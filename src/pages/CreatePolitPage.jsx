@@ -1004,8 +1004,8 @@ export const CreatePolitPage = () => {
         }
       }
 
-      // Force portrait output for videos by recording a 9:16 canvas stream (center-crop cover).
-      // This makes the *saved file* vertical even if the camera stream is delivered as landscape.
+      // Force portrait output for videos by recording a 9:16 canvas stream.
+      // IMPORTANT: use "contain" (fit) to avoid zoom/cropping; add letterbox (black) if needed.
       let outStream = stream;
       if (contentType === 'video') {
         try {
@@ -1020,7 +1020,6 @@ export const CreatePolitPage = () => {
               const CH = 1280;
               canvas.width = CW;
               canvas.height = CH;
-              const targetRatio = CW / CH; // 9/16
               let cancelled = false;
               const draw = () => {
                 if (cancelled) return;
@@ -1028,26 +1027,16 @@ export const CreatePolitPage = () => {
                   const vw = Number(v.videoWidth || 0) || 0;
                   const vh = Number(v.videoHeight || 0) || 0;
                   if (vw > 0 && vh > 0) {
-                    const srcRatio = vw / vh;
-                    let sw = vw;
-                    let sh = vh;
-                    let sx = 0;
-                    let sy = 0;
-                    // Center-crop so output fills 9:16 without letterboxing.
-                    if (srcRatio > targetRatio) {
-                      // Source is wider -> crop sides
-                      sw = Math.max(1, Math.round(vh * targetRatio));
-                      sh = vh;
-                      sx = Math.round((vw - sw) / 2);
-                      sy = 0;
-                    } else if (srcRatio < targetRatio) {
-                      // Source is taller -> crop top/bottom
-                      sw = vw;
-                      sh = Math.max(1, Math.round(vw / targetRatio));
-                      sx = 0;
-                      sy = Math.round((vh - sh) / 2);
-                    }
-                    ctx.drawImage(v, sx, sy, sw, sh, 0, 0, CW, CH);
+                    // Letterbox background
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, CW, CH);
+                    // Fit entire frame into 9:16 canvas without cropping.
+                    const scale = Math.min(CW / vw, CH / vh);
+                    const dw = Math.max(1, Math.round(vw * scale));
+                    const dh = Math.max(1, Math.round(vh * scale));
+                    const dx = Math.round((CW - dw) / 2);
+                    const dy = Math.round((CH - dh) / 2);
+                    ctx.drawImage(v, 0, 0, vw, vh, dx, dy, dw, dh);
                   }
                 } catch {
                   // ignore draw errors (we keep trying)
@@ -1670,11 +1659,11 @@ export const CreatePolitPage = () => {
                           </div>
                         ) : null}
                         {isRecording ? (
-                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
+                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-3">
                             <div
                               className={[
-                                'px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg bg-gray-800/90 border border-white/10',
-                                'font-black text-xs md:text-sm tabular-nums',
+                                'px-2 py-1 md:px-3 md:py-1.5 rounded-xl bg-black/75 border border-white/20 backdrop-blur-sm',
+                                'font-black text-sm md:text-lg tabular-nums',
                                 recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
                               ].join(' ')}
                               aria-label="Kalan süre"
@@ -1688,31 +1677,35 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden"
+                              className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative text-[8px] md:text-[11px] font-black leading-none">BİTİR</span>
-                              <span className="relative mt-0.5 md:mt-2 w-3 h-3 md:w-5 md:h-5 bg-white rounded-sm" />
+                              <span className="relative text-sm md:text-xl font-black leading-none drop-shadow">BİTİR</span>
+                              <span className="relative mt-1 md:mt-2 w-4 h-4 md:w-7 md:h-7 bg-white rounded-md" />
                             </button>
                           </div>
                         ) : null}
                         {isRecording ? (
-                          <video
-                            ref={previewRef}
-                            className="w-full aspect-[9/16] bg-black object-cover"
-                            playsInline
-                            muted
-                            autoPlay
-                          />
+                          <div className="w-full flex justify-center">
+                            <video
+                              ref={previewRef}
+                              className="w-auto h-[56vh] max-h-[560px] aspect-[9/16] bg-black object-contain"
+                              playsInline
+                              muted
+                              autoPlay
+                            />
+                          </div>
                         ) : recordedUrl ? (
-                          <video
-                            src={recordedUrl}
-                            controls
-                            className="w-full aspect-[9/16] bg-black object-contain"
-                            playsInline
-                          />
+                          <div className="w-full flex justify-center">
+                            <video
+                              src={recordedUrl}
+                              controls
+                              className="w-auto h-[56vh] max-h-[560px] aspect-[9/16] bg-black object-contain"
+                              playsInline
+                            />
+                          </div>
                         ) : (
                           <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
                         )}
@@ -1780,11 +1773,11 @@ export const CreatePolitPage = () => {
                           </div>
                         ) : null}
                         {isRecording ? (
-                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
+                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-3">
                             <div
                               className={[
-                                'px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg bg-gray-800/90 border border-white/10',
-                                'font-black text-xs md:text-sm tabular-nums',
+                                'px-2 py-1 md:px-3 md:py-1.5 rounded-xl bg-black/75 border border-white/20 backdrop-blur-sm',
+                                'font-black text-sm md:text-lg tabular-nums',
                                 recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
                               ].join(' ')}
                               aria-label="Kalan süre"
@@ -1798,13 +1791,13 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden"
+                              className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative text-[8px] md:text-[11px] font-black leading-none">BİTİR</span>
-                              <span className="relative mt-0.5 md:mt-2 w-3 h-3 md:w-5 md:h-5 bg-white rounded-sm" />
+                              <span className="relative text-sm md:text-xl font-black leading-none drop-shadow">BİTİR</span>
+                              <span className="relative mt-1 md:mt-2 w-4 h-4 md:w-7 md:h-7 bg-white rounded-md" />
                             </button>
                           </div>
                         ) : null}
