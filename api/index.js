@@ -5548,6 +5548,111 @@ async function adminGetAnalytics(req, res) {
     approx = { sampleSize: 0, totalViews: null, totalPolitScore: null };
   }
 
+  // Detailed window analytics (best-effort, limited sample to avoid heavy queries)
+  const windowDetail = {
+    sampleLimit: 0,
+    sampleSize: 0,
+    truncated: false,
+    totals: { views: 0, likes: 0, comments: 0, shares: 0, fastPosts: 0 },
+    series: [], // [{ date: 'YYYY-MM-DD', users: n, posts: n, fastPosts: n }]
+    topPostsByLikes: [], // [{ id, like_count, view_count, comment_count, share_count, created_at, excerpt, content_type }]
+  };
+  try {
+    const dayKey = (iso) => {
+      const d = new Date(String(iso || ''));
+      if (!Number.isFinite(d.getTime())) return '';
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+    const sampleLimit = range === 'today' ? 2000 : range === '90days' ? 5000 : 4000;
+    windowDetail.sampleLimit = sampleLimit;
+
+    // Posts created in range (sampled)
+    const postRows = await supabaseRestGet('posts', {
+      select: 'id,created_at,content_type,is_trending,view_count,like_count,comment_count,share_count,content_text,content,is_deleted',
+      is_deleted: 'eq.false',
+      created_at: `gte.${sinceIso}`,
+      order: 'created_at.desc',
+      limit: String(sampleLimit),
+    }).catch(() => []);
+    const postList = Array.isArray(postRows) ? postRows : [];
+    windowDetail.sampleSize = postList.length;
+    windowDetail.truncated = postList.length >= sampleLimit;
+
+    const postsByDay = new Map();
+    const fastByDay = new Map();
+    for (const p of postList) {
+      const k = dayKey(p?.created_at);
+      if (!k) continue;
+      postsByDay.set(k, (postsByDay.get(k) || 0) + 1);
+      if (p?.is_trending === true) fastByDay.set(k, (fastByDay.get(k) || 0) + 1);
+      windowDetail.totals.views += Number(p?.view_count || 0) || 0;
+      windowDetail.totals.likes += Number(p?.like_count || 0) || 0;
+      windowDetail.totals.comments += Number(p?.comment_count || 0) || 0;
+      windowDetail.totals.shares += Number(p?.share_count || 0) || 0;
+      if (p?.is_trending === true) windowDetail.totals.fastPosts += 1;
+    }
+
+    // Users created in range (counts by day, from count-only query isn't possible; sample IDs only)
+    const userRows = await supabaseRestGet('users', {
+      select: 'id,created_at',
+      created_at: `gte.${sinceIso}`,
+      order: 'created_at.desc',
+      limit: String(sampleLimit),
+    }).catch(() => []);
+    const userList = Array.isArray(userRows) ? userRows : [];
+    const usersByDay = new Map();
+    for (const u of userList) {
+      const k = dayKey(u?.created_at);
+      if (!k) continue;
+      usersByDay.set(k, (usersByDay.get(k) || 0) + 1);
+    }
+
+    // Build ordered series (UTC day keys) for the window
+    const days = Math.max(1, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+    const series = [];
+    for (let i = days - 1; i >= 0; i -= 1) {
+      const dt = new Date(now - i * 24 * 60 * 60 * 1000);
+      const y = dt.getUTCFullYear();
+      const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getUTCDate()).padStart(2, '0');
+      const key = `${y}-${m}-${dd}`;
+      series.push({
+        date: key,
+        users: usersByDay.get(key) || 0,
+        posts: postsByDay.get(key) || 0,
+        fastPosts: fastByDay.get(key) || 0,
+      });
+    }
+    windowDetail.series = series;
+
+    // Top posts (by likes) within window sample
+    const excerptOf = (p) => {
+      const s = String(p?.content_text || p?.content || '').trim();
+      if (!s) return '—';
+      return s.length > 120 ? `${s.slice(0, 117)}…` : s;
+    };
+    windowDetail.topPostsByLikes = postList
+      .slice()
+      .sort((a, b) => (Number(b?.like_count || 0) || 0) - (Number(a?.like_count || 0) || 0))
+      .slice(0, 12)
+      .map((p) => ({
+        id: p?.id,
+        created_at: p?.created_at,
+        content_type: p?.content_type,
+        is_trending: !!p?.is_trending,
+        view_count: Number(p?.view_count || 0) || 0,
+        like_count: Number(p?.like_count || 0) || 0,
+        comment_count: Number(p?.comment_count || 0) || 0,
+        share_count: Number(p?.share_count || 0) || 0,
+        excerpt: excerptOf(p),
+      }));
+  } catch {
+    // ignore (best-effort)
+  }
+
   return res.json({
     success: true,
     data: {
@@ -5560,6 +5665,7 @@ async function adminGetAnalytics(req, res) {
       topUsers,
       postTypeCounts,
       approx,
+      windowDetail,
     },
   });
 }
