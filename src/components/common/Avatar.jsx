@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import { normalizeAvatarUrl } from '../../utils/avatarUrl';
@@ -19,12 +20,44 @@ export const Avatar = ({
   const badgeSize = sizeNum * 0.3;
   const partyLogoSize = sizeNum * 0.35;
   
-  const getAvatarUrl = (url) => {
-    // If valid URL/path, normalize (proxy Supabase avatars + safe encoding)
-    if (url && (url.startsWith('/') || url.startsWith('http'))) return normalizeAvatarUrl(url);
-    // Yoksa default logo
-    return DEFAULT_AVATAR;
-  };
+  const candidates = useMemo(() => {
+    const raw = String(src || '').trim();
+    const out = [];
+
+    const push = (u) => {
+      const s = String(u || '').trim();
+      if (!s) return;
+      out.push(s);
+    };
+
+    if (raw) {
+      // If valid URL/path, normalize (proxy Supabase avatars + safe encoding)
+      if (raw.startsWith('/') || raw.startsWith('http')) {
+        push(normalizeAvatarUrl(raw));
+      } else {
+        // Some DB rows store only Storage paths (no full URL). Try best-effort public URL candidates.
+        const supabaseUrl = String(import.meta.env?.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
+        if (supabaseUrl) {
+          // 1) Treat "raw" as "bucket/objectPath"
+          push(normalizeAvatarUrl(`${supabaseUrl}/storage/v1/object/public/${raw}`));
+          // 2) Treat "raw" as objectPath under uploads bucket
+          push(normalizeAvatarUrl(`${supabaseUrl}/storage/v1/object/public/uploads/${raw}`));
+          // 3) If it already starts with "avatars/", also try avatars bucket without the prefix
+          if (raw.startsWith('avatars/')) {
+            push(normalizeAvatarUrl(`${supabaseUrl}/storage/v1/object/public/avatars/${raw.slice('avatars/'.length)}`));
+          }
+        }
+      }
+    }
+
+    push(DEFAULT_AVATAR);
+    return Array.from(new Set(out));
+  }, [src]);
+
+  const [tryIndex, setTryIndex] = useState(0);
+  useEffect(() => {
+    setTryIndex(0);
+  }, [src]);
 
   return (
     <div 
@@ -36,7 +69,7 @@ export const Avatar = ({
         <div className="absolute inset-0 rounded-full border-2 border-dashed border-primary-blue pointer-events-none" />
       ) : null}
       <img
-        src={getAvatarUrl(src)}
+        src={candidates[Math.min(tryIndex, Math.max(0, candidates.length - 1))] || DEFAULT_AVATAR}
         alt={alt}
         className={clsx(
           'w-full h-full rounded-full object-cover bg-white',
@@ -44,14 +77,19 @@ export const Avatar = ({
         )}
         crossOrigin="anonymous"
         onError={(e) => {
-          // Hata durumunda default logo göster
-          try {
-            // Avoid infinite loop
-            if (e.currentTarget?.src && e.currentTarget.src.endsWith(DEFAULT_AVATAR)) return;
-            e.currentTarget.src = DEFAULT_AVATAR;
-          } catch {
-            // ignore
-          }
+          // Try next candidate URL first; fallback to default.
+          setTryIndex((prev) => {
+            const next = Number(prev || 0) + 1;
+            if (next < (candidates?.length || 0)) return next;
+            try {
+              // Avoid infinite loop
+              if (e.currentTarget?.src && String(e.currentTarget.src).endsWith(DEFAULT_AVATAR)) return prev;
+              e.currentTarget.src = DEFAULT_AVATAR;
+            } catch {
+              // ignore
+            }
+            return prev;
+          });
         }}
       />
       {/* Parti Logosu - Sol alt köşe */}

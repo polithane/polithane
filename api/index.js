@@ -201,6 +201,43 @@ async function supabaseRestGet(path, params) {
   return await res.json();
 }
 
+function isMissingColumnError(e, columnName) {
+  const msgRaw = String(e?.message || e || '');
+  const msg = msgRaw.toLowerCase();
+  const col = String(columnName || '').trim().toLowerCase();
+  if (!msg) return false;
+  // Common Postgres error shape:
+  // ERROR: 42703: column "xxx" does not exist
+  if (msg.includes('column') && msg.includes('does not exist')) {
+    if (!col) return true;
+    return msg.includes(`"${col}"`) || msg.includes(` ${col} `) || msg.includes(col);
+  }
+  // PostgREST can also return "unknown column" or similar wording
+  if (msg.includes('unknown') && msg.includes('column')) {
+    if (!col) return true;
+    return msg.includes(col);
+  }
+  return false;
+}
+
+async function supabaseRestGetWithOrderFallback(path, baseParams, orderCandidates) {
+  const params = baseParams && typeof baseParams === 'object' ? { ...baseParams } : {};
+  const orders = Array.isArray(orderCandidates) ? orderCandidates.filter(Boolean) : [];
+  for (const ord of orders) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await supabaseRestGet(path, { ...params, order: ord });
+    } catch (e) {
+      // If the requested order column doesn't exist in this env/schema, retry with next.
+      if (isMissingColumnError(e)) continue;
+      throw e;
+    }
+  }
+  // Last resort: no ordering.
+  const { order: _ignored, ...rest } = params;
+  return await supabaseRestGet(path, rest);
+}
+
 function isAllowedAvatarUrl(u) {
   try {
     const url = new URL(String(u || ''));
@@ -1524,7 +1561,7 @@ async function adminDeleteComment(req, res, commentId) {
 async function adminStorageList(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
-  const bucket = String(req.query?.bucket || 'uploads').trim() || 'uploads';
+  const requestedBucket = String(req.query?.bucket || 'uploads').trim() || 'uploads';
   const prefix = String(req.query?.prefix || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
   const limit = Math.min(200, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
   const offset = Math.max(0, parseInt(String(req.query?.offset || 0), 10) || 0);
@@ -1543,13 +1580,46 @@ async function adminStorageList(req, res) {
     // Supabase Storage list() is NOT recursive.
     // Our app stores media under e.g. posts/<userId>/<file>, messages/<userId>/<file>, avatars/<userId>/<file>.
     // So a shallow list of `posts` returns only folder placeholders (looks like "empty").
-    const listOne = async (pfx, lim, off) => {
+    const listOne = async (bucketName, pfx, lim, off) => {
       const { data, error } = await supabase.storage
-        .from(bucket)
+        .from(bucketName)
         .list(pfx, { limit: lim, offset: off, sortBy: { column: 'updated_at', order: 'desc' } });
       if (error) throw error;
       return Array.isArray(data) ? data : [];
     };
+
+    const resolveBucket = async () => {
+      const envBucket = String(process.env.SUPABASE_BUCKET_NAME || '').trim();
+      const candidates = Array.from(
+        new Set(
+          [
+            requestedBucket,
+            envBucket,
+            'uploads',
+            'polithane-images',
+            'polithane_images',
+            'media',
+            'public',
+            'avatars',
+          ].filter(Boolean)
+        )
+      );
+
+      // Best-effort: try each bucket with a tiny list call.
+      for (const b of candidates) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await listOne(b, prefix, 1, 0);
+          return b;
+        } catch {
+          // continue
+        }
+      }
+      // Fall back to requested bucket (preserves current behavior)
+      return requestedBucket;
+    };
+
+    const bucket = await resolveBucket();
 
     const isFolderLike = (it) => {
       if (!it || !it.name) return false;
@@ -1585,7 +1655,7 @@ async function adminStorageList(req, res) {
     // - prefix '' -> root folders (posts/messages/avatars/...)
     // - prefix 'posts' -> userId subfolders -> files
     // - prefix 'posts/<userId>' -> files
-    const first = await listOne(prefix, Math.max(limit, 100), offset);
+    const first = await listOne(bucket, prefix, Math.max(limit, 100), offset);
     const firstFiles = first.filter((it) => it && it.name && !it.name.endsWith('/') && !isFolderLike(it));
     const firstFolders = first.filter((it) => it && it.name && !it.name.endsWith('/') && isFolderLike(it));
 
@@ -1599,7 +1669,7 @@ async function adminStorageList(req, res) {
         for (const f of folderItems) {
           const childPrefix = basePrefix ? `${basePrefix}/${f.name}` : f.name;
           // eslint-disable-next-line no-await-in-loop
-          const child = await listOne(childPrefix, Math.max(limit, 100), 0).catch(() => []);
+          const child = await listOne(bucket, childPrefix, Math.max(limit, 100), 0).catch(() => []);
           const childFiles = (child || []).filter((it) => it && it.name && !it.name.endsWith('/') && !isFolderLike(it));
           const childFolders = (child || []).filter((it) => it && it.name && !it.name.endsWith('/') && isFolderLike(it));
           for (const it of childFiles) {
@@ -1612,7 +1682,7 @@ async function adminStorageList(req, res) {
             for (const ff of childFolders) {
               const grandPrefix = `${childPrefix}/${ff.name}`;
               // eslint-disable-next-line no-await-in-loop
-              const grand = await listOne(grandPrefix, Math.max(limit, 100), 0).catch(() => []);
+              const grand = await listOne(bucket, grandPrefix, Math.max(limit, 100), 0).catch(() => []);
               const grandFiles = (grand || []).filter((it) => it && it.name && !it.name.endsWith('/') && !isFolderLike(it));
               for (const it of grandFiles) {
                 rows.push(toRow(it, grandPrefix));
@@ -1632,7 +1702,11 @@ async function adminStorageList(req, res) {
     rows.sort((a, b) => String(b?.updated_at || '').localeCompare(String(a?.updated_at || '')));
     rows = rows.slice(0, limit);
 
-    return res.json({ success: true, data: rows, meta: { bucket, prefix, limit, offset } });
+    return res.json({
+      success: true,
+      data: rows,
+      meta: { bucket, requestedBucket, prefix, limit, offset },
+    });
   } catch (e) {
     return res.status(500).json({ success: false, error: String(e?.message || 'Storage listesi alınamadı.') });
   }
@@ -2506,7 +2580,6 @@ async function getAgendas(req, res) {
       select: '*',
       limit: String(lim),
       offset: String(off),
-      order: ord,
     };
     if (String(is_active || 'true') === 'true') params.is_active = 'eq.true';
     if (String(is_trending || '') === 'true') params.is_trending = 'eq.true';
@@ -2616,12 +2689,27 @@ async function getAgendas(req, res) {
     // retry with the safe default order.
     let rows;
     try {
-      rows = await supabaseRestGet('agendas', params);
-    } catch {
-      if (ord !== 'trending_score.desc') {
-        rows = await supabaseRestGet('agendas', { ...params, order: 'trending_score.desc' }).catch(() => []);
+      rows = await supabaseRestGetWithOrderFallback(
+        'agendas',
+        params,
+        [
+          ord,
+          ord.startsWith('trending_score') ? 'created_at.desc' : 'trending_score.desc',
+          'created_at.desc',
+          'id.desc',
+          'title.asc',
+        ]
+      );
+    } catch (e) {
+      // Some environments may have an older agendas schema (missing is_active/is_trending/trending_score).
+      // Retry by dropping filters and using a safe order.
+      if (isMissingColumnError(e, 'is_active') || isMissingColumnError(e, 'is_trending') || isMissingColumnError(e, 'trending_score')) {
+        const retry = { ...params };
+        delete retry.is_active;
+        delete retry.is_trending;
+        rows = await supabaseRestGetWithOrderFallback('agendas', retry, ['created_at.desc', 'id.desc', 'title.asc']).catch(() => []);
       } else {
-        rows = [];
+        throw e;
       }
     }
     res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
@@ -5517,7 +5605,11 @@ async function adminGetWorkflows(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
-    const rows = await supabaseRestGet('admin_workflows', { select: '*', order: 'created_at.desc', limit: '200' });
+    const rows = await supabaseRestGetWithOrderFallback(
+      'admin_workflows',
+      { select: '*', limit: '200' },
+      ['created_at.desc', 'updated_at.desc', 'last_run_at.desc', 'id.desc']
+    );
     return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
   } catch (e) {
     if (isMissingRelationError(e)) {
@@ -5588,7 +5680,11 @@ async function adminGetRevenueEntries(req, res) {
   if (!auth) return;
   const limit = Math.min(500, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
   try {
-    const rows = await supabaseRestGet('admin_revenue_entries', { select: '*', order: 'occurred_at.desc', limit: String(limit) });
+    const rows = await supabaseRestGetWithOrderFallback(
+      'admin_revenue_entries',
+      { select: '*', limit: String(limit) },
+      ['occurred_at.desc', 'created_at.desc', 'updated_at.desc', 'id.desc']
+    );
     return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
   } catch (e) {
     if (isMissingRelationError(e)) {
@@ -5679,11 +5775,10 @@ async function adminGetApiKeys(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
-    const rows = await supabaseRestGet('admin_api_keys', {
+    const rows = await supabaseRestGetWithOrderFallback('admin_api_keys', {
       select: 'id,name,key_prefix,status,created_at,last_used_at,requests_count',
-      order: 'created_at.desc',
       limit: '200',
-    });
+    }, ['created_at.desc', 'last_used_at.desc', 'id.desc']);
     return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
   } catch (e) {
     if (isMissingRelationError(e)) {
@@ -5832,7 +5927,11 @@ async function adminGetEmailTemplates(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
-    let rows = await supabaseRestGet('admin_email_templates', { select: '*', order: 'updated_at.desc', limit: '200' });
+    let rows = await supabaseRestGetWithOrderFallback(
+      'admin_email_templates',
+      { select: '*', limit: '200' },
+      ['updated_at.desc', 'created_at.desc', 'id.desc']
+    );
     rows = Array.isArray(rows) ? rows : [];
 
     // If empty, seed a high-quality default set once (best-effort).
@@ -6205,11 +6304,11 @@ async function adminGetNotificationRules(req, res) {
   if (!auth) return;
 
   try {
-    let rows = await supabaseRestGet('admin_notification_rules', {
-      select: '*',
-      order: 'created_at.desc',
-      limit: '200',
-    });
+    let rows = await supabaseRestGetWithOrderFallback(
+      'admin_notification_rules',
+      { select: '*', limit: '200' },
+      ['created_at.desc', 'updated_at.desc', 'id.desc']
+    );
     rows = Array.isArray(rows) ? rows : [];
 
     // Seed defaults once if empty (best-effort).
@@ -7566,7 +7665,6 @@ async function adminGetAgendas(req, res) {
 
   const params = {
     select: '*',
-    order: 'trending_score.desc',
     limit: String(limitNum),
     offset: String(offset),
   };
@@ -7608,13 +7706,37 @@ create index if not exists agendas_is_active_idx on agendas (is_active);
   let total = 0;
   let rows = [];
   try {
-    const r = await Promise.all([
-      supabaseCount('agendas', countParams).catch(() => 0),
-      supabaseRestGet('agendas', params),
-    ]);
-    total = Number(r?.[0] || 0) || 0;
-    rows = Array.isArray(r?.[1]) ? r[1] : [];
+    const orderCandidates = ['trending_score.desc', 'updated_at.desc', 'created_at.desc', 'id.desc', 'title.asc'];
+    total = await supabaseCount('agendas', countParams).catch(() => 0);
+    rows = await supabaseRestGetWithOrderFallback('agendas', params, orderCandidates);
+    rows = Array.isArray(rows) ? rows : [];
   } catch (e) {
+    // Older schemas might not have slug/is_active/is_trending/trending_score.
+    // Retry with progressively simpler queries so admin can still see/manage existing data.
+    try {
+      const orderCandidates = ['trending_score.desc', 'updated_at.desc', 'created_at.desc', 'id.desc', 'title.asc'];
+      const retry = { ...params };
+      if (isMissingColumnError(e, 'slug')) delete retry.or;
+      if (isMissingColumnError(e, 'is_active')) delete retry.is_active;
+      if (isMissingColumnError(e, 'is_trending')) delete retry.is_trending;
+      rows = await supabaseRestGetWithOrderFallback('agendas', retry, orderCandidates).catch(() => []);
+      rows = Array.isArray(rows) ? rows : [];
+      total = await supabaseCount('agendas', { select: 'id' }).catch(() => 0);
+      if (rows.length > 0) {
+        return res.json({
+          success: true,
+          data: rows,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total,
+            totalPages: Math.max(1, Math.ceil((total || 0) / limitNum)),
+          },
+        });
+      }
+    } catch {
+      // ignore fallback errors and continue to normal error handling
+    }
     if (isMissingRelationError(e)) {
       return res.json({ success: false, schemaMissing: true, requiredSql: agendasRequiredSql() });
     }
