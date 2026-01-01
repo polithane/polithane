@@ -420,6 +420,12 @@ export const admin = {
     apiCall(`/api/admin/security/devices/${deviceId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
   systemTransform: (payload) =>
     apiCall('/api/admin/system/transform', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  getJobs: (params = {}) => {
+    const query = toQueryString(params);
+    return apiCall(`/api/admin/jobs${query ? `?${query}` : ''}`);
+  },
+  enqueueJob: (payload) => apiCall('/api/admin/jobs', { method: 'POST', body: JSON.stringify(payload || {}) }),
+  updateJob: (jobId, payload) => apiCall(`/api/admin/jobs/${jobId}`, { method: 'PUT', body: JSON.stringify(payload || {}) }),
   getAds: () => apiCall('/api/admin/ads'),
   createAd: (data) => apiCall('/api/admin/ads', { method: 'POST', body: JSON.stringify(data || {}) }),
   updateAd: (adId, data) => apiCall(`/api/admin/ads/${adId}`, { method: 'PUT', body: JSON.stringify(data || {}) }),

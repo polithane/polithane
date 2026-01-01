@@ -68,6 +68,19 @@ export const AutomationControl = () => {
     if (!r?.success) await load();
   };
 
+  const runWorkflowNow = async (w) => {
+    const id = String(w?.id || '');
+    if (!id) return;
+    setError('');
+    const r = await adminApi.enqueueJob({ job_type: 'run_workflow', payload: { workflow_id: id } }).catch(() => null);
+    if (!r?.success) {
+      if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
+      setError(r?.error || 'Job oluşturulamadı.');
+      return;
+    }
+    await load();
+  };
+
   const deleteWorkflow = async (w) => {
     const id = String(w?.id || '');
     if (!id) return;
@@ -190,6 +203,14 @@ export const AutomationControl = () => {
                 </div>
 
                 <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => runWorkflowNow(workflow)}
+                    className="p-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+                    title="Şimdi çalıştır (job)"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => toggleWorkflow(workflow)}

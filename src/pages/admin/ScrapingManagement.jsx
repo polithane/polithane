@@ -47,10 +47,14 @@ export const ScrapingManagement = () => {
   const runNow = async (s) => {
     const id = String(s?.id || '');
     if (!id) return;
-    const now = new Date().toISOString();
-    setSources((prev) => prev.map((x) => (String(x.id) === id ? { ...x, last_fetch_at: now } : x)));
-    const r = await adminApi.updateSource(id, { last_fetch_at: now }).catch(() => null);
-    if (!r?.success) await load();
+    setError('');
+    const r = await adminApi.enqueueJob({ job_type: 'scrape_source', payload: { source_id: id } }).catch(() => null);
+    if (!r?.success) {
+      if (r?.schemaMissing && r?.requiredSql) setSchemaSql(String(r.requiredSql || ''));
+      await load();
+      return;
+    }
+    await load();
   };
 
   return (
@@ -96,7 +100,7 @@ export const ScrapingManagement = () => {
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Not</div>
-          <div className="text-xs text-gray-500">Gerçek scraping runner bu sürümde yok</div>
+          <div className="text-xs text-gray-500">“Şimdi Çalıştır” isteği job kuyruğuna yazılır (admin_jobs).</div>
         </div>
       </div>
 
@@ -147,7 +151,7 @@ export const ScrapingManagement = () => {
               )}
               <button type="button" onClick={() => runNow(s)} className="flex items-center gap-2 px-4 py-2 bg-primary-blue text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-semibold">
                 <RefreshCw className="w-6 h-6 sm:w-5 sm:h-5" />
-                Şimdi Çalıştır (log)
+                Şimdi Çalıştır
               </button>
             </div>
           </div>

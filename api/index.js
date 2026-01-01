@@ -3657,6 +3657,7 @@ async function adminSchemaCheck(req, res) {
   await check('admin_payment_transactions', ['id', 'occurred_at', 'user_id', 'user_email', 'plan_name', 'amount_cents', 'currency', 'payment_method', 'status', 'provider', 'provider_ref', 'note', 'created_at']);
   await check('admin_security_events', ['id', 'user_id', 'event_type', 'ip', 'user_agent', 'metadata', 'created_at']);
   await check('admin_trusted_devices', ['id', 'user_id', 'device_key', 'ip', 'user_agent', 'trusted', 'first_seen_at', 'last_seen_at']);
+  await check('admin_jobs', ['id', 'job_type', 'status', 'payload', 'result', 'requested_by', 'requested_at', 'started_at', 'finished_at']);
 
   const ok = missingTables.length === 0 && Object.keys(missingColumns).length === 0;
   return res.json({
@@ -5322,6 +5323,24 @@ create unique index if not exists admin_trusted_devices_user_device_uniq on publ
 create index if not exists admin_trusted_devices_last_seen_at_idx on public.admin_trusted_devices (last_seen_at desc);
 `;
 
+// Generic admin job queue (DB-backed)
+const SQL_ADMIN_JOBS = `
+create table if not exists public.admin_jobs (
+  id uuid primary key default gen_random_uuid(),
+  job_type text not null, -- scrape_source | run_workflow | send_sms | etc.
+  status text not null default 'queued', -- queued | running | success | failed
+  payload jsonb not null default '{}'::jsonb,
+  result jsonb not null default '{}'::jsonb,
+  requested_by uuid,
+  requested_at timestamptz not null default now(),
+  started_at timestamptz,
+  finished_at timestamptz
+);
+create index if not exists admin_jobs_requested_at_idx on public.admin_jobs (requested_at desc);
+create index if not exists admin_jobs_job_type_idx on public.admin_jobs (job_type);
+create index if not exists admin_jobs_status_idx on public.admin_jobs (status);
+`;
+
 async function adminGetAnalytics(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
@@ -6552,6 +6571,71 @@ async function adminSystemTransform(req, res) {
     return res.status(400).json({ success: false, error: 'Geçersiz işlem (action).' });
   } catch (e) {
     return res.status(500).json({ success: false, error: String(e?.message || 'İşlem başarısız.') });
+  }
+}
+
+async function adminListJobs(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const limit = Math.min(200, Math.max(1, parseInt(String(req.query?.limit || 50), 10) || 50));
+  try {
+    const rows = await supabaseRestGet('admin_jobs', { select: '*', order: 'requested_at.desc', limit: String(limit) });
+    return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.json({ success: true, data: [], schemaMissing: true, requiredSql: SQL_ADMIN_JOBS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Job listesi yüklenemedi.') });
+  }
+}
+
+async function adminEnqueueJob(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const job_type = String(body?.job_type || '').trim();
+  const payload = body?.payload && typeof body.payload === 'object' ? body.payload : {};
+  if (!job_type) return res.status(400).json({ success: false, error: 'job_type gerekli.' });
+
+  const row = {
+    job_type,
+    status: 'queued',
+    payload,
+    result: {},
+    requested_by: auth.id || null,
+    requested_at: new Date().toISOString(),
+  };
+  try {
+    const inserted = await supabaseRestInsert('admin_jobs', [row]);
+    return res.json({ success: true, data: inserted?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_JOBS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Job oluşturulamadı.') });
+  }
+}
+
+async function adminUpdateJob(req, res, jobId) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const id = String(jobId || '').trim();
+  if (!id || !isSafeId(id)) return res.status(400).json({ success: false, error: 'Geçersiz job.' });
+  const body = await readJsonBody(req);
+  const patch = {};
+  if (body?.status !== undefined) patch.status = String(body.status || '').trim();
+  if (body?.result !== undefined) patch.result = body.result && typeof body.result === 'object' ? body.result : {};
+  if (body?.started_at !== undefined) patch.started_at = body.started_at ? String(body.started_at) : null;
+  if (body?.finished_at !== undefined) patch.finished_at = body.finished_at ? String(body.finished_at) : null;
+  if (Object.keys(patch).length === 0) return res.status(400).json({ success: false, error: 'Geçersiz istek.' });
+  try {
+    const updated = await supabaseRestPatch('admin_jobs', { id: `eq.${id}` }, patch);
+    return res.json({ success: true, data: updated?.[0] || null });
+  } catch (e) {
+    if (isMissingRelationError(e)) {
+      return res.status(400).json({ success: false, error: 'DB tablosu eksik.', schemaMissing: true, requiredSql: SQL_ADMIN_JOBS.trim() });
+    }
+    return res.status(500).json({ success: false, error: String(e?.message || 'Job güncellenemedi.') });
   }
 }
 
@@ -10355,6 +10439,8 @@ export default async function handler(req, res) {
       if (url === '/api/admin/security/events' && req.method === 'GET') return await adminGetSecurityEvents(req, res);
       if (url === '/api/admin/security/devices' && req.method === 'GET') return await adminGetTrustedDevices(req, res);
       if (url === '/api/admin/system/transform' && req.method === 'POST') return await adminSystemTransform(req, res);
+      if (url === '/api/admin/jobs' && req.method === 'GET') return await adminListJobs(req, res);
+      if (url === '/api/admin/jobs' && req.method === 'POST') return await adminEnqueueJob(req, res);
       if (url === '/api/admin/ads' && req.method === 'GET') return await adminGetAds(req, res);
       if (url === '/api/admin/ads' && req.method === 'POST') return await adminCreateAd(req, res);
       if (url === '/api/admin/workflows' && req.method === 'GET') return await adminGetWorkflows(req, res);
@@ -10426,6 +10512,10 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/admin/security/devices/') && req.method === 'PUT') {
         const deviceId = url.split('/api/admin/security/devices/')[1];
         return await adminUpdateTrustedDevice(req, res, deviceId);
+      }
+      if (url.startsWith('/api/admin/jobs/') && req.method === 'PUT') {
+        const jobId = url.split('/api/admin/jobs/')[1];
+        return await adminUpdateJob(req, res, jobId);
       }
       if (url.startsWith('/api/admin/sources/') && req.method === 'PUT') {
         const sourceId = url.split('/api/admin/sources/')[1];

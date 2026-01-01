@@ -521,7 +521,7 @@ export const NotificationRules = () => {
                 {channels.sms_enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
               </button>
             </div>
-            <p className="text-sm text-gray-600">SMS bildirimleri (entegrasyon bu sürümde yok)</p>
+            <p className="text-sm text-gray-600">SMS kanalı açıldığında job kuyruğuna yazılacak şekilde hazırlanmıştır.</p>
           </div>
         </div>
         <div className="mt-4">
