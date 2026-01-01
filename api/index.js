@@ -201,6 +201,43 @@ async function supabaseRestGet(path, params) {
   return await res.json();
 }
 
+function isMissingColumnError(e, columnName) {
+  const msgRaw = String(e?.message || e || '');
+  const msg = msgRaw.toLowerCase();
+  const col = String(columnName || '').trim().toLowerCase();
+  if (!msg) return false;
+  // Common Postgres error shape:
+  // ERROR: 42703: column "xxx" does not exist
+  if (msg.includes('column') && msg.includes('does not exist')) {
+    if (!col) return true;
+    return msg.includes(`"${col}"`) || msg.includes(` ${col} `) || msg.includes(col);
+  }
+  // PostgREST can also return "unknown column" or similar wording
+  if (msg.includes('unknown') && msg.includes('column')) {
+    if (!col) return true;
+    return msg.includes(col);
+  }
+  return false;
+}
+
+async function supabaseRestGetWithOrderFallback(path, baseParams, orderCandidates) {
+  const params = baseParams && typeof baseParams === 'object' ? { ...baseParams } : {};
+  const orders = Array.isArray(orderCandidates) ? orderCandidates.filter(Boolean) : [];
+  for (const ord of orders) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await supabaseRestGet(path, { ...params, order: ord });
+    } catch (e) {
+      // If the requested order column doesn't exist in this env/schema, retry with next.
+      if (isMissingColumnError(e)) continue;
+      throw e;
+    }
+  }
+  // Last resort: no ordering.
+  const { order: _ignored, ...rest } = params;
+  return await supabaseRestGet(path, rest);
+}
+
 function isAllowedAvatarUrl(u) {
   try {
     const url = new URL(String(u || ''));
@@ -5554,7 +5591,11 @@ async function adminGetWorkflows(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
-    const rows = await supabaseRestGet('admin_workflows', { select: '*', order: 'created_at.desc', limit: '200' });
+    const rows = await supabaseRestGetWithOrderFallback(
+      'admin_workflows',
+      { select: '*', limit: '200' },
+      ['created_at.desc', 'updated_at.desc', 'last_run_at.desc', 'id.desc']
+    );
     return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
   } catch (e) {
     if (isMissingRelationError(e)) {
@@ -5625,7 +5666,11 @@ async function adminGetRevenueEntries(req, res) {
   if (!auth) return;
   const limit = Math.min(500, Math.max(1, parseInt(String(req.query?.limit || 100), 10) || 100));
   try {
-    const rows = await supabaseRestGet('admin_revenue_entries', { select: '*', order: 'occurred_at.desc', limit: String(limit) });
+    const rows = await supabaseRestGetWithOrderFallback(
+      'admin_revenue_entries',
+      { select: '*', limit: String(limit) },
+      ['occurred_at.desc', 'created_at.desc', 'updated_at.desc', 'id.desc']
+    );
     return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
   } catch (e) {
     if (isMissingRelationError(e)) {
@@ -5716,11 +5761,10 @@ async function adminGetApiKeys(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
-    const rows = await supabaseRestGet('admin_api_keys', {
+    const rows = await supabaseRestGetWithOrderFallback('admin_api_keys', {
       select: 'id,name,key_prefix,status,created_at,last_used_at,requests_count',
-      order: 'created_at.desc',
       limit: '200',
-    });
+    }, ['created_at.desc', 'last_used_at.desc', 'id.desc']);
     return res.json({ success: true, data: Array.isArray(rows) ? rows : [] });
   } catch (e) {
     if (isMissingRelationError(e)) {
@@ -5869,7 +5913,11 @@ async function adminGetEmailTemplates(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
   try {
-    let rows = await supabaseRestGet('admin_email_templates', { select: '*', order: 'updated_at.desc', limit: '200' });
+    let rows = await supabaseRestGetWithOrderFallback(
+      'admin_email_templates',
+      { select: '*', limit: '200' },
+      ['updated_at.desc', 'created_at.desc', 'id.desc']
+    );
     rows = Array.isArray(rows) ? rows : [];
 
     // If empty, seed a high-quality default set once (best-effort).
@@ -6242,11 +6290,11 @@ async function adminGetNotificationRules(req, res) {
   if (!auth) return;
 
   try {
-    let rows = await supabaseRestGet('admin_notification_rules', {
-      select: '*',
-      order: 'created_at.desc',
-      limit: '200',
-    });
+    let rows = await supabaseRestGetWithOrderFallback(
+      'admin_notification_rules',
+      { select: '*', limit: '200' },
+      ['created_at.desc', 'updated_at.desc', 'id.desc']
+    );
     rows = Array.isArray(rows) ? rows : [];
 
     // Seed defaults once if empty (best-effort).
