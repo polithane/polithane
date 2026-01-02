@@ -388,6 +388,13 @@ export const CreatePolitPage = () => {
       out?.stop?.();
       const cs = out?.canvasStream;
       cs?.getTracks?.()?.forEach?.((t) => t.stop());
+      const src = out?.sourceEl;
+      try {
+        src?.pause?.();
+        if (src) src.srcObject = null;
+      } catch {
+        // ignore
+      }
     } catch {
       // ignore
     }
@@ -998,9 +1005,6 @@ export const CreatePolitPage = () => {
               width: { ideal: 720 },
               height: { ideal: 1280 },
               aspectRatio: { ideal: 9 / 16 },
-              // Some browsers support this hint.
-              // eslint-disable-next-line no-undef
-              ...(typeof ResizeObserver !== 'undefined' ? { resizeMode: 'crop-and-scale' } : {}),
             }).catch(() => null);
           }
         } catch {
@@ -1008,7 +1012,7 @@ export const CreatePolitPage = () => {
         }
       }
 
-      // Live preview for video recording
+      // Live preview for video recording (raw stream first; we may swap to canvas stream later)
       if (contentType === 'video' && previewRef.current) {
         try {
           previewRef.current.srcObject = stream;
@@ -1028,17 +1032,24 @@ export const CreatePolitPage = () => {
       }
 
       // Decide: if stream is already portrait, record directly (no canvas).
-      // If stream is landscape, fall back to a 9:16 canvas recording (contain; no zoom).
+      // If stream is landscape while device is portrait, rotate + fit into 9:16 on canvas (no zoom/crop).
       let outStream = stream;
       if (contentType === 'video') {
         try {
-          const v = previewRef.current;
+          const vRaw = previewRef.current;
           const canvas = recordCanvasRef.current;
           // Wait for metadata so we can decide orientation reliably.
           await new Promise((resolve) => setTimeout(resolve, 140));
-          const vw = Number(v?.videoWidth || 0) || 0;
-          const vh = Number(v?.videoHeight || 0) || 0;
+          const vw = Number(vRaw?.videoWidth || 0) || 0;
+          const vh = Number(vRaw?.videoHeight || 0) || 0;
           const isPortrait = vw > 0 && vh > 0 ? vh >= vw : false;
+          const devicePortrait = (() => {
+            try {
+              return window.matchMedia?.('(orientation: portrait)')?.matches || window.innerHeight > window.innerWidth;
+            } catch {
+              return false;
+            }
+          })();
 
           // Preview should feel vertical when portrait is supported.
           setRecordPreviewFit(isPortrait ? 'cover' : 'contain');
@@ -1046,8 +1057,27 @@ export const CreatePolitPage = () => {
           if (isPortrait) {
             // Record as-is; this is the desired path.
             outStream = stream;
-          } else if (v && canvas && canvas.getContext) {
-            setRecordStreamNote('Not: Tarayıcı kamerayı yatay verdi. Video dik kaydedilecek; yakınlaştırma yapılmaz.');
+          } else if (vRaw && canvas && canvas.getContext) {
+            const shouldRotate = !!devicePortrait;
+            setRecordStreamNote(
+              shouldRotate
+                ? 'Not: Telefon dik ama tarayıcı görüntüyü yatay verdi. Video döndürülerek dik kaydedilecek (yakınlaştırma yok).'
+                : 'Not: Tarayıcı kamerayı yatay verdi. Video dik kaydedilecek; yakınlaştırma yapılmaz.'
+            );
+
+            // Use a dedicated offscreen source element to draw frames (avoid feedback loop if we swap preview to canvas stream)
+            const sourceEl = document.createElement('video');
+            try {
+              sourceEl.srcObject = stream;
+              sourceEl.muted = true;
+              sourceEl.playsInline = true;
+              sourceEl.setAttribute('playsinline', 'true');
+              sourceEl.setAttribute('webkit-playsinline', 'true');
+              await sourceEl.play().catch(() => null);
+            } catch {
+              // ignore
+            }
+
             const ctx = canvas.getContext('2d');
             if (ctx) {
               const CW = 720;
@@ -1058,17 +1088,31 @@ export const CreatePolitPage = () => {
               const draw = () => {
                 if (cancelled) return;
                 try {
-                  const vw2 = Number(v.videoWidth || 0) || 0;
-                  const vh2 = Number(v.videoHeight || 0) || 0;
+                  const vw2 = Number(sourceEl.videoWidth || 0) || 0;
+                  const vh2 = Number(sourceEl.videoHeight || 0) || 0;
                   if (vw2 > 0 && vh2 > 0) {
                     ctx.fillStyle = '#000000';
                     ctx.fillRect(0, 0, CW, CH);
-                    const scale = Math.min(CW / vw2, CH / vh2);
-                    const dw = Math.max(1, Math.round(vw2 * scale));
-                    const dh = Math.max(1, Math.round(vh2 * scale));
-                    const dx = Math.round((CW - dw) / 2);
-                    const dy = Math.round((CH - dh) / 2);
-                    ctx.drawImage(v, 0, 0, vw2, vh2, dx, dy, dw, dh);
+                    if (shouldRotate) {
+                      // Rotate 90deg and fit (contain) into 9:16 canvas
+                      const rotW = vh2;
+                      const rotH = vw2;
+                      const scale = Math.min(CW / rotW, CH / rotH);
+                      ctx.save();
+                      ctx.translate(CW / 2, CH / 2);
+                      ctx.rotate(Math.PI / 2);
+                      ctx.scale(scale, scale);
+                      ctx.drawImage(sourceEl, -vw2 / 2, -vh2 / 2, vw2, vh2);
+                      ctx.restore();
+                    } else {
+                      // Fit as-is (contain) into 9:16 canvas
+                      const scale = Math.min(CW / vw2, CH / vh2);
+                      const dw = Math.max(1, Math.round(vw2 * scale));
+                      const dh = Math.max(1, Math.round(vh2 * scale));
+                      const dx = Math.round((CW - dw) / 2);
+                      const dy = Math.round((CH - dh) / 2);
+                      ctx.drawImage(sourceEl, 0, 0, vw2, vh2, dx, dy, dw, dh);
+                    }
                   }
                 } catch {
                   // ignore
@@ -1080,7 +1124,27 @@ export const CreatePolitPage = () => {
               if (canvasStream) {
                 const audioTracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
                 outStream = new MediaStream([...(canvasStream.getVideoTracks() || []), ...(audioTracks || [])]);
-                recordOutStreamRef.current = { canvasStream, stop: () => { cancelled = true; } };
+                recordOutStreamRef.current = {
+                  canvasStream,
+                  sourceEl,
+                  stop: () => {
+                    cancelled = true;
+                  },
+                };
+
+                // Show the *actual recorded* (rotated) view in the preview
+                try {
+                  if (previewRef.current) {
+                    previewRef.current.srcObject = canvasStream;
+                    previewRef.current.muted = true;
+                    previewRef.current.playsInline = true;
+                    previewRef.current.setAttribute('playsinline', 'true');
+                    previewRef.current.setAttribute('webkit-playsinline', 'true');
+                    previewRef.current.play?.().catch(() => null);
+                  }
+                } catch {
+                  // ignore
+                }
               }
             }
           }
@@ -1709,13 +1773,15 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
+                              className="relative w-32 h-32 md:w-36 md:h-36 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative text-sm md:text-xl font-black leading-none drop-shadow">BİTİR</span>
-                              <span className="relative mt-1 md:mt-2 w-4 h-4 md:w-7 md:h-7 bg-white rounded-md" />
+                              <span className="relative px-3 py-1 rounded-lg bg-black/25 backdrop-blur text-base md:text-2xl font-black leading-none drop-shadow">
+                                BİTİR
+                              </span>
+                              <span className="relative mt-2 w-5 h-5 md:w-8 md:h-8 bg-white rounded-md" />
                             </button>
                           </div>
                         ) : null}
