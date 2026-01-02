@@ -1773,15 +1773,22 @@ export const CreatePolitPage = () => {
                                 recordStopFiredRef.current = true;
                                 stopRecording();
                               }}
-                              className="relative w-32 h-32 md:w-36 md:h-36 rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
+                              className={[
+                                // Mobile: larger + readable
+                                'relative w-36 h-36 sm:w-40 sm:h-40',
+                                // Desktop: smaller (PC was too big)
+                                'md:w-24 md:h-24 lg:w-28 lg:h-28',
+                                'rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden',
+                                'shadow-[0_18px_60px_rgba(0,0,0,0.55)]',
+                              ].join(' ')}
                               aria-label="Durdur"
                               title="Durdur"
                             >
                               <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span className="relative px-3 py-1 rounded-lg bg-black/25 backdrop-blur text-base md:text-2xl font-black leading-none drop-shadow">
+                              <span className="relative px-3 py-1 rounded-lg bg-black/25 backdrop-blur text-xl sm:text-2xl md:text-base lg:text-lg font-black leading-none drop-shadow">
                                 BİTİR
                               </span>
-                              <span className="relative mt-2 w-5 h-5 md:w-8 md:h-8 bg-white rounded-md" />
+                              <span className="relative mt-2 w-8 h-8 md:w-5 md:h-5 bg-white rounded-md" />
                             </button>
                           </div>
                         ) : null}
