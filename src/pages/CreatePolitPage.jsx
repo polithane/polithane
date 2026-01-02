@@ -163,6 +163,8 @@ export const CreatePolitPage = () => {
   const recordCanvasRef = useRef(null);
   const recordCanvasRafRef = useRef(null);
   const recordOutStreamRef = useRef(null);
+  const [recordPreviewFit, setRecordPreviewFit] = useState('contain'); // contain | cover
+  const [recordStreamNote, setRecordStreamNote] = useState('');
   const recordTimeoutRef = useRef(null);
   const recordIntervalRef = useRef(null);
   const recordStartTsRef = useRef(0);
@@ -968,6 +970,8 @@ export const CreatePolitPage = () => {
     if (isRecording) return;
     resetMedia();
     try {
+      setRecordPreviewFit('contain');
+      setRecordStreamNote('');
       const constraints =
         contentType === 'video'
           ? {
@@ -984,6 +988,25 @@ export const CreatePolitPage = () => {
           : { audio: true };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+
+      // Best-effort: try to force portrait on the track after acquisition.
+      if (contentType === 'video') {
+        try {
+          const vt = stream.getVideoTracks?.()?.[0] || null;
+          if (vt?.applyConstraints) {
+            await vt.applyConstraints({
+              width: { ideal: 720 },
+              height: { ideal: 1280 },
+              aspectRatio: { ideal: 9 / 16 },
+              // Some browsers support this hint.
+              // eslint-disable-next-line no-undef
+              ...(typeof ResizeObserver !== 'undefined' ? { resizeMode: 'crop-and-scale' } : {}),
+            }).catch(() => null);
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       // Live preview for video recording
       if (contentType === 'video' && previewRef.current) {
@@ -1004,16 +1027,27 @@ export const CreatePolitPage = () => {
         }
       }
 
-      // Force portrait output for videos by recording a 9:16 canvas stream.
-      // IMPORTANT: use "contain" (fit) to avoid zoom/cropping; add letterbox (black) if needed.
+      // Decide: if stream is already portrait, record directly (no canvas).
+      // If stream is landscape, fall back to a 9:16 canvas recording (contain; no zoom).
       let outStream = stream;
       if (contentType === 'video') {
         try {
           const v = previewRef.current;
           const canvas = recordCanvasRef.current;
-          if (v && canvas && canvas.getContext) {
-            // Wait a tick for metadata (videoWidth/videoHeight)
-            await new Promise((resolve) => setTimeout(resolve, 120));
+          // Wait for metadata so we can decide orientation reliably.
+          await new Promise((resolve) => setTimeout(resolve, 140));
+          const vw = Number(v?.videoWidth || 0) || 0;
+          const vh = Number(v?.videoHeight || 0) || 0;
+          const isPortrait = vw > 0 && vh > 0 ? vh >= vw : false;
+
+          // Preview should feel vertical when portrait is supported.
+          setRecordPreviewFit(isPortrait ? 'cover' : 'contain');
+
+          if (isPortrait) {
+            // Record as-is; this is the desired path.
+            outStream = stream;
+          } else if (v && canvas && canvas.getContext) {
+            setRecordStreamNote('Not: Tarayıcı kamerayı yatay verdi. Video dik kaydedilecek; yakınlaştırma yapılmaz.');
             const ctx = canvas.getContext('2d');
             if (ctx) {
               const CW = 720;
@@ -1024,22 +1058,20 @@ export const CreatePolitPage = () => {
               const draw = () => {
                 if (cancelled) return;
                 try {
-                  const vw = Number(v.videoWidth || 0) || 0;
-                  const vh = Number(v.videoHeight || 0) || 0;
-                  if (vw > 0 && vh > 0) {
-                    // Letterbox background
+                  const vw2 = Number(v.videoWidth || 0) || 0;
+                  const vh2 = Number(v.videoHeight || 0) || 0;
+                  if (vw2 > 0 && vh2 > 0) {
                     ctx.fillStyle = '#000000';
                     ctx.fillRect(0, 0, CW, CH);
-                    // Fit entire frame into 9:16 canvas without cropping.
-                    const scale = Math.min(CW / vw, CH / vh);
-                    const dw = Math.max(1, Math.round(vw * scale));
-                    const dh = Math.max(1, Math.round(vh * scale));
+                    const scale = Math.min(CW / vw2, CH / vh2);
+                    const dw = Math.max(1, Math.round(vw2 * scale));
+                    const dh = Math.max(1, Math.round(vh2 * scale));
                     const dx = Math.round((CW - dw) / 2);
                     const dy = Math.round((CH - dh) / 2);
-                    ctx.drawImage(v, 0, 0, vw, vh, dx, dy, dw, dh);
+                    ctx.drawImage(v, 0, 0, vw2, vh2, dx, dy, dw, dh);
                   }
                 } catch {
-                  // ignore draw errors (we keep trying)
+                  // ignore
                 }
                 recordCanvasRafRef.current = requestAnimationFrame(draw);
               };
@@ -1691,7 +1723,10 @@ export const CreatePolitPage = () => {
                           <div className="w-full flex justify-center">
                             <video
                               ref={previewRef}
-                              className="w-auto h-[56vh] max-h-[560px] aspect-[9/16] bg-black object-contain"
+                              className={[
+                                'w-auto h-[56vh] max-h-[560px] aspect-[9/16] bg-black',
+                                recordPreviewFit === 'cover' ? 'object-cover' : 'object-contain',
+                              ].join(' ')}
                               playsInline
                               muted
                               autoPlay
@@ -1710,6 +1745,11 @@ export const CreatePolitPage = () => {
                           <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
                         )}
                       </div>
+                      {recordStreamNote ? (
+                        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                          {recordStreamNote}
+                        </div>
+                      ) : null}
 
                       {isMobileLike ? (
                         <div className="flex items-center justify-center gap-2 text-[11px] text-gray-600">
