@@ -1607,8 +1607,10 @@ export const CreatePolitPage = () => {
                       )}
                     </div>
                   ) : null}
-                  {/* hidden canvas used to force portrait recording output */}
+            {/* hidden canvas used to force portrait recording output */}
                   <canvas ref={recordCanvasRef} className="hidden" />
+                </div>
+              )}
 
                   {/* Action buttons */}
                   {!hasMedia && !isRecording ? (
