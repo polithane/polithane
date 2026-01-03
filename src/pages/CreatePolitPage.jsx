@@ -979,33 +979,66 @@ export const CreatePolitPage = () => {
     try {
       setRecordPreviewFit('contain');
       setRecordStreamNote('');
-      const constraints =
-        contentType === 'video'
-          ? {
+      
+      // Try to get portrait video stream (9:16 aspect ratio)
+      let stream = null;
+      if (contentType === 'video') {
+        // First attempt: exact 9:16 aspect ratio
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: videoFacingMode },
+              width: { min: 480, ideal: 720, max: 1080 },
+              height: { min: 720, ideal: 1280, max: 1920 },
+              aspectRatio: { exact: 9 / 16 },
+            },
+            audio: true,
+          });
+        } catch (exactError) {
+          // Fallback: ideal constraints if exact fails
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
               video: {
                 facingMode: { ideal: videoFacingMode },
-                // Try to keep mobile capture vertical and predictable.
-                // Not all browsers honor these, but it reduces "sideways" recordings on many devices.
                 width: { ideal: 720 },
                 height: { ideal: 1280 },
                 aspectRatio: { ideal: 9 / 16 },
               },
               audio: true,
-            }
-          : { audio: true };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            });
+          } catch (idealError) {
+            // Last resort: basic constraints
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: videoFacingMode } },
+              audio: true,
+            });
+          }
+        }
+      } else {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
       streamRef.current = stream;
 
-      // Best-effort: try to force portrait on the track after acquisition.
+      // Force portrait mode on the video track after acquisition
       if (contentType === 'video') {
         try {
           const vt = stream.getVideoTracks?.()?.[0] || null;
           if (vt?.applyConstraints) {
-            await vt.applyConstraints({
-              width: { ideal: 720 },
-              height: { ideal: 1280 },
-              aspectRatio: { ideal: 9 / 16 },
-            }).catch(() => null);
+            // First try exact aspect ratio
+            try {
+              await vt.applyConstraints({
+                width: { min: 480, ideal: 720, max: 1080 },
+                height: { min: 720, ideal: 1280, max: 1920 },
+                aspectRatio: { exact: 9 / 16 },
+              });
+            } catch {
+              // If exact fails, fall back to ideal
+              await vt.applyConstraints({
+                width: { ideal: 720 },
+                height: { ideal: 1280 },
+                aspectRatio: { ideal: 9 / 16 },
+              }).catch(() => null);
+            }
           }
         } catch {
           // ignore
@@ -1031,14 +1064,16 @@ export const CreatePolitPage = () => {
         }
       }
 
-      // Decide: if stream is already portrait, record directly (no canvas).
-      // If stream is landscape while device is portrait, rotate + fit into 9:16 on canvas (no zoom/crop).
+      // IMPORTANT: The goal is to record portrait video natively (9:16).
+      // We've requested portrait constraints above, but some browsers/cameras may ignore them.
+      // If the stream comes in landscape despite our constraints, we use canvas to rotate/fit it
+      // into a 9:16 portrait container (no crop/zoom - letterbox with black bars is acceptable).
       let outStream = stream;
       if (contentType === 'video') {
         try {
           const vRaw = previewRef.current;
           const canvas = recordCanvasRef.current;
-          // Wait for metadata so we can decide orientation reliably.
+          // Wait for metadata so we can reliably determine the actual stream orientation
           await new Promise((resolve) => setTimeout(resolve, 140));
           const vw = Number(vRaw?.videoWidth || 0) || 0;
           const vh = Number(vRaw?.videoHeight || 0) || 0;
@@ -1055,14 +1090,16 @@ export const CreatePolitPage = () => {
           setRecordPreviewFit(isPortrait ? 'cover' : 'contain');
 
           if (isPortrait) {
-            // Record as-is; this is the desired path.
+            // SUCCESS: Stream is already portrait (9:16) - record directly without any transformation
             outStream = stream;
           } else if (vRaw && canvas && canvas.getContext) {
+            // FALLBACK: Stream came in landscape despite our constraints
+            // We'll use canvas to fit it into a portrait container (no crop - letterbox is OK)
             const shouldRotate = !!devicePortrait;
             setRecordStreamNote(
               shouldRotate
-                ? 'Not: Telefon dik ama tarayıcı görüntüyü yatay verdi. Video döndürülerek dik kaydedilecek (yakınlaştırma yok).'
-                : 'Not: Tarayıcı kamerayı yatay verdi. Video dik kaydedilecek; yakınlaştırma yapılmaz.'
+                ? '✓ Video dikey kaydedilecek (tarayıcı yatay stream verdi, döndürülüyor - yakınlaştırma yok).'
+                : '✓ Video dikey formatta kaydedilecek (üst/alt boşluklar olabilir).'
             );
 
             // Use a dedicated offscreen source element to draw frames (avoid feedback loop if we swap preview to canvas stream)

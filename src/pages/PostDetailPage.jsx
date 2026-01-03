@@ -156,7 +156,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
         controls={false}
         autoPlay={autoPlay}
         preload="metadata"
-        className="w-full bg-black rounded-lg object-contain"
+        className={['w-full bg-black rounded-lg', isPortrait ? 'object-cover' : 'object-contain'].join(' ')}
         style={{ maxHeight: '80vh' }}
         onClick={togglePlay}
       />
