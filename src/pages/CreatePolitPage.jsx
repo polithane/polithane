@@ -1573,16 +1573,15 @@ export const CreatePolitPage = () => {
                           ÖNİZLEMELER YÜKLENİYOR...
                         </div>
                       ) : (
-                        <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight">                          {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'DEVAM ET'}
+                        <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight">
+                          {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'DEVAM ET'}
                         </button>
                       )}
                     </div>
                   )}
                 </div>
               ) : contentType === 'image' ? (
-                  ) : contentType === 'image' ? (
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                      {imagePreviews.length > 0 ? (
+                <div className="rounded-2xl border border-gray-200 bg-white p-4">                      {imagePreviews.length > 0 ? (
                         <div className="space-y-3">
                           {/* Main preview (large, button-sized feel) */}
                           <div className="rounded-3xl border border-gray-200 bg-gray-50 overflow-hidden">
@@ -1607,10 +1606,10 @@ export const CreatePolitPage = () => {
                       )}
                     </div>
                   ) : null}
-            {/* hidden canvas used to force portrait recording output */}
+                  {/* hidden canvas used to force portrait recording output */}
                   <canvas ref={recordCanvasRef} className="hidden" />
                 </div>
-              )}
+              ) : null}
 
                   {/* Action buttons */}
                   {!hasMedia && !isRecording ? (
