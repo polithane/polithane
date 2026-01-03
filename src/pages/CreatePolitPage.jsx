@@ -167,7 +167,8 @@ export const CreatePolitPage = () => {
   const MAX_RECORD_SEC = 60;
   const [recordSecLeft, setRecordSecLeft] = useState(60);
   const [videoFacingMode, setVideoFacingMode] = useState('user'); // user | environment
-  const [isDevicePortrait, setIsDevicePortrait] = useState(true);
+  // NOTE: Mobile browsers often handle rotation metadata automatically.
+  // Applying a manual rotate(90deg) can cause sideways previews on some devices.
 
   const imageUploadRef = useRef(null);
   const imageCaptureRef = useRef(null);
@@ -201,6 +202,7 @@ export const CreatePolitPage = () => {
 
   const hasMedia = useMemo(() => files.length > 0 || !!recordedUrl, [files.length, recordedUrl]);
   const canShowSubmitInMediaStep = useMemo(() => {
+    // Hide submit button during picking/recording; show only when we have a preview-ready media.
     if (step !== 'media') return false;
     if (isRecording) return false;
     if (preparingMedia) return false;
@@ -272,6 +274,7 @@ export const CreatePolitPage = () => {
     try {
       const out = [];
       for (const f of list) {
+        // eslint-disable-next-line no-await-in-loop
         out.push(await optimizeImageFile(f));
       }
       return out;
@@ -335,59 +338,68 @@ export const CreatePolitPage = () => {
     });
 
   const resetMedia = () => {
-    setFiles([]);
+  setFiles([]);
+  try {
+    (videoThumbs || []).forEach((t) => {
+      if (t?.previewUrl) URL.revokeObjectURL(t.previewUrl);
+    });
+  } catch {
+    // ignore
+  }
+  setVideoThumbs([]);
+  setSelectedVideoThumbIdx(0);
+  setVideoThumbRefreshCount(0);
+  setVideoThumbGenSeed(0);
+  if (recordedUrl) {
     try {
-      (videoThumbs || []).forEach((t) => {
-        if (t?.previewUrl) URL.revokeObjectURL(t.previewUrl);
-      });
+      URL.revokeObjectURL(recordedUrl);
     } catch {
       // ignore
     }
-    setVideoThumbs([]);
-    setSelectedVideoThumbIdx(0);
-    setVideoThumbRefreshCount(0);
-    setVideoThumbGenSeed(0);
-    if (recordedUrl) {
-      try {
-        URL.revokeObjectURL(recordedUrl);
-      } catch {
-        // ignore
-      }
-    }
-    setRecordedUrl('');
-    setRecordSecLeft(MAX_RECORD_SEC);
-    recordStopFiredRef.current = false;
-    if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
-    recordIntervalRef.current = null;
-    setPreparingMedia(false);
-    setUploadPct(0);
-    setUploadHint('');
-    chunksRef.current = [];
-    setIsRecording(false);
-    if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
-    recordTimeoutRef.current = null;
+  }
+  setRecordedUrl('');
+  // setVideoRotate(false); SİLİNDİ
+  setRecordSecLeft(MAX_RECORD_SEC);
+  recordStopFiredRef.current = false;
+  if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+  recordIntervalRef.current = null;
+  setPreparingMedia(false);
+  setUploadPct(0);
+  setUploadHint('');
+  chunksRef.current = [];
+  setIsRecording(false);
+  if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
+  recordTimeoutRef.current = null;
+  // CANVAS İLE İLGİLİ SATIRLAR SİLİNDİ
+  try {
+    if (videoUploadRef.current) videoUploadRef.current.value = '';
+    if (audioUploadRef.current) audioUploadRef.current.value = '';
+    if (imageUploadRef.current) imageUploadRef.current.value = '';
+    if (imageCaptureRef.current) imageCaptureRef.current.value = '';
+  } catch {
+    // ignore
+  }
+  try {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+  } catch {
+    // ignore
+  }
+  if (streamRef.current) {
     try {
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+      streamRef.current.getTracks().forEach((t) => t.stop());
     } catch {
       // ignore
     }
-    if (streamRef.current) {
-      try {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      } catch {
-        // ignore
-      }
-      streamRef.current = null;
+    streamRef.current = null;
+  }
+  if (previewRef.current) {
+    try {
+      previewRef.current.srcObject = null;
+    } catch {
+      // ignore
     }
-    if (previewRef.current) {
-      try {
-        previewRef.current.srcObject = null;
-      } catch {
-        // ignore
-      }
-    }
-  };
-
+  }
+};
   const resetAll = () => {
     setStep('type');
     setContentType('');
@@ -437,8 +449,6 @@ export const CreatePolitPage = () => {
     };
   }, [contentType, files]);
 
-  // videoThumbs useEffect tamamen aynı kaldı (orijinal hali)
-
   useEffect(() => {
     let cancelled = false;
     const cleanupPrev = (list) => {
@@ -471,12 +481,15 @@ export const CreatePolitPage = () => {
     const waitForFrame = (videoEl) =>
       new Promise((resolve) => {
         try {
+          // Prefer requestVideoFrameCallback where available (more reliable on mobile)
           if (typeof videoEl?.requestVideoFrameCallback === 'function') {
+            // eslint-disable-next-line no-unused-vars
             return videoEl.requestVideoFrameCallback((_now, _meta) => resolve(true));
           }
         } catch {
           // ignore
         }
+        // Fallback: allow decoder/render pipeline to catch up (esp. desktop Firefox)
         try {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
           return;
@@ -508,12 +521,16 @@ export const CreatePolitPage = () => {
               // ignore
             }
             try {
+              // Some desktop browsers won't decode frames for off-DOM video elements
+              // unless we force a brief play/pause (muted autoplay should be allowed).
               try {
+                // eslint-disable-next-line no-await-in-loop
                 await videoEl.play?.();
                 videoEl.pause?.();
               } catch {
                 // ignore
               }
+              // Ensure enough data is buffered/decoded for canvas draw
               if (Number(videoEl.readyState || 0) < 2) {
                 await new Promise((resolve) => {
                   let settled = false;
@@ -539,6 +556,7 @@ export const CreatePolitPage = () => {
                   setTimeout(done, 380);
                 });
               }
+              // On some mobile browsers, seeked fires before the frame is actually ready to draw.
               await waitForFrame(videoEl);
 
               const vw = Number(videoEl.videoWidth || 0);
@@ -568,10 +586,12 @@ export const CreatePolitPage = () => {
 
           videoEl.addEventListener('seeked', onSeeked);
           try {
+            // Ensure data is available around the target time
             if (videoEl.readyState < 2) videoEl.load?.();
           } catch {
             // ignore
           }
+          // If currentTime is already at `t`, some browsers won't fire `seeked`.
           try {
             if (Math.abs(Number(videoEl.currentTime || 0) - t) < 0.02) {
               const bumped = clamp(t + 0.06, 0.05, maxT);
@@ -582,6 +602,7 @@ export const CreatePolitPage = () => {
           }
           videoEl.currentTime = t;
 
+          // safety timeout
           setTimeout(() => {
             try {
               videoEl.removeEventListener('seeked', onSeeked);
@@ -607,6 +628,7 @@ export const CreatePolitPage = () => {
         videoEl.src = src;
         videoEl.muted = true;
         videoEl.playsInline = true;
+        // Attach offscreen to help desktop browsers decode frames reliably
         try {
           videoEl.style.position = 'fixed';
           videoEl.style.left = '-9999px';
@@ -632,12 +654,14 @@ export const CreatePolitPage = () => {
           setTimeout(done, 1200);
         });
         try {
+          // Warm up decode pipeline for desktop as well
           await videoEl.play?.();
           videoEl.pause?.();
         } catch {
           // ignore
         }
         try {
+          // warm up decoder on mobile (helps avoid black canvas)
           videoEl.currentTime = 0.1;
           await waitForFrame(videoEl);
         } catch {
@@ -646,9 +670,12 @@ export const CreatePolitPage = () => {
         const duration = Number(videoEl.duration || 0);
         const d = Number.isFinite(duration) && duration > 0 ? duration : Math.max(1, Number(mediaDurationSec || 0) || 1);
 
+        // Always TRY to produce 3 distinct thumbnails, even if metadata duration is missing.
+        // Apply small deterministic jitter so "Yenile" generates different frames.
         const maxT = Math.max(0.05, d - 0.12);
-        const jitter = (Number(videoThumbGenSeed || 0) % 7) * 0.07;
+        const jitter = (Number(videoThumbGenSeed || 0) % 7) * 0.07; // 0..0.42s
         const rawTimes = [Math.min(0.12 + jitter, maxT), d * 0.45 + jitter, d * 0.82 + jitter].map((t) => clamp(t, 0.05, maxT));
+        // De-dupe, but keep enough by nudging with a tiny epsilon when needed.
         const uniqTimes = [];
         for (const rt of rawTimes) {
           const base = Number(rt.toFixed(2));
@@ -668,6 +695,7 @@ export const CreatePolitPage = () => {
         uniqTimes.splice(3);
 
         const captured = [];
+        // Try more candidate times if seeking fails (mobile/webm combos).
         const candidates = uniqTimes.slice();
         for (const pct of [0.18, 0.28, 0.6, 0.72, 0.9]) {
           candidates.push(clamp(d * pct + jitter, 0.05, maxT));
@@ -679,10 +707,12 @@ export const CreatePolitPage = () => {
         }
         for (const t of uniqueCandidates) {
           if (cancelled) break;
+          // eslint-disable-next-line no-await-in-loop
           const one = await captureAt(videoEl, t, d);
           if (one) captured.push(one);
           if (captured.length >= 3) break;
         }
+        // IMPORTANT: Do NOT duplicate the same frame; if seeking fails, show fewer thumbs.
         if (cancelled) {
           cleanupPrev(captured);
           return;
@@ -708,8 +738,84 @@ export const CreatePolitPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentType, recordedUrl, isRecording, videoThumbGenSeed]);
 
-  // diğer useEffect'ler aynı
+  useEffect(() => {
+    let cancelled = false;
+    const f = files?.[0];
+    if (!f) {
+      setMediaDurationSec(0);
+      return;
+    }
+    if (contentType !== 'audio' && contentType !== 'video') {
+      setMediaDurationSec(0);
+      return;
+    }
+    const readDuration = () =>
+      new Promise((resolve) => {
+        // Some browsers (esp. MediaRecorder webm) report Infinity/NaN duration on metadata load.
+        // Workaround: seek to a very large time to force duration computation.
+        try {
+          const url = URL.createObjectURL(f);
+          const el = document.createElement(contentType === 'audio' ? 'audio' : 'video');
+          let settled = false;
 
+          const cleanup = () => {
+            if (settled) return;
+            settled = true;
+            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+          };
+
+          const finish = (d) => {
+            cleanup();
+            resolve(Number.isFinite(d) && d > 0 ? d : 0);
+          };
+
+          el.preload = 'metadata';
+          el.onloadedmetadata = () => {
+            const d0 = Number(el.duration);
+            if (Number.isFinite(d0) && d0 > 0) return finish(d0);
+            // Infinity / NaN workaround
+            const onFix = () => {
+              el.removeEventListener('timeupdate', onFix);
+              const d1 = Number(el.duration);
+              finish(d1);
+            };
+            el.addEventListener('timeupdate', onFix);
+            try {
+              el.currentTime = 1e101;
+            } catch {
+              el.removeEventListener('timeupdate', onFix);
+              finish(0);
+            }
+            // Safety timeout
+            setTimeout(() => {
+              try { el.removeEventListener('timeupdate', onFix); } catch { /* ignore */ }
+              finish(Number(el.duration));
+            }, 1200);
+          };
+          el.onerror = () => finish(0);
+          el.src = url;
+        } catch {
+          resolve(0);
+        }
+      });
+    (async () => {
+      const d = await readDuration();
+      if (!cancelled) setMediaDurationSec(Math.max(0, Math.floor(d || 0)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [files, contentType]);
+
+  useEffect(() => {
+    return () => {
+      resetMedia();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // IMPORTANT: During recording, the preview <video> is mounted only after `isRecording` is set.
+  // We must attach the stream in an effect (otherwise preview stays black).
   useEffect(() => {
     if (!isRecording) return;
     if (contentType !== 'video') return;
@@ -731,39 +837,278 @@ export const CreatePolitPage = () => {
     }
   }, [isRecording, contentType]);
 
-  const startRecording = async () => {
-    if (isRecording) return;
+  const pickType = (t) => {
+    setContentType(t);
+    setAgendaTag('');
+    setText('');
+    setPrimaryPost(null);
+    setAgendaVisibleCount(10);
     resetMedia();
-    try {
-      let stream = null;
-      if (contentType === 'video') {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: videoFacingMode,
-            width: { ideal: 720 },
-            height: { ideal: 1280 },
-          },
-          audio: true,
-        });
+    setStep('agenda');
+  };
 
-        const settings = stream.getVideoTracks()[0]?.getSettings();
-        setIsDevicePortrait((settings?.height || 0) >= (settings?.width || 0));
-      } else {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const goBack = () => {
+    if (step === 'agenda') return setStep('type');
+    if (step === 'media') return setStep('agenda');
+    if (step === 'desc') return setStep(contentType === 'text' ? 'agenda' : 'media');
+    return setStep('type');
+  };
+
+  const pickAgenda = (tag) => {
+    setAgendaTag(String(tag || ''));
+    if (contentType === 'text') setStep('desc');
+    else setStep('media');
+  };
+
+  const getVideoDurationSec = (file) =>
+    new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement('video');
+        let settled = false;
+        const cleanup = () => {
+          if (settled) return;
+          settled = true;
+          try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+        };
+        const finish = (d) => {
+          cleanup();
+          resolve(Number.isFinite(d) && d > 0 ? d : 0);
+        };
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => {
+          const d0 = Number(v.duration);
+          if (Number.isFinite(d0) && d0 > 0) return finish(d0);
+          const onFix = () => {
+            v.removeEventListener('timeupdate', onFix);
+            finish(Number(v.duration));
+          };
+          v.addEventListener('timeupdate', onFix);
+          try {
+            v.currentTime = 1e101;
+          } catch {
+            v.removeEventListener('timeupdate', onFix);
+            finish(0);
+          }
+          setTimeout(() => {
+            try { v.removeEventListener('timeupdate', onFix); } catch { /* ignore */ }
+            finish(Number(v.duration));
+          }, 1200);
+        };
+        v.onerror = () => finish(0);
+        v.src = url;
+      } catch {
+        resolve(0);
+      }
+    });
+
+  const getAudioDurationSec = (file) =>
+    new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('audio');
+        let settled = false;
+        const cleanup = () => {
+          if (settled) return;
+          settled = true;
+          try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+        };
+        const finish = (d) => {
+          cleanup();
+          resolve(Number.isFinite(d) && d > 0 ? d : 0);
+        };
+        a.preload = 'metadata';
+        a.onloadedmetadata = () => {
+          const d0 = Number(a.duration);
+          if (Number.isFinite(d0) && d0 > 0) return finish(d0);
+          const onFix = () => {
+            a.removeEventListener('timeupdate', onFix);
+            finish(Number(a.duration));
+          };
+          a.addEventListener('timeupdate', onFix);
+          try {
+            a.currentTime = 1e101;
+          } catch {
+            a.removeEventListener('timeupdate', onFix);
+            finish(0);
+          }
+          setTimeout(() => {
+            try { a.removeEventListener('timeupdate', onFix); } catch { /* ignore */ }
+            finish(Number(a.duration));
+          }, 1200);
+        };
+        a.onerror = () => finish(0);
+        a.src = url;
+      } catch {
+        resolve(0);
+      }
+    });
+
+  const startRecording = async () => {
+  if (isRecording) return;
+  resetMedia();
+  try {
+    // BASİT - SADECE KAMERA AL
+    let stream = null;
+    if (contentType === 'video') {
+      // ASPECT RATIO VS. HİÇBİR KISITLAMA YOK
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: { ideal: videoFacingMode }
+          // width/height/aspectRatio TANIMLAMA - TARAYICI NE VERİRSE
+        },
+        audio: true,
+      });
+    } else {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    streamRef.current = stream;
+    
+    // ASPECT RATIO UYGULAMA YOK - VİDEO OLDUĞU GİBİ
+      // Live preview for video recording (raw stream first; we may swap to canvas stream later)
+      if (contentType === 'video' && previewRef.current) {
+        try {
+          previewRef.current.srcObject = stream;
+          previewRef.current.muted = true;
+          previewRef.current.playsInline = true;
+          // Some mobile browsers require the attribute for inline playback.
+          previewRef.current.setAttribute('playsinline', 'true');
+          previewRef.current.setAttribute('webkit-playsinline', 'true');
+          await previewRef.current.play().catch(() => null);
+          // Retry shortly (iOS sometimes needs a second tick)
+          setTimeout(() => {
+            try { previewRef.current?.play?.().catch(() => null); } catch { /* ignore */ }
+          }, 250);
+        } catch {
+          // ignore
+        }
       }
 
-      streamRef.current = stream;
+      // IMPORTANT: The goal is to record portrait video natively (9:16).
+      // We've requested portrait constraints above, but some browsers/cameras may ignore them.
+      // If the stream comes in landscape despite our constraints, we use canvas to rotate/fit it
+      // into a 9:16 portrait container (no crop/zoom - letterbox with black bars is acceptable).
+      let outStream = stream;
+      if (contentType === 'video') {
+        try {
+          const vRaw = previewRef.current;
+          const canvas = recordCanvasRef.current;
+          // Wait for metadata so we can reliably determine the actual stream orientation
+          await new Promise((resolve) => setTimeout(resolve, 140));
+          const vw = Number(vRaw?.videoWidth || 0) || 0;
+          const vh = Number(vRaw?.videoHeight || 0) || 0;
+          const isPortrait = vw > 0 && vh > 0 ? vh >= vw : false;
+          const devicePortrait = (() => {
+            try {
+              return window.matchMedia?.('(orientation: portrait)')?.matches || window.innerHeight > window.innerWidth;
+            } catch {
+              return false;
+            }
+          })();
 
-      if (contentType === 'video' && previewRef.current) {
-        previewRef.current.srcObject = stream;
-        previewRef.current.muted = true;
-        previewRef.current.playsInline = true;
-        previewRef.current.setAttribute('playsinline', 'true');
-        previewRef.current.setAttribute('webkit-playsinline', 'true');
-        await previewRef.current.play().catch(() => null);
-        setTimeout(() => {
-          try { previewRef.current?.play?.().catch(() => null); } catch { /* ignore */ }
-        }, 250);
+          // Preview should feel vertical when portrait is supported.
+          setRecordPreviewFit(isPortrait ? 'cover' : 'contain');
+
+          if (isPortrait) {
+            // SUCCESS: Stream is already portrait (9:16) - record directly without any transformation
+            outStream = stream;
+          } else if (vRaw && canvas && canvas.getContext) {
+            // FALLBACK: Stream came in landscape despite our constraints
+            // We'll use canvas to fit it into a portrait container (no crop - letterbox is OK)
+            const shouldRotate = !!devicePortrait;
+            setRecordStreamNote(
+              shouldRotate
+                ? '✓ Video dikey kaydedilecek (tarayıcı yatay stream verdi, döndürülüyor - yakınlaştırma yok).'
+                : '✓ Video dikey formatta kaydedilecek (üst/alt boşluklar olabilir).'
+            );
+
+            // Use a dedicated offscreen source element to draw frames (avoid feedback loop if we swap preview to canvas stream)
+            const sourceEl = document.createElement('video');
+            try {
+              sourceEl.srcObject = stream;
+              sourceEl.muted = true;
+              sourceEl.playsInline = true;
+              sourceEl.setAttribute('playsinline', 'true');
+              sourceEl.setAttribute('webkit-playsinline', 'true');
+              await sourceEl.play().catch(() => null);
+            } catch {
+              // ignore
+            }
+
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              const CW = 720;
+              const CH = 1280;
+              canvas.width = CW;
+              canvas.height = CH;
+              let cancelled = false;
+              const draw = () => {
+                if (cancelled) return;
+                try {
+                  const vw2 = Number(sourceEl.videoWidth || 0) || 0;
+                  const vh2 = Number(sourceEl.videoHeight || 0) || 0;
+                  if (vw2 > 0 && vh2 > 0) {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, CW, CH);
+                    if (shouldRotate) {
+                      // Rotate 90deg and fit (contain) into 9:16 canvas
+                      const rotW = vh2;
+                      const rotH = vw2;
+                      const scale = Math.min(CW / rotW, CH / rotH);
+                      ctx.save();
+                      ctx.translate(CW / 2, CH / 2);
+                      ctx.rotate(Math.PI / 2);
+                      ctx.scale(scale, scale);
+                      ctx.drawImage(sourceEl, -vw2 / 2, -vh2 / 2, vw2, vh2);
+                      ctx.restore();
+                    } else {
+                      // Fit as-is (contain) into 9:16 canvas
+                      const scale = Math.min(CW / vw2, CH / vh2);
+                      const dw = Math.max(1, Math.round(vw2 * scale));
+                      const dh = Math.max(1, Math.round(vh2 * scale));
+                      const dx = Math.round((CW - dw) / 2);
+                      const dy = Math.round((CH - dh) / 2);
+                      ctx.drawImage(sourceEl, 0, 0, vw2, vh2, dx, dy, dw, dh);
+                    }
+                  }
+                } catch {
+                  // ignore
+                }
+                recordCanvasRafRef.current = requestAnimationFrame(draw);
+              };
+              draw();
+              const canvasStream = canvas.captureStream?.(30);
+              if (canvasStream) {
+                const audioTracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
+                outStream = new MediaStream([...(canvasStream.getVideoTracks() || []), ...(audioTracks || [])]);
+                recordOutStreamRef.current = {
+                  canvasStream,
+                  sourceEl,
+                  stop: () => {
+                    cancelled = true;
+                  },
+                };
+
+                // Show the *actual recorded* (rotated) view in the preview
+                try {
+                  if (previewRef.current) {
+                    previewRef.current.srcObject = canvasStream;
+                    previewRef.current.muted = true;
+                    previewRef.current.playsInline = true;
+                    previewRef.current.setAttribute('playsinline', 'true');
+                    previewRef.current.setAttribute('webkit-playsinline', 'true');
+                    previewRef.current.play?.().catch(() => null);
+                  }
+                } catch {
+                  // ignore
+                }
+              }
+            }
+          }
+        } catch {
+          // If canvas capture fails, fall back to raw stream
+          outStream = stream;
+        }
       }
 
       const mimeType =
@@ -774,11 +1119,13 @@ export const CreatePolitPage = () => {
           : MediaRecorder.isTypeSupported('video/webm')
             ? 'video/webm'
             : '';
+      // Target: 720p story-like recording with reasonable bitrate for fast uploads.
+      // These are best-effort; some browsers ignore/reject them.
       const recorderOptions =
         contentType === 'video'
           ? {
               ...(mimeType ? { mimeType } : {}),
-              videoBitsPerSecond: 2_800_000,
+              videoBitsPerSecond: 2_800_000, // ~2.8 Mbps
               audioBitsPerSecond: 96_000,
             }
           : {
@@ -787,9 +1134,9 @@ export const CreatePolitPage = () => {
             };
       let recorder;
       try {
-        recorder = new MediaRecorder(stream, recorderOptions);
+        recorder = new MediaRecorder(outStream, recorderOptions);
       } catch {
-        recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        recorder = new MediaRecorder(outStream, mimeType ? { mimeType } : undefined);
       }
       recorderRef.current = recorder;
       chunksRef.current = [];
@@ -833,6 +1180,7 @@ export const CreatePolitPage = () => {
         }
       }, 200);
 
+      // Limit: max 1 minute (video + audio)
       recordTimeoutRef.current = setTimeout(() => {
         if (recordStopFiredRef.current) return;
         recordStopFiredRef.current = true;
@@ -854,6 +1202,22 @@ export const CreatePolitPage = () => {
     } catch {
       // ignore
     }
+    // Stop canvas capture loop + stream (if used)
+    try {
+      if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
+      recordCanvasRafRef.current = null;
+    } catch {
+      // ignore
+    }
+    try {
+      const out = recordOutStreamRef.current;
+      out?.stop?.();
+      const cs = out?.canvasStream;
+      cs?.getTracks?.()?.forEach?.((t) => t.stop());
+    } catch {
+      // ignore
+    }
+    recordOutStreamRef.current = null;
     if (streamRef.current) {
       try {
         streamRef.current.getTracks().forEach((t) => t.stop());
@@ -872,7 +1236,339 @@ export const CreatePolitPage = () => {
     setIsRecording(false);
   };
 
-  // kalan tüm fonksiyonlar (publishPrimary, publishCross vs.) tamamen orijinal
+  const fileToDataUrl = (f) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Dosya okunamadı.'));
+      reader.readAsDataURL(f);
+    });
+
+  const uploadOne = async (file, progress) => {
+    // IMPORTANT:
+    // - Base64 uploads hit Vercel request-body limits quickly (esp. video).
+    // - Use signed upload so the file goes directly to Supabase Storage.
+    // Soft client limits (we still rely on provider limits on upload).
+    // Keep generous enough to avoid the old 12MB issue.
+    const bytes = Number(file?.size || 0) || 0;
+    const maxBytes =
+      contentType === 'video'
+        ? 80 * 1024 * 1024
+        : contentType === 'audio'
+          ? 40 * 1024 * 1024
+          : 15 * 1024 * 1024;
+    if (bytes > maxBytes) {
+      const mb = Math.round(maxBytes / 1024 / 1024);
+      throw new Error(`Dosya çok büyük. Şimdilik maksimum ${mb}MB yükleyebilirsiniz.`);
+    }
+
+    const guessContentType = (f) => {
+      const t = String(f?.type || '').trim();
+      if (t) return t.split(';')[0].trim();
+      const name = String(f?.name || '').trim().toLowerCase();
+      const ext = name.includes('.') ? name.split('.').pop() : '';
+      if (!ext) return '';
+      if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+      if (ext === 'jpg') return 'image/jpg';
+      if (ext === 'png') return 'image/png';
+      if (ext === 'webp') return 'image/webp';
+      if (ext === 'gif') return 'image/gif';
+      if (ext === 'mp4') return 'video/mp4';
+      if (ext === 'm4v') return 'video/x-m4v';
+      if (ext === 'mov') return 'video/quicktime';
+      if (ext === 'webm') return 'video/webm';
+      if (ext === '3gp') return 'video/3gpp';
+      if (ext === '3g2') return 'video/3gpp2';
+      if (ext === 'mp3') return 'audio/mpeg';
+      if (ext === 'm4a') return 'audio/mp4';
+      if (ext === 'aac') return 'audio/aac';
+      return '';
+    };
+
+    const ct = guessContentType(file);
+    if (!ct) throw new Error('Dosya türü bulunamadı. Lütfen farklı bir dosya seçin.');
+
+    const sign = await apiCall('/api/storage/sign-upload', {
+      method: 'POST',
+      body: JSON.stringify({
+        bucket: 'uploads',
+        folder: file?.__uploadFolder || 'posts',
+        contentType: ct,
+      }),
+    });
+    if (!sign?.success) throw new Error(sign?.error || 'Yükleme hazırlığı başarısız.');
+    const { publicUrl, signedUrl } = sign?.data || {};
+    if (!publicUrl || !signedUrl) throw new Error('Yükleme anahtarı alınamadı.');
+
+    // Progress-capable signed upload (XHR PUT) to match Supabase's `uploadToSignedUrl` endpoint behavior.
+    // Supabase expects a multipart/form-data body with cacheControl and the file under an empty field name.
+    const url = String(signedUrl).trim();
+    const fd = new FormData();
+    fd.append('cacheControl', '3600');
+    fd.append('', file);
+    const headers = await getUploadHeaders();
+    await xhrPutWithProgress({
+      url,
+      body: fd,
+      headers,
+      onProgress: (p) => progress?.(p),
+    });
+    return String(publicUrl);
+  };
+
+  const publishPrimary = async () => {
+    // Hard guard against double-click / double-submit (React state updates are async).
+    if (publishLockRef.current) return;
+    if (loading) return;
+    if (!isAuthenticated) {
+      toast.error('Paylaşım yapmak için giriş yapmalısınız.');
+      navigate('/login-new');
+      return;
+    }
+    if (!contentType) return;
+    if (approvalPending) {
+      toast.error('Üyeliğiniz onay bekliyor. Onay gelene kadar paylaşım yapamazsınız.');
+      return;
+    }
+
+    const isText = contentType === 'text';
+    const requiresText = isText || !isFastMode; // polit always requires text; fast requires text only for text posts
+    let trimmed = String(text || '').trim();
+    if (requiresText) {
+      if (trimmed.length < TEXT_MIN) return toast.error(`Metin en az ${TEXT_MIN} karakter olmalı.`);
+      if (trimmed.length > TEXT_MAX) return toast.error(`Metin en fazla ${TEXT_MAX} karakter olabilir.`);
+    }
+
+    if (!isText && !hasMedia) {
+      return toast.error(contentType === 'image' ? 'Önce resim ekleyin.' : contentType === 'audio' ? 'Önce ses ekleyin.' : 'Önce video ekleyin.');
+    }
+
+    // Fast medya gönderilerinde metin zorunlu değil ama backend boş içerik kabul etmiyor:
+    // medyaya göre kısa bir placeholder koyuyoruz.
+    if (!requiresText && !trimmed && hasMedia) {
+      trimmed = contentType === 'video' ? '🎥' : contentType === 'audio' ? '🎙️' : contentType === 'image' ? '📷' : '📝';
+    }
+
+    // Basic file type checks
+    // NOTE: Some mobile browsers provide empty/incorrect MIME types (e.g. application/octet-stream),
+    // so we validate by a best-effort guess (MIME or extension) instead of strict `file.type`.
+    const guessKind = (f) => {
+      const t = String(f?.type || '').trim().toLowerCase();
+      if (t.startsWith('video/')) return 'video';
+      if (t.startsWith('audio/')) return 'audio';
+      if (t.startsWith('image/')) return 'image';
+      const name = String(f?.name || '').trim().toLowerCase();
+      const ext = name.includes('.') ? name.split('.').pop() : '';
+      if (!ext) return '';
+      if (['mp4', 'm4v', 'mov', 'webm', '3gp', '3g2'].includes(ext)) return 'video';
+      if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'webm'].includes(ext)) return 'audio';
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image';
+      return '';
+    };
+    if (contentType === 'video' && files.some((f) => guessKind(f) !== 'video')) return toast.error('Sadece video dosyası (mp4/mov/m4v/webm/3gp).');
+    if (contentType === 'audio' && files.some((f) => guessKind(f) !== 'audio')) return toast.error('Sadece ses dosyası (mp3/m4a/aac/wav/ogg).');
+    if (contentType === 'image' && files.some((f) => guessKind(f) !== 'image')) return toast.error('Sadece resim dosyası (jpg/png/webp/gif).');
+
+    publishLockRef.current = true;
+    setLoading(true);
+    setUploadPct(0);
+    setUploadHint('');
+    try {
+      let media_urls = [];
+      if (files.length > 0) {
+        const list = files.slice(0, contentType === 'image' ? 10 : 1);
+        const totalBytes = list.reduce((acc, f) => acc + (Number(f?.size || 0) || 0), 0) || 0;
+        let doneBytes = 0;
+        const out = [];
+        let idxFile = 0;
+        for (const f of list) {
+          idxFile += 1;
+          setUploadHint(`Yükleniyor… (${idxFile}/${list.length})`);
+          // eslint-disable-next-line no-await-in-loop
+          const url = await uploadOne(f, (p) => {
+            const pct = totalBytes > 0 ? (doneBytes + (Number(f?.size || 0) || 0) * p) / totalBytes : p;
+            setUploadPct(Math.max(0, Math.min(1, pct)));
+          });
+          out.push(url);
+          doneBytes += Number(f?.size || 0) || 0;
+          setUploadPct(totalBytes > 0 ? Math.min(1, doneBytes / totalBytes) : 1);
+        }
+        media_urls = out;
+      }
+
+      let thumbnail_url = null;
+      if (contentType === 'video' && videoThumbs?.length > 0) {
+        const chosen = videoThumbs[Math.min(Math.max(0, selectedVideoThumbIdx), videoThumbs.length - 1)] || null;
+        if (chosen?.blob) {
+          const thumbFile = new File([chosen.blob], 'thumb.jpg', { type: 'image/jpeg' });
+          // mark folder without changing uploadOne signature
+          thumbFile.__uploadFolder = 'posts/thumbnails';
+          setUploadHint('Kapak yükleniyor…');
+          thumbnail_url = await uploadOne(thumbFile, (p) => setUploadPct(Math.max(0, Math.min(1, p))));
+        }
+      }
+
+      // Final step: create the post row in DB
+      setUploadHint(isFastMode ? 'Fast kaydediliyor…' : 'Polit kaydediliyor…');
+      setUploadPct((p) => Math.max(Number(p || 0) || 0, 0.92));
+
+      const payload = {
+        content: trimmed,
+        content_text: trimmed,
+        content_type: contentType,
+        category: 'general',
+        agenda_tag: agendaTag || null,
+        media_urls,
+        ...(thumbnail_url ? { thumbnail_url } : {}),
+        ...(mediaDurationSec > 0 ? { media_duration: mediaDurationSec } : {}),
+        ...(isFastMode ? { is_trending: true } : {}),
+      };
+
+      const r = await postsApi.create(payload);
+      const ok = !!(r?.success && r?.data?.id);
+      if (!ok) throw new Error(r?.error || 'Paylaşım oluşturulamadı.');
+      setUploadPct(1);
+      setPrimaryPost(r.data);
+      setStep('success');
+    } catch (e) {
+      toast.error(String(e?.message || 'Paylaşım oluşturulurken hata oluştu.'));
+    } finally {
+      setLoading(false);
+      publishLockRef.current = false;
+    }
+  };
+
+  const publishCross = async () => {
+    if (!primaryPost) return;
+    if (offerBusy) return;
+    if (publishLockRef.current) return;
+    publishLockRef.current = true;
+    setOfferBusy(true);
+    try {
+      const base = {
+        content: String(primaryPost?.content_text ?? primaryPost?.content ?? text ?? '').trim(),
+        content_text: String(primaryPost?.content_text ?? primaryPost?.content ?? text ?? '').trim(),
+        content_type: String(primaryPost?.content_type || contentType || 'text').trim(),
+        category: String(primaryPost?.category || 'general'),
+        agenda_tag: agendaTag || null,
+        media_urls: Array.isArray(primaryPost?.media_urls) ? primaryPost.media_urls : [],
+        thumbnail_url: primaryPost?.thumbnail_url || null,
+      };
+      const payload = {
+        ...base,
+        ...(isFastMode ? { is_trending: false } : { is_trending: true }),
+      };
+      const r = await postsApi.create(payload).catch(() => null);
+      const ok = !!(r?.success && r?.data?.id);
+      if (!ok) {
+        toast.error('Çapraz paylaşım oluşturulamadı. Lütfen tekrar deneyin.');
+      }
+    } finally {
+      setOfferBusy(false);
+      publishLockRef.current = false;
+    }
+  };
+
+  const publishCrossWithText = async () => {
+    if (!primaryPost) return;
+    if (!isFastMode) return; // only needed for Fast -> Polit flow
+    if (offerBusy) return;
+    if (publishLockRef.current) return;
+
+    const trimmed = String(text || '').trim();
+    if (trimmed.length < TEXT_MIN) return toast.error(`Metin en az ${TEXT_MIN} karakter olmalı.`);
+    if (trimmed.length > TEXT_MAX) return toast.error(`Metin en fazla ${TEXT_MAX} karakter olabilir.`);
+
+    publishLockRef.current = true;
+    setOfferBusy(true);
+    try {
+      const base = {
+        content: trimmed,
+        content_text: trimmed,
+        content_type: String(primaryPost?.content_type || contentType || 'text').trim(),
+        category: String(primaryPost?.category || 'general'),
+        agenda_tag: primaryPost?.agenda_tag ?? agendaTag ?? null,
+        media_urls: Array.isArray(primaryPost?.media_urls) ? primaryPost.media_urls : [],
+        thumbnail_url: primaryPost?.thumbnail_url || null,
+        ...(primaryPost?.media_duration ? { media_duration: primaryPost.media_duration } : {}),
+      };
+      const payload = { ...base, is_trending: false };
+      const r = await postsApi.create(payload).catch(() => null);
+      const id = r?.data?.id;
+      const ok = !!(r?.success && id);
+      if (!ok) return toast.error('Polit yayınlanamadı. Lütfen tekrar deneyin.');
+      toast.success('Polit yayınlandı.');
+      navigate(`/post/${encodeURIComponent(id)}`);
+    } finally {
+      setOfferBusy(false);
+      publishLockRef.current = false;
+    }
+  };
+
+  const goToFastStream = async () => {
+    // After posting a Fast, jump directly into the same Fast viewer/feed surface
+    // that opens when tapping a Fast bubble on the homepage.
+    const myId = user?.id || user?.user_id || null;
+    const myKey = String(myId || user?.username || '').trim();
+    if (!myKey) return navigate('/');
+    try {
+      const r = await apiCall('/api/fast?limit=24').catch(() => null);
+      const list = Array.isArray(r?.data) ? r.data : Array.isArray(r) ? r : [];
+      const queue = (list || [])
+        .map((s) => ({
+          key: String(s?.user_id || s?.id || s?.username || '').trim(),
+          user_id: s?.user_id ?? s?.id,
+          username: s?.username,
+          full_name: s?.full_name,
+          avatar_url: s?.avatar_url || s?.profile_image,
+          profile_image: s?.profile_image || s?.avatar_url,
+          story_count: s?.story_count,
+          latest_created_at: s?.latest_created_at,
+        }))
+        .filter((x) => x.key);
+
+      // Ensure my Fast is included as a starting point even if API list doesn't contain it yet.
+      const hasMe = queue.some((x) => String(x.key) === String(myId || myKey));
+      if (!hasMe) {
+        queue.unshift({
+          key: String(myId || myKey),
+          user_id: myId,
+          username: user?.username,
+          full_name: user?.full_name,
+          avatar_url: user?.avatar_url || user?.profile_image,
+          profile_image: user?.profile_image || user?.avatar_url,
+          story_count: 1,
+          latest_created_at: new Date().toISOString(),
+        });
+      }
+
+      const startKey = String(myId || myKey);
+      const startIndex = Math.max(0, queue.findIndex((x) => String(x.key) === startKey));
+      try {
+        sessionStorage.setItem('fast_queue_v1', JSON.stringify({ ts: Date.now(), queue, startKey, startIndex }));
+      } catch {
+        // ignore
+      }
+      return navigate(`/fast/${encodeURIComponent(startKey)}`, {
+        state: { fastQueue: queue, fastStartKey: startKey, fastStartIndex: startIndex },
+      });
+    } catch {
+      // Minimal fallback: open viewer for my key only.
+      return navigate(`/fast/${encodeURIComponent(myKey)}`);
+    }
+  };
+
+  const finishNo = () => {
+    if (isFastMode) goToFastStream();
+    else navigate(primaryPost?.id ? `/post/${primaryPost.id}` : '/');
+  };
+
+  const finishYes = async () => {
+    if (offerBusy) return;
+    await publishCross();
+    if (isFastMode) goToFastStream();
+    else navigate(primaryPost?.id ? `/post/${primaryPost.id}` : '/');
+  };
 
   const typeButtons = useMemo(
     () => [
@@ -894,6 +1590,7 @@ export const CreatePolitPage = () => {
       <div className="container-main py-6">
         <div className="max-w-xl mx-auto">
           <div className={['bg-white rounded-3xl border-2 overflow-hidden', theme.borderClass].join(' ')}>
+            {/* Fixed top identity + back */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar src={user?.avatar_url || user?.profile_image} size="46px" verified={isUiVerifiedUser(user)} className="border border-gray-200 flex-shrink-0" />
@@ -912,7 +1609,9 @@ export const CreatePolitPage = () => {
                 </button>
               ) : null}
             </div>
+
             <div className="p-5 space-y-4">
+              {/* STEP: TYPE */}
               {step === 'type' ? (
                 <div className="grid grid-cols-2 gap-3">
                   {typeButtons.map(({ key, label, Icon }) => (
@@ -954,59 +1653,625 @@ export const CreatePolitPage = () => {
                 </div>
               ) : null}
 
+              {/* STEP: AGENDA */}
               {step === 'agenda' ? (
-                // ... tamamen orijinal agenda kısmı
+                <div className="space-y-3">
+                  <div className="text-sm font-black text-gray-900">Gündem Seçin</div>
+                  <div className="space-y-2 max-h-[360px] overflow-auto pr-1">
+                    {sortedAgendas.slice(0, agendaVisibleCount).map((a) => {
+                      const title = String(a?.title || a?.name || '').trim();
+                      if (!title) return null;
+                      const score = agendaScoreOf(a);
+                      return (
+                        <button
+                          key={a?.id || a?.slug || title}
+                          type="button"
+                          onClick={() => pickAgenda(title)}
+                          className="w-full rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 px-4 py-3 flex items-center justify-between gap-3"
+                        >
+                          <span className="font-black text-gray-900 truncate">{title}</span>
+                          <span className="font-black text-gray-700 flex-shrink-0">{score}</span>
+                        </button>
+                      );
+                    })}
+                    {sortedAgendas.length > agendaVisibleCount ? (
+                      <button
+                        type="button"
+                        onClick={() => setAgendaVisibleCount((v) => Math.min(sortedAgendas.length, v + 10))}
+                        className="w-full py-4 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                      >
+                        + DİĞER GÜNDEMLERİ YÜKLE
+                      </button>
+                    ) : null}
+                    {sortedAgendas.length === 0 ? (
+                      <div className="text-sm text-gray-600">Gündem listesi boş.</div>
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => pickAgenda('')}
+                    className={['w-full py-4 rounded-2xl text-white font-black', theme.btnClass].join(' ')}
+                  >
+                    Gündem Dışı Paylaşım
+                  </button>
+                </div>
               ) : null}
 
+              {/* STEP: MEDIA */}
               {step === 'media' ? (
                 <div className="space-y-4">
+                  {/* Preview */}
                   {contentType === 'video' ? (
                     <div className="space-y-3">
-                      <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden aspect-[9/16]">
+                      <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden">
                         {isRecording ? (
-                          // kayıt göstergeleri
+                          <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+                            <span className="text-xs font-semibold text-white">Kayıt Yapıyor!</span>
+                          </div>
                         ) : null}
                         {isRecording ? (
-                          <video
-                            ref={previewRef}
-                            className="absolute inset-0 w-full h-full object-contain bg-black"
-                            playsInline
-                            muted
-                            autoPlay
-                          />
-                        ) : recordedUrl ? (
-                          <video
-                            src={recordedUrl}
-                            controls
-                            className="absolute inset-0 w-full h-full object-contain bg-black"
-                            playsInline
-                          />
-                        ) : (
-                          <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
-                        )}
+                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-3">
+                            <div
+                              className={[
+                                'px-2 py-1 md:px-3 md:py-1.5 rounded-xl bg-black/75 border border-white/20 backdrop-blur-sm',
+                                'font-black text-sm md:text-lg tabular-nums',
+                                recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
+                              ].join(' ')}
+                              aria-label="Kalan süre"
+                              title="Kalan süre"
+                            >
+                              {String(recordSecLeft).padStart(2, '0')}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                recordStopFiredRef.current = true;
+                                stopRecording();
+                              }}
+                              className={[
+                                'relative rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden',
+                                'shadow-[0_18px_60px_rgba(0,0,0,0.55)]',
+                                // Base fallback
+                                'w-28 h-28',
+                                // Mobile/tablet (coarse pointer): bigger + readable (even if viewport is wide)
+                                '[@media(pointer:coarse)]:w-40 [@media(pointer:coarse)]:h-40',
+                                // Desktop (fine pointer): smaller (PC was too big)
+                                '[@media(pointer:fine)]:w-20 [@media(pointer:fine)]:h-20',
+                              ].join(' ')}
+                              aria-label="Durdur"
+                              title="Durdur"
+                            >
+                              <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
+                              <span
+                                className={[
+                                  'relative px-3 py-1 rounded-lg bg-black/25 backdrop-blur font-black leading-none drop-shadow',
+                                  'text-lg',
+                                  '[@media(pointer:coarse)]:text-2xl',
+                                  '[@media(pointer:fine)]:text-base',
+                                ].join(' ')}
+                              >
+                                BİTİR
+                              </span>
+                              <span
+                                className={[
+                                  'relative mt-2 bg-white rounded-md',
+                                  'w-6 h-6',
+                                  '[@media(pointer:coarse)]:w-8 [@media(pointer:coarse)]:h-8',
+                                  '[@media(pointer:fine)]:w-5 [@media(pointer:fine)]:h-5',
+                                ].join(' ')}
+                              />
+                            </button>
+                          </div>
+                        ) : null}
+                        {isRecording ? (
+  <div className="w-full flex justify-center">
+    <video
+      ref={previewRef}
+      className="max-w-full max-h-[70vh] bg-black"
+      playsInline
+      muted
+      autoPlay
+      style={{
+        // OBJECT-FIT YOK - VİDEO OLDUĞU GİBİ GÖSTER
+        borderRadius: '16px'
+      }}
+    />
+  </div>
+) : recordedUrl ? (
+  <div className="w-full flex justify-center">
+    <video
+      src={recordedUrl}
+      controls
+      className="max-w-full max-h-[70vh] bg-black"
+      playsInline
+      style={{ borderRadius: '16px' }}
+    />
+  </div>
+) : (
+  <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
+)}
                       </div>
-                      {isMobileLike && isRecording && !isDevicePortrait ? (
+                      {recordStreamNote ? (
+                        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                          {recordStreamNote}
+                        </div>
+                      ) : null}
+
+                      {isMobileLike ? (
                         <div className="flex items-center justify-center gap-2 text-[11px] text-gray-600">
                           <Smartphone className="w-4 h-4 text-gray-500" />
                           <span>Telefonu dik tutunuz</span>
                         </div>
                       ) : null}
+
                       {videoThumbs.length > 0 ? (
-                        // thumbnail kısmı tamamen orijinal
+                        <div className="relative">
+                          <div className="text-xs font-black text-gray-900 mb-2">Önizleme seçin</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {videoThumbs.map((t, i) => (
+                              <button
+                                key={`${t?.previewUrl || ''}_${i}`}
+                                type="button"
+                                onClick={() => setSelectedVideoThumbIdx(i)}
+                                className={[
+                                  'rounded-2xl overflow-hidden border-2 bg-gray-50',
+                                  i === selectedVideoThumbIdx ? theme.borderClass : 'border-gray-200',
+                                ].join(' ')}
+                                title={`Önizleme ${i + 1}`}
+                              >
+                                <img src={t.previewUrl} alt="" className="w-full aspect-video object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                          {videoThumbRefreshCount < 3 ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (videoThumbRefreshCount >= 3) return;
+                                setVideoThumbRefreshCount((c) => c + 1);
+                                setVideoThumbGenSeed((s) => Number(s || 0) + 1);
+                              }}
+                              className="absolute -bottom-1 -right-1 w-11 h-11 rounded-full bg-white border border-gray-200 shadow-sm hover:bg-gray-50 flex items-center justify-center"
+                              aria-label="Önizlemeleri yenile"
+                              title={`Önizlemeleri yenile (${3 - videoThumbRefreshCount} hak kaldı)`}
+                            >
+                              <RotateCcw className="w-5 h-5 text-gray-800" />
+                            </button>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                   ) : contentType === 'audio' ? (
-                    // audio kısmı tamamen orijinal
+                    <div className="space-y-3">
+                      <div
+                        className="relative rounded-2xl border border-gray-200 overflow-hidden"
+                        style={{
+                          background:
+                            'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.35), transparent 55%),' +
+                            'radial-gradient(circle at 80% 30%, rgba(99,102,241,0.28), transparent 55%),' +
+                            'linear-gradient(135deg, rgba(17,24,39,1), rgba(2,6,23,1))',
+                        }}
+                      >
+                        {isRecording ? (
+                          <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+                            <span className="text-xs font-semibold text-white">Kayıt Yapıyor!</span>
+                          </div>
+                        ) : null}
+                        {isRecording ? (
+                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-3">
+                            <div
+                              className={[
+                                'px-2 py-1 md:px-3 md:py-1.5 rounded-xl bg-black/75 border border-white/20 backdrop-blur-sm',
+                                'font-black text-sm md:text-lg tabular-nums',
+                                recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
+                              ].join(' ')}
+                              aria-label="Kalan süre"
+                              title="Kalan süre"
+                            >
+                              {String(recordSecLeft).padStart(2, '0')}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                recordStopFiredRef.current = true;
+                                stopRecording();
+                              }}
+                              className={[
+                                'relative rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden',
+                                'shadow-[0_18px_60px_rgba(0,0,0,0.55)]',
+                                'w-28 h-28',
+                                '[@media(pointer:coarse)]:w-40 [@media(pointer:coarse)]:h-40',
+                                '[@media(pointer:fine)]:w-20 [@media(pointer:fine)]:h-20',
+                              ].join(' ')}
+                              aria-label="Durdur"
+                              title="Durdur"
+                            >
+                              <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
+                              <span
+                                className={[
+                                  'relative px-3 py-1 rounded-lg bg-black/25 backdrop-blur font-black leading-none drop-shadow',
+                                  'text-lg',
+                                  '[@media(pointer:coarse)]:text-2xl',
+                                  '[@media(pointer:fine)]:text-base',
+                                ].join(' ')}
+                              >
+                                BİTİR
+                              </span>
+                              <span
+                                className={[
+                                  'relative mt-2 bg-white rounded-md',
+                                  'w-6 h-6',
+                                  '[@media(pointer:coarse)]:w-8 [@media(pointer:coarse)]:h-8',
+                                  '[@media(pointer:fine)]:w-5 [@media(pointer:fine)]:h-5',
+                                ].join(' ')}
+                              />
+                            </button>
+                          </div>
+                        ) : null}
+                        <div className="w-full aspect-[9/16] flex items-center justify-center p-6">
+                          <div className="w-full max-w-[320px] rounded-[26px] border border-white/15 bg-white/10 backdrop-blur-sm shadow-[0_30px_90px_rgba(0,0,0,0.55)] overflow-hidden">
+                            <div className="px-6 py-7 flex flex-col items-center">
+                              <div className="w-28 h-28 rounded-full bg-sky-500/25 border border-sky-200/30 shadow-[0_18px_70px_rgba(56,189,248,0.25)] flex items-center justify-center">
+                                <Mic className="w-12 h-12 text-white" />
+                              </div>
+                              <div className="mt-4 text-sm font-black text-white/95">Sesli paylaşım</div>
+                              <div className="mt-2 text-xs text-white/80 max-w-[260px] text-center">
+                                {recordedUrl ? 'Kayıt hazır.' : 'Ses dosyan hazırlanıyor…'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {recordedUrl ? <audio src={recordedUrl} controls className="w-full" /> : <div className="text-sm text-gray-600">Ses önizleme burada.</div>}
+                    </div>
                   ) : contentType === 'image' ? (
-                    // image kısmı tamamen orijinal
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                      {imagePreviews.length > 0 ? (
+                        <div className="space-y-3">
+                          {/* Main preview (large, button-sized feel) */}
+                          <div className="rounded-3xl border border-gray-200 bg-gray-50 overflow-hidden">
+                            <img
+                              src={imagePreviews[0]}
+                              alt="Seçilen resim"
+                              className="w-full aspect-square object-cover"
+                            />
+                          </div>
+
+                          {/* Extra thumbnails */}
+                          {imagePreviews.length > 1 ? (
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {imagePreviews.slice(1).map((u) => (
+                                <img key={u} src={u} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-600">Resim önizleme burada görünecek.</div>
+                      )}
+                    </div>
+                  ) : null}
+                  {/* hidden canvas used to force portrait recording output */}
+
+                  {/* Action buttons */}
+                  {!hasMedia && !isRecording ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {contentType === 'video' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={startRecording}
+                          className={[
+                            'rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black',
+                            theme.btnClass,
+                          ].join(' ')}
+                        >
+                          <Video className="w-14 h-14" />
+                          <div>Kayda Başla</div>
+                          <div className="text-[11px] font-semibold opacity-90">
+                            Maximum <span className="font-black">1 Dk.</span> uzunluğunda olabilir
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => videoUploadRef.current?.click()}
+                          className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                        >
+                          <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
+                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isRecording}
+                          onClick={() => setVideoFacingMode((p) => (p === 'user' ? 'environment' : 'user'))}
+                          className="col-span-2 px-4 py-3 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black disabled:opacity-60"
+                        >
+                          Kamera Değiştir ({videoFacingMode === 'user' ? 'Ön Kamera' : 'Arka Kamera'})
+                        </button>
+                      </>
+                    ) : contentType === 'image' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => imageCaptureRef.current?.click()}
+                          className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}
+                        >
+                          <Camera className="w-14 h-14" />
+                          <div>Resim Çek</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => imageUploadRef.current?.click()}
+                          className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                        >
+                          <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
+                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={startRecording}
+                          className={[
+                            'rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black',
+                            theme.btnClass,
+                          ].join(' ')}
+                        >
+                          <Mic className="w-14 h-14" />
+                          <div>Kayda Başla</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => audioUploadRef.current?.click()}
+                          className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                        >
+                          <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
+                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
+                        </button>
+                      </>
+                    )}
+                  </div>
                   ) : null}
 
-                  {/* canvas satırı tamamen kaldırıldı */}
-                  {/* action buttons, input'lar, submit butonları tamamen orijinal */}
+                  <input
+                    ref={videoUploadRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      try {
+                        const duration = await getVideoDurationSec(f).catch(() => 0);
+                        if (duration && duration > 60.5) {
+                          toast.error('Video maksimum 1 dakika olmalı.');
+                          e.target.value = '';
+                          return;
+                        }
+                      } catch {
+                        // ignore duration check
+                      }
+                      resetMedia();
+                      setFiles([f]);
+                      try {
+                        setRecordedUrl(URL.createObjectURL(f));
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  />
+                  <input
+                    ref={audioUploadRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      try {
+                        const duration = await getAudioDurationSec(f).catch(() => 0);
+                        if (duration && duration > 60.5) {
+                          toast.error('Ses maksimum 1 dakika olmalı.');
+                          e.target.value = '';
+                          return;
+                        }
+                      } catch {
+                        // ignore duration check
+                      }
+                      resetMedia();
+                      setFiles([f]);
+                      try {
+                        setRecordedUrl(URL.createObjectURL(f));
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  />
+                  <input
+                    ref={imageUploadRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={async (e) => {
+                      const picked = Array.from(e.target.files || []).slice(0, 10);
+                      if (picked.length === 0) return;
+                      resetMedia();
+                      const optimized = await optimizeImageFiles(picked);
+                      setFiles(optimized);
+                    }}
+                  />
+                  <input
+                    ref={imageCaptureRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const picked = Array.from(e.target.files || []).slice(0, 10);
+                      if (picked.length === 0) return;
+                      resetMedia();
+                      const optimized = await optimizeImageFiles(picked);
+                      setFiles(optimized);
+                    }}
+                  />
+
+                  {hasMedia ? (
+                    <button
+                      type="button"
+                      onClick={resetMedia}
+                      className="w-full py-3 rounded-2xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-7 h-7" />
+                      Temizle
+                    </button>
+                  ) : null}
+
+                  {/* Continue / Publish */}
+                  {canShowSubmitInMediaStep ? (
+                    !isFastMode ? (
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => {
+                          setDescTarget('primary');
+                          setStep('desc');
+                        }}
+                        className={[
+                          'w-full rounded-3xl text-white font-black disabled:opacity-60',
+                          'bg-emerald-600 hover:bg-emerald-700',
+                          'py-5',
+                        ].join(' ')}
+                      >
+                        <div className="text-lg leading-none">Gönder</div>
+                        <div className="text-xs font-semibold opacity-90 mt-1">Açıklama ekleyip paylaş</div>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={publishPrimary}
+                        className={[
+                          'w-full rounded-3xl text-white font-black disabled:opacity-60',
+                          'bg-emerald-600 hover:bg-emerald-700',
+                          'py-5',
+                        ].join(' ')}
+                      >
+                        <div className="text-lg leading-none">
+                          {preparingMedia ? 'Hazırlanıyor…' : loading ? `Yükleniyor… %${Math.round(uploadPct * 100)}` : 'Gönder'}
+                        </div>
+                        <div className="text-xs font-semibold opacity-90 mt-1">{uploadHint || (isFastMode ? 'Fast paylaşımı' : 'Polit paylaşımı')}</div>
+                        {loading ? (
+                          <div className="mt-3 w-full h-2 rounded-full bg-white/20 overflow-hidden">
+                            <div className="h-full bg-white/90" style={{ width: `${Math.round(uploadPct * 100)}%` }} />
+                          </div>
+                        ) : null}
+                      </button>
+                    )
+                  ) : null}
                 </div>
               ) : null}
 
-              {/* desc ve success step'leri tamamen orijinal */}
+              {/* STEP: DESC */}
+              {step === 'desc' ? (
+                <div className="space-y-3">
+                  <div className="text-lg font-black text-gray-900">
+                    {descTarget === 'cross' ? 'Polit için kısa bir başlık yada açıklama giriniz!' : 'Kısa bir başlık yada açıklama giriniz!'}
+                  </div>
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    rows={6}
+                    maxLength={TEXT_MAX}
+                    className={[
+                      'w-full px-4 py-3 border-2 rounded-2xl outline-none resize-none',
+                      isFastMode ? 'border-rose-200 focus:border-rose-500' : 'border-blue-200 focus:border-primary-blue',
+                    ].join(' ')}
+                    placeholder="En az 10, en fazla 300 karakter…"
+                  />
+                  <div className="text-xs text-gray-600 flex items-center justify-between">
+                    <span>
+                      Minimum <span className="font-black">{TEXT_MIN}</span> / Maksimum <span className="font-black">{TEXT_MAX}</span>
+                    </span>
+                    <span className="font-black">{String(text || '').trim().length}/{TEXT_MAX}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={loading || !canSubmitText}
+                    onClick={descTarget === 'cross' ? publishCrossWithText : publishPrimary}
+                    className={['w-full py-4 rounded-2xl text-white font-black disabled:opacity-60', theme.btnClass].join(' ')}
+                  >
+                    <div className="text-lg leading-none">
+                      {preparingMedia
+                        ? 'Hazırlanıyor…'
+                        : loading
+                          ? `Yükleniyor… %${Math.round(uploadPct * 100)}`
+                          : descTarget === 'cross'
+                            ? 'Polit At'
+                            : isFastMode
+                              ? 'Fast At'
+                              : 'Polit At'}
+                    </div>
+                    <div className="text-xs font-semibold opacity-90 mt-1">{uploadHint || (isFastMode ? 'Fast paylaşımı' : 'Polit paylaşımı')}</div>
+                    {loading ? (
+                      <div className="mt-3 w-full h-2 rounded-full bg-white/20 overflow-hidden">
+                        <div className="h-full bg-white/90" style={{ width: `${Math.round(uploadPct * 100)}%` }} />
+                      </div>
+                    ) : null}
+                  </button>
+                </div>
+              ) : null}
+
+              {/* STEP: SUCCESS */}
+              {step === 'success' ? (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-black text-gray-900">
+                      {isFastMode ? 'Başarıyla Fast attınız!' : 'Başarıyla Polit attınız!'}
+                    </div>
+                    <div className="text-sm text-gray-700 mt-2">
+                      {isFastMode
+                        ? 'İsterseniz bu Fast’i Polit olarak da yayınlayabilirsiniz!'
+                        : 'İsterseniz bu Polit’i Fast olarak da yayınlayabilirsiniz!'}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      disabled={offerBusy}
+                      onClick={() => {
+                        // Requirement: If a Fast media post is being cross-published as Polit,
+                        // require a real description before creating the Polit.
+                        if (isFastMode && contentType !== 'text') {
+                          setDescTarget('cross');
+                          setStep('desc');
+                          return;
+                        }
+                        finishYes();
+                      }}
+                      className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}
+                    >
+                      <div className="text-2xl">EVET</div>
+                      <div className="text-sm font-black">{isFastMode ? 'Polit At' : 'Fast At'}</div>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={offerBusy}
+                      onClick={finishNo}
+                      className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                    >
+                      <div className="text-2xl">HAYIR</div>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
