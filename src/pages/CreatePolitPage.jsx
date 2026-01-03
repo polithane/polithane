@@ -167,7 +167,7 @@ export const CreatePolitPage = () => {
   const MAX_RECORD_SEC = 60;
   const [recordSecLeft, setRecordSecLeft] = useState(60);
   const [videoFacingMode, setVideoFacingMode] = useState('user'); // user | environment
-  const [isDevicePortrait, setIsDevicePortrait] = useState(true); // Yatay uyarı için
+  const [isDevicePortrait, setIsDevicePortrait] = useState(true); // uyarı için
 
   const imageUploadRef = useRef(null);
   const imageCaptureRef = useRef(null);
@@ -919,12 +919,10 @@ export const CreatePolitPage = () => {
             facingMode: videoFacingMode,
             width: { ideal: 720 },
             height: { ideal: 1280 },
-            // aspectRatio zorlamıyoruz → doğal yön korunuyor
           },
           audio: true,
         });
 
-        // Cihaz yönünü kontrol et (uyarı için)
         const settings = stream.getVideoTracks()[0]?.getSettings();
         setIsDevicePortrait((settings?.height || 0) >= (settings?.width || 0));
       } else {
@@ -945,7 +943,6 @@ export const CreatePolitPage = () => {
         }, 250);
       }
 
-      // Doğrudan ham stream ile kaydediyoruz (canvas dönüşü kaldırıldı)
       const mimeType =
         contentType === 'audio'
           ? MediaRecorder.isTypeSupported('audio/webm')
@@ -1052,8 +1049,6 @@ export const CreatePolitPage = () => {
     setIsRecording(false);
   };
 
-  // ... (uploadOne, publishPrimary, publishCross, publishCrossWithText, goToFastStream, finishNo, finishYes, typeButtons, canSubmitText aynı kaldı)
-
   const typeButtons = useMemo(
     () => [
       { key: 'video', label: 'Video', Icon: Video },
@@ -1074,7 +1069,6 @@ export const CreatePolitPage = () => {
       <div className="container-main py-6">
         <div className="max-w-xl mx-auto">
           <div className={['bg-white rounded-3xl border-2 overflow-hidden', theme.borderClass].join(' ')}>
-            {/* Fixed top identity + back */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar src={user?.avatar_url || user?.profile_image} size="46px" verified={isUiVerifiedUser(user)} className="border border-gray-200 flex-shrink-0" />
@@ -1094,7 +1088,6 @@ export const CreatePolitPage = () => {
               ) : null}
             </div>
             <div className="p-5 space-y-4">
-              {/* STEP: TYPE */}
               {step === 'type' ? (
                 <div className="grid grid-cols-2 gap-3">
                   {typeButtons.map(({ key, label, Icon }) => (
@@ -1135,7 +1128,7 @@ export const CreatePolitPage = () => {
                   ))}
                 </div>
               ) : null}
-              {/* STEP: AGENDA */}
+
               {step === 'agenda' ? (
                 <div className="space-y-3">
                   <div className="text-sm font-black text-gray-900">Gündem Seçin</div>
@@ -1178,10 +1171,9 @@ export const CreatePolitPage = () => {
                   </button>
                 </div>
               ) : null}
-              {/* STEP: MEDIA */}
+
               {step === 'media' ? (
                 <div className="space-y-4">
-                  {/* Preview */}
                   {contentType === 'video' ? (
                     <div className="space-y-3">
                       <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden aspect-[9/16]">
@@ -1304,19 +1296,428 @@ export const CreatePolitPage = () => {
                         </div>
                       ) : null}
                     </div>
-                  ) : /* diğer contentType'lar tamamen orijinal kaldı */}
-                  {/* ... (audio ve image preview'ları tamamen aynı) */}
+                  ) : contentType === 'audio' ? (
+                    <div className="space-y-3">
+                      <div
+                        className="relative rounded-2xl border border-gray-200 overflow-hidden"
+                        style={{
+                          background:
+                            'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.35), transparent 55%),' +
+                            'radial-gradient(circle at 80% 30%, rgba(99,102,241,0.28), transparent 55%),' +
+                            'linear-gradient(135deg, rgba(17,24,39,1), rgba(2,6,23,1))',
+                        }}
+                      >
+                        {isRecording ? (
+                          <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+                            <span className="text-xs font-semibold text-white">Kayıt Yapıyor!</span>
+                          </div>
+                        ) : null}
+                        {isRecording ? (
+                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-3">
+                            <div
+                              className={[
+                                'px-2 py-1 md:px-3 md:py-1.5 rounded-xl bg-black/75 border border-white/20 backdrop-blur-sm',
+                                'font-black text-sm md:text-lg tabular-nums',
+                                recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
+                              ].join(' ')}
+                              aria-label="Kalan süre"
+                              title="Kalan süre"
+                            >
+                              {String(recordSecLeft).padStart(2, '0')}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                recordStopFiredRef.current = true;
+                                stopRecording();
+                              }}
+                              className={[
+                                'relative rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden',
+                                'shadow-[0_18px_60px_rgba(0,0,0,0.55)]',
+                                'w-28 h-28',
+                                '[@media(pointer:coarse)]:w-40 [@media(pointer:coarse)]:h-40',
+                                '[@media(pointer:fine)]:w-20 [@media(pointer:fine)]:h-20',
+                              ].join(' ')}
+                              aria-label="Durdur"
+                              title="Durdur"
+                            >
+                              <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
+                              <span
+                                className={[
+                                  'relative px-3 py-1 rounded-lg bg-black/25 backdrop-blur font-black leading-none drop-shadow',
+                                  'text-lg',
+                                  '[@media(pointer:coarse)]:text-2xl',
+                                  '[@media(pointer:fine)]:text-base',
+                                ].join(' ')}
+                              >
+                                BİTİR
+                              </span>
+                              <span
+                                className={[
+                                  'relative mt-2 bg-white rounded-md',
+                                  'w-6 h-6',
+                                  '[@media(pointer:coarse)]:w-8 [@media(pointer:coarse)]:h-8',
+                                  '[@media(pointer:fine)]:w-5 [@media(pointer:fine)]:h-5',
+                                ].join(' ')}
+                              />
+                            </button>
+                          </div>
+                        ) : null}
+                        <div className="w-full aspect-[9/16] flex items-center justify-center p-6">
+                          <div className="w-full max-w-[320px] rounded-[26px] border border-white/15 bg-white/10 backdrop-blur-sm shadow-[0_30px_90px_rgba(0,0,0,0.55)] overflow-hidden">
+                            <div className="px-6 py-7 flex flex-col items-center">
+                              <div className="w-28 h-28 rounded-full bg-sky-500/25 border border-sky-200/30 shadow-[0_18px_70px_rgba(56,189,248,0.25)] flex items-center justify-center">
+                                <Mic className="w-12 h-12 text-white" />
+                              </div>
+                              <div className="mt-4 text-sm font-black text-white/95">Sesli paylaşım</div>
+                              <div className="mt-2 text-xs text-white/80 max-w-[260px] text-center">
+                                {recordedUrl ? 'Kayıt hazır.' : 'Ses dosyan hazırlanıyor…'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {recordedUrl ? <audio src={recordedUrl} controls className="w-full" /> : <div className="text-sm text-gray-600">Ses önizleme burada.</div>}
+                    </div>
+                  ) : contentType === 'image' ? (
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                      {imagePreviews.length > 0 ? (
+                        <div className="space-y-3">
+                          <div className="rounded-3xl border border-gray-200 bg-gray-50 overflow-hidden">
+                            <img
+                              src={imagePreviews[0]}
+                              alt="Seçilen resim"
+                              className="w-full aspect-square object-cover"
+                            />
+                          </div>
+
+                          {imagePreviews.length > 1 ? (
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {imagePreviews.slice(1).map((u) => (
+                                <img key={u} src={u} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-600">Resim önizleme burada görünecek.</div>
+                      )}
+                    </div>
+                  ) : null}
+
                   <canvas ref={recordCanvasRef} className="hidden" />
 
-                  {/* Action buttons ve input'lar tamamen aynı */}
-                  {/* ... */}
+                  {!hasMedia && !isRecording ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {contentType === 'video' ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={startRecording}
+                            className={[
+                              'rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black',
+                              theme.btnClass,
+                            ].join(' ')}
+                          >
+                            <Video className="w-14 h-14" />
+                            <div>Kayda Başla</div>
+                            <div className="text-[11px] font-semibold opacity-90">
+                              Maximum <span className="font-black">1 Dk.</span> uzunluğunda olabilir
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => videoUploadRef.current?.click()}
+                            className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                          >
+                            <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
+                            <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isRecording}
+                            onClick={() => setVideoFacingMode((p) => (p === 'user' ? 'environment' : 'user'))}
+                            className="col-span-2 px-4 py-3 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black disabled:opacity-60"
+                          >
+                            Kamera Değiştir ({videoFacingMode === 'user' ? 'Ön Kamera' : 'Arka Kamera'})
+                          </button>
+                        </>
+                      ) : contentType === 'image' ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => imageCaptureRef.current?.click()}
+                            className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}
+                          >
+                            <Camera className="w-14 h-14" />
+                            <div>Resim Çek</div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => imageUploadRef.current?.click()}
+                            className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                          >
+                            <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
+                            <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={startRecording}
+                            className={[
+                              'rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black',
+                              theme.btnClass,
+                            ].join(' ')}
+                          >
+                            <Mic className="w-14 h-14" />
+                            <div>Kayda Başla</div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => audioUploadRef.current?.click()}
+                            className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                          >
+                            <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
+                            <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+
+                  <input
+                    ref={videoUploadRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      try {
+                        const duration = await getVideoDurationSec(f).catch(() => 0);
+                        if (duration && duration > 60.5) {
+                          toast.error('Video maksimum 1 dakika olmalı.');
+                          e.target.value = '';
+                          return;
+                        }
+                      } catch {
+                        // ignore duration check
+                      }
+                      resetMedia();
+                      setFiles([f]);
+                      try {
+                        setRecordedUrl(URL.createObjectURL(f));
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  />
+                  <input
+                    ref={audioUploadRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      try {
+                        const duration = await getAudioDurationSec(f).catch(() => 0);
+                        if (duration && duration > 60.5) {
+                          toast.error('Ses maksimum 1 dakika olmalı.');
+                          e.target.value = '';
+                          return;
+                        }
+                      } catch {
+                        // ignore duration check
+                      }
+                      resetMedia();
+                      setFiles([f]);
+                      try {
+                        setRecordedUrl(URL.createObjectURL(f));
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  />
+                  <input
+                    ref={imageUploadRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={async (e) => {
+                      const picked = Array.from(e.target.files || []).slice(0, 10);
+                      if (picked.length === 0) return;
+                      resetMedia();
+                      const optimized = await optimizeImageFiles(picked);
+                      setFiles(optimized);
+                    }}
+                  />
+                  <input
+                    ref={imageCaptureRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const picked = Array.from(e.target.files || []).slice(0, 10);
+                      if (picked.length === 0) return;
+                      resetMedia();
+                      const optimized = await optimizeImageFiles(picked);
+                      setFiles(optimized);
+                    }}
+                  />
+
+                  {hasMedia ? (
+                    <button
+                      type="button"
+                      onClick={resetMedia}
+                      className="w-full py-3 rounded-2xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-7 h-7" />
+                      Temizle
+                    </button>
+                  ) : null}
 
                   {canShowSubmitInMediaStep ? (
-                    /* ... tamamen aynı */
+                    !isFastMode ? (
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => {
+                          setDescTarget('primary');
+                          setStep('desc');
+                        }}
+                        className={[
+                          'w-full rounded-3xl text-white font-black disabled:opacity-60',
+                          'bg-emerald-600 hover:bg-emerald-700',
+                          'py-5',
+                        ].join(' ')}
+                      >
+                        <div className="text-lg leading-none">Gönder</div>
+                        <div className="text-xs font-semibold opacity-90 mt-1">Açıklama ekleyip paylaş</div>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={publishPrimary}
+                        className={[
+                          'w-full rounded-3xl text-white font-black disabled:opacity-60',
+                          'bg-emerald-600 hover:bg-emerald-700',
+                          'py-5',
+                        ].join(' ')}
+                      >
+                        <div className="text-lg leading-none">
+                          {preparingMedia ? 'Hazırlanıyor…' : loading ? `Yükleniyor… %${Math.round(uploadPct * 100)}` : 'Gönder'}
+                        </div>
+                        <div className="text-xs font-semibold opacity-90 mt-1">{uploadHint || (isFastMode ? 'Fast paylaşımı' : 'Polit paylaşımı')}</div>
+                        {loading ? (
+                          <div className="mt-3 w-full h-2 rounded-full bg-white/20 overflow-hidden">
+                            <div className="h-full bg-white/90" style={{ width: `${Math.round(uploadPct * 100)}%` }} />
+                          </div>
+                        ) : null}
+                      </button>
+                    )
                   ) : null}
                 </div>
               ) : null}
-              {/* DESC ve SUCCESS step'leri tamamen aynı */}
+
+              {step === 'desc' ? (
+                <div className="space-y-3">
+                  <div className="text-lg font-black text-gray-900">
+                    {descTarget === 'cross' ? 'Polit için kısa bir başlık yada açıklama giriniz!' : 'Kısa bir başlık yada açıklama giriniz!'}
+                  </div>
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    rows={6}
+                    maxLength={TEXT_MAX}
+                    className={[
+                      'w-full px-4 py-3 border-2 rounded-2xl outline-none resize-none',
+                      isFastMode ? 'border-rose-200 focus:border-rose-500' : 'border-blue-200 focus:border-primary-blue',
+                    ].join(' ')}
+                    placeholder="En az 10, en fazla 300 karakter…"
+                  />
+                  <div className="text-xs text-gray-600 flex items-center justify-between">
+                    <span>
+                      Minimum <span className="font-black">{TEXT_MIN}</span> / Maksimum <span className="font-black">{TEXT_MAX}</span>
+                    </span>
+                    <span className="font-black">{String(text || '').trim().length}/{TEXT_MAX}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={loading || !canSubmitText}
+                    onClick={descTarget === 'cross' ? publishCrossWithText : publishPrimary}
+                    className={['w-full py-4 rounded-2xl text-white font-black disabled:opacity-60', theme.btnClass].join(' ')}
+                  >
+                    <div className="text-lg leading-none">
+                      {preparingMedia
+                        ? 'Hazırlanıyor…'
+                        : loading
+                          ? `Yükleniyor… %${Math.round(uploadPct * 100)}`
+                          : descTarget === 'cross'
+                            ? 'Polit At'
+                            : isFastMode
+                              ? 'Fast At'
+                              : 'Polit At'}
+                    </div>
+                    <div className="text-xs font-semibold opacity-90 mt-1">{uploadHint || (isFastMode ? 'Fast paylaşımı' : 'Polit paylaşımı')}</div>
+                    {loading ? (
+                      <div className="mt-3 w-full h-2 rounded-full bg-white/20 overflow-hidden">
+                        <div className="h-full bg-white/90" style={{ width: `${Math.round(uploadPct * 100)}%` }} />
+                      </div>
+                    ) : null}
+                  </button>
+                </div>
+              ) : null}
+
+              {step === 'success' ? (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-black text-gray-900">
+                      {isFastMode ? 'Başarıyla Fast attınız!' : 'Başarıyla Polit attınız!'}
+                    </div>
+                    <div className="text-sm text-gray-700 mt-2">
+                      {isFastMode
+                        ? 'İsterseniz bu Fast’i Polit olarak da yayınlayabilirsiniz!'
+                        : 'İsterseniz bu Polit’i Fast olarak da yayınlayabilirsiniz!'}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      disabled={offerBusy}
+                      onClick={() => {
+                        if (isFastMode && contentType !== 'text') {
+                          setDescTarget('cross');
+                          setStep('desc');
+                          return;
+                        }
+                        finishYes();
+                      }}
+                      className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}
+                    >
+                      <div className="text-2xl">EVET</div>
+                      <div className="text-sm font-black">{isFastMode ? 'Polit At' : 'Fast At'}</div>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={offerBusy}
+                      onClick={finishNo}
+                      className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                    >
+                      <div className="text-2xl">HAYIR</div>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
