@@ -1377,7 +1377,7 @@ export const CreatePolitPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
       <div className="container-main py-6">
-        <div className="max-w-md mx-auto scale-95 origin-top"> 
+        <div className="max-w-md mx-auto scale-[0.85] lg:scale-[0.80] origin-top">
           <div className={['bg-white rounded-2xl border-2 overflow-hidden shadow-sm', theme.borderClass].join(' ')}>
             {/* Fixed top identity + back */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
@@ -1494,8 +1494,7 @@ export const CreatePolitPage = () => {
                   {contentType === 'video' ? (
                 <div className="space-y-3">
                   {/* Video Önizleme Alanı - Daha Kompakt */}
-                  <div className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center" style={{ height: '420px' }}>
-                    {isRecording && (
+                      <div className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center" style={{ height: '360px' }}>                    {isRecording && (
                       <div className="absolute top-2 right-2 z-30 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-red-600/80 text-white text-[10px] font-bold animate-pulse">
                         KAYITTA
                       </div>
@@ -1527,13 +1526,13 @@ export const CreatePolitPage = () => {
                   {/* Butonlar - Boyutlar %40 Küçültüldü */}
                   {!isRecording && !recordedUrl && (
                     <div className="grid grid-cols-2 gap-2">
-                      <button type="button" onClick={startRecording} className={['rounded-2xl p-4 flex flex-col items-center justify-center gap-1 text-white font-black text-xs transition-transform active:scale-95', theme.btnClass].join(' ')}>
-                        <Video className="w-8 h-8" /> Kayda Başla
+                      <button type="button" onClick={startRecording} className={['rounded-2xl py-3 flex flex-col items-center justify-center gap-1 text-white font-black text-[10px] active:scale-95', theme.btnClass].join(' ')}>
+                        <Video className="w-6 h-6" /> Başla
                       </button>
-                      <button type="button" onClick={() => videoUploadRef.current?.click()} className="rounded-2xl p-4 flex flex-col items-center justify-center gap-1 border-2 border-gray-300 bg-white font-black text-xs text-gray-700 active:scale-95">
-                        <UploadCloud className="w-8 h-8" style={{ color: theme.primary }} /> Yükle
+                      <button type="button" onClick={() => videoUploadRef.current?.click()} className="rounded-2xl py-3 flex flex-col items-center justify-center gap-1 border-2 border-gray-300 bg-white font-black text-[10px] text-gray-700 active:scale-95">
+                        <UploadCloud className="w-6 h-6" style={{ color: theme.primary }} /> Yükle
                       </button>
-                      <button type="button" onClick={() => setVideoFacingMode(p => p === 'user' ? 'environment' : 'user')} className="col-span-2 py-2 rounded-xl border border-gray-200 bg-gray-50 text-[11px] font-bold text-gray-600">
+                      <button type="button" onClick={() => setVideoFacingMode(p => p === 'user' ? 'environment' : 'user')} className="col-span-2 py-1.5 rounded-xl border border-gray-200 bg-gray-50 text-[9px] font-bold text-gray-500">
                         Kamerayı Çevir
                       </button>
                     </div>
@@ -1543,28 +1542,28 @@ export const CreatePolitPage = () => {
                   {recordedUrl && !isRecording && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between px-1">
-                        <span className="text-[11px] font-bold text-gray-500">KAPAK RESMİ SEÇ</span>
-                        {videoThumbs.length > 0 && videoThumbRefreshCount < 3 && (
-                           <button onClick={() => {setVideoThumbRefreshCount(c => c+1); setVideoThumbGenSeed(s => s+1);}} className="text-blue-600 text-[10px] font-bold flex items-center gap-1"><RotateCcw className="w-3 h-3"/> Yenile</button>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Kapak Seç</span>
+                        {videoThumbs.length > 0 && (
+                           <button type="button" onClick={() => setVideoThumbGenSeed(s => s+1)} className="text-blue-600 text-[9px] font-bold flex items-center gap-1"><RotateCcw className="w-3 h-3"/> Yenile</button>
                         )}
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5">
                         {videoThumbs.length > 0 ? (
                           videoThumbs.map((t, i) => (
-                            <button key={i} onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-60'].join(' ')}>
+                            <button key={i} type="button" onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-40'].join(' ')}>
                               <img src={t.previewUrl} className="w-full aspect-video object-cover" />
                             </button>
                           ))
                         ) : (
-                          <div className="col-span-3 py-4 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-dashed">
-                             <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
-                             <span className="text-[10px] text-gray-500 font-medium">Önizleme Resimleri Hazırlanıyor...</span>
+                          <div className="col-span-3 py-3 flex items-center justify-center bg-gray-50 rounded-lg border border-dashed gap-2">
+                             <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                             <span className="text-[9px] text-gray-400 font-bold uppercase">Kapaklar Hazırlanıyor...</span>
                           </div>
                         )}
                       </div>
                     </div>
                   )}
-
+                  
                   {/* Dinamik Gönder Butonu */}
                   {canShowSubmitInMediaStep && (
                     <div className="pt-2">
@@ -1574,8 +1573,7 @@ export const CreatePolitPage = () => {
                           ÖNİZLEMELER YÜKLENİYOR...
                         </div>
                       ) : (
-                        <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-black text-md shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all">
-                          {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'DEVAM ET'}
+                        <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight">                          {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'DEVAM ET'}
                         </button>
                       )}
                     </div>
