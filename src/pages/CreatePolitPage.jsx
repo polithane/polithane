@@ -1377,8 +1377,8 @@ export const CreatePolitPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-0">
       <div className="container-main py-6">
-        <div className="max-w-xl mx-auto">
-          <div className={['bg-white rounded-3xl border-2 overflow-hidden', theme.borderClass].join(' ')}>
+        <div className="max-w-md mx-auto scale-95 origin-top"> 
+          <div className={['bg-white rounded-2xl border-2 overflow-hidden shadow-sm', theme.borderClass].join(' ')}>
             {/* Fixed top identity + back */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -1492,143 +1492,96 @@ export const CreatePolitPage = () => {
                 <div className="space-y-4">
                   {/* Preview */}
                   {contentType === 'video' ? (
-                    <div className="space-y-4">
-                      <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center" style={{ height: '560px' }}>
-                        {isRecording && (
-                          <div className="absolute top-3 right-3 z-30 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20 text-white text-xs font-semibold">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" /> Kayıt Yapıyor!
-                          </div>
-                        )}
-                        
-                        <video
-                          ref={previewRef}
-                          src={recordedUrl || undefined}
-                          className="w-full h-full object-cover bg-black"
-                          playsInline muted={isRecording} autoPlay controls={!isRecording && !!recordedUrl}
-                        />
+                <div className="space-y-3">
+                  {/* Video Önizleme Alanı - Daha Kompakt */}
+                  <div className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center" style={{ height: '420px' }}>
+                    {isRecording && (
+                      <div className="absolute top-2 right-2 z-30 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-red-600/80 text-white text-[10px] font-bold animate-pulse">
+                        KAYITTA
+                      </div>
+                    )}
+                    
+                    <video
+                      ref={previewRef}
+                      src={recordedUrl || undefined}
+                      className="w-full h-full object-cover bg-black"
+                      playsInline muted={isRecording} autoPlay controls={!isRecording && !!recordedUrl}
+                    />
 
-                        {isRecording && (
-                          <div className="absolute bottom-6 w-full flex flex-col items-center gap-4 px-6 z-40">
-                            <div className="px-4 py-1.5 rounded-full bg-black/60 text-sky-300 font-black text-xl tabular-nums backdrop-blur-md border border-white/10">
-                               00:{String(recordSecLeft).padStart(2, '0')}
-                            </div>
-                            <button 
-                              type="button" 
-                              onClick={stopRecording} 
-                              className="w-20 h-20 rounded-full bg-red-600 border-4 border-white/30 flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all"
-                            >
-                              <div className="w-8 h-8 bg-white rounded-sm" />
-                            </button>
-                          </div>
+                    {isRecording && (
+                      <div className="absolute bottom-4 w-full flex flex-col items-center gap-3 z-40">
+                        <div className="px-3 py-1 rounded-full bg-black/60 text-sky-300 font-black text-sm tabular-nums backdrop-blur-md">
+                           00:{String(recordSecLeft).padStart(2, '0')}
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={stopRecording} 
+                          className="w-14 h-14 rounded-full bg-red-600 border-4 border-white/30 flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all"
+                        >
+                          <div className="w-6 h-6 bg-white rounded-sm" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Butonlar - Boyutlar %40 Küçültüldü */}
+                  {!isRecording && !recordedUrl && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={startRecording} className={['rounded-2xl p-4 flex flex-col items-center justify-center gap-1 text-white font-black text-xs transition-transform active:scale-95', theme.btnClass].join(' ')}>
+                        <Video className="w-8 h-8" /> Kayda Başla
+                      </button>
+                      <button type="button" onClick={() => videoUploadRef.current?.click()} className="rounded-2xl p-4 flex flex-col items-center justify-center gap-1 border-2 border-gray-300 bg-white font-black text-xs text-gray-700 active:scale-95">
+                        <UploadCloud className="w-8 h-8" style={{ color: theme.primary }} /> Yükle
+                      </button>
+                      <button type="button" onClick={() => setVideoFacingMode(p => p === 'user' ? 'environment' : 'user')} className="col-span-2 py-2 rounded-xl border border-gray-200 bg-gray-50 text-[11px] font-bold text-gray-600">
+                        Kamerayı Çevir
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Önizleme Resimleri Seçeceği */}
+                  {recordedUrl && !isRecording && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[11px] font-bold text-gray-500">KAPAK RESMİ SEÇ</span>
+                        {videoThumbs.length > 0 && videoThumbRefreshCount < 3 && (
+                           <button onClick={() => {setVideoThumbRefreshCount(c => c+1); setVideoThumbGenSeed(s => s+1);}} className="text-blue-600 text-[10px] font-bold flex items-center gap-1"><RotateCcw className="w-3 h-3"/> Yenile</button>
                         )}
                       </div>
-
-                      {!isRecording && !recordedUrl && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <button type="button" onClick={startRecording} className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}>
-                            <Video className="w-14 h-14" /> Kayda Başla
-                          </button>
-                          <button type="button" onClick={() => videoUploadRef.current?.click()} className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white font-black">
-                            <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} /> Yükle
-                          </button>
-                          <button type="button" onClick={() => setVideoFacingMode(p => p === 'user' ? 'environment' : 'user')} className="col-span-2 py-3 rounded-2xl border-2 font-black">Kamera Değiştir</button>
-                        </div>
-                      )}
-
-                      {videoThumbs.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2">
-                          {videoThumbs.map((t, i) => (
-                            <button key={i} onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-xl overflow-hidden border-2', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent'].join(' ')}>
+                      <div className="grid grid-cols-3 gap-2">
+                        {videoThumbs.length > 0 ? (
+                          videoThumbs.map((t, i) => (
+                            <button key={i} onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-60'].join(' ')}>
                               <img src={t.previewUrl} className="w-full aspect-video object-cover" />
                             </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>                  ) : contentType === 'audio' ? (
-                    <div className="space-y-3">
-                      <div
-                        className="relative rounded-2xl border border-gray-200 overflow-hidden"
-                        style={{
-                          background:
-                            'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.35), transparent 55%),' +
-                            'radial-gradient(circle at 80% 30%, rgba(99,102,241,0.28), transparent 55%),' +
-                            'linear-gradient(135deg, rgba(17,24,39,1), rgba(2,6,23,1))',
-                        }}
-                      >
-                        {isRecording ? (
-                          <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
-                            <span className="text-xs font-semibold text-white">Kayıt Yapıyor!</span>
+                          ))
+                        ) : (
+                          <div className="col-span-3 py-4 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-dashed">
+                             <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+                             <span className="text-[10px] text-gray-500 font-medium">Önizleme Resimleri Hazırlanıyor...</span>
                           </div>
-                        ) : null}
-                        {isRecording ? (
-                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-3">
-                            <div
-                              className={[
-                                'px-2 py-1 md:px-3 md:py-1.5 rounded-xl bg-black/75 border border-white/20 backdrop-blur-sm',
-                                'font-black text-sm md:text-lg tabular-nums',
-                                recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
-                              ].join(' ')}
-                              aria-label="Kalan süre"
-                              title="Kalan süre"
-                            >
-                              {String(recordSecLeft).padStart(2, '0')}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                recordStopFiredRef.current = true;
-                                stopRecording();
-                              }}
-                              className={[
-                                'relative rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden',
-                                'shadow-[0_18px_60px_rgba(0,0,0,0.55)]',
-                                'w-28 h-28',
-                                '[@media(pointer:coarse)]:w-40 [@media(pointer:coarse)]:h-40',
-                                '[@media(pointer:fine)]:w-20 [@media(pointer:fine)]:h-20',
-                              ].join(' ')}
-                              aria-label="Durdur"
-                              title="Durdur"
-                            >
-                              <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span
-                                className={[
-                                  'relative px-3 py-1 rounded-lg bg-black/25 backdrop-blur font-black leading-none drop-shadow',
-                                  'text-lg',
-                                  '[@media(pointer:coarse)]:text-2xl',
-                                  '[@media(pointer:fine)]:text-base',
-                                ].join(' ')}
-                              >
-                                BİTİR
-                              </span>
-                              <span
-                                className={[
-                                  'relative mt-2 bg-white rounded-md',
-                                  'w-6 h-6',
-                                  '[@media(pointer:coarse)]:w-8 [@media(pointer:coarse)]:h-8',
-                                  '[@media(pointer:fine)]:w-5 [@media(pointer:fine)]:h-5',
-                                ].join(' ')}
-                              />
-                            </button>
-                          </div>
-                        ) : null}
-                        <div className="w-full aspect-[9/16] flex items-center justify-center p-6">
-                          <div className="w-full max-w-[320px] rounded-[26px] border border-white/15 bg-white/10 backdrop-blur-sm shadow-[0_30px_90px_rgba(0,0,0,0.55)] overflow-hidden">
-                            <div className="px-6 py-7 flex flex-col items-center">
-                              <div className="w-28 h-28 rounded-full bg-sky-500/25 border border-sky-200/30 shadow-[0_18px_70px_rgba(56,189,248,0.25)] flex items-center justify-center">
-                                <Mic className="w-12 h-12 text-white" />
-                              </div>
-                              <div className="mt-4 text-sm font-black text-white/95">Sesli paylaşım</div>
-                              <div className="mt-2 text-xs text-white/80 max-w-[260px] text-center">
-                                {recordedUrl ? 'Kayıt hazır.' : 'Ses dosyan hazırlanıyor…'}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        )}
                       </div>
-
-                      {recordedUrl ? <audio src={recordedUrl} controls className="w-full" /> : <div className="text-sm text-gray-600">Ses önizleme burada.</div>}
                     </div>
+                  )}
+
+                  {/* Dinamik Gönder Butonu */}
+                  {canShowSubmitInMediaStep && (
+                    <div className="pt-2">
+                      {videoThumbs.length === 0 ? (
+                        <div className="w-full py-4 rounded-2xl bg-gray-100 text-gray-400 font-black text-sm flex items-center justify-center gap-3 cursor-not-allowed">
+                          <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin"></div>
+                          ÖNİZLEMELER YÜKLENİYOR...
+                        </div>
+                      ) : (
+                        <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-black text-md shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all">
+                          {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'DEVAM ET'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : contentType === 'image' ? (
                   ) : contentType === 'image' ? (
                     <div className="rounded-2xl border border-gray-200 bg-white p-4">
                       {imagePreviews.length > 0 ? (
