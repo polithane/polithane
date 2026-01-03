@@ -160,6 +160,11 @@ export const CreatePolitPage = () => {
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const previewRef = useRef(null);
+  const recordCanvasRef = useRef(null);
+  const recordCanvasRafRef = useRef(null);
+  const recordOutStreamRef = useRef(null);
+  const [recordPreviewFit, setRecordPreviewFit] = useState('contain'); // contain | cover
+  const [recordStreamNote, setRecordStreamNote] = useState('');
   const recordTimeoutRef = useRef(null);
   const recordIntervalRef = useRef(null);
   const recordStartTsRef = useRef(0);
@@ -169,6 +174,7 @@ export const CreatePolitPage = () => {
   const [videoFacingMode, setVideoFacingMode] = useState('user'); // user | environment
   // NOTE: Mobile browsers often handle rotation metadata automatically.
   // Applying a manual rotate(90deg) can cause sideways previews on some devices.
+  const [videoRotate, setVideoRotate] = useState(false);
 
   const imageUploadRef = useRef(null);
   const imageCaptureRef = useRef(null);
@@ -338,68 +344,91 @@ export const CreatePolitPage = () => {
     });
 
   const resetMedia = () => {
-  setFiles([]);
-  try {
-    (videoThumbs || []).forEach((t) => {
-      if (t?.previewUrl) URL.revokeObjectURL(t.previewUrl);
-    });
-  } catch {
-    // ignore
-  }
-  setVideoThumbs([]);
-  setSelectedVideoThumbIdx(0);
-  setVideoThumbRefreshCount(0);
-  setVideoThumbGenSeed(0);
-  if (recordedUrl) {
+    setFiles([]);
     try {
-      URL.revokeObjectURL(recordedUrl);
+      (videoThumbs || []).forEach((t) => {
+        if (t?.previewUrl) URL.revokeObjectURL(t.previewUrl);
+      });
     } catch {
       // ignore
     }
-  }
-  setRecordedUrl('');
-  // setVideoRotate(false); SİLİNDİ
-  setRecordSecLeft(MAX_RECORD_SEC);
-  recordStopFiredRef.current = false;
-  if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
-  recordIntervalRef.current = null;
-  setPreparingMedia(false);
-  setUploadPct(0);
-  setUploadHint('');
-  chunksRef.current = [];
-  setIsRecording(false);
-  if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
-  recordTimeoutRef.current = null;
-  // CANVAS İLE İLGİLİ SATIRLAR SİLİNDİ
-  try {
-    if (videoUploadRef.current) videoUploadRef.current.value = '';
-    if (audioUploadRef.current) audioUploadRef.current.value = '';
-    if (imageUploadRef.current) imageUploadRef.current.value = '';
-    if (imageCaptureRef.current) imageCaptureRef.current.value = '';
-  } catch {
-    // ignore
-  }
-  try {
-    if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
-  } catch {
-    // ignore
-  }
-  if (streamRef.current) {
+    setVideoThumbs([]);
+    setSelectedVideoThumbIdx(0);
+    setVideoThumbRefreshCount(0);
+    setVideoThumbGenSeed(0);
+    if (recordedUrl) {
+      try {
+        URL.revokeObjectURL(recordedUrl);
+      } catch {
+        // ignore
+      }
+    }
+    setRecordedUrl('');
+    setVideoRotate(false);
+    setRecordSecLeft(MAX_RECORD_SEC);
+    recordStopFiredRef.current = false;
+    if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+    recordIntervalRef.current = null;
+    setPreparingMedia(false);
+    setUploadPct(0);
+    setUploadHint('');
+    chunksRef.current = [];
+    setIsRecording(false);
+    if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
+    recordTimeoutRef.current = null;
+    // Stop canvas capture loop + stream (if used)
     try {
-      streamRef.current.getTracks().forEach((t) => t.stop());
+      if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
+      recordCanvasRafRef.current = null;
     } catch {
       // ignore
     }
-    streamRef.current = null;
-  }
-  if (previewRef.current) {
     try {
-      previewRef.current.srcObject = null;
+      const out = recordOutStreamRef.current;
+      out?.stop?.();
+      const cs = out?.canvasStream;
+      cs?.getTracks?.()?.forEach?.((t) => t.stop());
+      const src = out?.sourceEl;
+      try {
+        src?.pause?.();
+        if (src) src.srcObject = null;
+      } catch {
+        // ignore
+      }
     } catch {
       // ignore
     }
-  }
-};
+    recordOutStreamRef.current = null;
+    try {
+      if (videoUploadRef.current) videoUploadRef.current.value = '';
+      if (audioUploadRef.current) audioUploadRef.current.value = '';
+      if (imageUploadRef.current) imageUploadRef.current.value = '';
+      if (imageCaptureRef.current) imageCaptureRef.current.value = '';
+    } catch {
+      // ignore
+    }
+    try {
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+    } catch {
+      // ignore
+    }
+    if (streamRef.current) {
+      try {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      } catch {
+        // ignore
+      }
+      streamRef.current = null;
+    }
+    if (previewRef.current) {
+      try {
+        previewRef.current.srcObject = null;
+      } catch {
+        // ignore
+      }
+    }
+  };
+
   const resetAll = () => {
     setStep('type');
     setContentType('');
@@ -945,297 +974,57 @@ export const CreatePolitPage = () => {
     });
 
   const startRecording = async () => {
-  if (isRecording) return;
-  resetMedia();
-  try {
-    // BASİT - SADECE KAMERA AL
-    let stream = null;
-    if (contentType === 'video') {
-      // ASPECT RATIO VS. HİÇBİR KISITLAMA YOK
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: { ideal: videoFacingMode }
-          // width/height/aspectRatio TANIMLAMA - TARAYICI NE VERİRSE
-        },
+    if (isRecording) return;
+    resetMedia();
+    try {
+      const constraints = {
+        video: contentType === 'video' ? {
+          facingMode: { ideal: videoFacingMode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          aspectRatio: { ideal: 9/16 }
+        } : false,
         audio: true,
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      const recorder = new MediaRecorder(stream, { 
+        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' 
       });
-    } else {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-    streamRef.current = stream;
-    
-    // ASPECT RATIO UYGULAMA YOK - VİDEO OLDUĞU GİBİ
-      // Live preview for video recording (raw stream first; we may swap to canvas stream later)
-      if (contentType === 'video' && previewRef.current) {
-        try {
-          previewRef.current.srcObject = stream;
-          previewRef.current.muted = true;
-          previewRef.current.playsInline = true;
-          // Some mobile browsers require the attribute for inline playback.
-          previewRef.current.setAttribute('playsinline', 'true');
-          previewRef.current.setAttribute('webkit-playsinline', 'true');
-          await previewRef.current.play().catch(() => null);
-          // Retry shortly (iOS sometimes needs a second tick)
-          setTimeout(() => {
-            try { previewRef.current?.play?.().catch(() => null); } catch { /* ignore */ }
-          }, 250);
-        } catch {
-          // ignore
-        }
-      }
-
-      // IMPORTANT: The goal is to record portrait video natively (9:16).
-      // We've requested portrait constraints above, but some browsers/cameras may ignore them.
-      // If the stream comes in landscape despite our constraints, we use canvas to rotate/fit it
-      // into a 9:16 portrait container (no crop/zoom - letterbox with black bars is acceptable).
-      let outStream = stream;
-      if (contentType === 'video') {
-        try {
-          const vRaw = previewRef.current;
-          const canvas = recordCanvasRef.current;
-          // Wait for metadata so we can reliably determine the actual stream orientation
-          await new Promise((resolve) => setTimeout(resolve, 140));
-          const vw = Number(vRaw?.videoWidth || 0) || 0;
-          const vh = Number(vRaw?.videoHeight || 0) || 0;
-          const isPortrait = vw > 0 && vh > 0 ? vh >= vw : false;
-          const devicePortrait = (() => {
-            try {
-              return window.matchMedia?.('(orientation: portrait)')?.matches || window.innerHeight > window.innerWidth;
-            } catch {
-              return false;
-            }
-          })();
-
-          // Preview should feel vertical when portrait is supported.
-          setRecordPreviewFit(isPortrait ? 'cover' : 'contain');
-
-          if (isPortrait) {
-            // SUCCESS: Stream is already portrait (9:16) - record directly without any transformation
-            outStream = stream;
-          } else if (vRaw && canvas && canvas.getContext) {
-            // FALLBACK: Stream came in landscape despite our constraints
-            // We'll use canvas to fit it into a portrait container (no crop - letterbox is OK)
-            const shouldRotate = !!devicePortrait;
-            setRecordStreamNote(
-              shouldRotate
-                ? '✓ Video dikey kaydedilecek (tarayıcı yatay stream verdi, döndürülüyor - yakınlaştırma yok).'
-                : '✓ Video dikey formatta kaydedilecek (üst/alt boşluklar olabilir).'
-            );
-
-            // Use a dedicated offscreen source element to draw frames (avoid feedback loop if we swap preview to canvas stream)
-            const sourceEl = document.createElement('video');
-            try {
-              sourceEl.srcObject = stream;
-              sourceEl.muted = true;
-              sourceEl.playsInline = true;
-              sourceEl.setAttribute('playsinline', 'true');
-              sourceEl.setAttribute('webkit-playsinline', 'true');
-              await sourceEl.play().catch(() => null);
-            } catch {
-              // ignore
-            }
-
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              const CW = 720;
-              const CH = 1280;
-              canvas.width = CW;
-              canvas.height = CH;
-              let cancelled = false;
-              const draw = () => {
-                if (cancelled) return;
-                try {
-                  const vw2 = Number(sourceEl.videoWidth || 0) || 0;
-                  const vh2 = Number(sourceEl.videoHeight || 0) || 0;
-                  if (vw2 > 0 && vh2 > 0) {
-                    ctx.fillStyle = '#000000';
-                    ctx.fillRect(0, 0, CW, CH);
-                    if (shouldRotate) {
-                      // Rotate 90deg and fit (contain) into 9:16 canvas
-                      const rotW = vh2;
-                      const rotH = vw2;
-                      const scale = Math.min(CW / rotW, CH / rotH);
-                      ctx.save();
-                      ctx.translate(CW / 2, CH / 2);
-                      ctx.rotate(Math.PI / 2);
-                      ctx.scale(scale, scale);
-                      ctx.drawImage(sourceEl, -vw2 / 2, -vh2 / 2, vw2, vh2);
-                      ctx.restore();
-                    } else {
-                      // Fit as-is (contain) into 9:16 canvas
-                      const scale = Math.min(CW / vw2, CH / vh2);
-                      const dw = Math.max(1, Math.round(vw2 * scale));
-                      const dh = Math.max(1, Math.round(vh2 * scale));
-                      const dx = Math.round((CW - dw) / 2);
-                      const dy = Math.round((CH - dh) / 2);
-                      ctx.drawImage(sourceEl, 0, 0, vw2, vh2, dx, dy, dw, dh);
-                    }
-                  }
-                } catch {
-                  // ignore
-                }
-                recordCanvasRafRef.current = requestAnimationFrame(draw);
-              };
-              draw();
-              const canvasStream = canvas.captureStream?.(30);
-              if (canvasStream) {
-                const audioTracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
-                outStream = new MediaStream([...(canvasStream.getVideoTracks() || []), ...(audioTracks || [])]);
-                recordOutStreamRef.current = {
-                  canvasStream,
-                  sourceEl,
-                  stop: () => {
-                    cancelled = true;
-                  },
-                };
-
-                // Show the *actual recorded* (rotated) view in the preview
-                try {
-                  if (previewRef.current) {
-                    previewRef.current.srcObject = canvasStream;
-                    previewRef.current.muted = true;
-                    previewRef.current.playsInline = true;
-                    previewRef.current.setAttribute('playsinline', 'true');
-                    previewRef.current.setAttribute('webkit-playsinline', 'true');
-                    previewRef.current.play?.().catch(() => null);
-                  }
-                } catch {
-                  // ignore
-                }
-              }
-            }
-          }
-        } catch {
-          // If canvas capture fails, fall back to raw stream
-          outStream = stream;
-        }
-      }
-
-      const mimeType =
-        contentType === 'audio'
-          ? MediaRecorder.isTypeSupported('audio/webm')
-            ? 'audio/webm'
-            : ''
-          : MediaRecorder.isTypeSupported('video/webm')
-            ? 'video/webm'
-            : '';
-      // Target: 720p story-like recording with reasonable bitrate for fast uploads.
-      // These are best-effort; some browsers ignore/reject them.
-      const recorderOptions =
-        contentType === 'video'
-          ? {
-              ...(mimeType ? { mimeType } : {}),
-              videoBitsPerSecond: 2_800_000, // ~2.8 Mbps
-              audioBitsPerSecond: 96_000,
-            }
-          : {
-              ...(mimeType ? { mimeType } : {}),
-              audioBitsPerSecond: 96_000,
-            };
-      let recorder;
-      try {
-        recorder = new MediaRecorder(outStream, recorderOptions);
-      } catch {
-        recorder = new MediaRecorder(outStream, mimeType ? { mimeType } : undefined);
-      }
       recorderRef.current = recorder;
       chunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-      };
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || (contentType === 'audio' ? 'audio/webm' : 'video/webm') });
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
         const url = URL.createObjectURL(blob);
         setRecordedUrl(url);
-        const t = String(blob.type || '').toLowerCase();
-        const ext =
-          contentType === 'audio'
-            ? (t.includes('mpeg') ? 'mp3' : t.includes('mp4') ? 'm4a' : 'webm')
-            : (t.includes('quicktime') ? 'mov' : t.includes('mp4') ? 'mp4' : 'webm');
-        const filename = contentType === 'audio' ? `polit-audio.${ext}` : `polit-video.${ext}`;
-        const file = new File([blob], filename, { type: blob.type });
-        setFiles([file]);
+        setFiles([new File([blob], `polit-video.webm`, { type: blob.type })]);
       };
 
       recorder.start();
       setIsRecording(true);
       recordStartTsRef.current = Date.now();
       setRecordSecLeft(MAX_RECORD_SEC);
-      recordStopFiredRef.current = false;
-      if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+      
       recordIntervalRef.current = setInterval(() => {
-        try {
-          const start = Number(recordStartTsRef.current || 0);
-          if (!start) return;
-          const elapsedSec = Math.floor((Date.now() - start) / 1000);
-          const left = Math.max(0, MAX_RECORD_SEC - elapsedSec);
-          setRecordSecLeft(left);
-          if (left <= 0 && !recordStopFiredRef.current) {
-            recordStopFiredRef.current = true;
-            stopRecording();
-          }
-        } catch {
-          // ignore
-        }
+        const left = MAX_RECORD_SEC - Math.floor((Date.now() - recordStartTsRef.current) / 1000);
+        setRecordSecLeft(Math.max(0, left));
+        if (left <= 0) stopRecording();
       }, 200);
-
-      // Limit: max 1 minute (video + audio)
-      recordTimeoutRef.current = setTimeout(() => {
-        if (recordStopFiredRef.current) return;
-        recordStopFiredRef.current = true;
-        stopRecording();
-      }, MAX_RECORD_SEC * 1000 + 50);
-    } catch {
-      toast.error('Kayıt başlatılamadı. Tarayıcı izinlerini kontrol edin.');
-    }
+    } catch { toast.error('Kamera izni alınamadı.'); }
   };
 
   const stopRecording = () => {
-    if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
-    recordTimeoutRef.current = null;
     if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
     recordIntervalRef.current = null;
-    setRecordSecLeft(MAX_RECORD_SEC);
-    try {
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
-    } catch {
-      // ignore
-    }
-    // Stop canvas capture loop + stream (if used)
-    try {
-      if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
-      recordCanvasRafRef.current = null;
-    } catch {
-      // ignore
-    }
-    try {
-      const out = recordOutStreamRef.current;
-      out?.stop?.();
-      const cs = out?.canvasStream;
-      cs?.getTracks?.()?.forEach?.((t) => t.stop());
-    } catch {
-      // ignore
-    }
-    recordOutStreamRef.current = null;
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     if (streamRef.current) {
-      try {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      } catch {
-        // ignore
-      }
+      streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
-    }
-    if (previewRef.current) {
-      try {
-        previewRef.current.srcObject = null;
-      } catch {
-        // ignore
-      }
     }
     setIsRecording(false);
   };
-
   const fileToDataUrl = (f) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1703,147 +1492,59 @@ export const CreatePolitPage = () => {
                 <div className="space-y-4">
                   {/* Preview */}
                   {contentType === 'video' ? (
-                    <div className="space-y-3">
-                      <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden">
-                        {isRecording ? (
-                          <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
-                            <span className="text-xs font-semibold text-white">Kayıt Yapıyor!</span>
+                    <div className="space-y-4">
+                      <div className="relative rounded-2xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center" style={{ height: '560px' }}>
+                        {isRecording && (
+                          <div className="absolute top-3 right-3 z-30 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/20 text-white text-xs font-semibold">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" /> Kayıt Yapıyor!
                           </div>
-                        ) : null}
-                        {isRecording ? (
-                          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-3">
-                            <div
-                              className={[
-                                'px-2 py-1 md:px-3 md:py-1.5 rounded-xl bg-black/75 border border-white/20 backdrop-blur-sm',
-                                'font-black text-sm md:text-lg tabular-nums',
-                                recordSecLeft <= 9 ? 'text-red-400 animate-pulse' : 'text-sky-300',
-                              ].join(' ')}
-                              aria-label="Kalan süre"
-                              title="Kalan süre"
-                            >
-                              {String(recordSecLeft).padStart(2, '0')}
+                        )}
+                        
+                        <video
+                          ref={previewRef}
+                          src={recordedUrl || undefined}
+                          className="w-full h-full object-cover bg-black"
+                          playsInline muted={isRecording} autoPlay controls={!isRecording && !!recordedUrl}
+                        />
+
+                        {isRecording && (
+                          <div className="absolute bottom-6 w-full flex flex-col items-center gap-4 px-6 z-40">
+                            <div className="px-4 py-1.5 rounded-full bg-black/60 text-sky-300 font-black text-xl tabular-nums backdrop-blur-md border border-white/10">
+                               00:{String(recordSecLeft).padStart(2, '0')}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                recordStopFiredRef.current = true;
-                                stopRecording();
-                              }}
-                              className={[
-                                'relative rounded-full bg-red-600 hover:bg-red-700 text-white flex flex-col items-center justify-center leading-none overflow-hidden',
-                                'shadow-[0_18px_60px_rgba(0,0,0,0.55)]',
-                                // Base fallback
-                                'w-28 h-28',
-                                // Mobile/tablet (coarse pointer): bigger + readable (even if viewport is wide)
-                                '[@media(pointer:coarse)]:w-40 [@media(pointer:coarse)]:h-40',
-                                // Desktop (fine pointer): smaller (PC was too big)
-                                '[@media(pointer:fine)]:w-20 [@media(pointer:fine)]:h-20',
-                              ].join(' ')}
-                              aria-label="Durdur"
-                              title="Durdur"
+                            <button 
+                              type="button" 
+                              onClick={stopRecording} 
+                              className="w-20 h-20 rounded-full bg-red-600 border-4 border-white/30 flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all"
                             >
-                              <span className="absolute inset-0 rounded-full ring-4 ring-red-400/35 animate-pulse" />
-                              <span
-                                className={[
-                                  'relative px-3 py-1 rounded-lg bg-black/25 backdrop-blur font-black leading-none drop-shadow',
-                                  'text-lg',
-                                  '[@media(pointer:coarse)]:text-2xl',
-                                  '[@media(pointer:fine)]:text-base',
-                                ].join(' ')}
-                              >
-                                BİTİR
-                              </span>
-                              <span
-                                className={[
-                                  'relative mt-2 bg-white rounded-md',
-                                  'w-6 h-6',
-                                  '[@media(pointer:coarse)]:w-8 [@media(pointer:coarse)]:h-8',
-                                  '[@media(pointer:fine)]:w-5 [@media(pointer:fine)]:h-5',
-                                ].join(' ')}
-                              />
+                              <div className="w-8 h-8 bg-white rounded-sm" />
                             </button>
                           </div>
-                        ) : null}
-                        {isRecording ? (
-  <div className="w-full flex justify-center">
-    <video
-      ref={previewRef}
-      className="max-w-full max-h-[70vh] bg-black"
-      playsInline
-      muted
-      autoPlay
-      style={{
-        // OBJECT-FIT YOK - VİDEO OLDUĞU GİBİ GÖSTER
-        borderRadius: '16px'
-      }}
-    />
-  </div>
-) : recordedUrl ? (
-  <div className="w-full flex justify-center">
-    <video
-      src={recordedUrl}
-      controls
-      className="max-w-full max-h-[70vh] bg-black"
-      playsInline
-      style={{ borderRadius: '16px' }}
-    />
-  </div>
-) : (
-  <div className="p-6 text-sm text-white/80">Video önizleme burada görünecek.</div>
-)}
+                        )}
                       </div>
-                      {recordStreamNote ? (
-                        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                          {recordStreamNote}
-                        </div>
-                      ) : null}
 
-                      {isMobileLike ? (
-                        <div className="flex items-center justify-center gap-2 text-[11px] text-gray-600">
-                          <Smartphone className="w-4 h-4 text-gray-500" />
-                          <span>Telefonu dik tutunuz</span>
+                      {!isRecording && !recordedUrl && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <button type="button" onClick={startRecording} className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}>
+                            <Video className="w-14 h-14" /> Kayda Başla
+                          </button>
+                          <button type="button" onClick={() => videoUploadRef.current?.click()} className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white font-black">
+                            <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} /> Yükle
+                          </button>
+                          <button type="button" onClick={() => setVideoFacingMode(p => p === 'user' ? 'environment' : 'user')} className="col-span-2 py-3 rounded-2xl border-2 font-black">Kamera Değiştir</button>
                         </div>
-                      ) : null}
+                      )}
 
-                      {videoThumbs.length > 0 ? (
-                        <div className="relative">
-                          <div className="text-xs font-black text-gray-900 mb-2">Önizleme seçin</div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {videoThumbs.map((t, i) => (
-                              <button
-                                key={`${t?.previewUrl || ''}_${i}`}
-                                type="button"
-                                onClick={() => setSelectedVideoThumbIdx(i)}
-                                className={[
-                                  'rounded-2xl overflow-hidden border-2 bg-gray-50',
-                                  i === selectedVideoThumbIdx ? theme.borderClass : 'border-gray-200',
-                                ].join(' ')}
-                                title={`Önizleme ${i + 1}`}
-                              >
-                                <img src={t.previewUrl} alt="" className="w-full aspect-video object-cover" />
-                              </button>
-                            ))}
-                          </div>
-                          {videoThumbRefreshCount < 3 ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (videoThumbRefreshCount >= 3) return;
-                                setVideoThumbRefreshCount((c) => c + 1);
-                                setVideoThumbGenSeed((s) => Number(s || 0) + 1);
-                              }}
-                              className="absolute -bottom-1 -right-1 w-11 h-11 rounded-full bg-white border border-gray-200 shadow-sm hover:bg-gray-50 flex items-center justify-center"
-                              aria-label="Önizlemeleri yenile"
-                              title={`Önizlemeleri yenile (${3 - videoThumbRefreshCount} hak kaldı)`}
-                            >
-                              <RotateCcw className="w-5 h-5 text-gray-800" />
+                      {videoThumbs.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2">
+                          {videoThumbs.map((t, i) => (
+                            <button key={i} onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-xl overflow-hidden border-2', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent'].join(' ')}>
+                              <img src={t.previewUrl} className="w-full aspect-video object-cover" />
                             </button>
-                          ) : null}
+                          ))}
                         </div>
-                      ) : null}
-                    </div>
-                  ) : contentType === 'audio' ? (
+                      )}
+                    </div>                  ) : contentType === 'audio' ? (
                     <div className="space-y-3">
                       <div
                         className="relative rounded-2xl border border-gray-200 overflow-hidden"
@@ -1956,6 +1657,7 @@ export const CreatePolitPage = () => {
                     </div>
                   ) : null}
                   {/* hidden canvas used to force portrait recording output */}
+                  <canvas ref={recordCanvasRef} className="hidden" />
 
                   {/* Action buttons */}
                   {!hasMedia && !isRecording ? (
