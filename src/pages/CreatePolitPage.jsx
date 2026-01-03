@@ -25,8 +25,7 @@ export const CreatePolitPage = () => {
   const iconBaseUrls = useMemo(() => {
     try {
       const explicit = String(import.meta.env?.VITE_ICON_BASE_URL || '').trim();
-      const supabaseUrl = String(import.meta.env?.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
-      const bases = [];
+      const supabaseUrl = String(import.meta.env?.VITE_SUPABASE_URL || '').trim().replace(/\/+$/g, '');      const bases = [];
       if (explicit) bases.push(explicit.replace(/\/+$/, ''));
       if (supabaseUrl) {
         bases.push(`${supabaseUrl}/storage/v1/object/public/uploads/ikons`);
