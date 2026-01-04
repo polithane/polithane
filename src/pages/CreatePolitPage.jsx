@@ -1491,7 +1491,7 @@ export const CreatePolitPage = () => {
                 <div className="space-y-4">
                   {/* Preview */}
                   {contentType === 'video' ? (
-                <div className="space-y-3">
+                    <div className="space-y-3">
                   {/* Video Önizleme Alanı - Daha Kompakt */}
                       <div className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center" style={{ height: '360px' }}>                    {isRecording && (
                       <div className="absolute top-2 right-2 z-30 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-red-600/80 text-white text-[10px] font-bold animate-pulse">
@@ -1579,8 +1579,8 @@ export const CreatePolitPage = () => {
                     </div>
                   )}
                 </div>
-              ) : contentType === 'image' ? (
-                <div className="rounded-2xl border border-gray-200 bg-white p-4">                      {imagePreviews.length > 0 ? (
+                  ) : contentType === 'image' ? (
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4">                      {imagePreviews.length > 0 ? (
                         <div className="space-y-3">
                           {/* Main preview (large, button-sized feel) */}
                           <div className="rounded-3xl border border-gray-200 bg-gray-50 overflow-hidden">
@@ -1605,9 +1605,9 @@ export const CreatePolitPage = () => {
                       )}
                     </div>
                   ) : null}
+
                   {/* hidden canvas used to force portrait recording output */}
                   <canvas ref={recordCanvasRef} className="hidden" />
-                </div>
               ) : null}
 
                   {/* Action buttons */}
