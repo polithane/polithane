@@ -15,9 +15,10 @@ export const CreatePolitPage = () => {
 
   const isFastMode = useMemo(() => String(location?.pathname || '') === '/fast-at', [location?.pathname]);
 
+  const [step, setStep] = useState('type'); // type | agenda | media | desc | success
+  const [descTarget, setDescTarget] = useState('primary'); // primary | cross
   const isFastUi = useMemo(() => (step === 'success' || descTarget === 'cross' ? !isFastMode : isFastMode), [descTarget, isFastMode, step]);
 
-  const [step, setStep] = useState('type'); // type | agenda | media | desc | success
   const [contentType, setContentType] = useState(''); // video | image | audio | text
   const [agendaTag, setAgendaTag] = useState(''); // '' => gündem dışı
   const [agendas, setAgendas] = useState([]);
@@ -139,7 +140,6 @@ export const CreatePolitPage = () => {
 
   const [primaryPost, setPrimaryPost] = useState(null);
   const [offerBusy, setOfferBusy] = useState(false);
-  const [descTarget, setDescTarget] = useState('primary'); // primary | cross
 
   const [isMobileLike, setIsMobileLike] = useState(() => {
     try {
