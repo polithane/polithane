@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Camera, Trash2, Video, Image as ImageIcon, Music, PenTool, UploadCloud, Mic, StopCircle, Smartphone, RotateCcw } from 'lucide-react';
+import { Camera, Trash2, Video, Image as ImageIcon, Music, PenTool, UploadCloud, Mic, StopCircle, Smartphone, RotateCcw, SwitchCamera } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiCall, posts as postsApi } from '../utils/api';
@@ -168,6 +168,7 @@ export const CreatePolitPage = () => {
   const recordIntervalRef = useRef(null);
   const recordStartTsRef = useRef(0);
   const recordStopFiredRef = useRef(false);
+  const recordDiscardOnStopRef = useRef(false);
   const MAX_RECORD_SEC = 60;
   const [recordSecLeft, setRecordSecLeft] = useState(60);
   const [videoFacingMode, setVideoFacingMode] = useState('user'); // user | environment
@@ -972,13 +973,14 @@ export const CreatePolitPage = () => {
       }
     });
 
-  const startRecording = async () => {
+  const startRecording = async (opts = {}) => {
     if (isRecording) return;
     resetMedia();
     try {
+      const facingMode = String(opts?.facingMode || videoFacingMode || 'user');
       const constraints = {
         video: contentType === 'video' ? {
-          facingMode: { ideal: videoFacingMode },
+          facingMode: { ideal: facingMode },
           width: { ideal: 1280 },
           height: { ideal: 720 },
           aspectRatio: { ideal: 9/16 }
@@ -995,6 +997,11 @@ export const CreatePolitPage = () => {
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
+        if (recordDiscardOnStopRef.current) {
+          recordDiscardOnStopRef.current = false;
+          chunksRef.current = [];
+          return;
+        }
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
         const url = URL.createObjectURL(blob);
         setRecordedUrl(url);
@@ -1023,6 +1030,25 @@ export const CreatePolitPage = () => {
       streamRef.current = null;
     }
     setIsRecording(false);
+  };
+
+  const toggleVideoOrientation = () => {
+    setVideoRotate((p) => !p);
+  };
+
+  const toggleVideoCamera = async () => {
+    const next = videoFacingMode === 'user' ? 'environment' : 'user';
+    setVideoFacingMode(next);
+    if (!isRecording) return;
+    recordDiscardOnStopRef.current = true;
+    stopRecording();
+    setTimeout(() => {
+      try {
+        startRecording({ facingMode: next });
+      } catch {
+        // ignore
+      }
+    }, 260);
   };
   const fileToDataUrl = (f) =>
     new Promise((resolve, reject) => {
@@ -1503,21 +1529,48 @@ export const CreatePolitPage = () => {
                       ref={previewRef}
                       src={recordedUrl || undefined}
                       className="w-full h-full object-cover bg-black"
+                      style={
+                        videoRotate
+                          ? { transform: 'rotate(90deg)', transformOrigin: 'center center' }
+                          : undefined
+                      }
                       playsInline muted={isRecording} autoPlay controls={!isRecording && !!recordedUrl}
                     />
 
                     {isRecording && (
-                      <div className="absolute bottom-4 w-full flex flex-col items-center gap-3 z-40">
-                        <div className="px-3 py-1 rounded-full bg-black/60 text-sky-300 font-black text-sm tabular-nums backdrop-blur-md">
-                           00:{String(recordSecLeft).padStart(2, '0')}
+                      <div className="absolute bottom-4 left-0 right-0 z-40 px-4">
+                        <div className="flex items-end justify-between">
+                          <button
+                            type="button"
+                            onClick={toggleVideoOrientation}
+                            className="w-12 h-12 rounded-full bg-black/55 border border-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/65 active:scale-95 transition-all"
+                            aria-label="Yatay/Dikey"
+                          >
+                            <Smartphone className={['w-6 h-6 transition-transform', videoRotate ? 'rotate-90' : 'rotate-0'].join(' ')} />
+                          </button>
+
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="px-3 py-1 rounded-full bg-black/60 text-sky-300 font-black text-sm tabular-nums backdrop-blur-md">
+                              00:{String(recordSecLeft).padStart(2, '0')}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={stopRecording}
+                              className="w-14 h-14 rounded-full bg-red-600 border-4 border-white/30 flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all"
+                            >
+                              <div className="w-6 h-6 bg-white rounded-sm" />
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={toggleVideoCamera}
+                            className="w-12 h-12 rounded-full bg-black/55 border border-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/65 active:scale-95 transition-all"
+                            aria-label="Ön/Arka Kamera"
+                          >
+                            <SwitchCamera className="w-6 h-6" />
+                          </button>
                         </div>
-                        <button 
-                          type="button" 
-                          onClick={stopRecording} 
-                          className="w-14 h-14 rounded-full bg-red-600 border-4 border-white/30 flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all"
-                        >
-                          <div className="w-6 h-6 bg-white rounded-sm" />
-                        </button>
                       </div>
                     )}
                   </div>
@@ -1530,9 +1583,6 @@ export const CreatePolitPage = () => {
                       </button>
                       <button type="button" onClick={() => videoUploadRef.current?.click()} className="rounded-2xl py-3 flex flex-col items-center justify-center gap-1 border-2 border-gray-300 bg-white font-black text-[10px] text-gray-700 active:scale-95">
                         <UploadCloud className="w-6 h-6" style={{ color: theme.primary }} /> Yükle
-                      </button>
-                      <button type="button" onClick={() => setVideoFacingMode(p => p === 'user' ? 'environment' : 'user')} className="col-span-2 py-1.5 rounded-xl border border-gray-200 bg-gray-50 text-[9px] font-bold text-gray-500">
-                        Kamerayı Çevir
                       </button>
                     </div>
                   )}
@@ -1608,10 +1658,9 @@ export const CreatePolitPage = () => {
 
                   {/* hidden canvas used to force portrait recording output */}
                   <canvas ref={recordCanvasRef} className="hidden" />
-              ) : null}
 
                   {/* Action buttons */}
-                  {!hasMedia && !isRecording ? (
+                  {!hasMedia && !isRecording && contentType !== 'video' ? (
                   <div className="grid grid-cols-2 gap-3">
                     {contentType === 'video' ? (
                       <>
