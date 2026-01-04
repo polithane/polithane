@@ -1088,17 +1088,17 @@ export const FastViewerPage = () => {
             ) : current.content_type === 'image' ? (
               <img src={itemSrc} alt="" className="h-full w-full object-cover" draggable={false} />
             ) : current.content_type === 'video' ? (
-              <div className="absolute inset-0">
-                <video
-                  ref={videoRef}
-                  src={itemSrc}
-                  playsInline
-                  muted={muted}
-                  autoPlay
-                  controls={false}
-                  className={['h-full w-full', isPortraitVideo ? 'object-cover' : 'object-contain'].join(' ')}
-                />
-              </div>
+              <video
+                ref={videoRef}
+                src={itemSrc}
+                playsInline
+                muted={muted}
+                autoPlay
+                controls={false}
+                className={[
+                  isPortraitVideo ? 'absolute inset-0 object-cover' : 'h-full w-full object-contain'
+                ].join(' ')}
+              />
             ) : current.content_type === 'audio' ? (
               <div className="h-full w-full flex items-center justify-center p-6">
                 <audio ref={audioRef} src={itemSrc} autoPlay />

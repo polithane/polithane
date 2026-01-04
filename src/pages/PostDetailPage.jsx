@@ -146,7 +146,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   if (!url) return null;
 
   return (
-    <div className={['w-full', isPortrait ? 'max-w-[520px] mx-auto' : ''].join(' ').trim()}>
+    <div className="w-full">
       <video
         ref={videoRef}
         src={url}
@@ -205,6 +205,10 @@ const SmartVideo = ({ src, autoPlay = false }) => {
             />
           </div>
 
+          <div className="text-xs font-semibold text-primary-blue tabular-nums px-2">
+            {Math.floor(safeT)} / {Math.floor(safeDur)}
+          </div>
+
           <button
             type="button"
             onClick={() => setMuted((v) => !v)}
@@ -214,13 +218,6 @@ const SmartVideo = ({ src, autoPlay = false }) => {
           >
             {muted ? <VolumeX className="w-5 h-5 text-gray-700" /> : <Volume2 className="w-5 h-5 text-gray-700" />}
           </button>
-        </div>
-
-        <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-          <div className="font-mono">
-            {formatDuration(safeT)} / {formatDuration(safeDur)}
-          </div>
-          {blocked ? <div className="font-semibold text-amber-700">Oynatma için dokunmanız gerekebilir.</div> : <div />}
         </div>
       </div>
     </div>
