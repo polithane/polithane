@@ -98,8 +98,8 @@ export const CreatePolitPage = () => {
     () => ({
       primary: 'var(--primary-color)',
       borderClass: 'border-primary-blue',
-      btnClass: 'bg-primary-blue hover:bg-blue-600',
-      btnAltClass: 'border-blue-300 text-primary-blue',
+      btnClass: 'bg-primary-blue hover:opacity-90',
+      btnAltClass: 'border-primary-blue text-primary-blue',
       ringClass: 'ring-primary-blue/20',
     }),
     []
@@ -1669,7 +1669,7 @@ export const CreatePolitPage = () => {
                         <div className="flex items-center justify-between px-1">
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Kapak Seç</span>
                           {videoThumbs.length > 0 && (
-                             <button type="button" onClick={() => setVideoThumbGenSeed(s => s+1)} className="text-blue-600 text-[9px] font-bold flex items-center gap-1"><RotateCcw className="w-3 h-3"/> Yenile</button>
+                             <button type="button" onClick={() => setVideoThumbGenSeed(s => s+1)} className="text-primary-blue text-[9px] font-bold flex items-center gap-1"><RotateCcw className="w-3 h-3"/> Yenile</button>
                           )}
                         </div>
                         <div className="grid grid-cols-3 gap-1.5">
@@ -1923,7 +1923,7 @@ export const CreatePolitPage = () => {
                     maxLength={TEXT_MAX}
                     className={[
                       'w-full px-4 py-3 border-2 rounded-2xl outline-none resize-none',
-                      isFastUi ? 'border-rose-200 focus:border-rose-500' : 'border-blue-200 focus:border-primary-blue',
+                      isFastUi ? 'border-rose-200 focus:border-rose-500' : 'border-primary-blue focus:border-primary-blue',
                     ].join(' ')}
                     placeholder="En az 10, en fazla 300 karakter…"
                   />
