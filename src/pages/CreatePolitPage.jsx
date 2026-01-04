@@ -15,6 +15,8 @@ export const CreatePolitPage = () => {
 
   const isFastMode = useMemo(() => String(location?.pathname || '') === '/fast-at', [location?.pathname]);
 
+  const isFastUi = useMemo(() => (step === 'success' || descTarget === 'cross' ? !isFastMode : isFastMode), [descTarget, isFastMode, step]);
+
   const [step, setStep] = useState('type'); // type | agenda | media | desc | success
   const [contentType, setContentType] = useState(''); // video | image | audio | text
   const [agendaTag, setAgendaTag] = useState(''); // '' => gündem dışı
@@ -106,7 +108,10 @@ export const CreatePolitPage = () => {
   // - Polit → offer Fast => Fast (red)
   // - Fast → offer Polit => Polit (blue)
   const offerTheme = useMemo(() => (isFastMode ? themePolit : themeFast), [isFastMode, themeFast, themePolit]);
-  const theme = useMemo(() => (step === 'success' ? offerTheme : baseTheme), [baseTheme, offerTheme, step]);
+  const theme = useMemo(
+    () => ((step === 'success' || descTarget === 'cross') ? offerTheme : baseTheme),
+    [baseTheme, descTarget, offerTheme, step]
+  );
 
   const approvalPending = useMemo(() => {
     if (!isAuthenticated) return false;
@@ -162,6 +167,7 @@ export const CreatePolitPage = () => {
   const recordCanvasRef = useRef(null);
   const recordCanvasRafRef = useRef(null);
   const recordOutStreamRef = useRef(null);
+  const activeVideoDeviceIdRef = useRef('');
   const [recordPreviewFit, setRecordPreviewFit] = useState('contain'); // contain | cover
   const [recordStreamNote, setRecordStreamNote] = useState('');
   const recordTimeoutRef = useRef(null);
@@ -207,13 +213,22 @@ export const CreatePolitPage = () => {
   }, [agendas]);
 
   const hasMedia = useMemo(() => files.length > 0 || !!recordedUrl, [files.length, recordedUrl]);
+  const isCoverPreparing = useMemo(() => {
+    if (step !== 'media') return false;
+    if (contentType !== 'video') return false;
+    if (!recordedUrl) return false;
+    if (isRecording) return false;
+    if (preparingMedia) return false;
+    return (videoThumbs?.length || 0) === 0;
+  }, [contentType, isRecording, preparingMedia, recordedUrl, step, videoThumbs?.length]);
   const canShowSubmitInMediaStep = useMemo(() => {
     // Hide submit button during picking/recording; show only when we have a preview-ready media.
     if (step !== 'media') return false;
     if (isRecording) return false;
     if (preparingMedia) return false;
+    if (contentType === 'video' && recordedUrl && (videoThumbs?.length || 0) === 0) return false;
     return hasMedia;
-  }, [hasMedia, isRecording, preparingMedia, step]);
+  }, [contentType, hasMedia, isRecording, preparingMedia, recordedUrl, step, videoThumbs?.length]);
 
   const optimizeImageFile = async (file) => {
     try {
@@ -975,8 +990,8 @@ export const CreatePolitPage = () => {
 
   const startRecording = async (opts = {}) => {
     if (isRecording) return;
-    resetMedia();
     try {
+      if (!opts?.skipReset) resetMedia();
       const facingMode = String(opts?.facingMode || videoFacingMode || 'user');
       const constraints = {
         video: contentType === 'video' ? {
@@ -987,8 +1002,21 @@ export const CreatePolitPage = () => {
         } : false,
         audio: true,
       };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = opts?.stream || (await navigator.mediaDevices.getUserMedia(constraints));
       streamRef.current = stream;
+
+      try {
+        const vt = stream.getVideoTracks?.()?.[0] || null;
+        const s = vt?.getSettings?.() || {};
+        const devId = String(s?.deviceId || '');
+        if (devId) activeVideoDeviceIdRef.current = devId;
+        const fm = String(s?.facingMode || '');
+        // If caller asked for a specific facing mode, do not override UI state with what the browser reports
+        // (some browsers report incorrectly or omit it, which looks like the UI "flips back").
+        if (!opts?.facingMode && (fm === 'user' || fm === 'environment')) setVideoFacingMode(fm);
+      } catch {
+        // ignore
+      }
 
       const recorder = new MediaRecorder(stream, { 
         mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' 
@@ -1037,18 +1065,53 @@ export const CreatePolitPage = () => {
   };
 
   const toggleVideoCamera = async () => {
-    const next = videoFacingMode === 'user' ? 'environment' : 'user';
-    setVideoFacingMode(next);
-    if (!isRecording) return;
+    const prevFacing = videoFacingMode;
+    const next = prevFacing === 'user' ? 'environment' : 'user';
+
+    if (!isRecording) {
+      setVideoFacingMode(next);
+      return;
+    }
+
+    let newStream = null;
+    try {
+      newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: next }, width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 9 / 16 } },
+        audio: true,
+      });
+    } catch {
+      toast.error('Kamera değiştirilemedi.');
+      return;
+    }
+
+    try {
+      const vt = newStream.getVideoTracks?.()?.[0] || null;
+      const s = vt?.getSettings?.() || {};
+      const newDev = String(s?.deviceId || '');
+      const oldDev = String(activeVideoDeviceIdRef.current || '');
+      const fm = String(s?.facingMode || '');
+      const facingOk = fm ? fm === next : true;
+      const deviceOk = newDev && oldDev ? newDev !== oldDev : true;
+
+      if (!facingOk || !deviceOk) {
+        try { newStream.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
+        toast.error('Bu cihazda diğer kamera kullanılamıyor.');
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
     recordDiscardOnStopRef.current = true;
     stopRecording();
     setTimeout(() => {
       try {
-        startRecording({ facingMode: next });
+        startRecording({ stream: newStream, skipReset: true, facingMode: next });
+        setVideoFacingMode(next);
       } catch {
-        // ignore
+        try { newStream.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
       }
-    }, 260);
+    }, 180);
   };
   const fileToDataUrl = (f) =>
     new Promise((resolve, reject) => {
@@ -1405,19 +1468,22 @@ export const CreatePolitPage = () => {
         <div className="max-w-md mx-auto scale-[0.85] lg:scale-[0.80] origin-top">
           <div className={['bg-white rounded-2xl border-2 overflow-hidden shadow-sm', theme.borderClass].join(' ')}>
             {/* Fixed top identity + back */}
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+            <div
+              className="px-5 py-4 border-b border-white/15 flex items-center justify-between gap-3"
+              style={{ backgroundColor: theme.primary }}
+            >
               <div className="flex items-center gap-3 min-w-0">
-                <Avatar src={user?.avatar_url || user?.profile_image} size="46px" verified={isUiVerifiedUser(user)} className="border border-gray-200 flex-shrink-0" />
+                <Avatar src={user?.avatar_url || user?.profile_image} size="46px" verified={isUiVerifiedUser(user)} className="border border-white/20 flex-shrink-0" />
                 <div className="min-w-0">
-                  <div className="font-black text-gray-900 truncate">{user?.full_name || 'Misafir'}</div>
-                  <div className="text-xs text-gray-500 truncate">@{user?.username || '-'}</div>
+                  <div className="font-black text-white truncate">{user?.full_name || 'Misafir'}</div>
+                  <div className="text-xs text-white/80 truncate">@{user?.username || '-'}</div>
                 </div>
               </div>
               {step !== 'success' ? (
                 <button
                   type="button"
                   onClick={step === 'type' ? () => navigate(-1) : goBack}
-                  className={['px-4 py-2 rounded-2xl border-2 font-black bg-white hover:bg-gray-50', theme.btnAltClass].join(' ')}
+                  className="px-4 py-2 rounded-2xl border border-white/30 font-black bg-white/95 hover:bg-white text-gray-900"
                 >
                   Geri Dön
                 </button>
@@ -1547,10 +1613,10 @@ export const CreatePolitPage = () => {
                           <button
                             type="button"
                             onClick={toggleVideoOrientation}
-                            className="w-12 h-12 rounded-full bg-black/55 border border-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/65 active:scale-95 transition-all"
+                            className="w-14 h-14 rounded-full bg-black/55 border-4 border-white/30 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/65 active:scale-95 transition-all"
                             aria-label="Yatay/Dikey"
                           >
-                            <Smartphone className={['w-6 h-6 transition-transform', videoRotate ? 'rotate-90' : 'rotate-0'].join(' ')} />
+                            <Smartphone className={['w-7 h-7 transition-transform', videoRotate ? 'rotate-90' : 'rotate-0'].join(' ')} />
                           </button>
 
                           <div className="flex flex-col items-center gap-3">
@@ -1569,10 +1635,10 @@ export const CreatePolitPage = () => {
                           <button
                             type="button"
                             onClick={toggleVideoCamera}
-                            className="w-12 h-12 rounded-full bg-black/55 border border-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/65 active:scale-95 transition-all"
+                            className="w-14 h-14 rounded-full bg-black/55 border-4 border-white/30 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/65 active:scale-95 transition-all"
                             aria-label="Ön/Arka Kamera"
                           >
-                            <SwitchCamera className="w-6 h-6" />
+                            <SwitchCamera className="w-7 h-7" />
                           </button>
                         </div>
                       </div>
@@ -1593,43 +1659,36 @@ export const CreatePolitPage = () => {
 
                   {/* Önizleme Resimleri Seçeceği */}
                   {recordedUrl && !isRecording && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between px-1">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Kapak Seç</span>
-                        {videoThumbs.length > 0 && (
-                           <button type="button" onClick={() => setVideoThumbGenSeed(s => s+1)} className="text-blue-600 text-[9px] font-bold flex items-center gap-1"><RotateCcw className="w-3 h-3"/> Yenile</button>
-                        )}
+                    isCoverPreparing ? (
+                      <div className="py-6 rounded-2xl border border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-3">
+                        <div className="text-xs font-black text-gray-600">Kapak resimleri hazırlanıyor, lütfen bekleyin!</div>
+                        <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
                       </div>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {videoThumbs.length > 0 ? (
-                          videoThumbs.map((t, i) => (
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Kapak Seç</span>
+                          {videoThumbs.length > 0 && (
+                             <button type="button" onClick={() => setVideoThumbGenSeed(s => s+1)} className="text-blue-600 text-[9px] font-bold flex items-center gap-1"><RotateCcw className="w-3 h-3"/> Yenile</button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {videoThumbs.map((t, i) => (
                             <button key={i} type="button" onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-40'].join(' ')}>
                               <img src={t.previewUrl} className="w-full aspect-video object-cover" />
                             </button>
-                          ))
-                        ) : (
-                          <div className="col-span-3 py-3 flex items-center justify-center bg-gray-50 rounded-lg border border-dashed gap-2">
-                             <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                             <span className="text-[9px] text-gray-400 font-bold uppercase">Kapaklar Hazırlanıyor...</span>
-                          </div>
-                        )}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )
                   )}
                   
                   {/* Dinamik Gönder Butonu */}
                   {canShowSubmitInMediaStep && (
                     <div className="pt-2">
-                      {videoThumbs.length === 0 ? (
-                        <div className="w-full py-4 rounded-2xl bg-gray-100 text-gray-400 font-black text-sm flex items-center justify-center gap-3 cursor-not-allowed">
-                          <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin"></div>
-                          ÖNİZLEMELER YÜKLENİYOR...
-                        </div>
-                      ) : (
-                        <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight">
-                          {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'DEVAM ET'}
-                        </button>
-                      )}
+                      <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight">
+                        {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'GÖNDER'}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1795,7 +1854,7 @@ export const CreatePolitPage = () => {
                     }}
                   />
 
-                  {hasMedia ? (
+                  {hasMedia && !isCoverPreparing ? (
                     <button
                       type="button"
                       onClick={resetMedia}
@@ -1807,7 +1866,7 @@ export const CreatePolitPage = () => {
                   ) : null}
 
                   {/* Continue / Publish */}
-                  {canShowSubmitInMediaStep ? (
+                  {contentType !== 'video' && canShowSubmitInMediaStep ? (
                     !isFastMode ? (
                       <button
                         type="button"
@@ -1864,7 +1923,7 @@ export const CreatePolitPage = () => {
                     maxLength={TEXT_MAX}
                     className={[
                       'w-full px-4 py-3 border-2 rounded-2xl outline-none resize-none',
-                      isFastMode ? 'border-rose-200 focus:border-rose-500' : 'border-blue-200 focus:border-primary-blue',
+                      isFastUi ? 'border-rose-200 focus:border-rose-500' : 'border-blue-200 focus:border-primary-blue',
                     ].join(' ')}
                     placeholder="En az 10, en fazla 300 karakter…"
                   />
