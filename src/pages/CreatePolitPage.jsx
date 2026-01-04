@@ -1518,8 +1518,12 @@ export const CreatePolitPage = () => {
                   {/* Preview */}
                   {contentType === 'video' ? (
                     <div className="space-y-3">
-                  {/* Video Önizleme Alanı - Daha Kompakt */}
-                      <div className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center" style={{ height: '360px' }}>                    {isRecording && (
+                      {/* Video Önizleme Alanı - Daha Kompakt */}
+                      <div
+                        className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center"
+                        style={{ height: '360px' }}
+                      >
+                        {isRecording && (
                       <div className="absolute top-2 right-2 z-30 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-red-600/80 text-white text-[10px] font-bold animate-pulse">
                         KAYITTA
                       </div>
@@ -1630,7 +1634,8 @@ export const CreatePolitPage = () => {
                   )}
                 </div>
                   ) : contentType === 'image' ? (
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4">                      {imagePreviews.length > 0 ? (
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                      {imagePreviews.length > 0 ? (
                         <div className="space-y-3">
                           {/* Main preview (large, button-sized feel) */}
                           <div className="rounded-3xl border border-gray-200 bg-gray-50 overflow-hidden">
@@ -1660,42 +1665,9 @@ export const CreatePolitPage = () => {
                   <canvas ref={recordCanvasRef} className="hidden" />
 
                   {/* Action buttons */}
-                  {!hasMedia && !isRecording && contentType !== 'video' ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    {contentType === 'video' ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={startRecording}
-                          className={[
-                            'rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black',
-                            theme.btnClass,
-                          ].join(' ')}
-                        >
-                          <Video className="w-14 h-14" />
-                          <div>Kayda Başla</div>
-                          <div className="text-[11px] font-semibold opacity-90">
-                            Maximum <span className="font-black">1 Dk.</span> uzunluğunda olabilir
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => videoUploadRef.current?.click()}
-                          className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
-                        >
-                          <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
-                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isRecording}
-                          onClick={() => setVideoFacingMode((p) => (p === 'user' ? 'environment' : 'user'))}
-                          className="col-span-2 px-4 py-3 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black disabled:opacity-60"
-                        >
-                          Kamera Değiştir ({videoFacingMode === 'user' ? 'Ön Kamera' : 'Arka Kamera'})
-                        </button>
-                      </>
-                    ) : contentType === 'image' ? (
+                  {!hasMedia && !isRecording ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {contentType === 'image' ? (
                       <>
                         <button
                           type="button"
@@ -1714,7 +1686,7 @@ export const CreatePolitPage = () => {
                           <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
                         </button>
                       </>
-                    ) : (
+                    ) : contentType === 'audio' ? (
                       <>
                         <button
                           type="button"
@@ -1736,8 +1708,8 @@ export const CreatePolitPage = () => {
                           <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
                         </button>
                       </>
-                    )}
-                  </div>
+                    ) : null}
+                    </div>
                   ) : null}
 
                   <input
