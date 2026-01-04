@@ -96,7 +96,7 @@ export const CreatePolitPage = () => {
   );
   const themePolit = useMemo(
     () => ({
-      primary: '#0B3D91',
+      primary: 'var(--primary-color)',
       borderClass: 'border-primary-blue',
       btnClass: 'bg-primary-blue hover:bg-blue-600',
       btnAltClass: 'border-blue-300 text-primary-blue',
@@ -996,8 +996,8 @@ export const CreatePolitPage = () => {
       const constraints = {
         video: contentType === 'video' ? {
           facingMode: { ideal: facingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 720 },
+          height: { ideal: 1280 },
           aspectRatio: { ideal: 9/16 }
         } : false,
         audio: true,
@@ -1076,7 +1076,7 @@ export const CreatePolitPage = () => {
     let newStream = null;
     try {
       newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: next }, width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 9 / 16 } },
+        video: { facingMode: { ideal: next }, width: { ideal: 720 }, height: { ideal: 1280 }, aspectRatio: { ideal: 9 / 16 } },
         audio: true,
       });
     } catch {
