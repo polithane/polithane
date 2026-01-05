@@ -15,6 +15,19 @@ import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 import { usePublicSite } from '../contexts/PublicSiteContext';
 
+/**
+ * SmartVideo - Custom video player component with unified controls
+ * 
+ * This component provides a consistent video playback experience with:
+ * - Custom control bar (avoiding native controls that create dark overlays on mobile)
+ * - Autoplay with mobile-friendly fallback (muted if needed)
+ * - Seek controls (±10s buttons, scrubber)
+ * - Play/pause, mute/unmute
+ * - Time display showing current/total duration
+ * 
+ * Note: We use a single control bar element to avoid redundancy and ensure
+ * clean, predictable UI across all devices.
+ */
 const SmartVideo = ({ src, autoPlay = false }) => {
   const videoRef = useRef(null);
   const url = String(src || '').trim();
@@ -206,8 +219,8 @@ const SmartVideo = ({ src, autoPlay = false }) => {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="text-sm font-bold text-primary-blue tabular-nums">
-              {Math.floor(safeT)}s
+            <div className="text-sm font-bold text-primary-blue tabular-nums whitespace-nowrap">
+              {formatDuration(safeT)} / {safeDur > 0 ? formatDuration(safeDur) : '0:00'}
             </div>
 
             <button
@@ -226,6 +239,19 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   );
 };
 
+/**
+ * SmartAudio - Custom audio player component with elegant controls
+ * 
+ * Provides a visually appealing audio player with:
+ * - Play/pause button with icon
+ * - Progress bar with scrubber (integrated, no redundant controls)
+ * - Time display (current/total)
+ * - Mute/unmute control
+ * - Gradient design matching the site aesthetic
+ * 
+ * The control bar is designed as a single, unified element to ensure
+ * clean UI and avoid redundant or conflicting controls.
+ */
 const SmartAudio = ({ src }) => {
   const audioRef = useRef(null);
   const url = String(src || '').trim();

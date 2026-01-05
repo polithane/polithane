@@ -1121,6 +1121,10 @@ export const FastViewerPage = () => {
               <img src={itemSrc} alt="" className="h-full w-full object-cover" draggable={false} />
             ) : current.content_type === 'video' ? (
               <div className="absolute inset-0">
+                {/* 
+                  Single video element with videoRef - no duplicates
+                  Uses custom controls via gesture zones to avoid native control overlay issues on mobile
+                */}
                 <video
                   ref={videoRef}
                   src={itemSrc}
