@@ -63,6 +63,7 @@ export const FastViewerPage = () => {
   const [vT, setVT] = useState(0);
   const [vDur, setVDur] = useState(0);
   const [vMeta, setVMeta] = useState({ w: 0, h: 0 });
+  const [imgMeta, setImgMeta] = useState({ w: 0, h: 0 });
 
   // UX: closing Fast should return to home.
   const closeToList = useCallback(() => navigate('/'), [navigate]);
@@ -422,6 +423,7 @@ export const FastViewerPage = () => {
     setVT(0);
     setVDur(0);
     setVMeta({ w: 0, h: 0 });
+    setImgMeta({ w: 0, h: 0 });
   }, [idx]);
 
   useEffect(() => {
@@ -575,6 +577,8 @@ export const FastViewerPage = () => {
   const videoPct = videoSafeDur > 0 ? Math.max(0, Math.min(1, videoSafeT / videoSafeDur)) : 0;
   const videoRatio = vMeta?.w > 0 && vMeta?.h > 0 ? vMeta.w / vMeta.h : 0;
   const isPortraitVideo = videoRatio > 0 && videoRatio < 0.95;
+  const imgRatio = imgMeta?.w > 0 && imgMeta?.h > 0 ? imgMeta.w / imgMeta.h : 0;
+  const isPortraitImage = imgRatio > 0 && imgRatio < 0.95;
 
   const seekVideoPct = (p) => {
     const el = videoRef.current;
@@ -1118,7 +1122,16 @@ export const FastViewerPage = () => {
             {!current ? (
               <div className="h-full w-full flex items-center justify-center text-white/70 text-sm">İçerik bulunamadı.</div>
             ) : current.content_type === 'image' ? (
-              <img src={itemSrc} alt="" className="h-full w-full object-cover" draggable={false} />
+              <img 
+                src={itemSrc} 
+                alt="" 
+                className={['h-full w-full', isPortraitImage ? 'object-cover' : 'object-contain'].join(' ')}
+                draggable={false}
+                onLoad={(e) => {
+                  const img = e.target;
+                  setImgMeta({ w: img.naturalWidth || 0, h: img.naturalHeight || 0 });
+                }}
+              />
             ) : current.content_type === 'video' ? (
               <div className="absolute inset-0">
                 {/* 

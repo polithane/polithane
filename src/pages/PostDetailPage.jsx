@@ -169,8 +169,8 @@ const SmartVideo = ({ src, autoPlay = false }) => {
         controls={false}
         autoPlay={autoPlay}
         preload="metadata"
-        className={['w-full bg-black rounded-lg', isPortrait ? 'object-cover' : 'object-contain'].join(' ')}
-        style={isPortrait ? { height: 'auto', minHeight: '60vh', maxHeight: '80vh' } : { maxHeight: '80vh' }}
+        className={['bg-black rounded-lg', isPortrait ? 'w-full object-cover' : 'max-w-full object-contain'].join(' ')}
+        style={isPortrait ? { height: 'auto', minHeight: '60vh', maxHeight: '80vh' } : { maxHeight: '80vh', height: 'auto' }}
         onClick={togglePlay}
       />
 
@@ -849,7 +849,12 @@ export const PostDetailPage = () => {
                   <div>
                     {activeImageSrc ? (
                       <>
-                        <img src={activeImageSrc} alt="" className="w-full rounded-lg mb-3" />
+                        <img 
+                          src={activeImageSrc} 
+                          alt="" 
+                          className="max-w-full rounded-lg mb-3" 
+                          style={{ height: 'auto' }}
+                        />
                         {imageList.length > 1 && (
                           <div className="mb-3 overflow-x-auto">
                             <div className="flex gap-2 w-max">
