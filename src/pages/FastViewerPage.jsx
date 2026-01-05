@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { normalizeAvatarUrl } from '../utils/avatarUrl';
 import { getProfilePath } from '../utils/paths';
 
-const DEFAULT_DURATION_MS = 3000; // image/text (3 seconds as per requirements)
+const DEFAULT_DURATION_MS = 3000; // image/text display duration
 const HOLD_TO_PAUSE_MS = 120;
 const SWIPE_MIN_PX = 50;
 const SWIPE_DOWN_MIN_PX = 80;
@@ -50,10 +50,11 @@ export const FastViewerPage = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1 for current item
   const [mediaBlocked, setMediaBlocked] = useState(false);
-  // Initialize muted state from localStorage, default to false (sound ON)
+  // Initialize muted state from localStorage, default to false (sound ON by default)
   const [muted, setMuted] = useState(() => {
     try {
       const stored = localStorage.getItem('fast_sound_muted');
+      // String comparison is safer than JSON.parse for boolean values
       return stored === 'true';
     } catch {
       return false;
