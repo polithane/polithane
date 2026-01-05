@@ -1118,14 +1118,14 @@ export const FastViewerPage = () => {
           </button>
 
           {/* content */}
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0 flex items-center justify-center">
             {!current ? (
               <div className="h-full w-full flex items-center justify-center text-white/70 text-sm">İçerik bulunamadı.</div>
             ) : current.content_type === 'image' ? (
               <img 
                 src={itemSrc} 
                 alt="" 
-                className={['h-full w-full', isPortraitImage ? 'object-cover' : 'object-contain'].join(' ')}
+                className={isPortraitImage ? 'h-full w-full object-cover' : 'max-h-full max-w-full'}
                 draggable={false}
                 onLoad={(e) => {
                   const img = e.target;
@@ -1133,7 +1133,7 @@ export const FastViewerPage = () => {
                 }}
               />
             ) : current.content_type === 'video' ? (
-              <div className="absolute inset-0">
+              <div className="absolute inset-0 flex items-center justify-center">
                 {/* 
                   Single video element with videoRef - no duplicates
                   Uses custom controls via gesture zones to avoid native control overlay issues on mobile
@@ -1146,7 +1146,7 @@ export const FastViewerPage = () => {
                   autoPlay
                   controls={false}
                   preload="metadata"
-                  className={['h-full w-full', isPortraitVideo ? 'object-cover' : 'object-contain'].join(' ')}
+                  className={isPortraitVideo ? 'h-full w-full object-cover' : 'max-h-full max-w-full'}
                 />
               </div>
             ) : current.content_type === 'audio' ? (
