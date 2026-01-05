@@ -146,7 +146,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   if (!url) return null;
 
   return (
-    <div className={['w-full', isPortrait ? 'max-w-[520px] mx-auto' : ''].join(' ').trim()}>
+    <div className="w-full">
       <video
         ref={videoRef}
         src={url}
@@ -157,7 +157,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
         autoPlay={autoPlay}
         preload="metadata"
         className={['w-full bg-black rounded-lg', isPortrait ? 'object-cover' : 'object-contain'].join(' ')}
-        style={{ maxHeight: '80vh' }}
+        style={isPortrait ? { height: 'auto', minHeight: '60vh', maxHeight: '80vh' } : { maxHeight: '80vh' }}
         onClick={togglePlay}
       />
 
@@ -205,15 +205,21 @@ const SmartVideo = ({ src, autoPlay = false }) => {
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => setMuted((v) => !v)}
-            className="w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center"
-            aria-label={muted ? 'Sesi aç' : 'Sesi kapat'}
-            title={muted ? 'Sesi aç' : 'Sesi kapat'}
-          >
-            {muted ? <VolumeX className="w-5 h-5 text-gray-700" /> : <Volume2 className="w-5 h-5 text-gray-700" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-bold text-primary-blue tabular-nums">
+              {Math.floor(safeT)}s
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMuted((v) => !v)}
+              className="w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center"
+              aria-label={muted ? 'Sesi aç' : 'Sesi kapat'}
+              title={muted ? 'Sesi aç' : 'Sesi kapat'}
+            >
+              {muted ? <VolumeX className="w-5 h-5 text-gray-700" /> : <Volume2 className="w-5 h-5 text-gray-700" />}
+            </button>
+          </div>
         </div>
 
         <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
