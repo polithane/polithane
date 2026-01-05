@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { X, Heart, Volume2, VolumeX, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { X, Heart, Volume2, VolumeX, ChevronLeft, ChevronRight, Trash2, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Avatar } from '../components/common/Avatar';
 import { LikeBurstHeart } from '../components/common/LikeBurstHeart';
@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { normalizeAvatarUrl } from '../utils/avatarUrl';
 import { getProfilePath } from '../utils/paths';
 
-const DEFAULT_DURATION_MS = 5000; // image/text
+const DEFAULT_DURATION_MS = 3000; // image/text display duration
 const HOLD_TO_PAUSE_MS = 120;
 const SWIPE_MIN_PX = 50;
 const SWIPE_DOWN_MIN_PX = 80;
@@ -50,7 +50,16 @@ export const FastViewerPage = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1 for current item
   const [mediaBlocked, setMediaBlocked] = useState(false);
-  const [muted, setMuted] = useState(false);
+  // Initialize muted state from localStorage, default to false (sound ON by default)
+  const [muted, setMuted] = useState(() => {
+    try {
+      const stored = localStorage.getItem('fast_sound_muted');
+      // String comparison is safer than JSON.parse for boolean values
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [vT, setVT] = useState(0);
   const [vDur, setVDur] = useState(0);
   const [vMeta, setVMeta] = useState({ w: 0, h: 0 });
@@ -280,6 +289,15 @@ export const FastViewerPage = () => {
       cancelled = true;
     };
   }, [queue, userIdx, safeKey]);
+
+  // Persist muted state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('fast_sound_muted', String(muted));
+    } catch {
+      // ignore
+    }
+  }, [muted]);
 
   // Progress + auto-advance for image/text
   useEffect(() => {
@@ -521,6 +539,20 @@ export const FastViewerPage = () => {
       cancelled = true;
     };
   }, [current, idx, muted]);
+
+  // Handle mute state changes for active media
+  useEffect(() => {
+    try {
+      if (current?.content_type === 'video' && videoRef.current) {
+        videoRef.current.muted = !!muted;
+      }
+      if (current?.content_type === 'audio' && audioRef.current) {
+        audioRef.current.muted = !!muted;
+      }
+    } catch {
+      // ignore
+    }
+  }, [muted, current?.content_type]);
 
   // Pause behavior should pause media too
   useEffect(() => {
@@ -845,7 +877,7 @@ export const FastViewerPage = () => {
             <div
               className={[
                 'absolute inset-0 grid',
-                current?.content_type === 'video' ? 'grid-cols-3' : 'grid-cols-2',
+                current?.content_type === 'video' || current?.content_type === 'audio' ? 'grid-cols-3' : 'grid-cols-2',
               ].join(' ')}
             >
               <div
@@ -939,7 +971,7 @@ export const FastViewerPage = () => {
                   finishGesture();
                 }}
               />
-              {current?.content_type === 'video' ? (
+              {current?.content_type === 'video' || current?.content_type === 'audio' ? (
                 <div
                   role="button"
                   tabIndex={-1}
@@ -948,7 +980,7 @@ export const FastViewerPage = () => {
                   onPointerDown={(e) => onPointerDownZone(e, 0)}
                   onPointerMove={onPointerMoveZone}
                   onPointerUp={(e) => {
-                    // Tap center toggles play/pause (no visible controls)
+                    // Tap center toggles play/pause for video/audio
                     const g = gestureRef.current;
                     if (holdTimerRef.current) {
                       clearTimeout(holdTimerRef.current);
@@ -1061,22 +1093,22 @@ export const FastViewerPage = () => {
             </div>
           </div>
 
-          {/* in-card arrows (desktop) */}
+          {/* in-card arrows (desktop) - Navigate between profiles */}
           <button
             type="button"
-            onClick={() => goItem(-1)}
+            onClick={() => goUser(-1)}
             className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
-            aria-label="Önceki Fast"
-            title="Önceki"
+            aria-label="Önceki Profil"
+            title="Önceki Profil"
           >
             <ChevronLeft className="w-7 h-7 text-sky-200" />
           </button>
           <button
             type="button"
-            onClick={() => goItem(1)}
+            onClick={() => goUser(1)}
             className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
-            aria-label="Sonraki Fast"
-            title="Sonraki"
+            aria-label="Sonraki Profil"
+            title="Sonraki Profil"
           >
             <ChevronRight className="w-7 h-7 text-sky-200" />
           </button>
@@ -1096,12 +1128,13 @@ export const FastViewerPage = () => {
                   muted={muted}
                   autoPlay
                   controls={false}
+                  preload="metadata"
                   className={['h-full w-full', isPortraitVideo ? 'object-cover' : 'object-contain'].join(' ')}
                 />
               </div>
             ) : current.content_type === 'audio' ? (
               <div className="h-full w-full flex items-center justify-center p-6">
-                <audio ref={audioRef} src={itemSrc} autoPlay />
+                <audio ref={audioRef} src={itemSrc} autoPlay preload="metadata" />
                 <div
                   className="w-full max-w-[360px] rounded-[22px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden"
                   style={{
@@ -1187,53 +1220,21 @@ export const FastViewerPage = () => {
             </div>
           ) : null}
 
-          {/* viewers (owner only) */}
+          {/* viewers (owner only) - Eye icon with count */}
           {isOwner && current?.id ? (
             <button
               type="button"
               onClick={() => setViewersOpen(true)}
-              className="absolute bottom-4 left-4 z-30 px-3 py-2 rounded-full bg-black/25 border border-white/15 backdrop-blur-sm text-xs font-black text-white/90"
+              className="absolute bottom-4 left-4 z-30 flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/25 border border-white/15 backdrop-blur-sm"
               aria-label="Bakanlar"
               title="Bakanlar"
             >
-              Bakanlar: {Array.isArray(viewers) ? viewers.length : 0}
+              <Eye className="w-4 h-4 text-white/90" />
+              <span className="text-xs font-black text-white/90">{Array.isArray(viewers) ? viewers.length : 0}</span>
             </button>
           ) : null}
         </div>
       </div>
-
-      {/* viewers (only owner) */}
-      {isOwner && current?.id ? (
-        <div className="absolute bottom-6 left-6 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setViewersOpen(true)}
-            className="flex items-center"
-            aria-label="Bakanlar"
-            title="Bakanlar"
-          >
-            <div className="flex -space-x-2">
-              {(viewers || []).slice(0, 3).map((v, i) => (
-                <div key={String(v?.user?.id || i)} className="rounded-full border border-white/15 bg-black/20">
-                  <Avatar src={v?.user?.avatar_url} size="28px" />
-                </div>
-              ))}
-              {(viewers || []).length === 0 ? (
-                <div className="text-xs text-white/60">Bakan yok</div>
-              ) : null}
-            </div>
-          </button>
-          {(viewers || []).length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setViewersOpen(true)}
-              className="text-xs font-black text-white/80 hover:text-white underline"
-            >
-              diğerleri
-            </button>
-          ) : null}
-        </div>
-      ) : null}
 
       <Modal
         isOpen={viewersOpen}
