@@ -1,7 +1,19 @@
 // NOTE:
 // - In production on Vercel, we must call same-origin /api/* (no localhost).
 // - In local dev, fallback to the local backend if VITE_API_URL is not set.
-const API_URL = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
+// - IMPORTANT: Some older envs set VITE_API_URL to ".../api". Normalize to avoid "/api/api/*".
+const normalizeBaseUrl = (base) => {
+  const s = String(base || '');
+  // keep '' for production (same-origin)
+  if (!s) return '';
+  // trim trailing slashes
+  let out = s.replace(/\/+$/, '');
+  // tolerate accidental "/api" suffix
+  if (out.endsWith('/api')) out = out.slice(0, -4);
+  return out;
+};
+
+const API_URL = import.meta.env.PROD ? '' : normalizeBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:5000');
 const DEBUG_API = !import.meta.env.PROD && String(import.meta.env.VITE_DEBUG_API || '').toLowerCase() === 'true';
 
 const debugLog = (...args) => {
