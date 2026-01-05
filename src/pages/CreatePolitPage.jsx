@@ -1058,12 +1058,6 @@ export const CreatePolitPage = () => {
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             
-            // Create gradient once and reuse it
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, '#3b82f6');
-            gradient.addColorStop(0.5, '#8b5cf6');
-            gradient.addColorStop(1, '#ec4899');
-            
             const draw = () => {
               if (!audioAnalyserRef.current) return;
               audioAnimationRef.current = requestAnimationFrame(draw);
@@ -1077,7 +1071,13 @@ export const CreatePolitPage = () => {
               let barHeight;
               let x = 0;
               
+              // Create gradient once per draw call for proper vertical positioning
+              const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+              gradient.addColorStop(0, '#3b82f6');
+              gradient.addColorStop(0.5, '#8b5cf6');
+              gradient.addColorStop(1, '#ec4899');
               ctx.fillStyle = gradient;
+              
               for (let i = 0; i < bufferLength; i++) {
                 barHeight = (dataArray[i] / 255) * canvas.height * 0.8;
                 ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
@@ -1092,9 +1092,19 @@ export const CreatePolitPage = () => {
         }
       }
 
-      const mimeType = contentType === 'audio' 
-        ? (MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/wav')
-        : (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm');
+      // Helper function to get the best supported MIME type
+      const getRecorderMimeType = (type) => {
+        if (type === 'audio') {
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
+          if (MediaRecorder.isTypeSupported('audio/webm')) return 'audio/webm';
+          return 'audio/wav';
+        }
+        // video
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) return 'video/webm;codecs=vp9';
+        return 'video/webm';
+      };
+
+      const mimeType = getRecorderMimeType(contentType);
       
       const recorder = new MediaRecorder(stream, { mimeType });
       recorderRef.current = recorder;
@@ -1110,13 +1120,14 @@ export const CreatePolitPage = () => {
         const url = URL.createObjectURL(blob);
         setRecordedUrl(url);
         // Generate file name with correct extension based on MIME type
-        const getExtension = (mime) => {
+        const getExtension = (mime, type) => {
           if (mime.includes('webm')) return 'webm';
           if (mime.includes('mp4')) return 'mp4';
           if (mime.includes('wav')) return 'wav';
-          return contentType === 'audio' ? 'webm' : 'webm';
+          // Fallback based on content type
+          return type === 'audio' ? 'mp3' : 'mp4';
         };
-        const ext = getExtension(recorder.mimeType);
+        const ext = getExtension(recorder.mimeType, contentType);
         const fileName = contentType === 'audio' ? `polit-audio.${ext}` : `polit-video.${ext}`;
         setFiles([new File([blob], fileName, { type: blob.type })]);
       };
