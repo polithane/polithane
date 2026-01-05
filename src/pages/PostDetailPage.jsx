@@ -221,13 +221,6 @@ const SmartVideo = ({ src, autoPlay = false }) => {
             </button>
           </div>
         </div>
-
-        <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-          <div className="font-mono">
-            {formatDuration(safeT)} / {formatDuration(safeDur)}
-          </div>
-          {blocked ? <div className="font-semibold text-amber-700">Oynatma için dokunmanız gerekebilir.</div> : <div />}
-        </div>
       </div>
     </div>
   );
