@@ -13,7 +13,7 @@ import {
   X
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import api from '../lib/api';
+import api from '../utils/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
 import ShareModal from '../components/ShareModal';
@@ -389,87 +389,14 @@ export default function FastViewerPage() {
               />
             </div>
 
-          {/* in-card arrows (desktop) */}
-          <button
-            type="button"
-            onClick={() => goItem(-1)}
-            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
-            aria-label="Önceki Fast"
-            title="Önceki"
-          >
-            <ChevronLeft className="w-7 h-7 text-sky-200" />
-          </button>
-          <button
-            type="button"
-            onClick={() => goItem(1)}
-            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
-            aria-label="Sonraki Fast"
-            title="Sonraki"
-          >
-            <ChevronRight className="w-7 h-7 text-sky-200" />
-          </button>
-
-          {/* content */}
-          <div className="absolute inset-0 z-0">
-            {!current ? (
-              <div className="h-full w-full flex items-center justify-center text-white/70 text-sm">İçerik bulunamadı.</div>
-            ) : current.content_type === 'image' ? (
-              <img src={itemSrc} alt="" className="h-full w-full object-cover" draggable={false} />
-            ) : current.content_type === 'video' ? (
-              <video
-                ref={videoRef}
-                src={itemSrc}
-                playsInline
-                muted={muted}
-                autoPlay
-                controls={false}
-                className={[
-                  isPortraitVideo ? 'absolute inset-0 object-cover' : 'h-full w-full object-contain'
-                ].join(' ')}
-              />
-            ) : current.content_type === 'audio' ? (
-              <div className="h-full w-full flex items-center justify-center p-6">
-                <audio ref={audioRef} src={itemSrc} autoPlay />
-                <div
-                  className="w-full max-w-[360px] rounded-[22px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden"
-                  style={{
-                    backgroundColor: '#0b1220',
-                    backgroundImage:
-                      'radial-gradient(circle at 20% 20%, rgba(29,78,216,0.35), transparent 55%),' +
-                      'radial-gradient(circle at 80% 30%, rgba(56,189,248,0.22), transparent 55%),' +
-                      'repeating-linear-gradient(to bottom, rgba(255,255,255,0) 0, rgba(255,255,255,0) 26px, rgba(59,130,246,0.22) 27px, rgba(59,130,246,0.22) 28px)',
-                  }}
-                >
-                  <div className="px-6 py-7 flex flex-col items-center">
-                    <div className="w-28 h-28 rounded-full bg-[#1D4ED8] shadow-[0_20px_70px_rgba(29,78,216,0.55)] flex items-center justify-center">
-                      <div className="w-10 h-16 rounded-2xl bg-white/95" />
-                    </div>
-                    <div className="mt-4 text-sm font-black text-white/90">Sesli Fast</div>
-                    <div className="mt-2 text-xs text-white/80 max-w-[260px] text-center">
-                      {String(current?.content_text || current?.content || '').trim()
-                        ? 'Not: ' + String(current.content_text || current.content).slice(0, 110)
-                        : 'Dinliyorsun…'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              // text (notebook style)
-              <div className="h-full w-full flex items-center justify-center p-6">
-                <div
-                  className="w-full max-w-[360px] rounded-[22px] border border-black/10 shadow-[0_30px_90px_rgba(0,0,0,0.35)] overflow-hidden"
-                  style={{
-                    backgroundColor: '#fff7dc',
-                    backgroundImage:
-                      'linear-gradient(to right, rgba(220,38,38,0.25) 0, rgba(220,38,38,0.25) 2px, transparent 2px),' +
-                      'repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 26px, rgba(59,130,246,0.22) 27px, rgba(59,130,246,0.22) 28px)',
-                  }}
-                >
-                  <div className="px-6 py-7">
-                    <div className="text-[22px] leading-snug font-black text-gray-900 whitespace-pre-wrap text-center">
-                      {String(current?.content_text || current?.content || '').trim() || '—'}
-                    </div>
-                  </div>
+            {/* Play/Pause Overlay */}
+            <button
+              onClick={togglePlayPause}
+              className="absolute inset-0 z-10 flex items-center justify-center"
+            >
+              {!isPlaying && (
+                <div className="bg-black/50 rounded-full p-4">
+                  <Play className="w-12 h-12 text-white" fill="white" />
                 </div>
               )}
             </button>
