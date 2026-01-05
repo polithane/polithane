@@ -1058,6 +1058,12 @@ export const CreatePolitPage = () => {
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             
+            // Create gradient once and reuse it
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#3b82f6');
+            gradient.addColorStop(0.5, '#8b5cf6');
+            gradient.addColorStop(1, '#ec4899');
+            
             const draw = () => {
               if (!audioAnalyserRef.current) return;
               audioAnimationRef.current = requestAnimationFrame(draw);
@@ -1071,17 +1077,10 @@ export const CreatePolitPage = () => {
               let barHeight;
               let x = 0;
               
+              ctx.fillStyle = gradient;
               for (let i = 0; i < bufferLength; i++) {
                 barHeight = (dataArray[i] / 255) * canvas.height * 0.8;
-                
-                const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
-                gradient.addColorStop(0, '#3b82f6');
-                gradient.addColorStop(0.5, '#8b5cf6');
-                gradient.addColorStop(1, '#ec4899');
-                
-                ctx.fillStyle = gradient;
                 ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-                
                 x += barWidth + 1;
               }
             };
@@ -1094,7 +1093,7 @@ export const CreatePolitPage = () => {
       }
 
       const mimeType = contentType === 'audio' 
-        ? (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4')
+        ? (MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/wav')
         : (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm');
       
       const recorder = new MediaRecorder(stream, { mimeType });
@@ -1110,7 +1109,15 @@ export const CreatePolitPage = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
         const url = URL.createObjectURL(blob);
         setRecordedUrl(url);
-        const fileName = contentType === 'audio' ? 'polit-audio.webm' : 'polit-video.webm';
+        // Generate file name with correct extension based on MIME type
+        const getExtension = (mime) => {
+          if (mime.includes('webm')) return 'webm';
+          if (mime.includes('mp4')) return 'mp4';
+          if (mime.includes('wav')) return 'wav';
+          return contentType === 'audio' ? 'webm' : 'webm';
+        };
+        const ext = getExtension(recorder.mimeType);
+        const fileName = contentType === 'audio' ? `polit-audio.${ext}` : `polit-video.${ext}`;
         setFiles([new File([blob], fileName, { type: blob.type })]);
       };
 
