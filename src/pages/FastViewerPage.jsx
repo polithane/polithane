@@ -876,7 +876,7 @@ export const FastViewerPage = () => {
             <div
               className={[
                 'absolute inset-0 grid',
-                current?.content_type === 'video' ? 'grid-cols-3' : 'grid-cols-2',
+                current?.content_type === 'video' || current?.content_type === 'audio' ? 'grid-cols-3' : 'grid-cols-2',
               ].join(' ')}
             >
               <div
@@ -970,7 +970,7 @@ export const FastViewerPage = () => {
                   finishGesture();
                 }}
               />
-              {current?.content_type === 'video' ? (
+              {current?.content_type === 'video' || current?.content_type === 'audio' ? (
                 <div
                   role="button"
                   tabIndex={-1}
@@ -979,7 +979,7 @@ export const FastViewerPage = () => {
                   onPointerDown={(e) => onPointerDownZone(e, 0)}
                   onPointerMove={onPointerMoveZone}
                   onPointerUp={(e) => {
-                    // Tap center toggles play/pause (no visible controls)
+                    // Tap center toggles play/pause for video/audio
                     const g = gestureRef.current;
                     if (holdTimerRef.current) {
                       clearTimeout(holdTimerRef.current);
@@ -1092,22 +1092,22 @@ export const FastViewerPage = () => {
             </div>
           </div>
 
-          {/* in-card arrows (desktop) */}
+          {/* in-card arrows (desktop) - Navigate between profiles */}
           <button
             type="button"
-            onClick={() => goItem(-1)}
+            onClick={() => goUser(-1)}
             className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
-            aria-label="Önceki Fast"
-            title="Önceki"
+            aria-label="Önceki Profil"
+            title="Önceki Profil"
           >
             <ChevronLeft className="w-7 h-7 text-sky-200" />
           </button>
           <button
             type="button"
-            onClick={() => goItem(1)}
+            onClick={() => goUser(1)}
             className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
-            aria-label="Sonraki Fast"
-            title="Sonraki"
+            aria-label="Sonraki Profil"
+            title="Sonraki Profil"
           >
             <ChevronRight className="w-7 h-7 text-sky-200" />
           </button>
