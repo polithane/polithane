@@ -186,6 +186,10 @@ export const CreatePolitPage = () => {
   const imageCaptureRef = useRef(null);
   const videoUploadRef = useRef(null);
   const audioUploadRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const audioAnalyserRef = useRef(null);
+  const audioAnimationRef = useRef(null);
+  const audioCanvasRef = useRef(null);
 
   const TEXT_MIN = 10;
   const TEXT_MAX = 300;
@@ -391,6 +395,24 @@ export const CreatePolitPage = () => {
     setIsRecording(false);
     if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
     recordTimeoutRef.current = null;
+    // Stop audio visualization
+    if (audioAnimationRef.current) {
+      try {
+        cancelAnimationFrame(audioAnimationRef.current);
+      } catch {
+        // ignore
+      }
+      audioAnimationRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch {
+        // ignore
+      }
+      audioContextRef.current = null;
+    }
+    audioAnalyserRef.current = null;
     // Stop canvas capture loop + stream (if used)
     try {
       if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
@@ -1018,9 +1040,73 @@ export const CreatePolitPage = () => {
         // ignore
       }
 
-      const recorder = new MediaRecorder(stream, { 
-        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' 
-      });
+      // Setup audio visualization for audio recording
+      if (contentType === 'audio') {
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const analyser = audioContext.createAnalyser();
+          const source = audioContext.createMediaStreamSource(stream);
+          source.connect(analyser);
+          analyser.fftSize = 256;
+          audioContextRef.current = audioContext;
+          audioAnalyserRef.current = analyser;
+          
+          // Start animation
+          const canvas = audioCanvasRef.current;
+          if (canvas) {
+            const ctx = canvas.getContext('2d');
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            const draw = () => {
+              if (!audioAnalyserRef.current) return;
+              audioAnimationRef.current = requestAnimationFrame(draw);
+              
+              analyser.getByteFrequencyData(dataArray);
+              
+              ctx.fillStyle = 'rgb(17, 24, 39)';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              
+              const barWidth = (canvas.width / bufferLength) * 2.5;
+              let barHeight;
+              let x = 0;
+              
+              // Create gradient once per draw call for proper vertical positioning
+              const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+              gradient.addColorStop(0, '#3b82f6');
+              gradient.addColorStop(0.5, '#8b5cf6');
+              gradient.addColorStop(1, '#ec4899');
+              ctx.fillStyle = gradient;
+              
+              for (let i = 0; i < bufferLength; i++) {
+                barHeight = (dataArray[i] / 255) * canvas.height * 0.8;
+                ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                x += barWidth + 1;
+              }
+            };
+            
+            draw();
+          }
+        } catch (err) {
+          console.error('Audio visualization setup failed:', err);
+        }
+      }
+
+      // Helper function to get the best supported MIME type
+      const getRecorderMimeType = (type) => {
+        if (type === 'audio') {
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
+          if (MediaRecorder.isTypeSupported('audio/webm')) return 'audio/webm';
+          return 'audio/wav';
+        }
+        // video
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) return 'video/webm;codecs=vp9';
+        return 'video/webm';
+      };
+
+      const mimeType = getRecorderMimeType(contentType);
+      
+      const recorder = new MediaRecorder(stream, { mimeType });
       recorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
@@ -1033,7 +1119,17 @@ export const CreatePolitPage = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
         const url = URL.createObjectURL(blob);
         setRecordedUrl(url);
-        setFiles([new File([blob], `polit-video.webm`, { type: blob.type })]);
+        // Generate file name with correct extension based on MIME type
+        const getExtension = (mime, type) => {
+          if (mime.includes('webm')) return 'webm';
+          if (mime.includes('mp4')) return 'mp4';
+          if (mime.includes('wav')) return 'wav';
+          // Fallback based on content type
+          return type === 'audio' ? 'mp3' : 'mp4';
+        };
+        const ext = getExtension(recorder.mimeType, contentType);
+        const fileName = contentType === 'audio' ? `polit-audio.${ext}` : `polit-video.${ext}`;
+        setFiles([new File([blob], fileName, { type: blob.type })]);
       };
 
       recorder.start();
@@ -1046,12 +1142,28 @@ export const CreatePolitPage = () => {
         setRecordSecLeft(Math.max(0, left));
         if (left <= 0) stopRecording();
       }, 200);
-    } catch { toast.error('Kamera izni alınamadı.'); }
+    } catch { toast.error(contentType === 'audio' ? 'Mikrofon izni alınamadı.' : 'Kamera izni alınamadı.'); }
   };
 
   const stopRecording = () => {
     if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
     recordIntervalRef.current = null;
+    
+    // Stop audio visualization
+    if (audioAnimationRef.current) {
+      cancelAnimationFrame(audioAnimationRef.current);
+      audioAnimationRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch {
+        // ignore
+      }
+      audioContextRef.current = null;
+    }
+    audioAnalyserRef.current = null;
+    
     if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
@@ -1718,56 +1830,146 @@ export const CreatePolitPage = () => {
                         <div className="text-sm text-gray-600">Resim önizleme burada görünecek.</div>
                       )}
                     </div>
+                  ) : contentType === 'audio' ? (
+                    <div className="space-y-3">
+                      {/* Audio Preview Area */}
+                      <div
+                        className="relative rounded-xl border border-gray-200 bg-gray-900 overflow-hidden flex items-center justify-center"
+                        style={{ height: '360px' }}
+                      >
+                        {isRecording && (
+                          <div className="absolute top-2 right-2 z-30 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-red-600/80 text-white text-[10px] font-bold animate-pulse">
+                            KAYITTA
+                          </div>
+                        )}
+                        
+                        {/* Audio Wave Visualization Canvas */}
+                        <canvas
+                          ref={audioCanvasRef}
+                          width={400}
+                          height={360}
+                          className="w-full h-full"
+                          style={{ display: isRecording ? 'block' : 'none' }}
+                        />
+                        
+                        {/* Audio Player for Recorded Audio */}
+                        {!isRecording && recordedUrl && (
+                          <div className="w-full h-full flex items-center justify-center p-8">
+                            <div className="w-full space-y-4">
+                              <div className="flex items-center justify-center">
+                                <Music className="w-24 h-24 text-blue-400" />
+                              </div>
+                              <audio
+                                src={recordedUrl}
+                                controls
+                                className="w-full"
+                                style={{ filter: 'invert(1) hue-rotate(180deg)' }}
+                              />
+                              <div className="text-center text-gray-300 text-sm">
+                                Ses kaydı hazır
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Initial State */}
+                        {!isRecording && !recordedUrl && (
+                          <div className="text-gray-500 text-center p-8">
+                            <Music className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                            <p className="text-sm">Ses kaydetmek için başlayın</p>
+                          </div>
+                        )}
+
+                        {/* Recording Controls */}
+                        {isRecording && (
+                          <div className="absolute bottom-4 left-0 right-0 z-40 px-4">
+                            <div className="flex items-center justify-center">
+                              <div className="flex flex-col items-center gap-3">
+                                <div className="px-3 py-1 rounded-full bg-black/60 text-sky-300 font-black text-sm tabular-nums backdrop-blur-md">
+                                  00:{String(recordSecLeft).padStart(2, '0')}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={stopRecording}
+                                  className="w-14 h-14 rounded-full bg-red-600 border-4 border-white/30 flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all"
+                                  aria-label="Kaydı Durdur"
+                                >
+                                  <div className="w-6 h-6 bg-white rounded-sm" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Buttons */}
+                      {!isRecording && !recordedUrl && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button 
+                            type="button" 
+                            onClick={startRecording} 
+                            className={['rounded-2xl py-3 flex flex-col items-center justify-center gap-1 text-white font-black text-[10px] active:scale-95', theme.btnClass].join(' ')}
+                          >
+                            <Mic className="w-6 h-6" /> Başla
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => audioUploadRef.current?.click()} 
+                            className="rounded-2xl py-3 flex flex-col items-center justify-center gap-1 border-2 border-gray-300 bg-white font-black text-[10px] text-gray-700 active:scale-95"
+                          >
+                            <UploadCloud className="w-6 h-6" style={{ color: theme.primary }} /> Yükle
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Clear Button */}
+                      {hasMedia && !isRecording && (
+                        <button
+                          type="button"
+                          onClick={resetMedia}
+                          className="w-full py-3 rounded-2xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="w-7 h-7" />
+                          Temizle
+                        </button>
+                      )}
+                      
+                      {/* Submit Button */}
+                      {canShowSubmitInMediaStep && (
+                        <div className="pt-2">
+                          <button 
+                            onClick={() => isFastMode ? publishPrimary() : setStep('desc')} 
+                            className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight"
+                          >
+                            {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'GÖNDER'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ) : null}
 
                   {/* hidden canvas used to force portrait recording output */}
                   <canvas ref={recordCanvasRef} className="hidden" />
 
-                  {/* Action buttons */}
-                  {!hasMedia && !isRecording ? (
+                  {/* Action buttons - only for image, not audio or video */}
+                  {!hasMedia && !isRecording && contentType === 'image' ? (
                     <div className="grid grid-cols-2 gap-3">
-                      {contentType === 'image' ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => imageCaptureRef.current?.click()}
-                          className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}
-                        >
-                          <Camera className="w-14 h-14" />
-                          <div>Resim Çek</div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => imageUploadRef.current?.click()}
-                          className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
-                        >
-                          <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
-                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
-                        </button>
-                      </>
-                    ) : contentType === 'audio' ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={startRecording}
-                          className={[
-                            'rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black',
-                            theme.btnClass,
-                          ].join(' ')}
-                        >
-                          <Mic className="w-14 h-14" />
-                          <div>Kayda Başla</div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => audioUploadRef.current?.click()}
-                          className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
-                        >
-                          <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
-                          <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
-                        </button>
-                      </>
-                    ) : null}
+                      <button
+                        type="button"
+                        onClick={() => imageCaptureRef.current?.click()}
+                        className={['rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 text-white font-black', theme.btnClass].join(' ')}
+                      >
+                        <Camera className="w-14 h-14" />
+                        <div>Resim Çek</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => imageUploadRef.current?.click()}
+                        className="rounded-3xl aspect-square flex flex-col items-center justify-center gap-2 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 font-black"
+                      >
+                        <UploadCloud className="w-14 h-14" style={{ color: theme.primary }} />
+                        <div>{isMobileLike ? 'Telefondan Yükle' : 'Bilgisayardan Yükle'}</div>
+                      </button>
                     </div>
                   ) : null}
 
@@ -1854,7 +2056,7 @@ export const CreatePolitPage = () => {
                     }}
                   />
 
-                  {hasMedia && !isCoverPreparing ? (
+                  {hasMedia && !isCoverPreparing && contentType === 'image' ? (
                     <button
                       type="button"
                       onClick={resetMedia}
@@ -1866,7 +2068,7 @@ export const CreatePolitPage = () => {
                   ) : null}
 
                   {/* Continue / Publish */}
-                  {contentType !== 'video' && canShowSubmitInMediaStep ? (
+                  {contentType !== 'video' && contentType !== 'audio' && canShowSubmitInMediaStep ? (
                     !isFastMode ? (
                       <button
                         type="button"
