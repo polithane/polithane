@@ -63,6 +63,8 @@ export const FastViewerPage = () => {
   const [vT, setVT] = useState(0);
   const [vDur, setVDur] = useState(0);
   const [vMeta, setVMeta] = useState({ w: 0, h: 0 });
+  const pendingStartRef = useRef(null); // null | 'first' | 'last'
+  const pendingUserDirRef = useRef(0); // -1 | 0 | 1 (best-effort when a user has no items)
 
   // UX: closing Fast should return to home.
   const closeToList = useCallback(() => navigate('/'), [navigate]);
@@ -136,6 +138,8 @@ export const FastViewerPage = () => {
         closeToList();
         return;
       }
+      pendingStartRef.current = 'first';
+      pendingUserDirRef.current = dir;
       navigateToUserIndex(next, { replace: true });
     },
     [closeToList, navigateToUserIndex, queue, userIdx]
@@ -146,16 +150,21 @@ export const FastViewerPage = () => {
       setIdx((prev) => {
         const next = prev + dir;
         if (next < 0) {
-          // go to previous user (last item)
+          // go to previous item; if none, previous user's last item; if none, close
           if (userIdx > 0) {
+            pendingStartRef.current = 'last';
+            pendingUserDirRef.current = -1;
             navigateToUserIndex(userIdx - 1, { replace: true });
-            return prev; // idx will be reset when new user loads
+            return prev; // idx will be set when new user loads
           }
-          return 0;
+          closeToList();
+          return prev;
         }
         if (next >= items.length) {
           // next user
           if (userIdx < (queue || []).length - 1) {
+            pendingStartRef.current = 'first';
+            pendingUserDirRef.current = 1;
             navigateToUserIndex(userIdx + 1, { replace: true });
             return prev;
           }
@@ -265,7 +274,18 @@ export const FastViewerPage = () => {
         const list = Array.isArray(rows) ? rows : [];
         if (cancelled) return;
         setItems(list);
-        setIdx(0);
+        const pending = pendingStartRef.current;
+        pendingStartRef.current = null;
+        pendingUserDirRef.current = 0;
+        if (list.length === 0) {
+          // If we somehow landed on a user with no items, fall back to list.
+          // (Queue is normally derived from /api/fast, so this should be rare.)
+          setIdx(0);
+          closeToList();
+          return;
+        }
+        if (pending === 'last') setIdx(Math.max(0, list.length - 1));
+        else setIdx(0);
         // Seed local like counts
         try {
           const next = {};
@@ -762,33 +782,31 @@ export const FastViewerPage = () => {
     finishGesture();
   };
 
-  const UserPreviewCard = ({ u, side }) => {
+  const SideAvatar = ({ u, side }) => {
     if (!u) return null;
-    const dir = side === 'left' ? -1 : 1;
-    const pos = side === 'left' ? 'left-0 -translate-x-[55%]' : 'right-0 translate-x-[55%]';
-    const name = String(u?.username || u?.full_name || '').trim() || 'Fast';
+    const pos = side === 'left' ? 'left-6' : 'right-6';
+    const name = String(u?.username || '').trim() || String(u?.full_name || '').trim() || 'Fast';
     const img = normalizeAvatarUrl(u?.avatar_url || u?.profile_image || '');
     return (
       <button
         type="button"
-        onClick={() => goUser(dir)}
+        onClick={() => navigate(getProfilePath(u || {}))}
         className={[
           'hidden md:flex absolute top-1/2 -translate-y-1/2',
           pos,
-          'w-[240px] max-w-[28vw] h-[74vh] max-h-[560px] rounded-[28px] overflow-hidden',
-          'bg-white/5 border border-white/10 shadow-2xl backdrop-blur-[2px]',
-          'opacity-60 hover:opacity-90 transition-opacity',
+          'items-center gap-3',
+          'px-3 py-2 rounded-full',
+          'bg-black/35 hover:bg-black/55 border border-white/10 backdrop-blur-sm',
+          'shadow-[0_20px_80px_rgba(0,0,0,0.55)]',
+          'opacity-80 hover:opacity-100 transition-opacity',
         ].join(' ')}
-        aria-label={side === 'left' ? 'Önceki kullanıcı' : 'Sonraki kullanıcı'}
+        aria-label={side === 'left' ? 'Önceki Fast sahibi profili' : 'Sonraki Fast sahibi profili'}
+        title={side === 'left' ? 'Önceki Fast sahibinin profili' : 'Sonraki Fast sahibinin profili'}
       >
-        <div className="h-full w-full flex items-center justify-center bg-black/35">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-20 h-20 rounded-full border border-white/20 bg-black/25 overflow-hidden">
-              {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : null}
-            </div>
-            <div className="text-sm font-black text-white/90">@{name}</div>
-          </div>
+        <div className="w-14 h-14 rounded-full border border-white/20 bg-black/25 overflow-hidden flex-shrink-0">
+          {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : null}
         </div>
+        <div className="text-sm font-black text-white/90 max-w-[140px] truncate">@{name}</div>
       </button>
     );
   };
@@ -798,8 +816,8 @@ export const FastViewerPage = () => {
       {/* Backdrop + desktop stage */}
       <div className="absolute inset-0 flex items-center justify-center px-3 md:px-8">
         {/* neighbor user previews (desktop) */}
-        {prevUser ? <UserPreviewCard u={prevUser} side="left" /> : null}
-        {nextUser ? <UserPreviewCard u={nextUser} side="right" /> : null}
+        {prevUser ? <SideAvatar u={prevUser} side="left" /> : null}
+        {nextUser ? <SideAvatar u={nextUser} side="right" /> : null}
 
         {/* main story card */}
         <div
@@ -864,6 +882,28 @@ export const FastViewerPage = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
+          </div>
+
+          {/* desktop item navigation (requested): prev/next FAST with fallback to prev/next profile, else close */}
+          <div className="hidden md:flex absolute top-[62px] left-0 right-0 px-3 z-30 items-center justify-between pointer-events-none">
+            <button
+              type="button"
+              onClick={() => goItem(-1)}
+              className="pointer-events-auto w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 flex items-center justify-center backdrop-blur-sm"
+              aria-label="Önceki Fast"
+              title="Önceki Fast"
+            >
+              <ChevronLeft className="w-7 h-7 text-sky-200" />
+            </button>
+            <button
+              type="button"
+              onClick={() => goItem(1)}
+              className="pointer-events-auto w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 flex items-center justify-center backdrop-blur-sm"
+              aria-label="Sonraki Fast"
+              title="Sonraki Fast"
+            >
+              <ChevronRight className="w-7 h-7 text-sky-200" />
+            </button>
           </div>
 
           {/* tap zones + hold-to-pause */}
@@ -1092,26 +1132,6 @@ export const FastViewerPage = () => {
               />
             </div>
           </div>
-
-          {/* in-card arrows (desktop) - Navigate between profiles */}
-          <button
-            type="button"
-            onClick={() => goUser(-1)}
-            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
-            aria-label="Önceki Profil"
-            title="Önceki Profil"
-          >
-            <ChevronLeft className="w-7 h-7 text-sky-200" />
-          </button>
-          <button
-            type="button"
-            onClick={() => goUser(1)}
-            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
-            aria-label="Sonraki Profil"
-            title="Sonraki Profil"
-          >
-            <ChevronRight className="w-7 h-7 text-sky-200" />
-          </button>
 
           {/* content */}
           <div className="absolute inset-0 z-0">
