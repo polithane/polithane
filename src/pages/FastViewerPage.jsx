@@ -15,6 +15,7 @@ const DEFAULT_DURATION_MS = 3000; // image/text display duration
 const HOLD_TO_PAUSE_MS = 120;
 const SWIPE_MIN_PX = 50;
 const SWIPE_DOWN_MIN_PX = 80;
+const PORTRAIT_ASPECT_RATIO_THRESHOLD = 0.95; // Threshold to detect portrait media (width/height < 0.95)
 
 export const FastViewerPage = () => {
   const navigate = useNavigate();
@@ -576,9 +577,14 @@ export const FastViewerPage = () => {
   const videoSafeT = Number.isFinite(vT) && vT >= 0 ? vT : 0;
   const videoPct = videoSafeDur > 0 ? Math.max(0, Math.min(1, videoSafeT / videoSafeDur)) : 0;
   const videoRatio = vMeta?.w > 0 && vMeta?.h > 0 ? vMeta.w / vMeta.h : 0;
-  const isPortraitVideo = videoRatio > 0 && videoRatio < 0.95;
+  const isPortraitVideo = videoRatio > 0 && videoRatio < PORTRAIT_ASPECT_RATIO_THRESHOLD;
   const imgRatio = imgMeta?.w > 0 && imgMeta?.h > 0 ? imgMeta.w / imgMeta.h : 0;
-  const isPortraitImage = imgRatio > 0 && imgRatio < 0.95;
+  const isPortraitImage = imgRatio > 0 && imgRatio < PORTRAIT_ASPECT_RATIO_THRESHOLD;
+
+  // Helper to get media sizing classes
+  const getMediaClasses = (isPortrait) => {
+    return isPortrait ? 'h-full w-full object-cover' : 'max-h-full max-w-full';
+  };
 
   const seekVideoPct = (p) => {
     const el = videoRef.current;
@@ -1125,7 +1131,7 @@ export const FastViewerPage = () => {
               <img 
                 src={itemSrc} 
                 alt="" 
-                className={isPortraitImage ? 'h-full w-full object-cover' : 'max-h-full max-w-full'}
+                className={getMediaClasses(isPortraitImage)}
                 draggable={false}
                 onLoad={(e) => {
                   const img = e.target;
@@ -1146,7 +1152,7 @@ export const FastViewerPage = () => {
                   autoPlay
                   controls={false}
                   preload="metadata"
-                  className={isPortraitVideo ? 'h-full w-full object-cover' : 'max-h-full max-w-full'}
+                  className={getMediaClasses(isPortraitVideo)}
                 />
               </div>
             ) : current.content_type === 'audio' ? (
