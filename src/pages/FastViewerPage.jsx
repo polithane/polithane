@@ -1088,7 +1088,7 @@ export const FastViewerPage = () => {
             ) : current.content_type === 'image' ? (
               <img src={itemSrc} alt="" className="h-full w-full object-cover" draggable={false} />
             ) : current.content_type === 'video' ? (
-              <div className="absolute inset-0">
+              <div className={isPortraitVideo ? 'fixed inset-0 z-0' : 'absolute inset-0'}>
                 <video
                   ref={videoRef}
                   src={itemSrc}
