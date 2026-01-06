@@ -20,7 +20,9 @@ export const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef(null);
   const notifRef = useRef(null);
+  const notifBtnRef = useRef(null);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
+  const [notifMenuTop, setNotifMenuTop] = useState(64);
 
   const [q, setQ] = useState('');
   const [results, setResults] = useState({ users: [], posts: [], parties: [] });
@@ -116,12 +118,40 @@ export const Header = () => {
     return '';
   };
   const onOpenNotif = async () => {
+    // Position dropdown relative to viewport, not the bell's container.
+    try {
+      const r = notifBtnRef.current?.getBoundingClientRect?.();
+      const top = Number(r?.bottom || 56) + 8;
+      setNotifMenuTop(Math.max(8, Math.min(top, window.innerHeight - 140)));
+    } catch {
+      setNotifMenuTop(64);
+    }
     setShowNotifMenu((v) => !v);
     // only fetch when opening
     if (!showNotifMenu) {
       await fetchNotifications?.({ limit: 10, offset: 0, reset: true });
     }
   };
+
+  // Keep dropdown anchored on resize/orientation changes while open.
+  useEffect(() => {
+    if (!showNotifMenu) return;
+    const update = () => {
+      try {
+        const r = notifBtnRef.current?.getBoundingClientRect?.();
+        const top = Number(r?.bottom || 56) + 8;
+        setNotifMenuTop(Math.max(8, Math.min(top, window.innerHeight - 140)));
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, [showNotifMenu]);
   
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-200 sm:h-[60px] py-2 sm:py-0">
@@ -250,6 +280,7 @@ export const Header = () => {
               {/* Bildirimler */}
               <div className="relative" ref={notifRef}>
                 <button
+                  ref={notifBtnRef}
                   type="button"
                   onClick={onOpenNotif}
                   className={[
@@ -267,7 +298,10 @@ export const Header = () => {
                 </button>
 
                 {showNotifMenu && (
-                  <div className="absolute right-2 sm:right-0 top-12 w-[92vw] max-w-[360px] bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden z-50">
+                  <div
+                    className="fixed right-2 w-[92vw] max-w-[360px] bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden z-50"
+                    style={{ top: notifMenuTop }}
+                  >
                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                       <div className="font-black text-gray-900">Bildirimler</div>
                       <div className="flex items-center gap-2">
@@ -302,6 +336,7 @@ export const Header = () => {
                           const isRead = !!n?.is_read;
                           const actor = n?.actor || null;
                           const title = getNotifTitle(n);
+                          const msg = getNotifMessage(n);
                           const targetPostId = n?.post_id ?? n?.post?.id ?? null;
                           const headerLine = title;
 
@@ -322,29 +357,34 @@ export const Header = () => {
                                   navigate(getProfilePath(actor));
                                 }
                               }}
-                              className={`w-full px-4 py-1.5 flex items-center gap-2 text-left border-b border-gray-100 hover:bg-gray-50 ${
+                              className={`w-full px-4 py-2 flex items-start gap-2 text-left border-b border-gray-100 hover:bg-gray-50 ${
                                 isRead ? '' : 'bg-blue-50/60'
                               }`}
                             >
-                              <Avatar src={actor?.avatar_url} size="32px" verified={isUiVerifiedUser(actor)} />
+                              <Avatar src={actor?.avatar_url} size="28px" verified={isUiVerifiedUser(actor)} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
                                   <div className={`text-[13px] leading-4 ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
                                     {headerLine}
                                   </div>
                                 </div>
+                                {msg ? (
+                                  <div className="mt-0.5 text-[12px] leading-4 text-gray-600 line-clamp-2">
+                                    {msg}
+                                  </div>
+                                ) : null}
                               </div>
 
                               <button
                                 type="button"
-                                className="p-1 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-700"
+                                className="p-1 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-700 mt-0.5"
                                 title="Sil"
                                 onClick={async (e) => {
                                   e.stopPropagation();
                                   if (id) await deleteNotification?.(id);
                                 }}
                               >
-                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </button>
                           );

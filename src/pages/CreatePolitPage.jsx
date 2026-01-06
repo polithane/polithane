@@ -880,8 +880,8 @@ export const CreatePolitPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // IMPORTANT: During recording, the preview <video> is mounted only after `isRecording` is set.
-  // We must attach the stream in an effect (otherwise preview stays black).
+  // IMPORTANT: During recording, attach the stream after the <video> is mounted.
+  // Otherwise the preview can stay black on mobile browsers.
   useEffect(() => {
     if (!isRecording) return;
     if (contentType !== 'video') return;
@@ -1113,6 +1113,7 @@ export const CreatePolitPage = () => {
       // Bu yüzden video kaydında kamerayı bir canvas'a çizip (9:16), canvas.captureStream ile kaydediyoruz.
       // Böylece çıkan dosyanın width/height'i gerçekten dikey olur (rotation metadata'ya güvenmeyiz).
       const buildPortraitRecordingStream = async (sourceStream) => {
+        // Use the hidden DOM canvas so preview & recorder are stable across renders.
         const canvas = recordCanvasRef.current || document.createElement('canvas');
         // Target: Polithane "Polit stage" portrait frame (shared aspect across Polit/Fast)
         // Keep it deterministic so playback and thumbnails are consistent.
@@ -1124,23 +1125,25 @@ export const CreatePolitPage = () => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return { outStream: sourceStream };
 
-        // Use an off-DOM video element as stable draw source
-        const srcVideo = document.createElement('video');
-        srcVideo.muted = true;
-        srcVideo.playsInline = true;
-        try {
-          srcVideo.setAttribute('playsinline', 'true');
-          srcVideo.setAttribute('webkit-playsinline', 'true');
-        } catch {
-          // ignore
-        }
-        srcVideo.srcObject = sourceStream;
-
-        try {
-          await srcVideo.play();
-        } catch {
-          // On some browsers, play may fail until user gesture; recording start is a gesture.
-          // We'll still proceed; draw loop will paint black until frames are ready.
+        // Use the SAME preview <video> element as the draw source.
+        // This avoids "sideways head" issues caused by orientation metadata differences
+        // between off-DOM decoding and on-screen preview decoding.
+        const srcVideo = previewRef.current || document.createElement('video');
+        if (!previewRef.current) {
+          srcVideo.muted = true;
+          srcVideo.playsInline = true;
+          try {
+            srcVideo.setAttribute('playsinline', 'true');
+            srcVideo.setAttribute('webkit-playsinline', 'true');
+          } catch {
+            // ignore
+          }
+          srcVideo.srcObject = sourceStream;
+          try {
+            await srcVideo.play();
+          } catch {
+            // ignore
+          }
         }
 
         // Compose output stream: canvas video + original audio (if any)
@@ -1160,9 +1163,9 @@ export const CreatePolitPage = () => {
           // ignore
         }
 
-        // Draw loop: WYSIWYG + no crop/zoom.
+        // Draw loop:
         // - Always "contain" inside the 9:16 frame (no cutting, no stretching).
-        // - Auto-rotate if the camera frame is landscape (common on some browsers) so the output becomes truly portrait.
+        // - Apply user rotate toggle only (auto-rotate heuristics are unreliable across browsers).
         const fitMode = 'contain';
         const draw = () => {
           try {
@@ -1177,12 +1180,7 @@ export const CreatePolitPage = () => {
               return;
             }
 
-            // Auto-rotate for portrait output when source is landscape.
-            // Some devices deliver landscape frames + rotation metadata; canvas draw won't apply metadata.
-            const autoRotate = vw > vh;
-            const rotate = !!videoRotate || autoRotate;
-
-            if (rotate) {
+            if (videoRotate) {
               ctx.save();
               ctx.translate(targetW / 2, targetH / 2);
               ctx.rotate(Math.PI / 2);
@@ -1269,6 +1267,8 @@ export const CreatePolitPage = () => {
       };
 
       recorder.start();
+      // Reset rotate toggle for each new recording session (prevents accidental sideways output).
+      setVideoRotate(false);
       setIsRecording(true);
       recordStartTsRef.current = Date.now();
       setRecordSecLeft(MAX_RECORD_SEC);
@@ -1847,8 +1847,8 @@ export const CreatePolitPage = () => {
                     <div className="space-y-3">
                       {/* Video Önizleme Alanı - Daha Kompakt */}
                       <div
-                        className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center"
-                        style={{ aspectRatio: '9 / 16' }}
+                        className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center mx-auto w-full max-w-[420px]"
+                        style={{ aspectRatio: '9 / 16', height: '52dvh', maxHeight: '420px' }}
                       >
                         {isRecording && (
                       <div className="absolute top-2 right-2 z-30 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-red-600/80 text-white text-[10px] font-bold animate-pulse">
@@ -1856,22 +1856,19 @@ export const CreatePolitPage = () => {
                       </div>
                     )}
 
-                    {/* WYSIWYG preview:
-                        - while recording, show the SAME portrait canvas we are recording
-                        - after recording, show the recorded file */}
-                    {isRecording ? (
-                      <canvas ref={recordCanvasRef} className="w-full h-full" />
-                    ) : (
-                      <video
-                        ref={previewRef}
-                        src={recordedUrl || undefined}
-                        className="w-full h-full object-contain bg-black"
-                        playsInline
-                        muted={false}
-                        autoPlay
-                        controls={!!recordedUrl}
-                      />
-                    )}
+                    {/* Preview video:
+                        - while recording: live camera stream (so user sees what they're recording)
+                        - after recording: playback of recorded file */}
+                    <video
+                      ref={previewRef}
+                      src={!isRecording ? (recordedUrl || undefined) : undefined}
+                      className="w-full h-full object-contain bg-black"
+                      style={videoRotate ? { transform: 'rotate(90deg)', transformOrigin: 'center center' } : undefined}
+                      playsInline
+                      muted={isRecording}
+                      autoPlay
+                      controls={!isRecording && !!recordedUrl}
+                    />
 
                     {isRecording && (
                       <div className="absolute bottom-4 left-0 right-0 z-40 px-4">
@@ -2103,7 +2100,7 @@ export const CreatePolitPage = () => {
                   ) : null}
 
                   {/* hidden canvas used to force portrait recording output */}
-                  {/* recordCanvasRef is rendered inside the video preview while recording */}
+                  <canvas ref={recordCanvasRef} className="hidden" />
 
                   {/* Action buttons - only for image, not audio or video */}
                   {!hasMedia && !isRecording && contentType === 'image' ? (

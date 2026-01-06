@@ -240,7 +240,10 @@ export const FastViewerPage = () => {
         closeToList();
         return;
       }
-      pendingStartRef.current = 'first';
+      // UX rule:
+      // - previous profile => open their LAST fast
+      // - next profile => open their FIRST fast
+      pendingStartRef.current = dir < 0 ? 'last' : 'first';
       pendingUserDirRef.current = dir;
       navigateToUserIndex(next, { replace: true });
     },
@@ -989,14 +992,15 @@ export const FastViewerPage = () => {
         <div
           className={[
             'relative',
-            'h-[92vh] md:h-[84vh]',
+            // Mobile: slightly smaller so top progress + bottom actions never get clipped.
+            'h-[calc(100dvh-36px)] md:h-[84vh]',
             'aspect-[9/16]',
             'rounded-[28px] overflow-hidden',
             'bg-[#0b0b0b] border border-white/10 shadow-[0_30px_120px_rgba(0,0,0,0.75)]',
           ].join(' ')}
         >
           {/* progress (dashed segments + count) */}
-          <div className="absolute top-0 left-0 right-0 px-3 pt-3 z-20">
+          <div className="absolute top-0 left-0 right-0 px-3 pt-[calc(env(safe-area-inset-top)+12px)] z-20">
             <div className="flex items-center gap-2">
               <div className="flex gap-1.5 flex-1 min-w-0">
               {Array.from({ length: progressCount }).map((_, i) => {
@@ -1020,7 +1024,7 @@ export const FastViewerPage = () => {
           </div>
 
           {/* header */}
-          <div className="absolute top-0 left-0 right-0 px-3 pt-6 z-20 flex items-center justify-between gap-3">
+          <div className="absolute top-0 left-0 right-0 px-3 pt-[calc(env(safe-area-inset-top)+24px)] z-20 flex items-center justify-between gap-3">
             <button type="button" onClick={goToProfile} className="flex items-center gap-2 min-w-0 text-left" title="Profile git">
               <Avatar src={user?.avatar_url || user?.profile_image} size="34px" verified={isUiVerifiedUser(user)} ring="fast" />
               <div className="min-w-0">
@@ -1389,7 +1393,7 @@ export const FastViewerPage = () => {
 
           {/* bottom right actions: delete (owner) + like */}
           {current?.id ? (
-            <div className="absolute bottom-4 right-4 z-30 flex items-end gap-3">
+            <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+16px)] right-4 z-30 flex items-end gap-3">
               {canDelete ? (
                 <button
                   type="button"
@@ -1430,7 +1434,7 @@ export const FastViewerPage = () => {
             <button
               type="button"
               onClick={() => setViewersOpen(true)}
-              className="absolute bottom-4 left-4 z-30 flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/25 border border-white/15 backdrop-blur-sm"
+              className="absolute bottom-[calc(env(safe-area-inset-bottom)+16px)] left-4 z-30 flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/25 border border-white/15 backdrop-blur-sm"
               aria-label="Bakanlar"
               title="Bakanlar"
             >
