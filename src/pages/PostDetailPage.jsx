@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users, Play, Pause, Music, Volume2, VolumeX, Rewind, FastForward } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users, Play, Pause, Music, Volume2, VolumeX, Rewind, FastForward, Plus, Minus, Printer } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -246,14 +246,17 @@ const NoUpscaleImage = ({ src, alt = '' }) => {
   if (!url) return null;
 
   return (
-    <div
-      className="relative w-full bg-black rounded-lg overflow-hidden mb-3 flex items-center justify-center"
-      style={{ aspectRatio: '9 / 16' }}
-    >
+    <div className="w-full mb-3 flex items-center justify-center">
       <img
         src={url}
         alt={alt}
-        className="max-w-full max-h-full w-auto h-auto object-contain"
+        className="rounded-lg bg-black"
+        style={{
+          maxWidth: '100%',
+          height: 'auto',
+          // Important: do NOT upscale small images.
+          width: 'auto',
+        }}
       />
     </div>
   );
@@ -452,6 +455,9 @@ export const PostDetailPage = () => {
   const [savingPost, setSavingPost] = useState(false);
   const [showDeletePost, setShowDeletePost] = useState(false);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const [textZoom, setTextZoom] = useState(1);
+  const textBoxRef = useRef(null);
+  const [textBoxW, setTextBoxW] = useState(0);
   const [expandedScoreCategory, setExpandedScoreCategory] = useState(null);
 
   const cacheKey = useMemo(() => `post:${String(postId || '').trim() || '-'}`, [postId]);
@@ -537,6 +543,40 @@ export const PostDetailPage = () => {
   useEffect(() => {
     setActiveImageIdx(0);
   }, [postId]);
+
+  // Measure text box width so we can cap height at 2x width.
+  useEffect(() => {
+    const el = textBoxRef.current;
+    if (!el) return;
+    const update = () => {
+      try {
+        const r = el.getBoundingClientRect();
+        setTextBoxW(Math.max(0, Number(r?.width || 0) || 0));
+      } catch {
+        // ignore
+      }
+    };
+    update();
+    let ro = null;
+    try {
+      ro = new ResizeObserver(() => update());
+      ro.observe(el);
+    } catch {
+      window.addEventListener('resize', update);
+    }
+    return () => {
+      try {
+        ro?.disconnect?.();
+      } catch {
+        // ignore
+      }
+      try {
+        window.removeEventListener('resize', update);
+      } catch {
+        // ignore
+      }
+    };
+  }, [uiPost?.content_type, uiPost?.post_id]);
 
   const isReady = !loading && !error && !!post;
   const safePost = post || {};
@@ -813,7 +853,7 @@ export const PostDetailPage = () => {
         ) : error || !post ? (
           <div className="text-center text-gray-700">{error || 'Paylaşım bulunamadı.'}</div>
         ) : (
-          <div className="max-w-3xl mx-auto">
+          <div className="mx-auto w-full max-w-[510px]">
             {/* Kullanıcı Bilgisi */}
             <div className="card mb-6">
               <div className="flex items-center gap-4 mb-4">
@@ -860,9 +900,74 @@ export const PostDetailPage = () => {
               <div className="mb-4">
                 {uiPost.content_type === 'text' && (
                   <div className="border-t border-gray-300 pt-6">
-                    <p className="text-gray-900 text-2xl leading-relaxed font-medium whitespace-pre-wrap">{uiPost.content_text}</p>
-                    <div className="h-[30px]" />
-                    <div className="border-t border-gray-300" />
+                    <div
+                      ref={textBoxRef}
+                      className="rounded-xl border border-gray-200 bg-white p-4 text-gray-900 whitespace-pre-wrap"
+                      style={{
+                        // Expand naturally, but cap at 2x width then allow scroll.
+                        maxHeight: textBoxW > 0 ? `${Math.round(textBoxW * 2)}px` : undefined,
+                        overflowY: 'auto',
+                        fontSize: `${Math.round(24 * Math.max(0.75, Math.min(1.6, Number(textZoom) || 1)))}px`,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {uiPost.content_text}
+                    </div>
+
+                    {/* Text tools (do NOT touch like/comment/share row) */}
+                    <div className="mt-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          className="w-11 h-11 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-900"
+                          title="Yazıyı küçült"
+                          aria-label="Yazıyı küçült"
+                          onClick={() => setTextZoom((z) => Math.max(0.75, Number(z || 1) - 0.1))}
+                        >
+                          <Minus className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          className="w-11 h-11 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-900"
+                          title="Yazıyı büyüt"
+                          aria-label="Yazıyı büyüt"
+                          onClick={() => setTextZoom((z) => Math.min(1.6, Number(z || 1) + 0.1))}
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          className="w-11 h-11 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-900"
+                          title="Yazdır"
+                          aria-label="Yazdır"
+                          onClick={() => {
+                            try {
+                              const text = String(uiPost.content_text || '').trim();
+                              const esc = (s) =>
+                                String(s || '')
+                                  .replace(/&/g, '&amp;')
+                                  .replace(/</g, '&lt;')
+                                  .replace(/>/g, '&gt;')
+                                  .replace(/"/g, '&quot;')
+                                  .replace(/'/g, '&#039;');
+                              const w = window.open('', '_blank', 'noopener,noreferrer,width=640,height=800');
+                              if (!w) return;
+                              w.document.open();
+                              w.document.write(
+                                `<!doctype html><html><head><meta charset="utf-8"><title>Polithane</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;white-space:pre-wrap;line-height:1.5;padding:24px}</style></head><body>${esc(text)}</body></html>`
+                              );
+                              w.document.close();
+                              w.focus?.();
+                              w.print?.();
+                            } catch {
+                              // ignore
+                            }
+                          }}
+                        >
+                          <Printer className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
                 {uiPost.content_type === 'image' && (
