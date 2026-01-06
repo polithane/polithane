@@ -576,7 +576,7 @@ export const PostDetailPage = () => {
         // ignore
       }
     };
-  }, [uiPost?.content_type, uiPost?.post_id]);
+  }, [postId]);
 
   const isReady = !loading && !error && !!post;
   const safePost = post || {};
