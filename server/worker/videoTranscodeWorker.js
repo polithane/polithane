@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import http from 'node:http';
 
 function mustEnv(name) {
   const v = String(process.env[name] || '').trim();
@@ -126,6 +127,32 @@ async function main() {
   });
 
   console.log(`[media-worker] started at ${nowIso()} poll=${POLL_MS}ms maxAttempts=${MAX_ATTEMPTS}`);
+
+  // Render Free often runs "Web Services" which must bind to $PORT.
+  // This worker doesn't need inbound traffic, but we open a tiny health server
+  // so the platform marks the service as healthy without requiring a paid "Background Worker".
+  try {
+    const port = Number(process.env.PORT || 0) || 10000;
+    const server = http.createServer((req, res) => {
+      try {
+        const u = new URL(req.url || '/', 'http://localhost');
+        if (u.pathname === '/health') {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, service: 'polithane-media-worker', at: nowIso() }));
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.end('ok');
+    });
+    server.listen(port, '0.0.0.0', () => {
+      console.log(`[media-worker] health server listening on :${port}`);
+    });
+  } catch (e) {
+    console.error('[media-worker] health server failed:', String(e?.message || e));
+  }
 
   // Basic dependency check
   try {
