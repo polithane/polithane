@@ -167,6 +167,7 @@ export const CreatePolitPage = () => {
   const recordCanvasRef = useRef(null);
   const recordCanvasRafRef = useRef(null);
   const recordOutStreamRef = useRef(null);
+  const recordAutoRotateRef = useRef(null); // null | boolean (decided per recording session)
   const activeVideoDeviceIdRef = useRef('');
   const [recordPreviewFit, setRecordPreviewFit] = useState('contain'); // contain | cover
   const [recordStreamNote, setRecordStreamNote] = useState('');
@@ -233,6 +234,22 @@ export const CreatePolitPage = () => {
     if (contentType === 'video' && recordedUrl && (videoThumbs?.length || 0) === 0) return false;
     return hasMedia;
   }, [contentType, hasMedia, isRecording, preparingMedia, recordedUrl, step, videoThumbs?.length]);
+
+  // While cover thumbnails are being prepared, don't let the recorded preview play.
+  useEffect(() => {
+    if (contentType !== 'video') return;
+    if (!recordedUrl) return;
+    if (isRecording) return;
+    if (!isCoverPreparing) return;
+    const el = previewRef.current;
+    if (!el) return;
+    try {
+      el.pause?.();
+      el.currentTime = 0;
+    } catch {
+      // ignore
+    }
+  }, [contentType, recordedUrl, isCoverPreparing, isRecording]);
 
   const optimizeImageFile = async (file) => {
     try {
@@ -1014,6 +1031,9 @@ export const CreatePolitPage = () => {
     if (isRecording) return;
     try {
       if (!opts?.skipReset) resetMedia();
+      // Always start a new session clean to avoid accidental sideways output.
+      setVideoRotate(false);
+      recordAutoRotateRef.current = null;
       const facingMode = String(opts?.facingMode || videoFacingMode || 'user');
       const constraints = {
         video: contentType === 'video' ? {
@@ -1165,7 +1185,9 @@ export const CreatePolitPage = () => {
 
         // Draw loop:
         // - Always "contain" inside the 9:16 frame (no cutting, no stretching).
-        // - Apply user rotate toggle only (auto-rotate heuristics are unreliable across browsers).
+        // - If device/screen is portrait but decoded frames are landscape (common on mobile),
+        //   auto-rotate ONCE for this recording session so the output becomes truly portrait.
+        // - User can still toggle rotate manually.
         const fitMode = 'contain';
         const draw = () => {
           try {
@@ -1180,7 +1202,17 @@ export const CreatePolitPage = () => {
               return;
             }
 
-            if (videoRotate) {
+            if (recordAutoRotateRef.current === null) {
+              try {
+                const screenPortrait = window.matchMedia?.('(orientation: portrait)')?.matches ?? (window.innerHeight >= window.innerWidth);
+                recordAutoRotateRef.current = !!(screenPortrait && vw > vh);
+              } catch {
+                recordAutoRotateRef.current = false;
+              }
+            }
+            const rotate = !!videoRotate || !!recordAutoRotateRef.current;
+
+            if (rotate) {
               ctx.save();
               ctx.translate(targetW / 2, targetH / 2);
               ctx.rotate(Math.PI / 2);
@@ -1866,8 +1898,8 @@ export const CreatePolitPage = () => {
                       style={videoRotate ? { transform: 'rotate(90deg)', transformOrigin: 'center center' } : undefined}
                       playsInline
                       muted={isRecording}
-                      autoPlay
-                      controls={!isRecording && !!recordedUrl}
+                      autoPlay={!isRecording && !!recordedUrl && !isCoverPreparing}
+                      controls={!isRecording && !!recordedUrl && !isCoverPreparing}
                     />
 
                     {isRecording && (

@@ -1337,13 +1337,13 @@ export const FastViewerPage = () => {
                   muted={muted}
                   autoPlay
                   controls={false}
-                  preload="metadata"
+                  preload="auto"
                   className="max-w-full max-h-full w-auto h-auto object-contain"
                 />
               </div>
             ) : current.content_type === 'audio' ? (
               <div className="h-full w-full flex items-center justify-center p-6">
-                <audio ref={audioRef} src={itemSrc} autoPlay preload="metadata" />
+                <audio ref={audioRef} src={itemSrc} autoPlay preload="auto" />
                 <div
                   className="w-full max-w-[360px] rounded-[22px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden"
                   style={{

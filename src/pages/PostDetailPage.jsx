@@ -109,6 +109,10 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   const safeDur = Number.isFinite(dur) && dur > 0 ? dur : 0;
   const safeT = Number.isFinite(t) && t >= 0 ? t : 0;
   const pct = safeDur > 0 ? Math.max(0, Math.min(1, safeT / safeDur)) : 0;
+  const fmtSn = (sec) => {
+    const n = Math.max(0, Math.floor(Number(sec || 0) || 0));
+    return `${n} Sn.`;
+  };
 
   const togglePlay = async () => {
     const el = videoRef.current;
@@ -165,7 +169,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
           // effect on many mobile browsers. We use our own control bar below.
           controls={false}
           autoPlay={autoPlay}
-          preload="metadata"
+          preload="auto"
           className="max-w-full max-h-full w-auto h-auto object-contain"
           onClick={togglePlay}
         />
@@ -217,7 +221,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
 
           <div className="flex items-center gap-2">
             <div className="text-sm font-bold text-primary-blue tabular-nums whitespace-nowrap">
-              {formatDuration(safeT)} / {safeDur > 0 ? formatDuration(safeDur) : '0:00'}
+              {fmtSn(safeT)} / {fmtSn(safeDur)}
             </div>
 
             <button
