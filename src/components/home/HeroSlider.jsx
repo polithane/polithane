@@ -76,7 +76,8 @@ export const HeroSlider = ({ posts = [], autoplay = true, interval = 5000 }) => 
   // İçerik tipi ikonu
   const getContentIcon = () => {
     // Mobile-first: keep icons readable (avoid "dot-sized" icons)
-    const iconClass = "w-6 h-6 md:w-5 md:h-5 text-white/90";
+    // Desktop was reported too small; keep at least text-size and bump on md+.
+    const iconClass = "w-6 h-6 md:w-7 md:h-7 text-white/90";
     switch (currentPost.content_type) {
       case CONTENT_TYPES.VIDEO:
         return <Video className={iconClass} />;

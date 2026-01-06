@@ -332,6 +332,9 @@ export const Header = () => {
 
                       {!notifLoading &&
                         notifItems.map((n) => {
+                          // Messages already have their own UX entry points; don't show them in bell notifications.
+                          const typ = String(n?.type || '').toLowerCase();
+                          if (typ === 'message' || typ.includes('dm')) return null;
                           const id = n?.id ?? n?.notification_id;
                           const isRead = !!n?.is_read;
                           const actor = n?.actor || null;
