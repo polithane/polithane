@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users, Play, Pause, Music, Volume2, VolumeX, Rewind, FastForward, Plus, Minus, Printer } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users, Play, Pause, Music, Volume2, VolumeX, Rewind, FastForward, Plus, Minus, Printer, Maximize2 } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -14,6 +14,36 @@ import { FollowButton } from '../components/common/FollowButton';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 import { usePublicSite } from '../contexts/PublicSiteContext';
+import { CITY_CODES } from '../utils/constants';
+
+const normalizeCityName = (name) =>
+  String(name || '')
+    .trim()
+    .toLowerCase('tr-TR')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u')
+    .replace(/\s+/g, ' ');
+
+const CITY_NAME_TO_CODE = (() => {
+  const m = new Map();
+  try {
+    Object.entries(CITY_CODES || {}).forEach(([code, cityName]) => {
+      m.set(normalizeCityName(cityName), String(code));
+    });
+  } catch {
+    // ignore
+  }
+  return m;
+})();
+
+const getPlateCodeFromProvince = (provinceName) => {
+  const key = normalizeCityName(provinceName);
+  return CITY_NAME_TO_CODE.get(key) || null;
+};
 
 /**
  * SmartVideo - Custom video player component with unified controls
@@ -458,6 +488,11 @@ export const PostDetailPage = () => {
   const [textZoom, setTextZoom] = useState(1);
   const textBoxRef = useRef(null);
   const [textBoxW, setTextBoxW] = useState(0);
+  const detailBoxRef = useRef(null);
+  const [detailBoxW, setDetailBoxW] = useState(0);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomSrc, setZoomSrc] = useState('');
+  const [zoomType, setZoomType] = useState(''); // image | video
   const [expandedScoreCategory, setExpandedScoreCategory] = useState(null);
 
   const cacheKey = useMemo(() => `post:${String(postId || '').trim() || '-'}`, [postId]);
@@ -578,6 +613,40 @@ export const PostDetailPage = () => {
     };
   }, [postId]);
 
+  // Measure detail width (used to cap zoom at 2.5x of Polit width).
+  useEffect(() => {
+    const el = detailBoxRef.current;
+    if (!el) return;
+    const update = () => {
+      try {
+        const r = el.getBoundingClientRect();
+        setDetailBoxW(Math.max(0, Number(r?.width || 0) || 0));
+      } catch {
+        // ignore
+      }
+    };
+    update();
+    let ro = null;
+    try {
+      ro = new ResizeObserver(() => update());
+      ro.observe(el);
+    } catch {
+      window.addEventListener('resize', update);
+    }
+    return () => {
+      try {
+        ro?.disconnect?.();
+      } catch {
+        // ignore
+      }
+      try {
+        window.removeEventListener('resize', update);
+      } catch {
+        // ignore
+      }
+    };
+  }, [postId]);
+
   const isReady = !loading && !error && !!post;
   const safePost = post || {};
   const uiPost = {
@@ -606,6 +675,18 @@ export const PostDetailPage = () => {
     return '';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uiPost.user_id, uiPost.user]);
+
+  const createdAtLabel = useMemo(() => {
+    try {
+      const d = new Date(uiPost.created_at || 0);
+      if (!Number.isFinite(d.getTime())) return formatDate(uiPost.created_at);
+      const date = new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+      const time = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' }).format(d);
+      return `${date} ${time}`;
+    } catch {
+      return formatDate(uiPost.created_at);
+    }
+  }, [uiPost.created_at]);
 
   const agendaSlug = useMemo(() => {
     if (!uiPost.agenda_tag) return '';
@@ -853,7 +934,7 @@ export const PostDetailPage = () => {
         ) : error || !post ? (
           <div className="text-center text-gray-700">{error || 'Paylaşım bulunamadı.'}</div>
         ) : (
-          <div className="mx-auto w-full max-w-[510px]">
+          <div ref={detailBoxRef} className="mx-auto w-full max-w-[410px]">
             {/* Kullanıcı Bilgisi */}
             <div className="card mb-6">
               <div className="flex items-center gap-4 mb-4">
@@ -873,13 +954,41 @@ export const PostDetailPage = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-lg break-words">{uiPost.user?.full_name}</h3>
-                      {uiPost.user?.party_id && uiPost.user?.party?.short_name && (
-                        <Badge variant="secondary" size="small">
-                          {uiPost.user.party.short_name}
-                        </Badge>
-                      )}
+                      {uiPost.user?.party_id && (uiPost.user?.party?.short_name || uiPost.user?.party?.party_short_name) ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/party/${uiPost.user.party_id}`);
+                          }}
+                          className="inline-flex"
+                          title="Parti sayfasına git"
+                        >
+                          <Badge variant="secondary" size="small">
+                            {uiPost.user.party.short_name || uiPost.user.party.party_short_name}
+                          </Badge>
+                        </button>
+                      ) : null}
+
+                      {(() => {
+                        const plate = uiPost.user?.city_code || getPlateCodeFromProvince(uiPost.user?.province) || null;
+                        if (!plate) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/city/${plate}`);
+                            }}
+                            className="inline-flex items-center justify-center px-2 py-1 bg-gray-900 hover:bg-primary-blue text-white text-[11px] font-black rounded-full transition-colors"
+                            title="Şehir sayfasına git"
+                          >
+                            {plate}
+                          </button>
+                        );
+                      })()}
                     </div>
-                    <p className="text-sm text-gray-500 break-words">{formatDate(uiPost.created_at)}</p>
+                    <p className="text-sm text-gray-500 break-words">{createdAtLabel}</p>
                   </div>
                 </button>
                 {uiPost.user_id ? (
@@ -999,7 +1108,23 @@ export const PostDetailPage = () => {
                   <div>
                     {activeImageSrc ? (
                       <>
-                        <NoUpscaleImage src={activeImageSrc} alt="" />
+                        <div className="relative">
+                          <NoUpscaleImage src={activeImageSrc} alt="" />
+                          <button
+                            type="button"
+                            className="absolute bottom-2 right-2 w-12 h-12 rounded-full bg-black/55 border border-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70"
+                            title="Büyüt"
+                            aria-label="Büyüt"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setZoomType('image');
+                              setZoomSrc(activeImageSrc);
+                              setZoomOpen(true);
+                            }}
+                          >
+                            <Maximize2 className="w-6 h-6" />
+                          </button>
+                        </div>
                         {imageList.length > 1 && (
                           <div className="mb-3 overflow-x-auto">
                             <div className="flex gap-2 w-max">
@@ -1029,7 +1154,24 @@ export const PostDetailPage = () => {
                 )}
                 {uiPost.content_type === 'video' && (
                   <div>
-                    <SmartVideo src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} autoPlay />
+                    <div className="relative">
+                      <SmartVideo src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} autoPlay />
+                      <button
+                        type="button"
+                        className="absolute bottom-3 right-3 w-12 h-12 rounded-full bg-black/55 border border-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 z-20"
+                        title="Büyüt"
+                        aria-label="Büyüt"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const src = Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url;
+                          setZoomType('video');
+                          setZoomSrc(String(src || '').trim());
+                          setZoomOpen(true);
+                        }}
+                      >
+                        <Maximize2 className="w-6 h-6" />
+                      </button>
+                    </div>
                     {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
                   </div>
                 )}
@@ -1735,6 +1877,59 @@ export const PostDetailPage = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Zoom overlay for image/video (max 2.5x of Polit width) */}
+      {zoomOpen && (zoomType === 'image' || zoomType === 'video') ? (
+        <div
+          className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => {
+            setZoomOpen(false);
+            setZoomSrc('');
+            setZoomType('');
+          }}
+        >
+          <div
+            className="relative bg-black rounded-2xl border border-white/15 overflow-hidden"
+            style={{
+              width: '100%',
+              maxWidth:
+                typeof window !== 'undefined'
+                  ? Math.min(window.innerWidth - 24, Math.max(320, (detailBoxW || 410) * 2.5))
+                  : Math.max(320, (detailBoxW || 410) * 2.5),
+              maxHeight: typeof window !== 'undefined' ? window.innerHeight - 40 : undefined,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute top-3 right-3 z-20">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-black/55 border border-white/20 text-white font-black hover:bg-black/70"
+                onClick={() => {
+                  setZoomOpen(false);
+                  setZoomSrc('');
+                  setZoomType('');
+                }}
+              >
+                Kapat <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="w-full h-full flex items-center justify-center p-4">
+              {zoomType === 'image' ? (
+                <img src={zoomSrc} alt="" className="max-w-full max-h-[85vh] w-auto h-auto object-contain" />
+              ) : (
+                <video
+                  src={zoomSrc}
+                  className="max-w-full max-h-[85vh] w-auto h-auto object-contain"
+                  controls
+                  playsInline
+                  autoPlay
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
