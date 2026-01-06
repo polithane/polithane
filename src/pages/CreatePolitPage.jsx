@@ -1105,8 +1105,137 @@ export const CreatePolitPage = () => {
       };
 
       const mimeType = getRecorderMimeType(contentType);
-      
-      const recorder = new MediaRecorder(stream, { mimeType });
+
+      // --------------------------------------------
+      // Kalıcı çözüm: Video kaydını "gerçek dikey" üret
+      // --------------------------------------------
+      // Bazı cihazlarda/tarayıcılarda telefon dik olsa bile MediaRecorder çıktısı yatay frame gelebiliyor.
+      // Bu yüzden video kaydında kamerayı bir canvas'a çizip (9:16), canvas.captureStream ile kaydediyoruz.
+      // Böylece çıkan dosyanın width/height'i gerçekten dikey olur (rotation metadata'ya güvenmeyiz).
+      const buildPortraitRecordingStream = async (sourceStream) => {
+        const canvas = recordCanvasRef.current || document.createElement('canvas');
+        // Target: vertical story frame
+        const targetW = 720;
+        const targetH = 1280;
+        canvas.width = targetW;
+        canvas.height = targetH;
+        if (!recordCanvasRef.current) recordCanvasRef.current = canvas;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return { outStream: sourceStream };
+
+        // Use an off-DOM video element as stable draw source
+        const srcVideo = document.createElement('video');
+        srcVideo.muted = true;
+        srcVideo.playsInline = true;
+        try {
+          srcVideo.setAttribute('playsinline', 'true');
+          srcVideo.setAttribute('webkit-playsinline', 'true');
+        } catch {
+          // ignore
+        }
+        srcVideo.srcObject = sourceStream;
+
+        try {
+          await srcVideo.play();
+        } catch {
+          // On some browsers, play may fail until user gesture; recording start is a gesture.
+          // We'll still proceed; draw loop will paint black until frames are ready.
+        }
+
+        // Compose output stream: canvas video + original audio (if any)
+        const fps = 30;
+        const canvasStream = canvas.captureStream?.(fps);
+        const out = new MediaStream();
+        try {
+          const vTrack = canvasStream?.getVideoTracks?.()?.[0];
+          if (vTrack) out.addTrack(vTrack);
+        } catch {
+          // ignore
+        }
+        try {
+          const aTrack = sourceStream?.getAudioTracks?.()?.[0];
+          if (aTrack) out.addTrack(aTrack);
+        } catch {
+          // ignore
+        }
+
+        // Draw loop: fill canvas with video (cover by default for Fast, contain for Polit)
+        const fitMode = isFastMode ? 'cover' : 'contain';
+        const draw = () => {
+          try {
+            // Background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, targetW, targetH);
+
+            const vw = Number(srcVideo.videoWidth || 0) || 0;
+            const vh = Number(srcVideo.videoHeight || 0) || 0;
+            if (!vw || !vh) {
+              recordCanvasRafRef.current = requestAnimationFrame(draw);
+              return;
+            }
+
+            // If user toggled rotate, apply rotation to output too (fallback for weird devices).
+            if (videoRotate) {
+              ctx.save();
+              ctx.translate(targetW / 2, targetH / 2);
+              ctx.rotate(Math.PI / 2);
+              const rw = targetH;
+              const rh = targetW;
+              const s = fitMode === 'contain' ? Math.min(rw / vw, rh / vh) : Math.max(rw / vw, rh / vh);
+              const dw = vw * s;
+              const dh = vh * s;
+              ctx.drawImage(srcVideo, -dw / 2, -dh / 2, dw, dh);
+              ctx.restore();
+            } else {
+              const s = fitMode === 'contain' ? Math.min(targetW / vw, targetH / vh) : Math.max(targetW / vw, targetH / vh);
+              const dw = vw * s;
+              const dh = vh * s;
+              const dx = (targetW - dw) / 2;
+              const dy = (targetH - dh) / 2;
+              ctx.drawImage(srcVideo, dx, dy, dw, dh);
+            }
+          } catch {
+            // ignore draw errors; keep loop alive
+          }
+          recordCanvasRafRef.current = requestAnimationFrame(draw);
+        };
+        if (recordCanvasRafRef.current) {
+          try { cancelAnimationFrame(recordCanvasRafRef.current); } catch { /* ignore */ }
+        }
+        recordCanvasRafRef.current = requestAnimationFrame(draw);
+
+        // Keep refs for cleanup
+        recordOutStreamRef.current = {
+          canvasStream,
+          sourceEl: srcVideo,
+          stop: () => {
+            try {
+              if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
+            } catch {
+              // ignore
+            }
+            recordCanvasRafRef.current = null;
+            try {
+              canvasStream?.getTracks?.()?.forEach?.((t) => t.stop());
+            } catch {
+              // ignore
+            }
+            try {
+              srcVideo.pause?.();
+              srcVideo.srcObject = null;
+            } catch {
+              // ignore
+            }
+          },
+        };
+
+        return { outStream: out };
+      };
+
+      const recorderStream =
+        contentType === 'video' ? (await buildPortraitRecordingStream(stream)).outStream : stream;
+
+      const recorder = new MediaRecorder(recorderStream, { mimeType });
       recorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
@@ -1165,6 +1294,19 @@ export const CreatePolitPage = () => {
     audioAnalyserRef.current = null;
     
     if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+    // Stop portrait recorder helpers (canvas stream + draw loop) if used
+    try {
+      recordOutStreamRef.current?.stop?.();
+    } catch {
+      // ignore
+    }
+    recordOutStreamRef.current = null;
+    try {
+      if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
+    } catch {
+      // ignore
+    }
+    recordCanvasRafRef.current = null;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
