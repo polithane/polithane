@@ -137,8 +137,10 @@ export const RegisterPageNew = () => {
 
   const loadParties = async () => {
     try {
-      const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
-      const res = await fetch(`${apiUrl}/parties`);
+      const apiBase = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000'))
+        .replace(/\/+$/, '')
+        .replace(/\/api$/, '');
+      const res = await fetch(`${apiBase}/api/parties`);
       const data = await res.json();
       // Ensure array
       if (Array.isArray(data)) {
@@ -200,8 +202,10 @@ export const RegisterPageNew = () => {
 
     const timeout = setTimeout(async () => {
       try {
-        const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
-        const response = await fetch(`${apiUrl}/auth/check-availability?${field}=${encodeURIComponent(value)}`);
+        const apiBase = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000'))
+          .replace(/\/+$/, '')
+          .replace(/\/api$/, '');
+        const response = await fetch(`${apiBase}/api/auth/check-availability?${field}=${encodeURIComponent(value)}`);
         const data = await response.json();
         
         if (data.success) {
@@ -248,8 +252,10 @@ export const RegisterPageNew = () => {
     }
     setIsSearching(true);
     try {
-      const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
-      const res = await fetch(`${apiUrl}/users?search=${encodeURIComponent(query)}&limit=5`);
+      const apiBase = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000'))
+        .replace(/\/+$/, '')
+        .replace(/\/api$/, '');
+      const res = await fetch(`${apiBase}/api/users?search=${encodeURIComponent(query)}&limit=5`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setSearchResults(data);
@@ -370,8 +376,10 @@ export const RegisterPageNew = () => {
         claim_user_id: claimUser?.id
       };
 
-      const apiUrl = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
-      const response = await fetch(`${apiUrl}/auth/register`, {
+      const apiBase = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000'))
+        .replace(/\/+$/, '')
+        .replace(/\/api$/, '');
+      const response = await fetch(`${apiBase}/api/auth/register`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -413,7 +421,7 @@ export const RegisterPageNew = () => {
             } else {
               // Fallback: fetch /me so AuthContext can restore session on refresh.
               try {
-                const meResp = await fetch(`${apiUrl}/auth/me`, {
+                const meResp = await fetch(`${apiBase}/api/auth/me`, {
                   headers: { Authorization: `Bearer ${result.data.token}` },
                 });
                 const meJson = await meResp.json().catch(() => ({}));
