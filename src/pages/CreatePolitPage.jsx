@@ -1184,11 +1184,10 @@ export const CreatePolitPage = () => {
         }
 
         // Draw loop:
-        // - Always "contain" inside the 9:16 frame (no cutting, no stretching).
-        // - If device/screen is portrait but decoded frames are landscape (common on mobile),
-        //   auto-rotate ONCE for this recording session so the output becomes truly portrait.
-        // - User can still toggle rotate manually.
-        const fitMode = 'contain';
+        // - Always "cover" the 9:16 frame to fill the background (user request).
+        // - Disable auto-rotate logic because modern mobile browsers handle orientation correctly,
+        //   and faulty auto-rotate logic was causing sideways videos.
+        const fitMode = 'cover';
         const draw = () => {
           try {
             // Background
@@ -1202,13 +1201,9 @@ export const CreatePolitPage = () => {
               return;
             }
 
+            // Forced disable auto-rotate. Let the user manually rotate if needed.
             if (recordAutoRotateRef.current === null) {
-              try {
-                const screenPortrait = window.matchMedia?.('(orientation: portrait)')?.matches ?? (window.innerHeight >= window.innerWidth);
-                recordAutoRotateRef.current = !!(screenPortrait && vw > vh);
-              } catch {
-                recordAutoRotateRef.current = false;
-              }
+              recordAutoRotateRef.current = false;
             }
             const rotate = !!videoRotate || !!recordAutoRotateRef.current;
 
