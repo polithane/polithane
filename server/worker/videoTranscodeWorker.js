@@ -95,7 +95,19 @@ function hasAudioStream(probe) {
   }
 }
 
-function buildVideoFilter({ rotationDeg }) {
+function codedDimensionsFromProbe(probe) {
+  try {
+    const streams = Array.isArray(probe?.streams) ? probe.streams : [];
+    const v = streams.find((s) => s?.codec_type === 'video') || null;
+    const w = Number(v?.width || 0) || 0;
+    const h = Number(v?.height || 0) || 0;
+    return { w, h };
+  } catch {
+    return { w: 0, h: 0 };
+  }
+}
+
+function buildVideoFilter({ rotationDeg, codedW, codedH }) {
   const parts = [];
 
   // Apply rotation into pixels (so output has rotate=0)
@@ -103,9 +115,21 @@ function buildVideoFilter({ rotationDeg }) {
   // 1: clockwise 90
   // 2: counter-clockwise 90
   // 2,transpose=2: 180 (or hflip,vflip)
-  if (rotationDeg === 90) parts.push('transpose=1');
-  else if (rotationDeg === 270) parts.push('transpose=2');
-  else if (rotationDeg === 180) parts.push('hflip,vflip');
+  // IMPORTANT:
+  // Some encoders store portrait video as portrait pixels *and* include rotate metadata.
+  // If we transpose in that case, we double-rotate and the output becomes sideways.
+  const cw = Number(codedW || 0) || 0;
+  const ch = Number(codedH || 0) || 0;
+  const codedIsLandscape = cw > 0 && ch > 0 ? cw > ch : null;
+
+  if (rotationDeg === 90) {
+    // Only transpose if coded pixels are landscape.
+    if (codedIsLandscape === true) parts.push('transpose=1');
+  } else if (rotationDeg === 270) {
+    if (codedIsLandscape === true) parts.push('transpose=2');
+  } else if (rotationDeg === 180) {
+    parts.push('hflip,vflip');
+  }
 
   // Standardize to portrait stage: contain + pad (NO CROP)
   parts.push('scale=720:1280:force_original_aspect_ratio=decrease');
@@ -230,8 +254,9 @@ async function main() {
 
         const probe = await ffprobeJson(inFile);
         const rot = rotationFromProbe(probe);
+        const dims = codedDimensionsFromProbe(probe);
         const audio = hasAudioStream(probe);
-        const vf = buildVideoFilter({ rotationDeg: rot });
+        const vf = buildVideoFilter({ rotationDeg: rot, codedW: dims.w, codedH: dims.h });
 
         // Transcode -> MP4 (faststart for fast loading)
         // IMPORTANT:

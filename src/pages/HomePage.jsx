@@ -37,7 +37,7 @@ export const HomePage = () => {
   const [activeCategory, setActiveCategory] = useState('all'); // Mobil için aktif kategori - Default 'Tüm'
   const [homePostsPerRow, setHomePostsPerRow] = useState(2);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(5);
-  const [desktopVisible, setDesktopVisible] = useState({ hit: 10, mp: 10, org: 10, citizen: 10 });
+  const [desktopVisible, setDesktopVisible] = useState({ hit: 5, mp: 5, org: 5, citizen: 5, media: 5 });
   const [loading, setLoading] = useState(() => !(initialCache?.posts && Array.isArray(initialCache.posts) && initialCache.posts.length > 0));
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
@@ -115,11 +115,9 @@ export const HomePage = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Mobile: render posts in small batches (5 by 5)
+  // Mobile: start with 5; load progressively on scroll only.
   useEffect(() => {
     setMobileVisibleCount(5);
-    const t = setTimeout(() => setMobileVisibleCount(10), 800);
-    return () => clearTimeout(t);
   }, [activeCategory]);
 
   // Desktop: initial 10 per category; then reveal progressively as carousel advances.
@@ -138,7 +136,8 @@ export const HomePage = () => {
         const e = entries?.[0];
         if (!e?.isIntersecting) return;
         if (!hasUserScrolledRef.current) return;
-        setMobileVisibleCount((prev) => Math.min(prev + 5, 500));
+        // Social-style incremental loading: +1 as you reach the end.
+        setMobileVisibleCount((prev) => Math.min(prev + 1, 500));
       },
       { root: null, rootMargin: '180px', threshold: 0.01 }
     );
@@ -328,40 +327,9 @@ export const HomePage = () => {
         const baseRows = (postsData || []).filter((p) => !p?.is_trending);
         let initialPosts = baseRows.map(mapDbPostToUi);
 
-        // Ensure each category has at least 5 posts (best-effort, capped).
-        const needPer = 5;
-        const maxExtraPages = 5; // 5*20 = 100 extra max
-        let extraPage = 0;
-        let offset = initialPosts.length;
-        const countByType = (list) => {
-          const arr = Array.isArray(list) ? list : [];
-          return {
-            mp: arr.filter((p) => p?.user?.user_type === 'mp').length,
-            org: arr.filter((p) => p?.user?.user_type === 'party_official').length,
-            media: arr.filter((p) => p?.user?.user_type === 'media').length,
-            citizen: arr.filter((p) => p?.user?.user_type === 'party_member' || p?.user?.user_type === 'citizen').length,
-          };
-        };
-        const isEnough = (c) => c.mp >= needPer && c.org >= needPer && c.media >= needPer && c.citizen >= needPer;
-
-        while (!isEnough(countByType(initialPosts)) && extraPage < maxExtraPages) {
-          // eslint-disable-next-line no-await-in-loop
-          const more = await api.posts.getAll({ limit: POSTS_PAGE_SIZE, offset, order: 'created_at.desc' }).catch(() => []);
-          const moreRows = (more || []).filter((p) => !p?.is_trending);
-          const nextBatch = moreRows.map(mapDbPostToUi);
-          if (nextBatch.length === 0) break;
-          const seen = new Set(initialPosts.map((p) => String(p?.post_id ?? p?.id ?? '')));
-          for (const p of nextBatch) {
-            const id = String(p?.post_id ?? p?.id ?? '');
-            if (!id || seen.has(id)) continue;
-            seen.add(id);
-            initialPosts.push(p);
-          }
-          offset += nextBatch.length;
-          extraPage += 1;
-          if (nextBatch.length < POSTS_PAGE_SIZE) break;
-        }
-
+        // IMPORTANT:
+        // Do NOT block first paint by fetching multiple pages.
+        // We start with a small pool and load more only when needed (scroll/carousel advance).
         setPosts(initialPosts);
         setPostsOffset(initialPosts.length);
         setHasMorePosts(initialPosts.length >= POSTS_PAGE_SIZE);
@@ -588,7 +556,8 @@ export const HomePage = () => {
   
   // Kategorilere göre post filtreleme (DB user_type ile)
   const pickFixedMix = (list = []) => {
-    const desiredByType = { video: 3, image: 3, text: 2, audio: 2 };
+    // Keep each rail light: pick ~5 items with a basic type mix.
+    const desiredByType = { video: 2, image: 2, text: 1, audio: 1 };
     const typeOrder = ['video', 'image', 'text', 'audio'];
     const selected = [];
     const used = new Set();
@@ -605,11 +574,12 @@ export const HomePage = () => {
           selected.push(p);
         });
     }
-    if (selected.length < 10) {
+    const target = 5;
+    if (selected.length < target) {
       list
         .filter((p) => !used.has(p.post_id))
         .sort((a, b) => (Number(b.polit_score || 0) - Number(a.polit_score || 0)))
-        .slice(0, 10 - selected.length)
+        .slice(0, target - selected.length)
         .forEach((p) => {
           used.add(p.post_id);
           selected.push(p);
