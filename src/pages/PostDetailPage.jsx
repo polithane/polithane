@@ -30,15 +30,12 @@ import { usePublicSite } from '../contexts/PublicSiteContext';
  */
 const SmartVideo = ({ src, autoPlay = false }) => {
   const videoRef = useRef(null);
-  const boxRef = useRef(null);
   const url = String(src || '').trim();
   const [isPlaying, setIsPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [t, setT] = useState(0);
   const [dur, setDur] = useState(0);
   const [blocked, setBlocked] = useState(false);
-  const [meta, setMeta] = useState({ w: 0, h: 0 });
-  const [box, setBox] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
     if (!url) return;
@@ -50,7 +47,6 @@ const SmartVideo = ({ src, autoPlay = false }) => {
     const onTime = () => setT(Number(el.currentTime || 0) || 0);
     const onMeta = () => {
       setDur(Number(el.duration || 0) || 0);
-      setMeta({ w: Number(el.videoWidth || 0) || 0, h: Number(el.videoHeight || 0) || 0 });
     };
     el.addEventListener('play', onPlay);
     el.addEventListener('pause', onPause);
@@ -113,52 +109,6 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   const safeDur = Number.isFinite(dur) && dur > 0 ? dur : 0;
   const safeT = Number.isFinite(t) && t >= 0 ? t : 0;
   const pct = safeDur > 0 ? Math.max(0, Math.min(1, safeT / safeDur)) : 0;
-  const ratio = meta?.w > 0 && meta?.h > 0 ? meta.w / meta.h : 0;
-  const isPortrait = ratio > 0 && ratio < 0.95;
-  // Measure the stage box so we can avoid upscaling small media.
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const update = () => {
-      try {
-        const r = el.getBoundingClientRect();
-        setBox({ w: Math.max(0, r.width || 0), h: Math.max(0, r.height || 0) });
-      } catch {
-        // ignore
-      }
-    };
-    update();
-    let ro = null;
-    try {
-      ro = new ResizeObserver(() => update());
-      ro.observe(el);
-    } catch {
-      window.addEventListener('resize', update);
-    }
-    return () => {
-      try {
-        if (ro) ro.disconnect();
-      } catch {
-        // ignore
-      }
-      try {
-        window.removeEventListener('resize', update);
-      } catch {
-        // ignore
-      }
-    };
-  }, []);
-
-  const scale = useMemo(() => {
-    const mw = Number(meta?.w || 0) || 0;
-    const mh = Number(meta?.h || 0) || 0;
-    const cw = Number(box?.w || 0) || 0;
-    const ch = Number(box?.h || 0) || 0;
-    if (!(mw > 0 && mh > 0 && cw > 0 && ch > 0)) return 1;
-    // Polit detayında asla zoom/crop yapma: sadece küçült (contain) ve büyütme.
-    const contain = Math.min(cw / mw, ch / mh);
-    return Math.min(1, Math.max(0, contain));
-  }, [box?.h, box?.w, meta?.h, meta?.w]);
 
   const togglePlay = async () => {
     const el = videoRef.current;
@@ -206,7 +156,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
 
   return (
     <div className="w-full">
-      <div ref={boxRef} className="relative w-full bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ aspectRatio: '9 / 16' }}>
+      <div className="relative w-full bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ aspectRatio: '9 / 16' }}>
         <video
           ref={videoRef}
           src={url}
@@ -287,60 +237,12 @@ const SmartVideo = ({ src, autoPlay = false }) => {
 };
 
 const NoUpscaleImage = ({ src, alt = '' }) => {
-  const boxRef = useRef(null);
-  const [box, setBox] = useState({ w: 0, h: 0 });
-  const [meta, setMeta] = useState({ w: 0, h: 0 });
   const url = String(src || '').trim();
-
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const update = () => {
-      try {
-        const r = el.getBoundingClientRect();
-        setBox({ w: Math.max(0, r.width || 0), h: Math.max(0, r.height || 0) });
-      } catch {
-        // ignore
-      }
-    };
-    update();
-    let ro = null;
-    try {
-      ro = new ResizeObserver(() => update());
-      ro.observe(el);
-    } catch {
-      window.addEventListener('resize', update);
-    }
-    return () => {
-      try {
-        if (ro) ro.disconnect();
-      } catch {
-        // ignore
-      }
-      try {
-        window.removeEventListener('resize', update);
-      } catch {
-        // ignore
-      }
-    };
-  }, []);
-
-  const scale = useMemo(() => {
-    const mw = Number(meta?.w || 0) || 0;
-    const mh = Number(meta?.h || 0) || 0;
-    const cw = Number(box?.w || 0) || 0;
-    const ch = Number(box?.h || 0) || 0;
-    if (!(mw > 0 && mh > 0 && cw > 0 && ch > 0)) return 1;
-    // Polit detayında asla zoom/crop yapma: sadece küçült (contain) ve büyütme.
-    const contain = Math.min(cw / mw, ch / mh);
-    return Math.min(1, Math.max(0, contain));
-  }, [box?.h, box?.w, meta?.h, meta?.w]);
 
   if (!url) return null;
 
   return (
     <div
-      ref={boxRef}
       className="relative w-full bg-black rounded-lg overflow-hidden mb-3 flex items-center justify-center"
       style={{ aspectRatio: '9 / 16' }}
     >
@@ -348,15 +250,6 @@ const NoUpscaleImage = ({ src, alt = '' }) => {
         src={url}
         alt={alt}
         className="max-w-full max-h-full w-auto h-auto object-contain"
-        onLoad={(e) => {
-          try {
-            const w = Number(e?.currentTarget?.naturalWidth || 0) || 0;
-            const h = Number(e?.currentTarget?.naturalHeight || 0) || 0;
-            setMeta({ w, h });
-          } catch {
-            // ignore
-          }
-        }}
       />
     </div>
   );

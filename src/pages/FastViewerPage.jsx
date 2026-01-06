@@ -985,11 +985,12 @@ export const FastViewerPage = () => {
         {prevUser ? <SideAvatar u={prevUser} side="left" /> : null}
         {nextUser ? <SideAvatar u={nextUser} side="right" /> : null}
 
-        {/* main story card */}
+        {/* main story card (portrait stage: match Polit detail aspect) */}
         <div
           className={[
-            'relative w-full max-w-[520px] md:max-w-[420px]',
+            'relative',
             'h-[92vh] md:h-[84vh]',
+            'aspect-[9/16]',
             'rounded-[28px] overflow-hidden',
             'bg-[#0b0b0b] border border-white/10 shadow-[0_30px_120px_rgba(0,0,0,0.75)]',
           ].join(' ')}

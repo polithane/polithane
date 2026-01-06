@@ -1114,7 +1114,8 @@ export const CreatePolitPage = () => {
       // Böylece çıkan dosyanın width/height'i gerçekten dikey olur (rotation metadata'ya güvenmeyiz).
       const buildPortraitRecordingStream = async (sourceStream) => {
         const canvas = recordCanvasRef.current || document.createElement('canvas');
-        // Target: vertical story frame
+        // Target: Polithane "Polit stage" portrait frame (shared aspect across Polit/Fast)
+        // Keep it deterministic so playback and thumbnails are consistent.
         const targetW = 720;
         const targetH = 1280;
         canvas.width = targetW;
@@ -1159,8 +1160,9 @@ export const CreatePolitPage = () => {
           // ignore
         }
 
-        // Draw loop: NEVER zoom/crop. Always contain inside the 9:16 frame.
-        // If the source is already 9:16, contain == cover (no empty bars).
+        // Draw loop: WYSIWYG + no crop/zoom.
+        // - Always "contain" inside the 9:16 frame (no cutting, no stretching).
+        // - Auto-rotate if the camera frame is landscape (common on some browsers) so the output becomes truly portrait.
         const fitMode = 'contain';
         const draw = () => {
           try {
@@ -1175,8 +1177,12 @@ export const CreatePolitPage = () => {
               return;
             }
 
-            // If user toggled rotate, apply rotation to output too (fallback for weird devices).
-            if (videoRotate) {
+            // Auto-rotate for portrait output when source is landscape.
+            // Some devices deliver landscape frames + rotation metadata; canvas draw won't apply metadata.
+            const autoRotate = vw > vh;
+            const rotate = !!videoRotate || autoRotate;
+
+            if (rotate) {
               ctx.save();
               ctx.translate(targetW / 2, targetH / 2);
               ctx.rotate(Math.PI / 2);
@@ -1842,25 +1848,30 @@ export const CreatePolitPage = () => {
                       {/* Video Önizleme Alanı - Daha Kompakt */}
                       <div
                         className="relative rounded-xl border border-gray-200 bg-black overflow-hidden flex items-center justify-center"
-                        style={{ height: '360px' }}
+                        style={{ aspectRatio: '9 / 16' }}
                       >
                         {isRecording && (
                       <div className="absolute top-2 right-2 z-30 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-red-600/80 text-white text-[10px] font-bold animate-pulse">
                         KAYITTA
                       </div>
                     )}
-                    
-                    <video
-                      ref={previewRef}
-                      src={recordedUrl || undefined}
-                      className="w-full h-full object-cover bg-black"
-                      style={
-                        videoRotate
-                          ? { transform: 'rotate(90deg)', transformOrigin: 'center center' }
-                          : undefined
-                      }
-                      playsInline muted={isRecording} autoPlay controls={!isRecording && !!recordedUrl}
-                    />
+
+                    {/* WYSIWYG preview:
+                        - while recording, show the SAME portrait canvas we are recording
+                        - after recording, show the recorded file */}
+                    {isRecording ? (
+                      <canvas ref={recordCanvasRef} className="w-full h-full" />
+                    ) : (
+                      <video
+                        ref={previewRef}
+                        src={recordedUrl || undefined}
+                        className="w-full h-full object-contain bg-black"
+                        playsInline
+                        muted={false}
+                        autoPlay
+                        controls={!!recordedUrl}
+                      />
+                    )}
 
                     {isRecording && (
                       <div className="absolute bottom-4 left-0 right-0 z-40 px-4">
@@ -2092,7 +2103,7 @@ export const CreatePolitPage = () => {
                   ) : null}
 
                   {/* hidden canvas used to force portrait recording output */}
-                  <canvas ref={recordCanvasRef} className="hidden" />
+                  {/* recordCanvasRef is rendered inside the video preview while recording */}
 
                   {/* Action buttons - only for image, not audio or video */}
                   {!hasMedia && !isRecording && contentType === 'image' ? (

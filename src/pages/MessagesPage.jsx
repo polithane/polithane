@@ -40,6 +40,17 @@ export const MessagesPage = () => {
   const shouldAutoScrollRef = useRef(true);
 
   const [blockedIds, setBlockedIds] = useState(new Set());
+
+  // Mobile keyboard/viewport fix:
+  // On some mobile browsers, 100dvh doesn't restore after keyboard closes.
+  // We track visualViewport height and drive the container height from it.
+  const [viewportH, setViewportH] = useState(() => {
+    try {
+      return Number(window?.visualViewport?.height || window?.innerHeight || 0) || 0;
+    } catch {
+      return 0;
+    }
+  });
   
   const [conversations, setConversations] = useState([]);
   const convPollRef = useRef(null);
@@ -106,6 +117,38 @@ export const MessagesPage = () => {
       });
     }
   }, [authLoading, isAuthenticated, navigate, location.pathname, location.search]);
+
+  useEffect(() => {
+    const update = () => {
+      try {
+        const h = Number(window?.visualViewport?.height || window?.innerHeight || 0) || 0;
+        setViewportH(h);
+      } catch {
+        // ignore
+      }
+    };
+    update();
+    let vv = null;
+    try {
+      vv = window.visualViewport;
+      vv?.addEventListener?.('resize', update);
+      vv?.addEventListener?.('scroll', update);
+    } catch {
+      // ignore
+    }
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      try {
+        vv?.removeEventListener?.('resize', update);
+        vv?.removeEventListener?.('scroll', update);
+      } catch {
+        // ignore
+      }
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
   
   const filteredConversations = useMemo(() => {
     const base = (conversations || []).filter((c) => (tab === 'requests' ? c.message_type === 'request' : c.message_type !== 'request'));
@@ -648,6 +691,14 @@ export const MessagesPage = () => {
         // On desktop, keep it almost full-height but not flush to the OS taskbar edge.
         'lg:h-[calc(100dvh-16px)]',
       ].join(' ')}
+      style={{
+        height:
+          viewportH > 0
+            ? window.innerWidth >= 1024
+              ? `${Math.max(320, viewportH - 16)}px`
+              : `${Math.max(320, viewportH - 96 - 86)}px`
+            : undefined,
+      }}
     >
       <div className="container-main py-4 md:py-6 h-full flex flex-col min-h-0">
         <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0 overflow-hidden">

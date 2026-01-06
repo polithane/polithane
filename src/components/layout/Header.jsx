@@ -267,7 +267,7 @@ export const Header = () => {
                 </button>
 
                 {showNotifMenu && (
-                  <div className="absolute right-0 top-12 w-[360px] bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden z-50">
+                  <div className="absolute right-2 sm:right-0 top-12 w-[92vw] max-w-[360px] bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden z-50">
                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                       <div className="font-black text-gray-900">Bildirimler</div>
                       <div className="flex items-center gap-2">
@@ -322,14 +322,14 @@ export const Header = () => {
                                   navigate(getProfilePath(actor));
                                 }
                               }}
-                              className={`w-full px-4 py-2 flex items-center gap-2 text-left border-b border-gray-100 hover:bg-gray-50 ${
+                              className={`w-full px-4 py-1.5 flex items-center gap-2 text-left border-b border-gray-100 hover:bg-gray-50 ${
                                 isRead ? '' : 'bg-blue-50/60'
                               }`}
                             >
                               <Avatar src={actor?.avatar_url} size="32px" verified={isUiVerifiedUser(actor)} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
-                                  <div className={`text-sm ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
+                                  <div className={`text-[13px] leading-4 ${isRead ? 'font-semibold text-gray-900' : 'font-black text-gray-900'} truncate`}>
                                     {headerLine}
                                   </div>
                                 </div>
