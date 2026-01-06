@@ -58,7 +58,7 @@ const getPlateCodeFromProvince = (provinceName) => {
  * Note: We use a single control bar element to avoid redundancy and ensure
  * clean, predictable UI across all devices.
  */
-const SmartVideo = ({ src, autoPlay = false }) => {
+const SmartVideo = ({ src, autoPlay = false, overlay = null }) => {
   const videoRef = useRef(null);
   const url = String(src || '').trim();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -203,6 +203,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
           className="max-w-full max-h-full w-auto h-auto object-contain"
           onClick={togglePlay}
         />
+        {overlay ? <div className="absolute inset-0 pointer-events-none">{overlay}</div> : null}
       </div>
 
       <div className="mt-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
@@ -1112,7 +1113,7 @@ export const PostDetailPage = () => {
                           <NoUpscaleImage src={activeImageSrc} alt="" />
                           <button
                             type="button"
-                            className="absolute bottom-2 right-2 w-12 h-12 rounded-full bg-black/55 border border-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70"
+                            className="absolute bottom-2 right-2 w-16 h-16 rounded-full bg-black/55 border border-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70"
                             title="Büyüt"
                             aria-label="Büyüt"
                             onClick={(e) => {
@@ -1122,7 +1123,7 @@ export const PostDetailPage = () => {
                               setZoomOpen(true);
                             }}
                           >
-                            <Maximize2 className="w-6 h-6" />
+                            <Maximize2 className="w-9 h-9" />
                           </button>
                         </div>
                         {imageList.length > 1 && (
@@ -1155,22 +1156,29 @@ export const PostDetailPage = () => {
                 {uiPost.content_type === 'video' && (
                   <div>
                     <div className="relative">
-                      <SmartVideo src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url} autoPlay />
-                      <button
-                        type="button"
-                        className="absolute bottom-3 right-3 w-12 h-12 rounded-full bg-black/55 border border-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 z-20"
-                        title="Büyüt"
-                        aria-label="Büyüt"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const src = Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url;
-                          setZoomType('video');
-                          setZoomSrc(String(src || '').trim());
-                          setZoomOpen(true);
-                        }}
-                      >
-                        <Maximize2 className="w-6 h-6" />
-                      </button>
+                      <SmartVideo
+                        src={Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url}
+                        autoPlay
+                        overlay={
+                          <div className="w-full h-full relative">
+                            <button
+                              type="button"
+                              className="pointer-events-auto absolute bottom-3 right-3 w-16 h-16 rounded-full bg-black/55 border border-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70"
+                              title="Büyüt"
+                              aria-label="Büyüt"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const src = Array.isArray(uiPost.media_url) ? uiPost.media_url[0] : uiPost.media_url;
+                                setZoomType('video');
+                                setZoomSrc(String(src || '').trim());
+                                setZoomOpen(true);
+                              }}
+                            >
+                              <Maximize2 className="w-9 h-9" />
+                            </button>
+                          </div>
+                        }
+                      />
                     </div>
                     {uiPost.content_text && <p className="text-gray-800 mt-3">{uiPost.content_text}</p>}
                   </div>
