@@ -664,10 +664,11 @@ export const FastViewerPage = () => {
         setMediaBlocked(false);
       } catch {
         try {
+          // Try a muted autoplay without changing the user's preference.
+          // Some browsers block autoplay with sound; we should not flip the UI toggle.
           el.muted = true;
           await el.play();
           setMediaBlocked(false);
-          setMuted(true);
         } catch {
           setMediaBlocked(true);
         }

@@ -218,22 +218,16 @@ export const CreatePolitPage = () => {
   }, [agendas]);
 
   const hasMedia = useMemo(() => files.length > 0 || !!recordedUrl, [files.length, recordedUrl]);
-  const isCoverPreparing = useMemo(() => {
-    if (step !== 'media') return false;
-    if (contentType !== 'video') return false;
-    if (!recordedUrl) return false;
-    if (isRecording) return false;
-    if (preparingMedia) return false;
-    return (videoThumbs?.length || 0) === 0;
-  }, [contentType, isRecording, preparingMedia, recordedUrl, step, videoThumbs?.length]);
+  // Worker-based pipeline: cover thumbnails are generated server-side after upload.
+  // Client-side thumbnail capture is slow and often has rotation quirks on mobile browsers.
+  const isCoverPreparing = useMemo(() => false, []);
   const canShowSubmitInMediaStep = useMemo(() => {
     // Hide submit button during picking/recording; show only when we have a preview-ready media.
     if (step !== 'media') return false;
     if (isRecording) return false;
     if (preparingMedia) return false;
-    if (contentType === 'video' && recordedUrl && (videoThumbs?.length || 0) === 0) return false;
     return hasMedia;
-  }, [contentType, hasMedia, isRecording, preparingMedia, recordedUrl, step, videoThumbs?.length]);
+  }, [hasMedia, isRecording, preparingMedia, step]);
 
   // While cover thumbnails are being prepared, don't let the recorded preview play.
   useEffect(() => {
@@ -543,6 +537,12 @@ export const CreatePolitPage = () => {
         // ignore
       }
     };
+
+    // Disabled: we rely on the FFmpeg worker to generate thumbnail_url.
+    if (true) {
+      cancelled = true;
+      return undefined;
+    }
 
     if (contentType !== 'video') {
       cleanupPrev(videoThumbs);

@@ -121,14 +121,22 @@ function buildVideoFilter({ rotationDeg, codedW, codedH }) {
   const cw = Number(codedW || 0) || 0;
   const ch = Number(codedH || 0) || 0;
   const codedIsLandscape = cw > 0 && ch > 0 ? cw > ch : null;
+  let appliedRotation = false;
 
   if (rotationDeg === 90) {
     // Only transpose if coded pixels are landscape.
-    if (codedIsLandscape === true) parts.push('transpose=1');
+    if (codedIsLandscape === true) {
+      parts.push('transpose=1');
+      appliedRotation = true;
+    }
   } else if (rotationDeg === 270) {
-    if (codedIsLandscape === true) parts.push('transpose=2');
+    if (codedIsLandscape === true) {
+      parts.push('transpose=2');
+      appliedRotation = true;
+    }
   } else if (rotationDeg === 180) {
     parts.push('hflip,vflip');
+    appliedRotation = true;
   }
 
   // Standardize to portrait stage: contain + pad (NO CROP)
@@ -136,7 +144,7 @@ function buildVideoFilter({ rotationDeg, codedW, codedH }) {
   parts.push('pad=720:1280:(ow-iw)/2:(oh-ih)/2:black');
   parts.push('setsar=1');
 
-  return parts.join(',');
+  return { vf: parts.join(','), appliedRotation };
 }
 
 async function main() {
@@ -256,7 +264,7 @@ async function main() {
         const rot = rotationFromProbe(probe);
         const dims = codedDimensionsFromProbe(probe);
         const audio = hasAudioStream(probe);
-        const vf = buildVideoFilter({ rotationDeg: rot, codedW: dims.w, codedH: dims.h });
+        const { vf, appliedRotation } = buildVideoFilter({ rotationDeg: rot, codedW: dims.w, codedH: dims.h });
 
         // Transcode -> MP4 (faststart for fast loading)
         // IMPORTANT:
@@ -277,12 +285,13 @@ async function main() {
           '28',
           '-pix_fmt',
           'yuv420p',
-          // Ensure the output does not carry rotation metadata anymore (upright pixels).
-          '-metadata:s:v:0',
-          'rotate=0',
           '-movflags',
           '+faststart',
         ];
+        // Only clear rotation metadata when we actually applied a pixel-rotation fix.
+        if (appliedRotation) {
+          ffArgs.push('-metadata:s:v:0', 'rotate=0');
+        }
         if (audio) {
           ffArgs.push('-c:a', 'aac', '-b:a', '96k', '-ar', '48000', '-ac', '2');
         } else {
