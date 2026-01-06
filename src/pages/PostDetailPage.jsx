@@ -950,15 +950,40 @@ export const PostDetailPage = () => {
                                   .replace(/>/g, '&gt;')
                                   .replace(/"/g, '&quot;')
                                   .replace(/'/g, '&#039;');
-                              const w = window.open('', '_blank', 'noopener,noreferrer,width=640,height=800');
-                              if (!w) return;
-                              w.document.open();
-                              w.document.write(
-                                `<!doctype html><html><head><meta charset="utf-8"><title>Polithane</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;white-space:pre-wrap;line-height:1.5;padding:24px}</style></head><body>${esc(text)}</body></html>`
-                              );
-                              w.document.close();
-                              w.focus?.();
-                              w.print?.();
+
+                              // Prefer iframe printing (more reliable than popup windows on mobile/strict browsers).
+                              const html = `<!doctype html><html><head><meta charset="utf-8"><title>Polithane</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;white-space:pre-wrap;line-height:1.5;padding:24px}</style></head><body>${esc(text)}</body></html>`;
+                              const iframe = document.createElement('iframe');
+                              iframe.style.position = 'fixed';
+                              iframe.style.right = '0';
+                              iframe.style.bottom = '0';
+                              iframe.style.width = '0';
+                              iframe.style.height = '0';
+                              iframe.style.border = '0';
+                              iframe.setAttribute('aria-hidden', 'true');
+                              document.body.appendChild(iframe);
+                              const doc = iframe.contentWindow?.document;
+                              if (!doc) return;
+                              doc.open();
+                              doc.write(html);
+                              doc.close();
+
+                              // Give the browser a tick to render, then print.
+                              setTimeout(() => {
+                                try {
+                                  iframe.contentWindow?.focus?.();
+                                  iframe.contentWindow?.print?.();
+                                } catch {
+                                  // ignore
+                                }
+                                setTimeout(() => {
+                                  try {
+                                    iframe.remove?.();
+                                  } catch {
+                                    // ignore
+                                  }
+                                }, 600);
+                              }, 120);
                             } catch {
                               // ignore
                             }
