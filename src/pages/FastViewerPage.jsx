@@ -180,7 +180,16 @@ export const FastViewerPage = () => {
         // Fast endpoint accepts username or id; use it directly to avoid extra /users lookup in the critical path.
         const r = await apiCall(`/api/fast/${encodeURIComponent(k)}`).catch(() => null);
         const rows = r?.data || [];
-        const list = Array.isArray(rows) ? rows : [];
+        // Defensive: backend may return an extra placeholder row in some environments.
+        // Filter out empty rows so progress segments match the real fast count.
+        const raw = Array.isArray(rows) ? rows : [];
+        const list = raw
+          .filter((it) => it && (it.id != null || it.post_id != null))
+          .filter((it, i, arr) => {
+            const id = String(it?.id ?? it?.post_id ?? '').trim();
+            if (!id) return false;
+            return arr.findIndex((x) => String(x?.id ?? x?.post_id ?? '').trim() === id) === i;
+          });
         // user info: prefer queue snapshot (fastQueue carries avatar/name), else try to infer from first item.
         const inferredUser = normalizeQueueUser(queue?.find((q) => String(q?.key || '') === k) || {}) || null;
         const userFromItem = list?.[0]?.user || null;

@@ -234,8 +234,12 @@ async function main() {
         const vf = buildVideoFilter({ rotationDeg: rot });
 
         // Transcode -> MP4 (faststart for fast loading)
+        // IMPORTANT:
+        // ffmpeg may auto-apply rotation metadata during decode. If we also transpose manually,
+        // the result becomes sideways (double-rotation). Disable autorotate and handle rotation ourselves.
         const ffArgs = [
           '-y',
+          '-noautorotate',
           '-i',
           inFile,
           '-vf',
@@ -248,6 +252,9 @@ async function main() {
           '28',
           '-pix_fmt',
           'yuv420p',
+          // Ensure the output does not carry rotation metadata anymore (upright pixels).
+          '-metadata:s:v:0',
+          'rotate=0',
           '-movflags',
           '+faststart',
         ];
