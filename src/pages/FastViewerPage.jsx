@@ -69,6 +69,10 @@ export const FastViewerPage = () => {
   const inflightRef = useRef(new Map()); // key -> Promise
   const stageRef = useRef(null);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [slide, setSlide] = useState({ x: 0, o: 1 });
+  const [contentBox, setContentBox] = useState({ w: 0, h: 0 });
+  const [imgMeta, setImgMeta] = useState({ w: 0, h: 0 });
 
   // UX: closing Fast should return to home.
   const closeToList = useCallback(() => navigate('/'), [navigate]);
@@ -110,6 +114,41 @@ export const FastViewerPage = () => {
   // It causes some landscape videos to appear sideways.
 
   const safeKey = useMemo(() => String(usernameOrId || '').trim(), [usernameOrId]);
+
+  // Measure stage (content area) for "no upscale" rendering rules.
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const update = () => {
+      try {
+        const r = el.getBoundingClientRect();
+        setContentBox({ w: Math.max(0, r.width || 0), h: Math.max(0, r.height || 0) });
+      } catch {
+        // ignore
+      }
+    };
+    update();
+    let ro = null;
+    try {
+      ro = new ResizeObserver(() => update());
+      ro.observe(el);
+    } catch {
+      // fallback: window resize
+      window.addEventListener('resize', update);
+    }
+    return () => {
+      try {
+        if (ro) ro.disconnect();
+      } catch {
+        // ignore
+      }
+      try {
+        window.removeEventListener('resize', update);
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
 
   const normalizeQueueUser = (x) => ({
     id: x?.id || x?.user_id,
@@ -408,18 +447,18 @@ export const FastViewerPage = () => {
       const p = Math.max(0, Math.min(1, elapsed / currentDuration));
       setProgress(p);
       if (p >= 1) {
-        goItem(1);
+        animateItem(1, () => goItem(1));
         return;
       }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
-    timerRef.current = setTimeout(() => goItem(1), currentDuration + 30);
+    timerRef.current = setTimeout(() => animateItem(1, () => goItem(1)), currentDuration + 30);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [current?.id, currentDuration, goItem, isPaused, items.length]);
+  }, [animateItem, current?.id, currentDuration, goItem, isPaused, items.length]);
 
   const mediaUrl = (p) => {
     const m = p?.media_urls ?? p?.media_url ?? [];
@@ -516,6 +555,7 @@ export const FastViewerPage = () => {
     setVT(0);
     setVDur(0);
     setVMeta({ w: 0, h: 0 });
+    setImgMeta({ w: 0, h: 0 });
   }, [idx]);
 
   useEffect(() => {
@@ -669,6 +709,57 @@ export const FastViewerPage = () => {
   const videoPct = videoSafeDur > 0 ? Math.max(0, Math.min(1, videoSafeT / videoSafeDur)) : 0;
   const videoRatio = vMeta?.w > 0 && vMeta?.h > 0 ? vMeta.w / vMeta.h : 0;
   const isPortraitVideo = videoRatio > 0 && videoRatio < 0.95;
+  const isLandscapeVideo = videoRatio > 1.05;
+
+  const imgRatio = imgMeta?.w > 0 && imgMeta?.h > 0 ? imgMeta.w / imgMeta.h : 0;
+  const isLandscapeImage = imgRatio > 1.05;
+
+  const computeScale = useCallback(
+    ({ mediaW, mediaH, mode }) => {
+      const mw = Number(mediaW || 0) || 0;
+      const mh = Number(mediaH || 0) || 0;
+      const cw = Number(contentBox?.w || 0) || 0;
+      const ch = Number(contentBox?.h || 0) || 0;
+      if (!(mw > 0 && mh > 0 && cw > 0 && ch > 0)) return 1;
+      const contain = Math.min(cw / mw, ch / mh);
+      const cover = Math.max(cw / mw, ch / mh);
+      const s = mode === 'contain' ? contain : cover;
+      return Math.min(1, Math.max(0, s));
+    },
+    [contentBox?.h, contentBox?.w]
+  );
+
+  const imageScale = useMemo(() => computeScale({ mediaW: imgMeta?.w, mediaH: imgMeta?.h, mode: isLandscapeImage ? 'contain' : 'cover' }), [
+    computeScale,
+    imgMeta?.h,
+    imgMeta?.w,
+    isLandscapeImage,
+  ]);
+  const videoScale = useMemo(() => computeScale({ mediaW: vMeta?.w, mediaH: vMeta?.h, mode: isLandscapeVideo ? 'contain' : 'cover' }), [
+    computeScale,
+    isLandscapeVideo,
+    vMeta?.h,
+    vMeta?.w,
+  ]);
+
+  const animateItem = useCallback(
+    async (dir, fn) => {
+      if (isTransitioning || isSwitching) return;
+      const d = Number(dir || 0);
+      if (!d) return;
+      setIsTransitioning(true);
+      // slide out
+      setSlide({ x: -d * 28, o: 0.25 });
+      await new Promise((r) => setTimeout(r, 90));
+      fn?.();
+      // prepare slide in
+      setSlide({ x: d * 28, o: 0.25 });
+      requestAnimationFrame(() => setSlide({ x: 0, o: 1 }));
+      await new Promise((r) => setTimeout(r, 180));
+      setIsTransitioning(false);
+    },
+    [isSwitching, isTransitioning]
+  );
 
   const seekVideoPct = (p) => {
     const el = videoRef.current;
@@ -712,22 +803,22 @@ export const FastViewerPage = () => {
         // ignore
       }
     };
-    const onEnd = () => goItem(1);
+    const onEnd = () => animateItem(1, () => goItem(1));
     el.addEventListener('timeupdate', onTime);
     el.addEventListener('ended', onEnd);
     return () => {
       el.removeEventListener('timeupdate', onTime);
       el.removeEventListener('ended', onEnd);
     };
-  }, [current?.id, current?.content_type, goItem]);
+  }, [animateItem, current?.id, current?.content_type, goItem]);
 
   // Keyboard: left/right, esc, space
   useEffect(() => {
     const onKey = (e) => {
       const k = String(e.key || '');
       if (k === 'Escape') return closeToList();
-      if (k === 'ArrowLeft') return goItem(-1);
-      if (k === 'ArrowRight') return goItem(1);
+      if (k === 'ArrowLeft') return animateItem(-1, () => goItem(-1));
+      if (k === 'ArrowRight') return animateItem(1, () => goItem(1));
       if (k === ' ' || k === 'Spacebar') {
         e.preventDefault();
         setIsPaused((v) => !v);
@@ -736,7 +827,7 @@ export const FastViewerPage = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [closeToList, goItem]);
+  }, [animateItem, closeToList, goItem]);
 
   // Tap / press-hold to pause + swipe gestures (Instagram-like)
   const finishGesture = () => {
@@ -836,7 +927,7 @@ export const FastViewerPage = () => {
     // Tap (no meaningful move): left/right zones navigate items
     if (!g.moved && !g.pausedByHold && !isPaused) {
       const tapDir = g.zoneDir || 0;
-      if (tapDir) goItem(tapDir);
+      if (tapDir) animateItem(tapDir, () => goItem(tapDir));
     }
 
     // Hold-to-pause resumes on release
@@ -962,7 +1053,7 @@ export const FastViewerPage = () => {
           {/* desktop item navigation (PC only): keep arrows vertically centered */}
           <button
             type="button"
-            onClick={() => goItem(-1)}
+            onClick={() => animateItem(-1, () => goItem(-1))}
             className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
             aria-label="Önceki Fast"
             title="Önceki Fast"
@@ -971,7 +1062,7 @@ export const FastViewerPage = () => {
           </button>
           <button
             type="button"
-            onClick={() => goItem(1)}
+            onClick={() => animateItem(1, () => goItem(1))}
             className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
             aria-label="Sonraki Fast"
             title="Sonraki Fast"
@@ -1069,7 +1160,7 @@ export const FastViewerPage = () => {
                     else goUser(-1);
                     return;
                   }
-                  if (!g.moved && !g.pausedByHold && !isPaused) goItem(-1);
+                  if (!g.moved && !g.pausedByHold && !isPaused) animateItem(-1, () => goItem(-1));
                   if (g.pausedByHold) setIsPaused(false);
                   finishGesture();
                 }}
@@ -1188,7 +1279,7 @@ export const FastViewerPage = () => {
                     else goUser(-1);
                     return;
                   }
-                  if (!g.moved && !g.pausedByHold && !isPaused) goItem(1);
+                  if (!g.moved && !g.pausedByHold && !isPaused) animateItem(1, () => goItem(1));
                   if (g.pausedByHold) setIsPaused(false);
                   finishGesture();
                 }}
@@ -1207,11 +1298,44 @@ export const FastViewerPage = () => {
           </div>
 
           {/* content */}
-          <div className="absolute inset-0 z-0">
+          <div
+            ref={stageRef}
+            className="absolute inset-0 z-0"
+            style={{
+              transform: `translateX(${slide.x}px)`,
+              opacity: slide.o,
+              transition: isTransitioning ? 'transform 160ms ease, opacity 160ms ease' : undefined,
+              willChange: isTransitioning ? 'transform, opacity' : undefined,
+            }}
+          >
             {!current ? (
               <div className="h-full w-full flex items-center justify-center text-white/70 text-sm">İçerik bulunamadı.</div>
             ) : current.content_type === 'image' ? (
-              <img src={itemSrc} alt="" className="h-full w-full object-cover" draggable={false} />
+              <div className="absolute inset-0 overflow-hidden">
+                <img
+                  src={itemSrc}
+                  alt=""
+                  draggable={false}
+                  onLoad={(e) => {
+                    try {
+                      const w = Number(e?.currentTarget?.naturalWidth || 0) || 0;
+                      const h = Number(e?.currentTarget?.naturalHeight || 0) || 0;
+                      setImgMeta({ w, h });
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  className="absolute"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    width: imgMeta?.w ? `${imgMeta.w}px` : '100%',
+                    height: imgMeta?.h ? `${imgMeta.h}px` : '100%',
+                    transform: imgMeta?.w && imgMeta?.h ? `translate(-50%, -50%) scale(${imageScale})` : 'translate(-50%, -50%)',
+                    objectFit: isLandscapeImage ? 'contain' : 'cover',
+                  }}
+                />
+              </div>
             ) : current.content_type === 'video' ? (
               <div className="absolute inset-0">
                 {/* 
@@ -1226,7 +1350,15 @@ export const FastViewerPage = () => {
                   autoPlay
                   controls={false}
                   preload="metadata"
-                  className={['h-full w-full', isPortraitVideo ? 'object-cover' : 'object-contain'].join(' ')}
+                  className="absolute"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    width: vMeta?.w ? `${vMeta.w}px` : '100%',
+                    height: vMeta?.h ? `${vMeta.h}px` : '100%',
+                    transform: vMeta?.w && vMeta?.h ? `translate(-50%, -50%) scale(${videoScale})` : 'translate(-50%, -50%)',
+                    objectFit: isLandscapeVideo ? 'contain' : 'cover',
+                  }}
                 />
               </div>
             ) : current.content_type === 'audio' ? (
