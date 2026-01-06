@@ -279,6 +279,25 @@ export const FastViewerPage = () => {
     [closeToList, items.length, navigateToUserIndex, queue, userIdx]
   );
 
+  const animateItem = useCallback(
+    async (dir, fn) => {
+      if (isTransitioning || isSwitching) return;
+      const d = Number(dir || 0);
+      if (!d) return;
+      setIsTransitioning(true);
+      // slide out
+      setSlide({ x: -d * 28, o: 0.25 });
+      await new Promise((r) => setTimeout(r, 90));
+      fn?.();
+      // prepare slide in
+      setSlide({ x: d * 28, o: 0.25 });
+      requestAnimationFrame(() => setSlide({ x: 0, o: 1 }));
+      await new Promise((r) => setTimeout(r, 180));
+      setIsTransitioning(false);
+    },
+    [isSwitching, isTransitioning]
+  );
+
   const currentDuration = useMemo(() => {
     if (!current) return DEFAULT_DURATION_MS;
     // We do not auto-advance for audio/video; we advance on "ended".
@@ -741,25 +760,6 @@ export const FastViewerPage = () => {
     vMeta?.h,
     vMeta?.w,
   ]);
-
-  const animateItem = useCallback(
-    async (dir, fn) => {
-      if (isTransitioning || isSwitching) return;
-      const d = Number(dir || 0);
-      if (!d) return;
-      setIsTransitioning(true);
-      // slide out
-      setSlide({ x: -d * 28, o: 0.25 });
-      await new Promise((r) => setTimeout(r, 90));
-      fn?.();
-      // prepare slide in
-      setSlide({ x: d * 28, o: 0.25 });
-      requestAnimationFrame(() => setSlide({ x: 0, o: 1 }));
-      await new Promise((r) => setTimeout(r, 180));
-      setIsTransitioning(false);
-    },
-    [isSwitching, isTransitioning]
-  );
 
   const seekVideoPct = (p) => {
     const el = videoRef.current;
@@ -1311,33 +1311,16 @@ export const FastViewerPage = () => {
             {!current ? (
               <div className="h-full w-full flex items-center justify-center text-white/70 text-sm">İçerik bulunamadı.</div>
             ) : current.content_type === 'image' ? (
-              <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 flex items-center justify-center bg-black">
                 <img
                   src={itemSrc}
                   alt=""
                   draggable={false}
-                  onLoad={(e) => {
-                    try {
-                      const w = Number(e?.currentTarget?.naturalWidth || 0) || 0;
-                      const h = Number(e?.currentTarget?.naturalHeight || 0) || 0;
-                      setImgMeta({ w, h });
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                  className="absolute"
-                  style={{
-                    left: '50%',
-                    top: '50%',
-                    width: imgMeta?.w ? `${imgMeta.w}px` : '100%',
-                    height: imgMeta?.h ? `${imgMeta.h}px` : '100%',
-                    transform: imgMeta?.w && imgMeta?.h ? `translate(-50%, -50%) scale(${imageScale})` : 'translate(-50%, -50%)',
-                    objectFit: isLandscapeImage ? 'contain' : 'cover',
-                  }}
+                  className="max-w-full max-h-full w-auto h-auto object-contain"
                 />
               </div>
             ) : current.content_type === 'video' ? (
-              <div className="absolute inset-0">
+              <div className="absolute inset-0 flex items-center justify-center bg-black">
                 {/* 
                   Single video element with videoRef - no duplicates
                   Uses custom controls via gesture zones to avoid native control overlay issues on mobile
@@ -1350,15 +1333,7 @@ export const FastViewerPage = () => {
                   autoPlay
                   controls={false}
                   preload="metadata"
-                  className="absolute"
-                  style={{
-                    left: '50%',
-                    top: '50%',
-                    width: vMeta?.w ? `${vMeta.w}px` : '100%',
-                    height: vMeta?.h ? `${vMeta.h}px` : '100%',
-                    transform: vMeta?.w && vMeta?.h ? `translate(-50%, -50%) scale(${videoScale})` : 'translate(-50%, -50%)',
-                    objectFit: isLandscapeVideo ? 'contain' : 'cover',
-                  }}
+                  className="max-w-full max-h-full w-auto h-auto object-contain"
                 />
               </div>
             ) : current.content_type === 'audio' ? (

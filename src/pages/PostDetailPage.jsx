@@ -115,8 +115,6 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   const pct = safeDur > 0 ? Math.max(0, Math.min(1, safeT / safeDur)) : 0;
   const ratio = meta?.w > 0 && meta?.h > 0 ? meta.w / meta.h : 0;
   const isPortrait = ratio > 0 && ratio < 0.95;
-  const isLandscape = ratio > 1.05;
-
   // Measure the stage box so we can avoid upscaling small media.
   useEffect(() => {
     const el = boxRef.current;
@@ -157,11 +155,10 @@ const SmartVideo = ({ src, autoPlay = false }) => {
     const cw = Number(box?.w || 0) || 0;
     const ch = Number(box?.h || 0) || 0;
     if (!(mw > 0 && mh > 0 && cw > 0 && ch > 0)) return 1;
+    // Polit detayında asla zoom/crop yapma: sadece küçült (contain) ve büyütme.
     const contain = Math.min(cw / mw, ch / mh);
-    const cover = Math.max(cw / mw, ch / mh);
-    const prefer = isLandscape ? contain : cover; // portrait => cover, landscape => contain
-    return Math.min(1, Math.max(0, prefer));
-  }, [box?.h, box?.w, isLandscape, meta?.h, meta?.w]);
+    return Math.min(1, Math.max(0, contain));
+  }, [box?.h, box?.w, meta?.h, meta?.w]);
 
   const togglePlay = async () => {
     const el = videoRef.current;
@@ -209,16 +206,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
 
   return (
     <div className="w-full">
-      <div
-        ref={boxRef}
-        className="relative w-full bg-black rounded-lg overflow-hidden"
-        style={{
-          // Keep a vertical-first stage; media is centered inside without distortion.
-          minHeight: '60vh',
-          maxHeight: '80vh',
-          height: '80vh',
-        }}
-      >
+      <div ref={boxRef} className="relative w-full bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ aspectRatio: '9 / 16' }}>
         <video
           ref={videoRef}
           src={url}
@@ -228,15 +216,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
           controls={false}
           autoPlay={autoPlay}
           preload="metadata"
-          className="absolute"
-          style={{
-            left: '50%',
-            top: '50%',
-            width: meta?.w ? `${meta.w}px` : '100%',
-            height: meta?.h ? `${meta.h}px` : '100%',
-            transform: meta?.w && meta?.h ? `translate(-50%, -50%) scale(${scale})` : 'translate(-50%, -50%)',
-            objectFit: isLandscape ? 'contain' : 'cover',
-          }}
+          className="max-w-full max-h-full w-auto h-auto object-contain"
           onClick={togglePlay}
         />
       </div>
@@ -345,33 +325,29 @@ const NoUpscaleImage = ({ src, alt = '' }) => {
     };
   }, []);
 
-  const ratio = meta?.w > 0 && meta?.h > 0 ? meta.w / meta.h : 0;
-  const isLandscape = ratio > 1.05;
-
   const scale = useMemo(() => {
     const mw = Number(meta?.w || 0) || 0;
     const mh = Number(meta?.h || 0) || 0;
     const cw = Number(box?.w || 0) || 0;
     const ch = Number(box?.h || 0) || 0;
     if (!(mw > 0 && mh > 0 && cw > 0 && ch > 0)) return 1;
+    // Polit detayında asla zoom/crop yapma: sadece küçült (contain) ve büyütme.
     const contain = Math.min(cw / mw, ch / mh);
-    const cover = Math.max(cw / mw, ch / mh);
-    const prefer = isLandscape ? contain : cover; // portrait => cover, landscape => contain
-    return Math.min(1, Math.max(0, prefer));
-  }, [box?.h, box?.w, isLandscape, meta?.h, meta?.w]);
+    return Math.min(1, Math.max(0, contain));
+  }, [box?.h, box?.w, meta?.h, meta?.w]);
 
   if (!url) return null;
 
   return (
     <div
       ref={boxRef}
-      className="relative w-full bg-black rounded-lg overflow-hidden mb-3"
-      style={{ height: '80vh', maxHeight: '80vh', minHeight: '60vh' }}
+      className="relative w-full bg-black rounded-lg overflow-hidden mb-3 flex items-center justify-center"
+      style={{ aspectRatio: '9 / 16' }}
     >
       <img
         src={url}
         alt={alt}
-        className="absolute"
+        className="max-w-full max-h-full w-auto h-auto object-contain"
         onLoad={(e) => {
           try {
             const w = Number(e?.currentTarget?.naturalWidth || 0) || 0;
@@ -380,14 +356,6 @@ const NoUpscaleImage = ({ src, alt = '' }) => {
           } catch {
             // ignore
           }
-        }}
-        style={{
-          left: '50%',
-          top: '50%',
-          width: meta?.w ? `${meta.w}px` : '100%',
-          height: meta?.h ? `${meta.h}px` : '100%',
-          transform: meta?.w && meta?.h ? `translate(-50%, -50%) scale(${scale})` : 'translate(-50%, -50%)',
-          objectFit: isLandscape ? 'contain' : 'cover',
         }}
       />
     </div>

@@ -1159,8 +1159,9 @@ export const CreatePolitPage = () => {
           // ignore
         }
 
-        // Draw loop: fill canvas with video (cover by default for Fast, contain for Polit)
-        const fitMode = isFastMode ? 'cover' : 'contain';
+        // Draw loop: NEVER zoom/crop. Always contain inside the 9:16 frame.
+        // If the source is already 9:16, contain == cover (no empty bars).
+        const fitMode = 'contain';
         const draw = () => {
           try {
             // Background
