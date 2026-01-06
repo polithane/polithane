@@ -175,8 +175,9 @@ export const IntroSlider = ({ autoplay = true, interval = 6500 }) => {
         <div className="absolute inset-0 bg-gradient-to-r from-black/25 to-transparent" />
         <div className="relative h-full flex items-center justify-between px-4 md:px-6 gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="inline-flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white/15 border border-white/20 flex-shrink-0">
-              <current.Icon className="w-14 h-14 md:w-16 md:h-16 text-white" />
+            {/* Desktop icon was reported "dot-sized": make it clearly visible on md+ */}
+            <span className="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-2xl bg-white/15 border border-white/20 flex-shrink-0">
+              <current.Icon className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 text-white" />
             </span>
             <div className="min-w-0">
               <div className="text-lg md:text-xl lg:text-2xl font-black text-white drop-shadow leading-tight">

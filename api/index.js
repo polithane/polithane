@@ -2480,16 +2480,44 @@ async function deletePost(req, res, postId) {
     return res.status(403).json({ success: false, error: 'Bu paylaşımı silemezsiniz.' });
   }
 
-  // Archive-first delete:
-  // - Immediately hide the post from the app (soft delete)
-  // - Do NOT delete media yet (so we can support a short "archive/grace" window)
-  // - A cron job will hard-delete rows + media after the archive window expires
-  const updated = await supabaseRestPatch(
-    'posts',
-    { id: `eq.${id}`, user_id: `eq.${auth.id}` },
-    { is_deleted: true, updated_at: new Date().toISOString() }
-  ).catch(() => []);
-  return res.json({ success: true, data: updated?.[0] || null });
+  // HARD delete (user-requested):
+  // - delete related rows
+  // - delete media objects from Storage immediately
+  // - delete the post row
+  try {
+    // 1) Delete related rows (best-effort)
+    await supabaseRestDelete('likes', { post_id: `eq.${id}` }, { Prefer: 'return=minimal' }).catch(() => null);
+    await supabaseRestDelete('comments', { post_id: `eq.${id}` }, { Prefer: 'return=minimal' }).catch(() => null);
+    await supabaseRestDelete('notifications', { post_id: `eq.${id}` }, { Prefer: 'return=minimal' }).catch(() => null);
+  } catch {
+    // ignore
+  }
+
+  // 2) Delete media objects from storage (uploads bucket)
+  try {
+    const urls = [];
+    if (Array.isArray(post?.media_urls)) urls.push(...post.media_urls);
+    if (Array.isArray(post?.media_original_urls)) urls.push(...post.media_original_urls);
+    if (post?.thumbnail_url) urls.push(post.thumbnail_url);
+    const objs = (urls || [])
+      .map((u) => parseSupabasePublicObjectUrl(u))
+      .filter(Boolean)
+      .filter((o) => o.bucket === 'uploads' && o.objectPath);
+    const seen = new Set();
+    for (const o of objs) {
+      const key = `${o.bucket}/${o.objectPath}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // eslint-disable-next-line no-await-in-loop
+      await supabaseStorageDeleteObject(o.bucket, o.objectPath).catch(() => null);
+    }
+  } catch {
+    // ignore
+  }
+
+  // 3) Delete post row
+  await supabaseRestDelete('posts', { id: `eq.${id}` }, { Prefer: 'return=minimal' });
+  return res.json({ success: true, deleted: true, id });
 }
 
 async function purgeArchivedPosts({ olderThanDays = 3, limit = 200 } = {}) {
