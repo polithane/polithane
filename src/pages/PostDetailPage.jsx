@@ -30,6 +30,7 @@ import { usePublicSite } from '../contexts/PublicSiteContext';
  */
 const SmartVideo = ({ src, autoPlay = false }) => {
   const videoRef = useRef(null);
+  const boxRef = useRef(null);
   const url = String(src || '').trim();
   const [isPlaying, setIsPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -37,6 +38,7 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   const [dur, setDur] = useState(0);
   const [blocked, setBlocked] = useState(false);
   const [meta, setMeta] = useState({ w: 0, h: 0 });
+  const [box, setBox] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
     if (!url) return;
@@ -113,6 +115,53 @@ const SmartVideo = ({ src, autoPlay = false }) => {
   const pct = safeDur > 0 ? Math.max(0, Math.min(1, safeT / safeDur)) : 0;
   const ratio = meta?.w > 0 && meta?.h > 0 ? meta.w / meta.h : 0;
   const isPortrait = ratio > 0 && ratio < 0.95;
+  const isLandscape = ratio > 1.05;
+
+  // Measure the stage box so we can avoid upscaling small media.
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const update = () => {
+      try {
+        const r = el.getBoundingClientRect();
+        setBox({ w: Math.max(0, r.width || 0), h: Math.max(0, r.height || 0) });
+      } catch {
+        // ignore
+      }
+    };
+    update();
+    let ro = null;
+    try {
+      ro = new ResizeObserver(() => update());
+      ro.observe(el);
+    } catch {
+      window.addEventListener('resize', update);
+    }
+    return () => {
+      try {
+        if (ro) ro.disconnect();
+      } catch {
+        // ignore
+      }
+      try {
+        window.removeEventListener('resize', update);
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
+  const scale = useMemo(() => {
+    const mw = Number(meta?.w || 0) || 0;
+    const mh = Number(meta?.h || 0) || 0;
+    const cw = Number(box?.w || 0) || 0;
+    const ch = Number(box?.h || 0) || 0;
+    if (!(mw > 0 && mh > 0 && cw > 0 && ch > 0)) return 1;
+    const contain = Math.min(cw / mw, ch / mh);
+    const cover = Math.max(cw / mw, ch / mh);
+    const prefer = isLandscape ? contain : cover; // portrait => cover, landscape => contain
+    return Math.min(1, Math.max(0, prefer));
+  }, [box?.h, box?.w, isLandscape, meta?.h, meta?.w]);
 
   const togglePlay = async () => {
     const el = videoRef.current;
@@ -160,19 +209,37 @@ const SmartVideo = ({ src, autoPlay = false }) => {
 
   return (
     <div className="w-full">
-      <video
-        ref={videoRef}
-        src={url}
-        playsInline
-        // IMPORTANT: native controls create the "dark overlay + controls on top"
-        // effect on many mobile browsers. We use our own control bar below.
-        controls={false}
-        autoPlay={autoPlay}
-        preload="metadata"
-        className={['w-full bg-black rounded-lg', isPortrait ? 'object-cover' : 'object-contain'].join(' ')}
-        style={isPortrait ? { height: 'auto', minHeight: '60vh', maxHeight: '80vh' } : { maxHeight: '80vh' }}
-        onClick={togglePlay}
-      />
+      <div
+        ref={boxRef}
+        className="relative w-full bg-black rounded-lg overflow-hidden"
+        style={{
+          // Keep a vertical-first stage; media is centered inside without distortion.
+          minHeight: '60vh',
+          maxHeight: '80vh',
+          height: '80vh',
+        }}
+      >
+        <video
+          ref={videoRef}
+          src={url}
+          playsInline
+          // IMPORTANT: native controls create the "dark overlay + controls on top"
+          // effect on many mobile browsers. We use our own control bar below.
+          controls={false}
+          autoPlay={autoPlay}
+          preload="metadata"
+          className="absolute"
+          style={{
+            left: '50%',
+            top: '50%',
+            width: meta?.w ? `${meta.w}px` : '100%',
+            height: meta?.h ? `${meta.h}px` : '100%',
+            transform: meta?.w && meta?.h ? `translate(-50%, -50%) scale(${scale})` : 'translate(-50%, -50%)',
+            objectFit: isLandscape ? 'contain' : 'cover',
+          }}
+          onClick={togglePlay}
+        />
+      </div>
 
       <div className="mt-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
         <div className="flex items-center gap-2">
@@ -235,6 +302,94 @@ const SmartVideo = ({ src, autoPlay = false }) => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+const NoUpscaleImage = ({ src, alt = '' }) => {
+  const boxRef = useRef(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [meta, setMeta] = useState({ w: 0, h: 0 });
+  const url = String(src || '').trim();
+
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const update = () => {
+      try {
+        const r = el.getBoundingClientRect();
+        setBox({ w: Math.max(0, r.width || 0), h: Math.max(0, r.height || 0) });
+      } catch {
+        // ignore
+      }
+    };
+    update();
+    let ro = null;
+    try {
+      ro = new ResizeObserver(() => update());
+      ro.observe(el);
+    } catch {
+      window.addEventListener('resize', update);
+    }
+    return () => {
+      try {
+        if (ro) ro.disconnect();
+      } catch {
+        // ignore
+      }
+      try {
+        window.removeEventListener('resize', update);
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
+  const ratio = meta?.w > 0 && meta?.h > 0 ? meta.w / meta.h : 0;
+  const isLandscape = ratio > 1.05;
+
+  const scale = useMemo(() => {
+    const mw = Number(meta?.w || 0) || 0;
+    const mh = Number(meta?.h || 0) || 0;
+    const cw = Number(box?.w || 0) || 0;
+    const ch = Number(box?.h || 0) || 0;
+    if (!(mw > 0 && mh > 0 && cw > 0 && ch > 0)) return 1;
+    const contain = Math.min(cw / mw, ch / mh);
+    const cover = Math.max(cw / mw, ch / mh);
+    const prefer = isLandscape ? contain : cover; // portrait => cover, landscape => contain
+    return Math.min(1, Math.max(0, prefer));
+  }, [box?.h, box?.w, isLandscape, meta?.h, meta?.w]);
+
+  if (!url) return null;
+
+  return (
+    <div
+      ref={boxRef}
+      className="relative w-full bg-black rounded-lg overflow-hidden mb-3"
+      style={{ height: '80vh', maxHeight: '80vh', minHeight: '60vh' }}
+    >
+      <img
+        src={url}
+        alt={alt}
+        className="absolute"
+        onLoad={(e) => {
+          try {
+            const w = Number(e?.currentTarget?.naturalWidth || 0) || 0;
+            const h = Number(e?.currentTarget?.naturalHeight || 0) || 0;
+            setMeta({ w, h });
+          } catch {
+            // ignore
+          }
+        }}
+        style={{
+          left: '50%',
+          top: '50%',
+          width: meta?.w ? `${meta.w}px` : '100%',
+          height: meta?.h ? `${meta.h}px` : '100%',
+          transform: meta?.w && meta?.h ? `translate(-50%, -50%) scale(${scale})` : 'translate(-50%, -50%)',
+          objectFit: isLandscape ? 'contain' : 'cover',
+        }}
+      />
     </div>
   );
 };
@@ -849,7 +1004,7 @@ export const PostDetailPage = () => {
                   <div>
                     {activeImageSrc ? (
                       <>
-                        <img src={activeImageSrc} alt="" className="w-full rounded-lg mb-3" />
+                        <NoUpscaleImage src={activeImageSrc} alt="" />
                         {imageList.length > 1 && (
                           <div className="mb-3 overflow-x-auto">
                             <div className="flex gap-2 w-max">
