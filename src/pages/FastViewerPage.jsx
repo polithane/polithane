@@ -65,6 +65,10 @@ export const FastViewerPage = () => {
   const [vMeta, setVMeta] = useState({ w: 0, h: 0 });
   const pendingStartRef = useRef(null); // null | 'first' | 'last'
   const pendingUserDirRef = useRef(0); // -1 | 0 | 1 (best-effort when a user has no items)
+  const itemsCacheRef = useRef(new Map()); // key -> { ts, items, user }
+  const inflightRef = useRef(new Map()); // key -> Promise
+  const stageRef = useRef(null);
+  const [isSwitching, setIsSwitching] = useState(false);
 
   // UX: closing Fast should return to home.
   const closeToList = useCallback(() => navigate('/'), [navigate]);
@@ -106,6 +110,65 @@ export const FastViewerPage = () => {
   // It causes some landscape videos to appear sideways.
 
   const safeKey = useMemo(() => String(usernameOrId || '').trim(), [usernameOrId]);
+
+  const normalizeQueueUser = (x) => ({
+    id: x?.id || x?.user_id,
+    user_id: x?.user_id || x?.id,
+    username: x?.username,
+    full_name: x?.full_name,
+    avatar_url: x?.avatar_url || x?.profile_image,
+    profile_image: x?.profile_image || x?.avatar_url,
+    story_count: x?.story_count,
+    latest_created_at: x?.latest_created_at,
+  });
+
+  const fetchFastForKey = useCallback(
+    async (key) => {
+      const k = String(key || '').trim();
+      if (!k) return { user: null, items: [] };
+      const cached = itemsCacheRef.current.get(k);
+      if (cached && Date.now() - Number(cached.ts || 0) < 60_000) return { user: cached.user, items: cached.items };
+
+      if (inflightRef.current.has(k)) {
+        try {
+          return await inflightRef.current.get(k);
+        } catch {
+          // fall through
+        }
+      }
+
+      const p = (async () => {
+        // Fast endpoint accepts username or id; use it directly to avoid extra /users lookup in the critical path.
+        const r = await apiCall(`/api/fast/${encodeURIComponent(k)}`).catch(() => null);
+        const rows = r?.data || [];
+        const list = Array.isArray(rows) ? rows : [];
+        // user info: prefer queue snapshot (fastQueue carries avatar/name), else try to infer from first item.
+        const inferredUser = normalizeQueueUser(queue?.find((q) => String(q?.key || '') === k) || {}) || null;
+        const userFromItem = list?.[0]?.user || null;
+        const resolvedUser = userFromItem || inferredUser || null;
+        itemsCacheRef.current.set(k, { ts: Date.now(), items: list, user: resolvedUser });
+        return { user: resolvedUser, items: list };
+      })();
+
+      inflightRef.current.set(k, p);
+      try {
+        const out = await p;
+        return out;
+      } finally {
+        inflightRef.current.delete(k);
+      }
+    },
+    [queue]
+  );
+
+  const prefetchNeighbor = useCallback(
+    (k) => {
+      const key = String(k || '').trim();
+      if (!key) return;
+      fetchFastForKey(key).catch(() => null);
+    },
+    [fetchFastForKey]
+  );
 
   const navigateToUserIndex = useCallback(
     (nextIndex, { replace = true } = {}) => {
@@ -253,26 +316,27 @@ export const FastViewerPage = () => {
     (async () => {
       const key = String(queue?.[userIdx]?.key || safeKey || '').trim();
       if (!key) return;
-      const isId = /^\d+$/.test(key) || /^[0-9a-fA-F-]{36}$/.test(key);
+      // Optimistic: show cached immediately if possible to reduce "did it click?" feeling.
+      const cached = itemsCacheRef.current.get(key);
+      if (cached && !cancelled) {
+        setUser(cached.user || queue?.[userIdx] || null);
+        setItems(Array.isArray(cached.items) ? cached.items : []);
+        const pending = pendingStartRef.current;
+        pendingStartRef.current = null;
+        pendingUserDirRef.current = 0;
+        if (Array.isArray(cached.items) && cached.items.length) {
+          if (pending === 'last') setIdx(Math.max(0, cached.items.length - 1));
+          else setIdx(0);
+        }
+      }
       setMediaBlocked(false);
       setProgress(0);
       setIsPaused(false);
+      setIsSwitching(true);
       try {
-        const profileRes = isId
-          ? await apiCall(`/api/users?id=${encodeURIComponent(key)}`)
-          : await apiCall(`/api/users?username=${encodeURIComponent(key)}`);
-        const profile = profileRes?.data ? profileRes.data : profileRes;
-        if (!cancelled) setUser(profile || queue?.[userIdx] || null);
-
-        const userId = profile?.id || (isId ? key : null);
-        if (!userId) {
-          if (!cancelled) setItems([]);
-          return;
-        }
-        const r = await apiCall(`/api/fast/${encodeURIComponent(userId)}`);
-        const rows = r?.data || [];
-        const list = Array.isArray(rows) ? rows : [];
+        const { user: resolvedUser, items: list } = await fetchFastForKey(key);
         if (cancelled) return;
+        setUser(resolvedUser || queue?.[userIdx] || null);
         setItems(list);
         const pending = pendingStartRef.current;
         pendingStartRef.current = null;
@@ -303,12 +367,22 @@ export const FastViewerPage = () => {
         setUser(queue?.[userIdx] || null);
         setItems([]);
         setIdx(0);
+      } finally {
+        if (!cancelled) setIsSwitching(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [queue, userIdx, safeKey]);
+  }, [closeToList, fetchFastForKey, queue, safeKey, userIdx]);
+
+  // Prefetch neighbors to make edge transitions faster.
+  useEffect(() => {
+    const prev = userIdx > 0 ? queue?.[userIdx - 1]?.key : null;
+    const next = userIdx < (queue?.length || 0) - 1 ? queue?.[userIdx + 1]?.key : null;
+    if (prev) prefetchNeighbor(prev);
+    if (next) prefetchNeighbor(next);
+  }, [prefetchNeighbor, queue, userIdx]);
 
   // Persist muted state to localStorage
   useEffect(() => {
@@ -787,10 +861,11 @@ export const FastViewerPage = () => {
     const pos = side === 'left' ? 'left-6' : 'right-6';
     const name = String(u?.username || '').trim() || String(u?.full_name || '').trim() || 'Fast';
     const img = normalizeAvatarUrl(u?.avatar_url || u?.profile_image || '');
+    const dir = side === 'left' ? -1 : 1;
     return (
       <button
         type="button"
-        onClick={() => navigate(getProfilePath(u || {}))}
+        onClick={() => goUser(dir)}
         className={[
           'hidden md:flex absolute top-1/2 -translate-y-1/2',
           pos,
@@ -800,8 +875,8 @@ export const FastViewerPage = () => {
           'shadow-[0_20px_80px_rgba(0,0,0,0.55)]',
           'opacity-80 hover:opacity-100 transition-opacity',
         ].join(' ')}
-        aria-label={side === 'left' ? 'Önceki Fast sahibi profili' : 'Sonraki Fast sahibi profili'}
-        title={side === 'left' ? 'Önceki Fast sahibinin profili' : 'Sonraki Fast sahibinin profili'}
+        aria-label={side === 'left' ? 'Önceki Fast' : 'Sonraki Fast'}
+        title={side === 'left' ? 'Önceki Fast' : 'Sonraki Fast'}
       >
         <div className="w-14 h-14 rounded-full border border-white/20 bg-black/25 overflow-hidden flex-shrink-0">
           {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : null}
@@ -884,27 +959,25 @@ export const FastViewerPage = () => {
             </div>
           </div>
 
-          {/* desktop item navigation (requested): prev/next FAST with fallback to prev/next profile, else close */}
-          <div className="hidden md:flex absolute top-[62px] left-0 right-0 px-3 z-30 items-center justify-between pointer-events-none">
-            <button
-              type="button"
-              onClick={() => goItem(-1)}
-              className="pointer-events-auto w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 flex items-center justify-center backdrop-blur-sm"
-              aria-label="Önceki Fast"
-              title="Önceki Fast"
-            >
-              <ChevronLeft className="w-7 h-7 text-sky-200" />
-            </button>
-            <button
-              type="button"
-              onClick={() => goItem(1)}
-              className="pointer-events-auto w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 flex items-center justify-center backdrop-blur-sm"
-              aria-label="Sonraki Fast"
-              title="Sonraki Fast"
-            >
-              <ChevronRight className="w-7 h-7 text-sky-200" />
-            </button>
-          </div>
+          {/* desktop item navigation (PC only): keep arrows vertically centered */}
+          <button
+            type="button"
+            onClick={() => goItem(-1)}
+            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
+            aria-label="Önceki Fast"
+            title="Önceki Fast"
+          >
+            <ChevronLeft className="w-7 h-7 text-sky-200" />
+          </button>
+          <button
+            type="button"
+            onClick={() => goItem(1)}
+            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-sky-500/20 hover:bg-sky-500/30 border border-sky-300/30 items-center justify-center backdrop-blur-sm"
+            aria-label="Sonraki Fast"
+            title="Sonraki Fast"
+          >
+            <ChevronRight className="w-7 h-7 text-sky-200" />
+          </button>
 
           {/* tap zones + hold-to-pause */}
           <div
