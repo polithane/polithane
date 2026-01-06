@@ -1908,6 +1908,7 @@ async function createPost(req, res) {
     // Try schema variants (content/content_text) and optional fields (is_trending, media_duration)
     let inserted;
     try {
+      const willProcessVideo = content_type === 'video' && Array.isArray(media_urls) && media_urls.length > 0;
       const payload = {
         user_id: auth.id,
         party_id,
@@ -1916,6 +1917,7 @@ async function createPost(req, res) {
         category,
         agenda_tag,
         media_urls,
+        ...(willProcessVideo ? { media_status: 'processing', media_original_urls: media_urls } : {}),
         ...(thumbnail_url ? { thumbnail_url } : {}),
         ...(Number.isFinite(media_duration) ? { media_duration } : {}),
         is_deleted: false,
@@ -1925,7 +1927,15 @@ async function createPost(req, res) {
     } catch (e) {
       const msg = String(e?.message || '');
       // Retry without unsupported fields (schema-agnostic)
-      if (msg.includes('is_trending') || msg.includes('media_duration') || msg.includes('thumbnail_url')) {
+      if (
+        msg.includes('is_trending') ||
+        msg.includes('media_duration') ||
+        msg.includes('thumbnail_url') ||
+        msg.includes('media_status') ||
+        msg.includes('media_original_urls') ||
+        msg.includes('media_processed_at') ||
+        msg.includes('media_processing_error')
+      ) {
         try {
           inserted = await supabaseRestInsert('posts', [{
             user_id: auth.id,
@@ -1978,6 +1988,29 @@ async function createPost(req, res) {
       }
     }
     const post = inserted?.[0] || null;
+
+    // If this is a video upload, enqueue a transcode job (FFmpeg worker will standardize 9:16 + rotation).
+    // Best-effort: never block publishing if the queue insert fails.
+    try {
+      if (post?.id && content_type === 'video' && Array.isArray(media_urls) && media_urls.length > 0) {
+        const firstUrl = String(media_urls[0] || '').trim();
+        const parsed = parseSupabasePublicObjectUrl(firstUrl);
+        if (parsed?.bucket && parsed?.objectPath) {
+          await supabaseRestInsert('media_jobs', [
+            {
+              post_id: String(post.id),
+              user_id: String(auth.id),
+              input_bucket: parsed.bucket,
+              input_path: parsed.objectPath,
+              input_public_url: firstUrl,
+              status: 'queued',
+            },
+          ]);
+        }
+      }
+    } catch {
+      // ignore
+    }
 
     // Mention notifications in post body (best-effort)
     if (post?.id) {
