@@ -274,6 +274,7 @@ async function main() {
             '-y',
             '-ss',
             '0.5',
+            '-noautorotate',
             '-i',
             outFile,
             '-frames:v',
