@@ -41,6 +41,12 @@ export const AnimatedSlogan = () => {
     return String(url || '').trim() || '/logo.png';
   }, [site]);
 
+  const logoSize = useMemo(() => {
+    const bw = Number(site?.branding?.logoHeaderWidth || 0) || 0;
+    const bh = Number(site?.branding?.logoHeaderHeight || 0) || 0;
+    return { w: bw > 0 ? bw : 40, h: bh > 0 ? bh : 40 };
+  }, [site?.branding?.logoHeaderHeight, site?.branding?.logoHeaderWidth]);
+
   return (
     <div className="flex items-center gap-3 min-w-0">
       {/* Logo - Tıklanabilir */}
@@ -48,9 +54,10 @@ export const AnimatedSlogan = () => {
         <img
           src={logoSrc}
           alt="Polithane"
-          width={40}
-          height={40}
-          className="h-10 w-10 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+          width={logoSize.w}
+          height={logoSize.h}
+          style={{ width: `${logoSize.w}px`, height: `${logoSize.h}px` }}
+          className="object-contain cursor-pointer hover:opacity-80 transition-opacity"
           onClick={() => navigate('/')}
           onError={() => setLogoFailed(true)}
         />

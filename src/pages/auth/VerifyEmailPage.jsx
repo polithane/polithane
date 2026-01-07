@@ -16,6 +16,12 @@ export const VerifyEmailPage = () => {
     return String(url || '').trim() || '/logo.png';
   }, [site]);
 
+  const logoSize = useMemo(() => {
+    const w = Number(site?.branding?.logoAuthWidth || 0) || 0;
+    const h = Number(site?.branding?.logoAuthHeight || 0) || 0;
+    return { w: w > 0 ? w : 96, h: h > 0 ? h : 96 };
+  }, [site?.branding?.logoAuthHeight, site?.branding?.logoAuthWidth]);
+
   const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState(false);
   const [error, setError] = useState('');
@@ -62,9 +68,10 @@ export const VerifyEmailPage = () => {
               <img
                 src={logoSrc}
                 alt="Polithane"
-                width={96}
-                height={96}
-                className="w-24 h-24 object-contain drop-shadow-lg"
+                width={logoSize.w}
+                height={logoSize.h}
+                className="object-contain drop-shadow-lg"
+                style={{ width: `${logoSize.w}px`, height: `${logoSize.h}px` }}
                 onError={() => setLogoFailed(true)}
               />
             )}

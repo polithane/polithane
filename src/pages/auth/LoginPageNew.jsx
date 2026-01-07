@@ -14,6 +14,13 @@ export const LoginPageNew = () => {
     const url = site?.branding?.logoAuthUrl;
     return String(url || '').trim() || '/favicon.ico';
   }, [site]);
+
+  const logoSize = useMemo(() => {
+    const w = Number(site?.branding?.logoAuthWidth || 0) || 0;
+    const h = Number(site?.branding?.logoAuthHeight || 0) || 0;
+    // Keep existing layout defaults if not set.
+    return { w: w > 0 ? w : 112, h: h > 0 ? h : 112 };
+  }, [site?.branding?.logoAuthHeight, site?.branding?.logoAuthWidth]);
   
   const [formData, setFormData] = useState({
     identifier: '',
@@ -73,7 +80,8 @@ export const LoginPageNew = () => {
               <img 
                 src={logoSrc} 
                 alt="Polithane" 
-                className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-lg"
+                className="object-contain drop-shadow-lg"
+                style={{ width: `${logoSize.w}px`, height: `${logoSize.h}px` }}
                 onError={() => setLogoFailed(true)}
               />
             )}

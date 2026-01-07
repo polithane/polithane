@@ -73,6 +73,43 @@ export const ProfilePage = () => {
   const [reportBusy, setReportBusy] = useState(false);
   const [reportDone, setReportDone] = useState(false);
 
+  const emailVerified = useMemo(() => {
+    const u = currentUser && typeof currentUser === 'object' ? currentUser : null;
+    const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+    return u?.email_verified === true || meta?.email_verified === true;
+  }, [currentUser]);
+
+  const isSelfFromParams = useMemo(() => {
+    const meId = String(currentUser?.id || '').trim();
+    const meUsername = String(currentUser?.username || '').trim().toLowerCase();
+    const pid = String(userId || '').trim();
+    const pun = String(username || '').trim().toLowerCase();
+    if (meId && pid && meId === pid) return true;
+    if (meUsername && pun && meUsername === pun) return true;
+    return false;
+  }, [currentUser?.id, currentUser?.username, userId, username]);
+
+  if (isSelfFromParams && !emailVerified) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="container-main py-8">
+          <div className="max-w-2xl mx-auto bg-white rounded-2xl border border-amber-200 p-6 sm:p-8 shadow-sm">
+            <div className="text-2xl font-black text-gray-900">Profil detayları için mail aktivasyonu gerekli</div>
+            <div className="text-sm text-gray-700 mt-2">
+              E-posta adresini doğruladıktan sonra profilini düzenleyebilir ve etkileşimlere başlayabilirsin. Spam/Junk klasörünü de kontrol etmeyi unutma.
+            </div>
+            <Link
+              to="/email-activation"
+              className="inline-flex mt-5 px-5 py-3 rounded-xl bg-gray-900 hover:bg-black text-white font-black"
+            >
+              Mail Aktivasyonu’na git
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const cacheKey = useMemo(() => {
     const u = String(userId || '').trim();
     const un = String(username || '').trim();

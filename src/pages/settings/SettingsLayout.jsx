@@ -1,8 +1,16 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { User, Lock, Shield, Bell, Palette, Globe, Trash2, UserX } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const SettingsLayout = () => {
   const location = useLocation();
+  const { user } = useAuth();
+
+  const emailVerified = (() => {
+    const u = user && typeof user === 'object' ? user : null;
+    const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+    return u?.email_verified === true || meta?.email_verified === true;
+  })();
   
   const menuItems = [
     { path: '/settings/profile', icon: User, label: 'Profil Düzenle' },
@@ -35,7 +43,22 @@ export const SettingsLayout = () => {
           
           {/* Content */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <Outlet />
+            {!emailVerified ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+                <div className="font-black text-lg">E-posta doğrulaması gerekli</div>
+                <div className="text-sm mt-2">
+                  Profil detayları ve ayarlar için önce e-posta adresinizi doğrulamalısınız. Spam/junk klasörünü de kontrol edin.
+                </div>
+                <Link
+                  to="/email-activation"
+                  className="inline-flex mt-4 px-4 py-2 rounded-xl bg-gray-900 hover:bg-black text-white font-black"
+                >
+                  Mail Aktivasyonu’na git
+                </Link>
+              </div>
+            ) : (
+              <Outlet />
+            )}
           </div>
         </div>
       </div>

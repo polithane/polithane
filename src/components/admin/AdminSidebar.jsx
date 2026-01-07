@@ -23,6 +23,18 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
     const url = s?.branding?.logoAdminBottomUrl;
     return String(url || '').trim();
   }, [site]);
+
+  const topLogoSize = useMemo(() => {
+    const w = Number(site?.branding?.logoAdminTopWidth || 0) || 0;
+    const h = Number(site?.branding?.logoAdminTopHeight || 0) || 0;
+    return { w: w > 0 ? w : 48, h: h > 0 ? h : 48 };
+  }, [site?.branding?.logoAdminTopHeight, site?.branding?.logoAdminTopWidth]);
+
+  const bottomLogoSize = useMemo(() => {
+    const w = Number(site?.branding?.logoAdminBottomWidth || 0) || 0;
+    const h = Number(site?.branding?.logoAdminBottomHeight || 0) || 0;
+    return { w: w > 0 ? w : 0, h: h > 0 ? h : 32 };
+  }, [site?.branding?.logoAdminBottomHeight, site?.branding?.logoAdminBottomWidth]);
   
   const menuSections = [
     {
@@ -91,7 +103,8 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
             <img
               src={logoSrc}
               alt="Polithane"
-              className="w-12 h-12 rounded-2xl object-contain drop-shadow"
+              className="rounded-2xl object-contain drop-shadow"
+              style={{ width: `${topLogoSize.w}px`, height: `${topLogoSize.h}px` }}
               onError={() => setLogoFailed(true)}
             />
           ) : (
@@ -145,7 +158,15 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
 
       {bottomLogoSrc ? (
         <div className="p-4 border-t border-gray-200">
-          <img src={bottomLogoSrc} alt="Admin Logo" className="h-8 w-auto object-contain opacity-90" />
+          <img
+            src={bottomLogoSrc}
+            alt="Admin Logo"
+            className="object-contain opacity-90"
+            style={{
+              width: bottomLogoSize.w > 0 ? `${bottomLogoSize.w}px` : undefined,
+              height: `${bottomLogoSize.h}px`,
+            }}
+          />
         </div>
       ) : null}
     </div>

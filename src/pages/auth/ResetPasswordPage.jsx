@@ -15,6 +15,12 @@ export const ResetPasswordPage = () => {
     const url = site?.branding?.logoAuthUrl;
     return String(url || '').trim() || '/logo.png';
   }, [site]);
+
+  const logoSize = useMemo(() => {
+    const w = Number(site?.branding?.logoAuthWidth || 0) || 0;
+    const h = Number(site?.branding?.logoAuthHeight || 0) || 0;
+    return { w: w > 0 ? w : 96, h: h > 0 ? h : 96 };
+  }, [site?.branding?.logoAuthHeight, site?.branding?.logoAuthWidth]);
   
   const [formData, setFormData] = useState({
     password: '',
@@ -98,9 +104,10 @@ export const ResetPasswordPage = () => {
                 <img
                   src={logoSrc}
                   alt="Polithane"
-                  width={96}
-                  height={96}
-                  className="w-24 h-24 object-contain drop-shadow-lg"
+                  width={logoSize.w}
+                  height={logoSize.h}
+                  className="object-contain drop-shadow-lg"
+                  style={{ width: `${logoSize.w}px`, height: `${logoSize.h}px` }}
                   onError={() => setLogoFailed(true)}
                 />
               ) : (

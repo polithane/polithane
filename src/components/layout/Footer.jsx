@@ -5,6 +5,8 @@ import { apiCall } from '../../utils/api';
 export const Footer = () => {
   const [contactEmail, setContactEmail] = useState('info@polithane.com');
   const [footerLogo, setFooterLogo] = useState('');
+  const [footerLogoW, setFooterLogoW] = useState(0);
+  const [footerLogoH, setFooterLogoH] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -15,6 +17,10 @@ export const Footer = () => {
         if (mounted && email) setContactEmail(email);
         const logo = String(r?.data?.branding?.logoFooterUrl || '').trim();
         if (mounted) setFooterLogo(logo);
+        const lw = Number(r?.data?.branding?.logoFooterWidth || 0) || 0;
+        const lh = Number(r?.data?.branding?.logoFooterHeight || 0) || 0;
+        if (mounted) setFooterLogoW(lw);
+        if (mounted) setFooterLogoH(lh);
       } catch {
         // ignore
       }
@@ -30,7 +36,15 @@ export const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             {footerLogo ? (
-              <img src={footerLogo} alt="Polithane" className="h-10 w-auto object-contain mb-4" />
+              <img
+                src={footerLogo}
+                alt="Polithane"
+                className="object-contain mb-4"
+                style={{
+                  width: footerLogoW > 0 ? `${footerLogoW}px` : undefined,
+                  height: `${footerLogoH > 0 ? footerLogoH : 40}px`,
+                }}
+              />
             ) : (
               <h3 className="text-xl font-bold mb-4">POLITHANE</h3>
             )}

@@ -119,6 +119,70 @@ function verifyJwtFromRequest(req) {
   }
 }
 
+async function ensureEmailVerifiedForWrite(req, res, auth) {
+  // Returns true if the request is allowed to perform interactions (like/comment/follow/post/message).
+  // When email verification is enabled, unverified users can browse but cannot interact.
+  const a = auth && auth.id ? auth : verifyJwtFromRequest(req);
+  if (!a?.id) return false;
+
+  // cache per-request
+  if (req && req._polithaneEmailWriteGate && typeof req._polithaneEmailWriteGate === 'object') {
+    return req._polithaneEmailWriteGate.allowed === true;
+  }
+
+  const settingsMap = await getSiteSettingsMapCached().catch(() => ({}));
+  const envEmailGate = String(process.env.EMAIL_VERIFICATION_ENABLED || '').trim();
+  const emailVerificationRequired =
+    envEmailGate ? envEmailGate === 'true' : String(settingsMap?.email_verification_enabled || 'false').trim() === 'true';
+  const verificationChannel = String(settingsMap?.verification_channel || 'email').trim().toLowerCase() || 'email';
+
+  if (!emailVerificationRequired) {
+    if (req) req._polithaneEmailWriteGate = { allowed: true };
+    return true;
+  }
+  if (verificationChannel === 'sms') {
+    // keep parity with login: if SMS selected but not configured, disallow interactions explicitly
+    if (req) req._polithaneEmailWriteGate = { allowed: false };
+    res.status(503).json({
+      success: false,
+      error: 'SMS doğrulama aktif ancak SMS provider yapılandırılmadı.',
+      code: 'SMS_NOT_CONFIGURED',
+    });
+    return false;
+  }
+
+  const rows = await supabaseRestGet('users', { select: 'id,email_verified,metadata,is_active', id: `eq.${a.id}`, limit: '1' }).catch(() => []);
+  const u = rows?.[0] || null;
+  const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+  const verified = u?.email_verified === true || meta?.email_verified === true;
+  const allowed = verified === true;
+  if (req) req._polithaneEmailWriteGate = { allowed };
+  if (!allowed) {
+    // Ensure they have the right notification
+    try {
+      await supabaseInsertNotifications([
+        {
+          user_id: a.id,
+          actor_id: null,
+          type: 'email_verification_required',
+          title: 'E-posta adresinizi aktif edin',
+          message: 'Etkileşim için e-posta doğrulaması gerekli. Gelen kutusu yanında spam/junk klasörünü de kontrol edin.',
+          is_read: false,
+        },
+      ]).catch(() => null);
+    } catch {
+      // ignore
+    }
+    res.status(403).json({
+      success: false,
+      error: 'Etkileşim için e-posta adresinizi doğrulamanız gerekiyor.',
+      code: 'EMAIL_NOT_VERIFIED',
+    });
+    return false;
+  }
+  return true;
+}
+
 function isSafeId(value) {
   const s = String(value || '').trim();
   // Accept numeric IDs or UUIDv4+ (common Supabase patterns).
@@ -1086,6 +1150,7 @@ async function notifyMentions(req, { text, actorId, postId = null, commentId = n
 async function addPostComment(req, res, postId) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!(await ensureEmailVerifiedForWrite(req, res, auth))) return;
     const ip = getClientIp(req);
     const rl = rateLimit(`comment:${auth.id}:${ip}`, { windowMs: 60_000, max: 10 });
     if (!rl.ok) {
@@ -1343,6 +1408,7 @@ async function reportUser(req, res, userId) {
 async function trackPostShare(req, res, postId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  if (!(await ensureEmailVerifiedForWrite(req, res, auth))) return;
 
   // Block checks (either direction) between sharer and post owner
   try {
@@ -1788,6 +1854,7 @@ async function adminStorageReplace(req, res) {
 async function togglePostLike(req, res, postId) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!(await ensureEmailVerifiedForWrite(req, res, auth))) return;
     const userId = auth.id;
 
     // Block checks (either direction) between liker and post owner
@@ -1833,6 +1900,7 @@ async function togglePostLike(req, res, postId) {
 async function createPost(req, res) {
     const auth = verifyJwtFromRequest(req);
     if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!(await ensureEmailVerifiedForWrite(req, res, auth))) return;
     const ip = getClientIp(req);
     const rl = rateLimit(`post:${auth.id}:${ip}`, { windowMs: 60_000, max: 5 });
     if (!rl.ok) {
@@ -2139,8 +2207,17 @@ async function getFastPublicUsers(req, res) {
       if (!u || !info) return null;
       const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
       const ps = meta?.privacy_settings && typeof meta.privacy_settings === 'object' ? meta.privacy_settings : {};
-      const fastVis = String(ps.fastVisibility || 'public').trim().toLowerCase();
-      if (fastVis === 'private') return null;
+      const raw = String(ps.fastVisibility ?? ps.fast_visibility ?? 'public').trim().toLowerCase();
+      const fastVis =
+        raw === 'everyone' || raw === 'public'
+          ? 'public'
+          : raw === 'none' || raw === 'private'
+            ? 'private'
+            : raw === 'following'
+              ? 'following'
+              : raw;
+      // Public list must only include "public/everyone" profiles.
+      if (fastVis !== 'public') return null;
 
       return {
         user_id: u.id,
@@ -2163,7 +2240,8 @@ async function getFastPublicUsers(req, res) {
 
 async function getFastUsers(req, res) {
   const auth = verifyJwtFromRequest(req);
-  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  // If not logged in, fall back to public Fast list.
+  if (!auth?.id) return await getFastPublicUsers(req, res);
   const since = fastSinceIso(24);
   const { limit = 80 } = req.query || {};
   const lim = Math.min(200, Math.max(1, parseInt(limit, 10) || 80));
@@ -2210,7 +2288,7 @@ async function getFastUsers(req, res) {
     const idsList = Array.isArray(idsIn) ? idsIn : [];
     if (idsList.length === 0) return [];
     const users = await supabaseRestGet('users', {
-      select: 'id,username,full_name,avatar_url,is_active,polit_score',
+      select: 'id,username,full_name,avatar_url,is_active,polit_score,metadata',
       id: `in.(${idsList.join(',')})`,
       is_active: 'eq.true',
       limit: String(Math.min(200, idsList.length)),
@@ -2221,6 +2299,7 @@ async function getFastUsers(req, res) {
         const u = userMap.get(String(id));
         const info = infoMap.get(String(id));
         if (!u || !info) return null;
+        // NOTE: Fast visibility is filtered later (applyFastVisibilityFilter).
         return {
           user_id: u.id,
           username: u.username,
@@ -2230,12 +2309,68 @@ async function getFastUsers(req, res) {
           story_count: info.story_count,
           latest_created_at: info.latest ? new Date(info.latest).toISOString() : null,
           polit_score: u.polit_score ?? 0,
+          _meta: u.metadata,
         };
       })
       .filter(Boolean);
   };
 
-  const primaryCards = await fetchUserCards(activeIds, byUser);
+  // Preload "owner follows viewer" map for fastVisibility=following users (best-effort).
+  const ownerFollowsViewerCache = new Map(); // ownerId -> boolean
+  const checkOwnerFollowsViewer = async (ownerId) => {
+    const k = String(ownerId || '');
+    if (!k) return false;
+    if (ownerFollowsViewerCache.has(k)) return !!ownerFollowsViewerCache.get(k);
+    try {
+      const rows = await supabaseRestGet('follows', {
+        select: 'id',
+        follower_id: `eq.${k}`,
+        following_id: `eq.${auth.id}`,
+        limit: '1',
+      }).catch(() => []);
+      const ok = Array.isArray(rows) && rows.length > 0;
+      ownerFollowsViewerCache.set(k, ok);
+      return ok;
+    } catch {
+      ownerFollowsViewerCache.set(k, false);
+      return false;
+    }
+  };
+
+  const applyFastVisibilityFilter = async (cards) => {
+    const out = [];
+    for (const c of Array.isArray(cards) ? cards : []) {
+      const ownerId = String(c?.user_id || '');
+      if (!ownerId) continue;
+      if (ownerId === String(auth.id)) {
+        out.push(c);
+        continue;
+      }
+      const meta = c?._meta && typeof c._meta === 'object' ? c._meta : {};
+      const ps = meta?.privacy_settings && typeof meta.privacy_settings === 'object' ? meta.privacy_settings : {};
+      const raw = String(ps.fastVisibility ?? ps.fast_visibility ?? 'public').trim().toLowerCase();
+      const fastVis =
+        raw === 'everyone' || raw === 'public'
+          ? 'public'
+          : raw === 'none' || raw === 'private'
+            ? 'private'
+            : raw === 'following'
+              ? 'following'
+              : raw;
+      if (fastVis === 'private') continue;
+      if (fastVis === 'following') {
+        // Only people the OWNER follows can see
+        // eslint-disable-next-line no-await-in-loop
+        const ok = await checkOwnerFollowsViewer(ownerId);
+        if (!ok) continue;
+      }
+      out.push(c);
+    }
+    return out;
+  };
+
+  const primaryCardsRaw = await fetchUserCards(activeIds, byUser);
+  const primaryCards = await applyFastVisibilityFilter(primaryCardsRaw);
   primaryCards.sort((a, b) => new Date(b.latest_created_at || 0).getTime() - new Date(a.latest_created_at || 0).getTime());
   let out = primaryCards.slice(0, lim);
 
@@ -2266,7 +2401,8 @@ async function getFastUsers(req, res) {
     }
 
     const globalIds = Array.from(globalByUser.keys()).slice(0, 200);
-    const globalCards = await fetchUserCards(globalIds, globalByUser);
+    const globalCardsRaw = await fetchUserCards(globalIds, globalByUser);
+    const globalCards = await applyFastVisibilityFilter(globalCardsRaw);
     globalCards.sort((a, b) => Number(b.polit_score || 0) - Number(a.polit_score || 0));
 
     const needed = Math.max(0, lim - out.length);
@@ -2274,17 +2410,49 @@ async function getFastUsers(req, res) {
   }
 
   // Do not leak polit_score to the client here; keep output schema stable.
-  out = out.map(({ polit_score, ...rest }) => rest);
+  out = out.map(({ polit_score, _meta, ...rest }) => rest);
   return res.json({ success: true, data: out });
 }
 
 async function getFastForUser(req, res, userKey) {
   const auth = verifyJwtFromRequest(req);
-  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
   const uid = await resolveUserId(userKey);
   if (!uid) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
 
-  // Allow viewing Fast even without following (needed for fallback/global fast discovery).
+  // Enforce Fast visibility:
+  // - public/everyone => anyone (even logged out)
+  // - private/none => only self
+  // - following => only if owner follows viewer (or self)
+  const viewerId = auth?.id ? String(auth.id) : '';
+  const ownerId = String(uid);
+  if (!viewerId || viewerId !== ownerId) {
+    const urows = await supabaseRestGet('users', { select: 'id,metadata', id: `eq.${ownerId}`, limit: '1' }).catch(() => []);
+    const u = urows?.[0] || null;
+    const meta = u?.metadata && typeof u.metadata === 'object' ? u.metadata : {};
+    const ps = meta?.privacy_settings && typeof meta.privacy_settings === 'object' ? meta.privacy_settings : {};
+    const raw = String(ps.fastVisibility ?? ps.fast_visibility ?? 'public').trim().toLowerCase();
+    const fastVis =
+      raw === 'everyone' || raw === 'public'
+        ? 'public'
+        : raw === 'none' || raw === 'private'
+          ? 'private'
+          : raw === 'following'
+            ? 'following'
+            : raw;
+    if (fastVis === 'private') {
+      return res.json({ success: true, data: [] });
+    }
+    if (fastVis === 'following') {
+      if (!viewerId) return res.json({ success: true, data: [] });
+      const f = await supabaseRestGet('follows', {
+        select: 'id',
+        follower_id: `eq.${ownerId}`,
+        following_id: `eq.${viewerId}`,
+        limit: '1',
+      }).catch(() => []);
+      if (!Array.isArray(f) || f.length === 0) return res.json({ success: true, data: [] });
+    }
+  }
 
   const since = fastSinceIso(24);
   const rows = await supabaseRestGet('posts', {
@@ -2321,7 +2489,8 @@ create index if not exists fast_views_post_viewed_at_idx on fast_views (post_id,
 
 async function fastTrackView(req, res, postId) {
   const auth = verifyJwtFromRequest(req);
-  if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  // Public viewers can watch Fast; tracking is best-effort.
+  if (!auth?.id) return res.json({ success: true, ignored: true });
   const id = String(postId || '').trim();
   if (!id) return res.status(400).json({ success: false, error: 'Geçersiz içerik.' });
 
@@ -3178,6 +3347,7 @@ async function getMessageSuggestions(req, res) {
 async function toggleFollow(req, res, targetId) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  if (!(await ensureEmailVerifiedForWrite(req, res, auth))) return;
 
   const tid = String(targetId || '').trim();
   const isValidId = /^\d+$/.test(tid) || /^[0-9a-fA-F-]{36}$/.test(tid);
@@ -9209,8 +9379,40 @@ async function authLogin(req, res) {
           code: 'SMS_NOT_CONFIGURED',
         });
       }
+      // NEW PRODUCT RULE:
+      // - Unverified users can login and browse
+      // - but they must not interact (like/comment/follow/post/message) and should be guided to verify
+      // So, do NOT block login here.
       if (!verified) {
-        return res.status(403).json({ success: false, error: 'E-posta adresinizi doğrulamanız gerekiyor.', code: 'EMAIL_NOT_VERIFIED' });
+        try {
+          // Ensure they see "verify your email" notification instead of profile reminder.
+          const existing = await supabaseRestGet('notifications', {
+            select: 'id,type',
+            user_id: `eq.${user.id}`,
+            type: 'in.(email_verification_required,profile_reminder)',
+            limit: '20',
+          }).catch(() => []);
+          const hasVerify = Array.isArray(existing) && existing.some((n) => String(n?.type || '') === 'email_verification_required');
+          const profileNotifs = Array.isArray(existing) ? existing.filter((n) => String(n?.type || '') === 'profile_reminder') : [];
+          if (profileNotifs.length > 0) {
+            // best-effort cleanup: do not show profile reminder before email verification
+            await supabaseRestDelete('notifications', { user_id: `eq.${user.id}`, type: 'eq.profile_reminder' }).catch(() => null);
+          }
+          if (!hasVerify) {
+            await supabaseInsertNotifications([
+              {
+                user_id: user.id,
+                actor_id: null,
+                type: 'email_verification_required',
+                title: 'E-posta adresinizi aktif edin',
+                message: 'Hesabınızı kullanmak için e-posta doğrulaması gerekiyor. Gelen kutusu yanında spam/junk klasörünü de kontrol edin.',
+                is_read: false,
+              },
+            ]).catch(() => null);
+          }
+        } catch {
+          // ignore (best-effort)
+        }
       }
     }
 
@@ -9268,7 +9470,10 @@ async function authLogin(req, res) {
       // ignore
     }
     
-    res.json({ success: true, message: 'Giriş başarılı.', data: { user, token, claimPending } });
+    // Add a hint so the UI can gracefully block interactions client-side too.
+    const meta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : {};
+    const emailVerified = user?.email_verified === true || meta?.email_verified === true;
+    res.json({ success: true, message: 'Giriş başarılı.', data: { user, token, claimPending, emailVerified } });
 }
 
 async function authForgotPassword(req, res) {
@@ -9454,6 +9659,36 @@ async function authVerifyEmail(req, res) {
     email_verified_at: new Date().toISOString(),
   };
   await safeUserPatch(u.id, { metadata: nextMeta, email_verified: true }).catch(() => null);
+
+  // After verification:
+  // - remove "verify email" notification
+  // - add "profile reminder" notification (so onboarding continues)
+  try {
+    await supabaseRestDelete('notifications', { user_id: `eq.${u.id}`, type: 'eq.email_verification_required' }).catch(() => null);
+    // After verification, keep onboarding focused: remove welcome notification (user can still access /welcome anytime).
+    await supabaseRestDelete('notifications', { user_id: `eq.${u.id}`, type: 'eq.welcome' }).catch(() => null);
+    const existing = await supabaseRestGet('notifications', {
+      select: 'id',
+      user_id: `eq.${u.id}`,
+      type: 'eq.profile_reminder',
+      limit: '1',
+    }).catch(() => []);
+    if (!Array.isArray(existing) || existing.length === 0) {
+      await supabaseInsertNotifications([
+        {
+          user_id: u.id,
+          actor_id: null,
+          type: 'profile_reminder',
+          title: 'Profilinizi tamamlayın',
+          message: 'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
+          is_read: false,
+        },
+      ]).catch(() => null);
+    }
+  } catch {
+    // ignore
+  }
+
   await sendWelcomeEmailToUser(req, { toEmail: u.email, fullName: u.full_name }).catch(() => null);
   return res.json({ success: true, message: 'E-posta doğrulandı.' });
 }
@@ -9481,8 +9716,18 @@ async function authResendVerification(req, res) {
     email_verified: false,
   };
   await safeUserPatch(u.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
-  await sendVerificationEmailForUser(req, { toEmail: u.email, token: tokenRaw });
-  return res.json({ success: true, message: 'Doğrulama e-postası gönderildi.' });
+  try {
+    await sendVerificationEmailForUser(req, { toEmail: u.email, token: tokenRaw });
+    return res.json({ success: true, message: 'Doğrulama e-postası gönderildi.' });
+  } catch (e) {
+    return res.json({
+      success: true,
+      message:
+        'Kayıt bulundu ancak doğrulama e-postası şu an gönderilemedi. Lütfen birkaç dakika sonra tekrar deneyin ve spam/junk klasörünü kontrol edin.',
+      mailSent: false,
+      mailError: String(e?.message || 'Doğrulama e-postası gönderilemedi.'),
+    });
+  }
 }
 
 async function authRegister(req, res) {
@@ -9636,28 +9881,51 @@ async function authRegister(req, res) {
     }
 
     if (!user) throw new Error('Kullanıcı oluşturulamadı.');
+    if (user && Object.prototype.hasOwnProperty.call(user, 'password_hash')) {
+      try {
+        delete user.password_hash;
+      } catch {
+        // ignore
+      }
+    }
 
     // First-login notifications (schema-agnostic insert helper)
-    await supabaseInsertNotifications([
-      {
-        user_id: user.id,
-        actor_id: null,
-        type: 'welcome',
-        title: 'Hoş geldiniz',
-        message:
-          'Polithane ailesine katıldığınız için çok mutluyuz. Profilinizi tamamlayarak daha güçlü bir deneyim yaşayabilirsiniz.',
-        is_read: false,
-      },
-      {
-        user_id: user.id,
-        actor_id: null,
-        type: 'profile_reminder',
-        title: 'Profilinizi tamamlayın',
-        message:
-          'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
-        is_read: false,
-      },
-    ]).catch(() => null);
+    // First-login notifications
+    // Product rule:
+    // - If email verification is required: show welcome + "verify email" (NOT profile reminder yet)
+    // - After verification: show profile reminder (handled in verify endpoint)
+    await supabaseInsertNotifications(
+      [
+        {
+          user_id: user.id,
+          actor_id: null,
+          type: 'welcome',
+          title: 'Hoş geldiniz',
+          message:
+            'Polithane ailesine katıldığınız için çok mutluyuz. Kısa bir turla başlayalım: amacımız, misyonumuz ve vizyonumuz burada.',
+          is_read: false,
+        },
+        emailVerificationRequired
+          ? {
+              user_id: user.id,
+              actor_id: null,
+              type: 'email_verification_required',
+              title: 'E-posta adresinizi aktif edin',
+              message:
+                'Hesabınızı kullanmak için e-posta doğrulaması gerekiyor. Gelen kutusu yanında spam/junk klasörünü de kontrol edin.',
+              is_read: false,
+            }
+          : {
+              user_id: user.id,
+              actor_id: null,
+              type: 'profile_reminder',
+              title: 'Profilinizi tamamlayın',
+              message:
+                'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
+              is_read: false,
+            },
+      ].filter(Boolean)
+    ).catch(() => null);
 
     // Approval notification for non-citizen accounts (they can login, but cannot post until approved).
     if (user_type !== 'citizen') {
@@ -9725,11 +9993,26 @@ async function authRegister(req, res) {
         email_verified: false,
       };
       await safeUserPatch(user.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
-      await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw });
+      let mailSent = false;
+      let mailError = null;
+      try {
+        await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw });
+        mailSent = true;
+      } catch (e) {
+        // IMPORTANT:
+        // Previously this would throw and the UI would show "Sunucu hatası",
+        // but the user record was already created -> next attempt says "Email kayıtlı".
+        // Now we keep registration successful and guide the user to resend.
+        mailSent = false;
+        mailError = String(e?.message || 'Doğrulama e-postası gönderilemedi.');
+      }
+      const token = signJwt({ id: user.id, username: user.username, email: user.email, user_type: user.user_type, is_admin: !!user.is_admin });
       return res.status(201).json({
         success: true,
-        message: 'Kayıt başarılı. Lütfen e-posta adresinizi doğrulayın.',
-        data: { requiresApproval },
+        message: mailSent
+          ? 'Kayıt başarılı. Lütfen e-posta adresinizi doğrulayın.'
+          : 'Kayıt başarılı. Doğrulama e-postası gönderilemedi. Lütfen “Mail Aktivasyonu” sayfasından tekrar gönderin ve spam/junk klasörünü kontrol edin.',
+        data: { user, token, requiresApproval, emailVerificationRequired: true, mailSent, ...(mailError ? { mailError } : {}) },
       });
     }
 
@@ -10199,6 +10482,7 @@ async function reportConversation(req, res, otherId) {
 async function sendMessage(req, res) {
   const auth = verifyJwtFromRequest(req);
   if (!auth?.id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  if (!(await ensureEmailVerifiedForWrite(req, res, auth))) return;
   const ip = getClientIp(req);
   const rl = rateLimit(`msg:${auth.id}:${ip}`, { windowMs: 60_000, max: 30 });
   if (!rl.ok) {
@@ -11240,6 +11524,16 @@ async function getPublicSite(req, res) {
       logoAuthUrl: String(map.logo_auth_url || '').trim(),
       logoAdminTopUrl: String(map.logo_admin_top_url || '').trim(),
       logoAdminBottomUrl: String(map.logo_admin_bottom_url || '').trim(),
+      logoHeaderWidth: Number(map.logo_header_w || 0) || 0,
+      logoHeaderHeight: Number(map.logo_header_h || 0) || 0,
+      logoFooterWidth: Number(map.logo_footer_w || 0) || 0,
+      logoFooterHeight: Number(map.logo_footer_h || 0) || 0,
+      logoAuthWidth: Number(map.logo_auth_w || 0) || 0,
+      logoAuthHeight: Number(map.logo_auth_h || 0) || 0,
+      logoAdminTopWidth: Number(map.logo_admin_top_w || 0) || 0,
+      logoAdminTopHeight: Number(map.logo_admin_top_h || 0) || 0,
+      logoAdminBottomWidth: Number(map.logo_admin_bottom_w || 0) || 0,
+      logoAdminBottomHeight: Number(map.logo_admin_bottom_h || 0) || 0,
     },
     welcomePageHtml: String(map.welcome_page_html || '').trim(),
   };

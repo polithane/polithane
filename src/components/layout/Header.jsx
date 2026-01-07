@@ -92,6 +92,7 @@ export const Header = () => {
     // Be tolerant: deployments may use slightly different type strings.
     if (t === 'approval' || t.includes('approval') || t.includes('verified')) return 'Üyelik Onayı';
     if (t === 'welcome' || t.includes('welcome') || t.includes('hosgeldin') || t.includes('hoşgeldin')) return 'Hoş geldiniz';
+    if (t === 'email_verification_required' || t.includes('email') && t.includes('verify')) return 'E-posta adresinizi aktif edin';
     if (t === 'profile_reminder' || (t.includes('profile') && t.includes('reminder')) || t.includes('profil')) return 'Profilinizi tamamlayın';
     if (t === 'message' || t.includes('message') || t.includes('dm')) return 'Mesaj';
     if (t === 'follow' || t.includes('follow')) return 'Takip';
@@ -111,6 +112,9 @@ export const Header = () => {
     if (String(n?.type || '') === 'comment_like') {
       return 'Yorumunuz beğenildi.';
     }
+    if (String(n?.type || '') === 'email_verification_required') {
+      return 'Etkileşim için e-posta doğrulaması gerekli. Spam/junk klasörünü de kontrol edin.';
+    }
     if (String(n?.type || '') === 'mention') {
       return 'Sizi bir içerikte etiketledi.';
     }
@@ -122,6 +126,7 @@ export const Header = () => {
     const t = String(n?.type || '').trim().toLowerCase();
     // New user onboarding shortcuts
     if (t === 'welcome') return { kind: 'route', to: '/welcome' };
+    if (t === 'email_verification_required') return { kind: 'route', to: '/email-activation' };
     if (t === 'profile_reminder') return { kind: 'route', to: '/settings/account?incomplete=1' };
     return { kind: 'auto' };
   };

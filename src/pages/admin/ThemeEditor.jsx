@@ -95,6 +95,16 @@ export const ThemeEditor = () => {
     logo_auth_url: '',
     logo_admin_top_url: '',
     logo_admin_bottom_url: '',
+    logo_header_w: '',
+    logo_header_h: '',
+    logo_footer_w: '',
+    logo_footer_h: '',
+    logo_auth_w: '',
+    logo_auth_h: '',
+    logo_admin_top_w: '',
+    logo_admin_top_h: '',
+    logo_admin_bottom_w: '',
+    logo_admin_bottom_h: '',
   });
   const [welcomeHtml, setWelcomeHtml] = useState('');
   const [uploadingKey, setUploadingKey] = useState('');
@@ -113,6 +123,16 @@ export const ThemeEditor = () => {
           logo_auth_url: String(d.logo_auth_url || '').trim(),
           logo_admin_top_url: String(d.logo_admin_top_url || '').trim(),
           logo_admin_bottom_url: String(d.logo_admin_bottom_url || '').trim(),
+          logo_header_w: String(d.logo_header_w || '').trim(),
+          logo_header_h: String(d.logo_header_h || '').trim(),
+          logo_footer_w: String(d.logo_footer_w || '').trim(),
+          logo_footer_h: String(d.logo_footer_h || '').trim(),
+          logo_auth_w: String(d.logo_auth_w || '').trim(),
+          logo_auth_h: String(d.logo_auth_h || '').trim(),
+          logo_admin_top_w: String(d.logo_admin_top_w || '').trim(),
+          logo_admin_top_h: String(d.logo_admin_top_h || '').trim(),
+          logo_admin_bottom_w: String(d.logo_admin_bottom_w || '').trim(),
+          logo_admin_bottom_h: String(d.logo_admin_bottom_h || '').trim(),
         });
         const wh = String(d.welcome_page_html || '').trim();
         setWelcomeHtml(wh || defaultWelcomeHtml);
@@ -331,11 +351,11 @@ export const ThemeEditor = () => {
             </div>
 
             {[
-              { key: 'logo_header_url', label: 'Sol Üst Logo (Header)' },
-              { key: 'logo_footer_url', label: 'Sol Alt Logo (Footer)' },
-              { key: 'logo_auth_url', label: 'Üye Giriş/Kayıt Logo (Auth)' },
-              { key: 'logo_admin_top_url', label: 'Admin Sol Üst Logo' },
-              { key: 'logo_admin_bottom_url', label: 'Admin Sol Alt Logo' },
+              { key: 'logo_header_url', wKey: 'logo_header_w', hKey: 'logo_header_h', label: 'Sol Üst Logo (Header)', minW: 24, maxW: 240, minH: 24, maxH: 96 },
+              { key: 'logo_footer_url', wKey: 'logo_footer_w', hKey: 'logo_footer_h', label: 'Sol Alt Logo (Footer)', minW: 24, maxW: 360, minH: 24, maxH: 140 },
+              { key: 'logo_auth_url', wKey: 'logo_auth_w', hKey: 'logo_auth_h', label: 'Üye Giriş/Kayıt Logo (Auth)', minW: 48, maxW: 240, minH: 48, maxH: 240 },
+              { key: 'logo_admin_top_url', wKey: 'logo_admin_top_w', hKey: 'logo_admin_top_h', label: 'Admin Sol Üst Logo', minW: 24, maxW: 240, minH: 24, maxH: 120 },
+              { key: 'logo_admin_bottom_url', wKey: 'logo_admin_bottom_w', hKey: 'logo_admin_bottom_h', label: 'Admin Sol Alt Logo', minW: 24, maxW: 240, minH: 16, maxH: 96 },
             ].map((row) => (
               <div key={row.key} className="mb-4">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">{row.label}</label>
@@ -346,6 +366,34 @@ export const ThemeEditor = () => {
                     placeholder="https://... veya /assets/..."
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
                   />
+                  <div className="flex gap-2">
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white">
+                      <span className="text-xs font-black text-gray-700">W</span>
+                      <input
+                        type="number"
+                        min={row.minW}
+                        max={row.maxW}
+                        value={branding[row.wKey] || ''}
+                        onChange={(e) => setBranding((p) => ({ ...p, [row.wKey]: e.target.value }))}
+                        className="w-20 outline-none text-sm"
+                        placeholder={`${row.minW}-${row.maxW}`}
+                      />
+                      <span className="text-xs text-gray-500">px</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white">
+                      <span className="text-xs font-black text-gray-700">H</span>
+                      <input
+                        type="number"
+                        min={row.minH}
+                        max={row.maxH}
+                        value={branding[row.hKey] || ''}
+                        onChange={(e) => setBranding((p) => ({ ...p, [row.hKey]: e.target.value }))}
+                        className="w-20 outline-none text-sm"
+                        placeholder={`${row.minH}-${row.maxH}`}
+                      />
+                      <span className="text-xs text-gray-500">px</span>
+                    </div>
+                  </div>
                   <label className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 cursor-pointer font-bold">
                     <Upload className="w-5 h-5" />
                     {uploadingKey === row.key ? 'Yükleniyor…' : 'Yükle'}
@@ -395,9 +443,20 @@ export const ThemeEditor = () => {
                     Temizle
                   </button>
                 </div>
+                <div className="mt-2 text-[11px] text-gray-500">
+                  Sınırlar: W {row.minW}-{row.maxW}px, H {row.minH}-{row.maxH}px (boş bırakabilirsiniz).
+                </div>
                 {branding[row.key] ? (
                   <div className="mt-2">
-                    <img src={branding[row.key]} alt={row.label} className="h-10 w-auto object-contain" />
+                    <img
+                      src={branding[row.key]}
+                      alt={row.label}
+                      className="object-contain"
+                      style={{
+                        width: branding[row.wKey] ? `${Math.max(row.minW, Math.min(row.maxW, Number(branding[row.wKey] || 0) || 0))}px` : undefined,
+                        height: branding[row.hKey] ? `${Math.max(row.minH, Math.min(row.maxH, Number(branding[row.hKey] || 0) || 0))}px` : '40px',
+                      }}
+                    />
                   </div>
                 ) : null}
               </div>

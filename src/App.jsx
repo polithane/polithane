@@ -31,6 +31,7 @@ import { RegisterPageNew } from './pages/auth/RegisterPageNew';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
+import { EmailActivationPage } from './pages/EmailActivationPage';
 
 // Settings Pages
 import { SettingsLayout } from './pages/settings/SettingsLayout';
@@ -178,6 +179,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/email-activation" element={<><Header /><EmailActivationPage /><Footer /></>} />
         
         {/* Settings Routes */}
         <Route path="/settings" element={<><Header /><SettingsLayout /><Footer /></>}>
