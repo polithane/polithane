@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { sql } from './db.js';
+export { sql };
 
 // Load environment variables
 dotenv.config();

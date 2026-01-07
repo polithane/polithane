@@ -1,6 +1,6 @@
 import express from 'express';
 import { sql } from '../index.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { getSettings, updateSettings, getSetting } from '../utils/settingsService.js';
 
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 // ============================================
 // GET ALL SETTINGS (Admin only)
 // ============================================
-router.get('/', requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const settings = await getSettings();
     
@@ -34,7 +34,7 @@ router.get('/', requireAdmin, async (req, res) => {
 // ============================================
 // UPDATE SETTINGS (Admin only)
 // ============================================
-router.put('/', requireAdmin, async (req, res) => {
+router.put('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const settingsToUpdate = req.body;
 

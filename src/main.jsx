@@ -12,6 +12,7 @@ import { PublicSiteProvider } from './contexts/PublicSiteContext'
 
 // Error Boundary
 import ErrorBoundary from './components/common/ErrorBoundary'
+import { DebugPanel } from './components/system/DebugPanel'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -22,6 +23,7 @@ createRoot(document.getElementById('root')).render(
             <AuthProvider>
               <NotificationProvider>
                 <App />
+                <DebugPanel />
               </NotificationProvider>
             </AuthProvider>
           </PublicSiteProvider>

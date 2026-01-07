@@ -154,7 +154,25 @@ export const apiCall = async (endpoint, options = {}) => {
         errorMessage += ` (Kalan deneme: ${data.remainingAttempts})`;
       }
       
-      throw new Error(errorMessage);
+      const err = new Error(errorMessage);
+      // Attach structured payload for callers that need field-level errors
+      // (Backward compatible: message remains the same.)
+      err.status = response.status;
+      err.data = data;
+      // Keep last error for debug panel (admin only UI will read this).
+      try {
+        window.__lastApiError = {
+          ts: new Date().toISOString(),
+          endpoint,
+          url,
+          status: response.status,
+          message: errorMessage,
+          data,
+        };
+      } catch {
+        // ignore
+      }
+      throw err;
     }
 
     return data;
@@ -653,9 +671,16 @@ export const admin = {
 
   // Email
   sendTestEmail: ({ to, subject, text, html } = {}) =>
-    apiCall('/api/admin/email/test', {
+    apiCall('/api/admin/mail/test', {
       method: 'POST',
       body: JSON.stringify({ to, subject, text, html }),
+    }),
+
+  getMailSettings: () => apiCall('/api/admin/mail/settings'),
+  updateMailSettings: (payload = {}) =>
+    apiCall('/api/admin/mail/settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload || {}),
     }),
 };
 

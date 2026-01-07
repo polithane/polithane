@@ -205,6 +205,8 @@ function App() {
           <Route path="theme" element={<ThemeEditor />} />
           <Route path="seo" element={<SEOSettings />} />
           <Route path="email" element={<EmailTemplates />} />
+          <Route path="mail-settings" element={<MailTest />} />
+          {/* Backward compatible */}
           <Route path="email-test" element={<MailTest />} />
           <Route path="notifications" element={<NotificationRules />} />
           <Route path="automation" element={<AutomationControl />} />

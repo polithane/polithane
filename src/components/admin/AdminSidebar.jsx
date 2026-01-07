@@ -38,7 +38,7 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
         { path: '/adminyonetim/theme', icon: Palette, label: 'Tasarım & Tema' },
         { path: '/adminyonetim/seo', icon: Search, label: 'SEO Ayarları' },
         { path: '/adminyonetim/email', icon: Mail, label: 'E-posta Şablonları' },
-        { path: '/adminyonetim/email-test', icon: Send, label: 'E-posta Testi' },
+        { path: '/adminyonetim/mail-settings', icon: Send, label: 'Mail Ayarları' },
         { path: '/adminyonetim/notifications', icon: Bell, label: 'Bildirim Kuralları' },
       ]
     },

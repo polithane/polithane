@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Globe, Mail, Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
+import { Save, Globe, Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
 import { apiCall } from '../../utils/api';
 
 export const SiteSettings = () => {
@@ -33,15 +33,6 @@ export const SiteSettings = () => {
     allowComments: true,
     allowMessages: true,
     homePostsPerRow: 2,
-    // E-posta ayarları
-    email_verification_enabled: 'true',
-    email_service_provider: 'smtp',
-    email_from_address: 'noreply@polithane.com',
-    email_from_name: 'Polithane',
-    email_smtp_host: 'mail.polithane.com',
-    email_smtp_port: '587',
-    email_smtp_user: '',
-    email_smtp_password: '',
     socialLinks: {
       twitter: 'https://twitter.com/polithane',
       facebook: 'https://facebook.com/polithane',
@@ -79,15 +70,6 @@ export const SiteSettings = () => {
             allowComments: fromSettingBool(d.allow_comments, prev.allowComments),
             allowMessages: fromSettingBool(d.allow_messages, prev.allowMessages),
             homePostsPerRow: Math.max(1, Math.min(3, parseInt(String(d.home_posts_per_row ?? prev.homePostsPerRow), 10) || prev.homePostsPerRow)),
-
-            email_verification_enabled: d.email_verification_enabled ?? prev.email_verification_enabled,
-            email_service_provider: d.email_service_provider ?? prev.email_service_provider,
-            email_from_address: d.email_from_address ?? prev.email_from_address,
-            email_from_name: d.email_from_name ?? prev.email_from_name,
-            email_smtp_host: d.email_smtp_host ?? prev.email_smtp_host,
-            email_smtp_port: d.email_smtp_port ?? prev.email_smtp_port,
-            email_smtp_user: d.email_smtp_user ?? prev.email_smtp_user,
-            email_smtp_password: d.email_smtp_password ?? prev.email_smtp_password,
 
             socialLinks: social && typeof social === 'object' ? { ...prev.socialLinks, ...social } : prev.socialLinks,
           }));
@@ -130,14 +112,6 @@ export const SiteSettings = () => {
           allow_messages: !!settings.allowMessages,
           home_posts_per_row: Math.max(1, Math.min(3, Number(settings.homePostsPerRow) || 2)),
           social_links: settings.socialLinks || {},
-          email_verification_enabled: settings.email_verification_enabled,
-          email_service_provider: settings.email_service_provider,
-          email_from_address: settings.email_from_address,
-          email_from_name: settings.email_from_name,
-              email_smtp_host: settings.email_smtp_host,
-              email_smtp_port: settings.email_smtp_port,
-          email_smtp_user: settings.email_smtp_user,
-          email_smtp_password: settings.email_smtp_password,
         })
       });
       
@@ -213,101 +187,7 @@ export const SiteSettings = () => {
           </div>
         </div>
 
-        {/* E-posta Ayarları */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Mail className="w-5 h-5 text-primary-blue" />
-            E-posta Doğrulama Ayarları
-          </h3>
-          
-          <div className="space-y-4">
-            {/* E-posta Doğrulama Aktif/Pasif */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div>
-                <p className="font-semibold">E-posta Doğrulama Sistemi</p>
-                <p className="text-sm text-gray-600">Yeni kullanıcılar e-posta doğrulaması yapmalı mı?</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.email_verification_enabled === 'true'}
-                  onChange={(e) => handleChange('email_verification_enabled', e.target.checked ? 'true' : 'false')}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-blue"></div>
-              </label>
-            </div>
-
-            {/* E-posta Ayarları (sadece e-posta doğrulama açıksa göster) */}
-            {settings.email_verification_enabled === 'true' && (
-              <div className="border-t pt-4 space-y-4">
-                <p className="text-sm font-semibold text-gray-700">E-posta Servisi Yapılandırması</p>
-                
-                {/* Service Provider */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">E-posta Servis Sağlayıcısı</label>
-                  <select
-                    value={settings.email_service_provider}
-                    onChange={(e) => handleChange('email_service_provider', e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg"
-                  >
-                    <option value="smtp">SMTP (mail.polithane.com)</option>
-                  </select>
-                </div>
-
-                {/* SMTP ayarları */}
-                {settings.email_service_provider === 'smtp' && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">SMTP Sunucu</label>
-                      <input
-                        type="text"
-                        value={settings.email_smtp_host}
-                        onChange={(e) => handleChange('email_smtp_host', e.target.value)}
-                        className="w-full px-4 py-2 border rounded-lg"
-                        placeholder="mail.polithane.com"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">SMTP Port</label>
-                      <input
-                        type="text"
-                        value={settings.email_smtp_port}
-                        onChange={(e) => handleChange('email_smtp_port', e.target.value)}
-                        className="w-full px-4 py-2 border rounded-lg"
-                        placeholder="587"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Önerilen: 587 (STARTTLS)</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">SMTP Kullanıcı</label>
-                      <input
-                        type="email"
-                        value={settings.email_smtp_user}
-                        onChange={(e) => handleChange('email_smtp_user', e.target.value)}
-                        className="w-full px-4 py-2 border rounded-lg"
-                        placeholder="bilgi@polithane.com"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">SMTP Şifre</label>
-                      <input
-                        type="password"
-                        value={settings.email_smtp_password}
-                        onChange={(e) => handleChange('email_smtp_password', e.target.value)}
-                        className="w-full px-4 py-2 border rounded-lg"
-                        placeholder="••••••••"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Not: Mail ayarları ayrı sayfada yönetilir */}
 
         {/* General Settings */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
