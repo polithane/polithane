@@ -154,7 +154,12 @@ export const apiCall = async (endpoint, options = {}) => {
         errorMessage += ` (Kalan deneme: ${data.remainingAttempts})`;
       }
       
-      throw new Error(errorMessage);
+      const err = new Error(errorMessage);
+      // Attach structured payload for callers that need field-level errors
+      // (Backward compatible: message remains the same.)
+      err.status = response.status;
+      err.data = data;
+      throw err;
     }
 
     return data;

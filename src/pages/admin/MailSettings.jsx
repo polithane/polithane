@@ -12,6 +12,8 @@ export const MailSettings = () => {
   const [saving, setSaving] = useState(false);
   const [testSending, setTestSending] = useState(false);
   const [result, setResult] = useState(null);
+  const [saveError, setSaveError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [settings, setSettings] = useState({
     mail_enabled: 'true',
@@ -57,9 +59,26 @@ export const MailSettings = () => {
 
   const onSave = async () => {
     if (saving) return;
+    setSaveError('');
+    setFieldErrors({});
+
+    const isEnabled = String(settings.mail_enabled) === 'true';
     const senderEmail = String(settings.mail_sender_email || '').trim();
-    if (settings.mail_enabled === 'true' && !senderEmail) {
-      toast.error('Gönderici email zorunlu (mail_sender_email).');
+    const replyToEmail = String(settings.mail_reply_to_email || '').trim();
+
+    const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim());
+    const nextFieldErrors = {};
+    if (isEnabled) {
+      if (!senderEmail) nextFieldErrors.mail_sender_email = 'Gönderici e-posta zorunlu.';
+      else if (!isEmail(senderEmail)) nextFieldErrors.mail_sender_email = 'Geçerli bir e-posta girin.';
+    } else if (senderEmail && !isEmail(senderEmail)) {
+      nextFieldErrors.mail_sender_email = 'Geçerli bir e-posta girin.';
+    }
+    if (replyToEmail && !isEmail(replyToEmail)) nextFieldErrors.mail_reply_to_email = 'Geçerli bir e-posta girin.';
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setSaveError('Lütfen hatalı alanları düzeltin.');
+      toast.error('Lütfen hatalı alanları düzeltin.');
       return;
     }
 
@@ -75,13 +94,17 @@ export const MailSettings = () => {
         email_verification_enabled: String(settings.email_verification_enabled),
         brevo_api_key: String(brevoApiKeyDraft || '').trim() || undefined,
       };
-      const r = await api.admin.updateMailSettings(payload).catch(() => null);
+      const r = await api.admin.updateMailSettings(payload);
       if (!r?.success) throw new Error(r?.error || 'Kaydedilemedi.');
       setBrevoApiKeyDraft('');
       toast.success('Mail ayarları kaydedildi.');
       await load();
     } catch (e) {
-      toast.error(String(e?.message || 'Kaydedilemedi.'));
+      const msg = String(e?.message || 'Kaydedilemedi.');
+      setSaveError(msg);
+      const fe = e?.data?.fieldErrors && typeof e.data.fieldErrors === 'object' ? e.data.fieldErrors : null;
+      if (fe) setFieldErrors(fe);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -165,6 +188,11 @@ export const MailSettings = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-3">
+            {saveError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 font-semibold">
+                {saveError}
+              </div>
+            ) : null}
             <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
               <div>
                 <div className="font-black text-gray-900">Mail Sistemi</div>
@@ -231,8 +259,14 @@ export const MailSettings = () => {
                   value={settings.mail_sender_email}
                   onChange={(e) => setSettings((p) => ({ ...p, mail_sender_email: e.target.value }))}
                   placeholder="noreply@polithane.com"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-blue"
+                  className={[
+                    'w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-blue',
+                    fieldErrors.mail_sender_email ? 'border-red-300 bg-red-50' : 'border-gray-200',
+                  ].join(' ')}
                 />
+                {fieldErrors.mail_sender_email ? (
+                  <div className="mt-1 text-xs font-bold text-red-700">{String(fieldErrors.mail_sender_email)}</div>
+                ) : null}
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Gönderici Ad</label>
@@ -249,8 +283,14 @@ export const MailSettings = () => {
                   value={settings.mail_reply_to_email}
                   onChange={(e) => setSettings((p) => ({ ...p, mail_reply_to_email: e.target.value }))}
                   placeholder="support@polithane.com"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-blue"
+                  className={[
+                    'w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-blue',
+                    fieldErrors.mail_reply_to_email ? 'border-red-300 bg-red-50' : 'border-gray-200',
+                  ].join(' ')}
                 />
+                {fieldErrors.mail_reply_to_email ? (
+                  <div className="mt-1 text-xs font-bold text-red-700">{String(fieldErrors.mail_reply_to_email)}</div>
+                ) : null}
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Reply-To Ad (opsiyonel)</label>
