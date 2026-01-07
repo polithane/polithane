@@ -10,11 +10,15 @@ export const NotificationSettings = () => {
     pushNotifications: true,
     smsNotifications: false,
     likes: true,
+    commentLikes: true,
     comments: true,
+    shares: true,
     follows: true,
     mentions: true,
     messages: true,
     weeklyDigest: true,
+    approval: true,
+    system: true,
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -66,12 +70,26 @@ export const NotificationSettings = () => {
       setError('');
       try {
         const baseMeta = user && typeof user.metadata === 'object' && user.metadata ? user.metadata : {};
+        // Backward-compat with backend keys (shouldEmailFromMeta supports both, but store both for safety)
+        const normalized = {
+          ...settings,
+          likesEmail: settings.likes,
+          commentsEmail: settings.comments,
+          followsEmail: settings.follows,
+          mentionsEmail: settings.mentions,
+          messagesEmail: settings.messages,
+          sharesEmail: settings.shares,
+          approvalEmail: settings.approval,
+          systemEmail: settings.system,
+          // comment_like is treated as part of likes by backend; keep explicit key too
+          commentLikesEmail: settings.commentLikes,
+        };
         const res = await apiCall('/api/users/me', {
           method: 'PUT',
           body: JSON.stringify({
             metadata: {
               ...baseMeta,
-              notification_settings: settings,
+              notification_settings: normalized,
             },
           }),
         });
@@ -154,7 +172,9 @@ export const NotificationSettings = () => {
         <div className="space-y-3">
           {[
             { key: 'likes', label: 'Beğeniler', desc: 'Paylaşımlarınız beğenildiğinde' },
+            { key: 'commentLikes', label: 'Yorum Beğenileri', desc: 'Yorumlarınız beğenildiğinde' },
             { key: 'comments', label: 'Yorumlar', desc: 'Paylaşımlarınıza yorum yapıldığında' },
+            { key: 'shares', label: 'Paylaşımlar', desc: 'Paylaşımlarınız paylaşıldığında' },
             { key: 'follows', label: 'Takipler', desc: 'Sizi takip ettiklerinde' },
             { key: 'mentions', label: 'Bahsetmeler', desc: 'Sizi etiketlediklerinde' },
             { key: 'messages', label: 'Mesajlar', desc: 'Yeni mesaj aldığınızda' },
@@ -167,6 +187,30 @@ export const NotificationSettings = () => {
               <input
                 type="checkbox"
                 checked={settings[item.key]}
+                onChange={() => handleToggle(item.key)}
+                className="w-5 h-5 text-primary-blue rounded"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* System / Membership */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Sistem</h3>
+        <div className="space-y-3">
+          {[
+            { key: 'approval', label: 'Üyelik Durumu', desc: 'Üyelik/onay durumu ile ilgili bildirimler' },
+            { key: 'system', label: 'Sistem Bildirimleri', desc: 'Güvenlik ve sistem duyuruları' },
+          ].map((item) => (
+            <label key={item.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer">
+              <div>
+                <div className="font-semibold text-gray-900">{item.label}</div>
+                <div className="text-sm text-gray-600">{item.desc}</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={!!settings[item.key]}
                 onChange={() => handleToggle(item.key)}
                 className="w-5 h-5 text-primary-blue rounded"
               />

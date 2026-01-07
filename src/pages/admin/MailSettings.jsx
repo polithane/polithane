@@ -23,6 +23,7 @@ export const MailSettings = () => {
     mail_reply_to_email: '',
     mail_reply_to_name: '',
     email_verification_enabled: 'false',
+    verification_channel: 'email',
     brevo_api_key_configured: false,
   });
   const [brevoApiKeyDraft, setBrevoApiKeyDraft] = useState('');
@@ -92,6 +93,7 @@ export const MailSettings = () => {
         mail_reply_to_email: String(settings.mail_reply_to_email || '').trim(),
         mail_reply_to_name: String(settings.mail_reply_to_name || '').trim(),
         email_verification_enabled: String(settings.email_verification_enabled),
+        verification_channel: String(settings.verification_channel || 'email'),
         brevo_api_key: String(brevoApiKeyDraft || '').trim() || undefined,
       };
       const r = await api.admin.updateMailSettings(payload);
@@ -224,7 +226,7 @@ export const MailSettings = () => {
                 <ShieldCheck className="w-5 h-5 text-primary-blue" />
                 <div>
                   <div className="font-black text-gray-900">E-posta Doğrulama</div>
-                  <div className="text-sm text-gray-600">Login için email_verified zorunlu olsun</div>
+                  <div className="text-sm text-gray-600">Login için doğrulama zorunlu olsun</div>
                 </div>
               </div>
               <select
@@ -234,6 +236,21 @@ export const MailSettings = () => {
               >
                 <option value="true">Açık</option>
                 <option value="false">Kapalı</option>
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
+              <div>
+                <div className="font-black text-gray-900">Doğrulama Kanalı</div>
+                <div className="text-sm text-gray-600">E-posta veya SMS</div>
+              </div>
+              <select
+                value={String(settings.verification_channel || 'email')}
+                onChange={(e) => setSettings((p) => ({ ...p, verification_channel: e.target.value }))}
+                className="px-3 py-2 rounded-lg border border-gray-200 bg-white font-semibold"
+              >
+                <option value="email">E-posta</option>
+                <option value="sms">SMS (provider gerekli)</option>
               </select>
             </div>
 

@@ -4334,13 +4334,91 @@ function shouldEmailFromMeta(meta, type) {
   // Global switch (default: on)
   if (settings.emailNotifications === false) return false;
   // Per-type switches (default: on)
-  if (type === 'message' && settings.messagesEmail === false) return false;
-  if (type === 'like' && settings.likesEmail === false) return false;
-  if (type === 'comment' && settings.commentsEmail === false) return false;
-  if (type === 'share' && settings.sharesEmail === false) return false;
-  if (type === 'follow' && settings.followsEmail === false) return false;
-  if (type === 'approval' && settings.approvalEmail === false) return false;
-  if (type === 'system' && settings.systemEmail === false) return false;
+  // Backward-compat: older keys used *Email suffix; newer UI uses plain keys.
+  const isOff = (plainKey, legacyKey) => settings?.[plainKey] === false || settings?.[legacyKey] === false;
+
+  if (type === 'message' && isOff('messages', 'messagesEmail')) return false;
+  if (type === 'like' && isOff('likes', 'likesEmail')) return false;
+  if (type === 'comment_like') {
+    // Prefer dedicated toggle when present; otherwise fall back to likes.
+    const commentLikeOff = settings?.commentLikes === false || settings?.commentLikesEmail === false || settings?.comment_like === false;
+    if (commentLikeOff) return false;
+    if (isOff('likes', 'likesEmail')) return false;
+  }
+  if (type === 'comment' && isOff('comments', 'commentsEmail')) return false;
+  if (type === 'share' && isOff('shares', 'sharesEmail')) return false;
+  if (type === 'follow' && isOff('follows', 'followsEmail')) return false;
+  if (type === 'mention' && isOff('mentions', 'mentionsEmail')) return false;
+  if (type === 'approval' && isOff('approval', 'approvalEmail')) return false;
+  if (type === 'system' && isOff('system', 'systemEmail')) return false;
+  if (type === 'weekly_digest' && isOff('weeklyDigest', 'weeklyDigestEmail')) return false;
+  return true;
+}
+
+// Admin-level notification channel/rule gating (email_enabled + per-trigger channels)
+let adminNotifChannelsCache = null;
+let adminNotifChannelsCacheAt = 0;
+let adminNotifRulesCache = null; // Map(trigger -> { enabled, channels })
+let adminNotifRulesCacheAt = 0;
+const ADMIN_NOTIF_CACHE_MS = 30_000;
+
+function normalizeChannelsValue(v) {
+  if (Array.isArray(v)) return v.map((x) => String(x || '').trim()).filter(Boolean);
+  const s = String(v || '').trim();
+  if (!s) return [];
+  try {
+    const parsed = JSON.parse(s);
+    if (Array.isArray(parsed)) return parsed.map((x) => String(x || '').trim()).filter(Boolean);
+  } catch {
+    // ignore
+  }
+  return s.split(',').map((x) => x.trim()).filter(Boolean);
+}
+
+async function getAdminNotificationChannelsCached() {
+  const now = Date.now();
+  if (adminNotifChannelsCache && (now - adminNotifChannelsCacheAt) < ADMIN_NOTIF_CACHE_MS) return adminNotifChannelsCache;
+  let row = null;
+  try {
+    const rows = await supabaseRestGet('admin_notification_channels', { select: '*', id: 'eq.1', limit: '1' });
+    row = Array.isArray(rows) ? rows?.[0] || null : null;
+  } catch {
+    row = null;
+  }
+  const out = row || { id: 1, in_app_enabled: true, push_enabled: false, email_enabled: true, sms_enabled: false };
+  adminNotifChannelsCache = out;
+  adminNotifChannelsCacheAt = now;
+  return out;
+}
+
+async function getAdminNotificationRulesCached() {
+  const now = Date.now();
+  if (adminNotifRulesCache && (now - adminNotifRulesCacheAt) < ADMIN_NOTIF_CACHE_MS) return adminNotifRulesCache;
+  const map = new Map();
+  try {
+    const rows = await supabaseRestGet('admin_notification_rules', { select: 'trigger,enabled,channels', limit: '200' }).catch(() => []);
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const trig = String(r?.trigger || '').trim();
+      if (!trig) continue;
+      map.set(trig, { enabled: r?.enabled !== false, channels: normalizeChannelsValue(r?.channels) });
+    }
+  } catch {
+    // ignore
+  }
+  adminNotifRulesCache = map;
+  adminNotifRulesCacheAt = now;
+  return map;
+}
+
+async function isEmailNotificationAllowedByAdmin(trigger) {
+  const t = String(trigger || '').trim() || 'system';
+  const channels = await getAdminNotificationChannelsCached();
+  if (channels?.email_enabled === false) return false;
+  const rules = await getAdminNotificationRulesCached();
+  const rule = rules?.get(t) || null;
+  // If a rule exists and is disabled, block it. If no rule exists, allow by default.
+  if (rule && rule.enabled === false) return false;
+  if (rule && Array.isArray(rule.channels) && rule.channels.length > 0 && !rule.channels.includes('email')) return false;
   return true;
 }
 
@@ -4494,6 +4572,10 @@ async function sendWelcomeEmailToUser(req, { toEmail, fullName }) {
 
 async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
   try {
+    // Admin-level channels/rules (email_enabled + per-trigger channels)
+    const adminOk = await isEmailNotificationAllowedByAdmin(type).catch(() => true);
+    if (!adminOk) return;
+
     const rows = await supabaseRestGet('users', { select: 'id,email,full_name,metadata,is_active,email_verified', id: `eq.${userId}`, limit: '1' }).catch(() => []);
     const u = rows?.[0] || null;
     if (!u?.email) return;
@@ -4503,12 +4585,25 @@ async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
 
     const appUrl = getPublicAppUrl(req);
     const link = postId ? `${appUrl}/post/${encodeURIComponent(postId)}` : actorId ? `${appUrl}/profile/${encodeURIComponent(actorId)}` : appUrl;
+    const settingsLink = `${appUrl}/settings/notifications`;
 
     let actorName = '';
     if (actorId) {
       const aRows = await supabaseRestGet('users', { select: 'id,full_name,username', id: `eq.${actorId}`, limit: '1' }).catch(() => []);
       const a = aRows?.[0] || null;
       actorName = a?.full_name || a?.username || '';
+    }
+
+    let postExcerpt = '';
+    if (postId) {
+      try {
+        const pRows = await supabaseRestGet('posts', { select: 'id,content_text,content', id: `eq.${postId}`, limit: '1' }).catch(() => []);
+        const p = pRows?.[0] || null;
+        const raw = String(p?.content_text || p?.content || '').trim();
+        if (raw) postExcerpt = raw.replace(/\s+/g, ' ').slice(0, 140);
+      } catch {
+        postExcerpt = '';
+      }
     }
 
     const titleMap = {
@@ -4555,7 +4650,7 @@ async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
     const text = `${ttl}\n\n${actorName ? actorName + ' ' : ''}${detail.replace(/<[^>]+>/g, '')}\n${link}\n`;
     const rendered = await renderEmailTemplate(req, {
       type: String(type || 'system').trim() || 'system',
-      vars: { actor_name: actorName, link, app_url: appUrl },
+      vars: { actor_name: actorName, link, app_url: appUrl, settings_link: settingsLink, post_excerpt: postExcerpt },
       fallbackSubject: subject,
       fallbackHtml: html,
       fallbackText: text,
@@ -4568,6 +4663,9 @@ async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
 
 async function sendMessageEmail(req, { receiverId, senderId, messagePreview }) {
   try {
+    const adminOk = await isEmailNotificationAllowedByAdmin('message').catch(() => true);
+    if (!adminOk) return;
+
     const recvRows = await supabaseRestGet('users', { select: 'id,email,metadata,is_active', id: `eq.${receiverId}`, limit: '1' }).catch(() => []);
     const recv = recvRows?.[0] || null;
     if (!recv?.email) return;
@@ -6968,12 +7066,14 @@ async function adminGetNotificationRules(req, res) {
         const now = new Date().toISOString();
         const DEFAULTS = [
           { name: 'Beğeni', description: 'Birisi paylaşımınızı beğendiğinde', trigger: 'like', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
+          { name: 'Yorum Beğenisi', description: 'Birisi yorumunuzu beğendiğinde', trigger: 'comment_like', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
           { name: 'Yorum', description: 'Birisi paylaşımınıza yorum yaptığında', trigger: 'comment', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
           { name: 'Takip', description: 'Birisi sizi takip ettiğinde', trigger: 'follow', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
           { name: 'Mesaj', description: 'Yeni mesaj aldığınızda', trigger: 'message', enabled: true, priority: 'high', channels: ['in_app', 'email'], created_at: now, updated_at: now },
           { name: 'Bahsedilme', description: 'Birisi sizi etiketlediğinde', trigger: 'mention', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
           { name: 'Paylaşım', description: 'Paylaşımınız paylaşıldığında', trigger: 'share', enabled: true, priority: 'low', channels: ['in_app'], created_at: now, updated_at: now },
           { name: 'Üyelik Onayı', description: 'Üyelik onayıyla ilgili sistem bildirimi', trigger: 'approval', enabled: true, priority: 'high', channels: ['in_app', 'email'], created_at: now, updated_at: now },
+          { name: 'Sistem', description: 'Sistem bildirimi', trigger: 'system', enabled: true, priority: 'normal', channels: ['in_app', 'email'], created_at: now, updated_at: now },
         ];
         await supabaseRestInsert('admin_notification_rules', DEFAULTS).catch(() => null);
         rows = await supabaseRestGet('admin_notification_rules', { select: '*', order: 'created_at.desc', limit: '200' }).catch(() => []);
@@ -9086,11 +9186,23 @@ async function authLogin(req, res) {
       claimPending = false;
     }
     
-    // Email verification gate (optional)
-    const emailVerificationRequired = String(process.env.EMAIL_VERIFICATION_ENABLED || '').trim() === 'true';
+    // Email/SMS verification gate (optional, admin-controlled via site_settings unless env overrides)
+    const settingsMap = await getSiteSettingsMapCached().catch(() => ({}));
+    const envEmailGate = String(process.env.EMAIL_VERIFICATION_ENABLED || '').trim();
+    const emailVerificationRequired =
+      envEmailGate ? envEmailGate === 'true' : String(settingsMap?.email_verification_enabled || 'false').trim() === 'true';
+    const verificationChannel = String(settingsMap?.verification_channel || 'email').trim().toLowerCase() || 'email';
     if (emailVerificationRequired) {
       const meta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : {};
       const verified = user?.email_verified === true || meta?.email_verified === true;
+      if (verificationChannel === 'sms') {
+        // SMS verification is not implemented without a provider; keep error explicit.
+        return res.status(503).json({
+          success: false,
+          error: 'SMS doğrulama aktif ancak SMS provider yapılandırılmadı.',
+          code: 'SMS_NOT_CONFIGURED',
+        });
+      }
       if (!verified) {
         return res.status(403).json({ success: false, error: 'E-posta adresinizi doğrulamanız gerekiyor.', code: 'EMAIL_NOT_VERIFIED' });
       }
@@ -9446,7 +9558,20 @@ async function authRegister(req, res) {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
-    const emailVerificationRequired = String(process.env.EMAIL_VERIFICATION_ENABLED || '').trim() === 'true';
+    // Email/SMS verification gate (optional, admin-controlled via site_settings unless env overrides)
+    const settingsMap = await getSiteSettingsMapCached().catch(() => ({}));
+    const envEmailGate = String(process.env.EMAIL_VERIFICATION_ENABLED || '').trim();
+    const emailVerificationRequired =
+      envEmailGate ? envEmailGate === 'true' : String(settingsMap?.email_verification_enabled || 'false').trim() === 'true';
+    const verificationChannel = String(settingsMap?.verification_channel || 'email').trim().toLowerCase() || 'email';
+
+    if (emailVerificationRequired && verificationChannel === 'sms') {
+      return res.status(503).json({
+        success: false,
+        error: 'SMS doğrulama aktif ancak SMS provider yapılandırılmadı.',
+        code: 'SMS_NOT_CONFIGURED',
+      });
+    }
     const cleanEmpty = (v) => (v === '' ? null : v);
     const userData = {
         username,
@@ -10868,6 +10993,7 @@ async function adminGetMailSettings(req, res) {
       mail_reply_to_email: get('mail_reply_to_email', '') || '',
       mail_reply_to_name: get('mail_reply_to_name', '') || '',
       email_verification_enabled: get('email_verification_enabled', 'false') || 'false',
+      verification_channel: (get('verification_channel', 'email') || 'email').toLowerCase(),
       brevo_api_key_configured: brevoConfigured,
     },
   });
@@ -10889,6 +11015,7 @@ async function adminUpdateMailSettings(req, res) {
   const mail_reply_to_name = obj.mail_reply_to_name !== undefined ? String(obj.mail_reply_to_name || '').trim() : undefined;
   const email_verification_enabled =
     obj.email_verification_enabled !== undefined ? String(obj.email_verification_enabled).trim() : undefined;
+  const verification_channel = obj.verification_channel !== undefined ? String(obj.verification_channel || '').trim().toLowerCase() : undefined;
 
   const brevo_api_key = typeof obj.brevo_api_key === 'string' ? obj.brevo_api_key.trim() : '';
   const clear_brevo_api_key = obj.clear_brevo_api_key === true;
@@ -10899,6 +11026,9 @@ async function adminUpdateMailSettings(req, res) {
   }
   if (email_verification_enabled !== undefined && email_verification_enabled !== 'true' && email_verification_enabled !== 'false') {
     fieldErrors.email_verification_enabled = 'true/false olmalı.';
+  }
+  if (verification_channel !== undefined && verification_channel && verification_channel !== 'email' && verification_channel !== 'sms') {
+    fieldErrors.verification_channel = 'email veya sms olmalı.';
   }
   if (mail_provider !== undefined && mail_provider && mail_provider !== 'brevo') {
     fieldErrors.mail_provider = 'Sadece "brevo" destekleniyor.';
@@ -10931,6 +11061,7 @@ async function adminUpdateMailSettings(req, res) {
   if (mail_reply_to_email !== undefined) push('mail_reply_to_email', mail_reply_to_email);
   if (mail_reply_to_name !== undefined) push('mail_reply_to_name', mail_reply_to_name);
   if (email_verification_enabled !== undefined) push('email_verification_enabled', email_verification_enabled);
+  if (verification_channel !== undefined) push('verification_channel', verification_channel || 'email');
 
   if (brevo_api_key) push('mail_brevo_api_key', brevo_api_key);
   if (clear_brevo_api_key) push('mail_brevo_api_key', '');
