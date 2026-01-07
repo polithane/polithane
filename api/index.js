@@ -4297,7 +4297,7 @@ function isMailRelayConfigured() {
 function isBrevoConfigured() {
   // Keep env-based fast check for legacy paths (admin env check, etc).
   const key = String(process.env.BREVO_API_KEY || '').trim();
-  const fromEmail = String(process.env.BREVO_FROM_EMAIL || process.env.MAIL_SENDER_EMAIL || process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim();
+  const fromEmail = String(process.env.BREVO_FROM_EMAIL || process.env.MAIL_SENDER_EMAIL || '').trim();
   return !!(key && fromEmail);
 }
 
@@ -4389,6 +4389,7 @@ async function sendEmail({ to, subject, html, text }) {
   if (!enabled) throw new Error('Mail sistemi kapalı (mail_enabled=false).');
 
   const provider = String(process.env.MAIL_PROVIDER || get('mail_provider', 'brevo') || 'brevo').trim().toLowerCase();
+  if (provider !== 'brevo') throw new Error(`Desteklenmeyen mail provider: ${provider}. (Sadece brevo)`);
 
   const apiKey = String(process.env.BREVO_API_KEY || get('mail_brevo_api_key', '') || '').trim();
   const senderEmail =
@@ -4396,68 +4397,14 @@ async function sendEmail({ to, subject, html, text }) {
       process.env.MAIL_SENDER_EMAIL ||
         process.env.BREVO_FROM_EMAIL ||
         get('mail_sender_email', '') ||
-        get('email_from_address', '') ||
-        process.env.SMTP_FROM ||
-        process.env.EMAIL_FROM ||
-        process.env.SMTP_USER ||
-        ''
+        get('email_from_address', '')
     ).trim();
   const senderName = String(process.env.MAIL_SENDER_NAME || process.env.BREVO_FROM_NAME || get('mail_sender_name', 'Polithane') || 'Polithane').trim() || 'Polithane';
 
-  // Prefer Brevo when selected and configured.
-  if (provider === 'brevo' && apiKey && senderEmail) {
-    await sendEmailViaBrevo({ to, subject, html, text, fromEmail: senderEmail, fromName: senderName, apiKey });
-    return;
-  }
+  if (!apiKey) throw new Error('Brevo API key eksik (BREVO_API_KEY / mail_brevo_api_key).');
+  if (!senderEmail) throw new Error('Gönderici e-posta eksik (MAIL_SENDER_EMAIL / mail_sender_email).');
 
-  const fromEmail = senderEmail || String(process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim();
-  if (!fromEmail) throw new Error('Gönderici e-posta eksik (mail_sender_email / SMTP_FROM).');
-  const fromName = senderName;
-
-  const mail = {
-    from: `Polithane <${fromEmail}>`,
-    to: String(to || '').trim(),
-    subject: String(subject || '').trim(),
-    text: text ? String(text) : undefined,
-    html: html ? String(html) : undefined,
-  };
-
-  // Try candidate ports in order (helps if 587 is blocked but 465 works, or vice versa).
-  const ports = getSmtpPortCandidates();
-  let lastErr = null;
-
-  // Prefer relay first when configured (Vercel commonly blocks outbound SMTP ports).
-  const relayConfigured = isMailRelayConfigured();
-  const relayPrefer = String(process.env.MAIL_RELAY_PREFER || 'true').trim().toLowerCase() !== 'false';
-  if (relayConfigured && relayPrefer) {
-    try {
-      await sendEmailViaRelay({ to, subject, html, text, fromEmail });
-      return;
-    } catch (e) {
-      lastErr = e;
-      // fall through to SMTP as a best-effort fallback
-    }
-  }
-
-  for (const p of ports) {
-    try {
-      const transporter = getSmtpTransporterForPort(p);
-      // Make sure API requests never hang forever on SMTP.
-      // eslint-disable-next-line no-await-in-loop
-      await withTimeout(transporter.sendMail(mail), 6_000, `SMTP sendMail:${p}`);
-      return;
-    } catch (e) {
-      lastErr = e;
-      // continue trying next port
-    }
-  }
-  // If SMTP fails and we didn't try relay first, try relay as final fallback.
-  if (relayConfigured && !relayPrefer) {
-    await sendEmailViaRelay({ to, subject, html, text, fromEmail });
-    return;
-  }
-
-  throw lastErr || new Error('SMTP send failed');
+  await sendEmailViaBrevo({ to, subject, html, text, fromEmail: senderEmail, fromName: senderName, apiKey });
 }
 
 function isSmtpConfigured() {
@@ -4490,9 +4437,8 @@ function emailLayout({ title, bodyHtml }) {
 
 async function safeSendEmail(payload) {
   try {
-    if (!isBrevoConfigured() && !isSmtpConfigured() && !isMailRelayConfigured()) return false;
     // Keep this bounded so user-facing API endpoints don't stall.
-    await withTimeout(sendEmail(payload), 12_000, 'SMTP send');
+    await withTimeout(sendEmail(payload), 12_000, 'Mail send');
     return true;
   } catch {
     return false;
@@ -4715,7 +4661,8 @@ async function sendVerificationEmailForUser(req, { toEmail, token }) {
     fallbackHtml: html,
     fallbackText: text,
   }).catch(() => null);
-  await safeSendEmail({ to: toEmail, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+  // STRICT: verification email must be delivered (uses centralized mail settings).
+  await sendEmail({ to: toEmail, subject: rendered?.subject || subject, html: rendered?.html || html, text });
 }
 
 async function sendWelcomeEmailToUser(req, { toEmail, fullName }) {
@@ -9720,17 +9667,17 @@ async function authResendVerification(req, res) {
     await sendVerificationEmailForUser(req, { toEmail: u.email, token: tokenRaw });
     return res.json({ success: true, message: 'Doğrulama e-postası gönderildi.' });
   } catch (e) {
-    return res.json({
-      success: true,
-      message:
-        'Kayıt bulundu ancak doğrulama e-postası şu an gönderilemedi. Lütfen birkaç dakika sonra tekrar deneyin ve spam/junk klasörünü kontrol edin.',
-      mailSent: false,
-      mailError: String(e?.message || 'Doğrulama e-postası gönderilemedi.'),
+    return res.status(503).json({
+      success: false,
+      error: 'Doğrulama e-postası gönderilemedi. Lütfen Mail Ayarları’nı kontrol edin.',
+      code: 'MAIL_SEND_FAILED',
+      debug: String(e?.message || 'mail send failed').slice(0, 900),
     });
   }
 }
 
 async function authRegister(req, res) {
+  try {
     const body = await readJsonBody(req);
     const { email, password, full_name, user_type = 'citizen', province, district, party_id, politician_type, metadata = {}, document, is_claim, claim_user_id } = body;
     
@@ -9978,7 +9925,7 @@ async function authRegister(req, res) {
       });
     }
 
-    // Email verification (best-effort). If enabled, user can register but must verify before login.
+    // Email verification (STRICT). If enabled, registration must successfully send the verification email.
     if (emailVerificationRequired) {
       // eslint-disable-next-line global-require
       const crypto = require('crypto');
@@ -9993,26 +9940,53 @@ async function authRegister(req, res) {
         email_verified: false,
       };
       await safeUserPatch(user.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
-      let mailSent = false;
-      let mailError = null;
       try {
         await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw });
-        mailSent = true;
       } catch (e) {
-        // IMPORTANT:
-        // Previously this would throw and the UI would show "Sunucu hatası",
-        // but the user record was already created -> next attempt says "Email kayıtlı".
-        // Now we keep registration successful and guide the user to resend.
-        mailSent = false;
-        mailError = String(e?.message || 'Doğrulama e-postası gönderilemedi.');
+        // Roll back (so the user can re-register with the same email without "email kayıtlı").
+        const errMsg = String(e?.message || 'Doğrulama e-postası gönderilemedi.');
+        try {
+          await supabaseRestDelete('notifications', { user_id: `eq.${user.id}` }).catch(() => null);
+        } catch {
+          // ignore
+        }
+        let removed = false;
+        try {
+          await supabaseRestDelete('users', { id: `eq.${user.id}` }).catch(() => null);
+          // verify it is gone (best-effort)
+          const chk = await supabaseRestGet('users', { select: 'id', id: `eq.${user.id}`, limit: '1' }).catch(() => []);
+          removed = !Array.isArray(chk) || chk.length === 0;
+        } catch {
+          removed = false;
+        }
+        if (!removed) {
+          // If hard delete didn't work, free the email by rewriting it.
+          try {
+            const em = String(user.email || emailLower).trim().toLowerCase();
+            const parts = em.split('@');
+            const local = parts[0] || 'user';
+            const domain = parts[1] || 'example.com';
+            const nextEmail = `${local}+failed-${String(user.id).slice(0, 8)}-${Date.now()}@${domain}`;
+            const baseMeta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : (metadata && typeof metadata === 'object' ? metadata : {});
+            const nextMeta2 = { ...baseMeta, registration_failed: true, registration_failed_at: new Date().toISOString() };
+            await safeUserPatch(user.id, { email: nextEmail, is_active: false, metadata: nextMeta2 }).catch(() => null);
+          } catch {
+            // ignore
+          }
+        }
+        return res.status(503).json({
+          success: false,
+          error: 'Doğrulama e-postası gönderilemedi. Lütfen Mail Ayarları’nı kontrol edin.',
+          code: 'MAIL_SEND_FAILED',
+          debug: errMsg.slice(0, 900),
+        });
       }
+
       const token = signJwt({ id: user.id, username: user.username, email: user.email, user_type: user.user_type, is_admin: !!user.is_admin });
       return res.status(201).json({
         success: true,
-        message: mailSent
-          ? 'Kayıt başarılı. Lütfen e-posta adresinizi doğrulayın.'
-          : 'Kayıt başarılı. Doğrulama e-postası gönderilemedi. Lütfen “Mail Aktivasyonu” sayfasından tekrar gönderin ve spam/junk klasörünü kontrol edin.',
-        data: { user, token, requiresApproval, emailVerificationRequired: true, mailSent, ...(mailError ? { mailError } : {}) },
+        message: 'Kayıt başarılı. Lütfen e-posta adresinizi doğrulayın.',
+        data: { user, token, requiresApproval, emailVerificationRequired: true, mailSent: true },
       });
     }
 
@@ -10020,6 +9994,13 @@ async function authRegister(req, res) {
     sendWelcomeEmailToUser(req, { toEmail: user.email, fullName: user.full_name }).catch(() => null);
     const token = signJwt({ id: user.id, username: user.username, email: user.email, user_type: user.user_type, is_admin: !!user.is_admin });
     res.status(201).json({ success: true, message: 'Kayıt başarılı.', data: { user, token, requiresApproval } });
+  } catch (e) {
+    // Never return a generic "sunucu hatası" for registration: surface a safe message.
+    const msg = String(e?.message || 'Kayıt başarısız.');
+    // eslint-disable-next-line no-console
+    console.error('authRegister error:', msg);
+    return res.status(500).json({ success: false, error: 'Kayıt başarısız. Lütfen tekrar deneyin.', debug: msg.slice(0, 900) });
+  }
 }
 
 async function authMe(req, res) {
