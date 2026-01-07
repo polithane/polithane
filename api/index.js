@@ -4395,10 +4395,11 @@ async function sendEmail({ to, subject, html, text }) {
   const senderEmail =
     String(
       process.env.MAIL_SENDER_EMAIL ||
-        process.env.BREVO_FROM_EMAIL ||
         get('mail_sender_email', '') ||
         get('email_from_address', '') ||
         process.env.EMAIL_FROM ||
+        // Keep legacy env as a last-resort fallback only (admin panel should be the source of truth).
+        process.env.BREVO_FROM_EMAIL ||
         ''
     ).trim();
   const senderName = String(process.env.MAIL_SENDER_NAME || process.env.BREVO_FROM_NAME || get('mail_sender_name', 'Polithane') || 'Polithane').trim() || 'Polithane';
