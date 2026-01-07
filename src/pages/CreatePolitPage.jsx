@@ -539,7 +539,7 @@ export const CreatePolitPage = () => {
     };
 
     // Disabled: we rely on the FFmpeg worker to generate thumbnail_url.
-    if (true) {
+    if (false) {
       cancelled = true;
       return undefined;
     }
@@ -1129,16 +1129,19 @@ export const CreatePolitPage = () => {
       // --------------------------------------------
       // Kalıcı çözüm: Video kaydını "gerçek dikey" üret
       // --------------------------------------------
-      // Bazı cihazlarda/tarayıcılarda telefon dik olsa bile MediaRecorder çıktısı yatay frame gelebiliyor.
-      // Bu yüzden video kaydında kamerayı bir canvas'a çizip (9:16), canvas.captureStream ile kaydediyoruz.
-      // Böylece çıkan dosyanın width/height'i gerçekten dikey olur (rotation metadata'ya güvenmeyiz).
+      // Kullanıcı dikey video istiyor. Ancak MediaRecorder mobilde bazen yatay (landscape)
+      // kaydediyor. Biz de canvas'a 9:16 (720x1280) çizip, oradan stream alarak kaydedeceğiz.
+      // 
+      // ÖNEMLİ: "aspectRatio" kısıtlamasını getUserMedia'ya versek bile mobil cihazlar
+      // sensör durumuna göre yine yatay verebiliyor. Bu yüzden canvas ile dikey zorlaması yapıyoruz.
       const buildPortraitRecordingStream = async (sourceStream) => {
         // Use the hidden DOM canvas so preview & recorder are stable across renders.
         const canvas = recordCanvasRef.current || document.createElement('canvas');
+        
         // Target: Polithane "Polit stage" portrait frame (shared aspect across Polit/Fast)
-        // Keep it deterministic so playback and thumbnails are consistent.
         const targetW = 720;
         const targetH = 1280;
+        
         canvas.width = targetW;
         canvas.height = targetH;
         if (!recordCanvasRef.current) recordCanvasRef.current = canvas;
@@ -1146,8 +1149,6 @@ export const CreatePolitPage = () => {
         if (!ctx) return { outStream: sourceStream };
 
         // Use the SAME preview <video> element as the draw source.
-        // This avoids "sideways head" issues caused by orientation metadata differences
-        // between off-DOM decoding and on-screen preview decoding.
         const srcVideo = previewRef.current || document.createElement('video');
         if (!previewRef.current) {
           srcVideo.muted = true;
@@ -1185,12 +1186,12 @@ export const CreatePolitPage = () => {
 
         // Draw loop:
         // - Always "cover" the 9:16 frame to fill the background (user request).
-        // - Disable auto-rotate logic because modern mobile browsers handle orientation correctly,
-        //   and faulty auto-rotate logic was causing sideways videos.
+        // - This ensures NO black bars on PC or mobile, effectively "cropping" to portrait if source is landscape.
         const fitMode = 'cover';
+        
         const draw = () => {
           try {
-            // Background
+            // Background (failsafe black, though cover should fill it)
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, targetW, targetH);
 
@@ -1201,36 +1202,32 @@ export const CreatePolitPage = () => {
               return;
             }
 
-            // Forced disable auto-rotate. Let the user manually rotate if needed.
-            if (recordAutoRotateRef.current === null) {
-              recordAutoRotateRef.current = false;
-            }
-            const rotate = !!videoRotate || !!recordAutoRotateRef.current;
-
-            if (rotate) {
-              ctx.save();
-              ctx.translate(targetW / 2, targetH / 2);
-              ctx.rotate(Math.PI / 2);
-              const rw = targetH;
-              const rh = targetW;
-              const s = fitMode === 'contain' ? Math.min(rw / vw, rh / vh) : Math.max(rw / vw, rh / vh);
-              const dw = vw * s;
-              const dh = vh * s;
-              ctx.drawImage(srcVideo, -dw / 2, -dh / 2, dw, dh);
-              ctx.restore();
-            } else {
-              const s = fitMode === 'contain' ? Math.min(targetW / vw, targetH / vh) : Math.max(targetW / vw, targetH / vh);
-              const dw = vw * s;
-              const dh = vh * s;
-              const dx = (targetW - dw) / 2;
-              const dy = (targetH - dh) / 2;
-              ctx.drawImage(srcVideo, dx, dy, dw, dh);
-            }
+            // AUTO-ROTATE LOGIC:
+            // Modern mobile browsers often report video dimensions correctly (e.g. 1080x1920 for portrait).
+            // However, PC webcams are landscape (1280x720).
+            // If we receive a landscape source (width > height), we assume it's a PC webcam
+            // and we rely on 'cover' fitMode to center-crop it to vertical.
+            // If it's a mobile device sending landscape frames but rotated via metadata (rare now),
+            // the 'cover' mode will still fill the screen, preventing black bars.
+            // WE DO NOT MANUALLY ROTATE THE CONTEXT anymore, as that caused the "sideways" issue.
+            
+            // Just draw centered with cover
+            const s = Math.max(targetW / vw, targetH / vh);
+            const dw = vw * s;
+            const dh = vh * s;
+            const dx = (targetW - dw) / 2;
+            const dy = (targetH - dh) / 2;
+            
+            // Flip horizontally if using user-facing camera (mirror effect) - Optional UX polish
+            // But let's keep it simple first: just draw.
+            ctx.drawImage(srcVideo, dx, dy, dw, dh);
+            
           } catch {
             // ignore draw errors; keep loop alive
           }
           recordCanvasRafRef.current = requestAnimationFrame(draw);
         };
+        
         if (recordCanvasRafRef.current) {
           try { cancelAnimationFrame(recordCanvasRafRef.current); } catch { /* ignore */ }
         }
@@ -1895,6 +1892,10 @@ export const CreatePolitPage = () => {
                       muted={isRecording}
                       autoPlay={!isRecording && !!recordedUrl && !isCoverPreparing}
                       controls={!isRecording && !!recordedUrl && !isCoverPreparing}
+                      onEnded={(e) => {
+                        // Stop looping by default
+                        e.target.pause();
+                      }}
                     />
 
                     {isRecording && (
