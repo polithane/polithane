@@ -1136,133 +1136,15 @@ export const CreatePolitPage = () => {
       const mimeType = getRecorderMimeType(contentType);
 
       // --------------------------------------------
-      // Kalıcı çözüm: Video kaydını "gerçek dikey" üret
+      // Native Portrait Recording (No Canvas)
       // --------------------------------------------
-      // Kullanıcı dikey video istiyor. Mobil tarayıcılar portrait modda çalışırken
-      // bazen aspect ratio doğru olsa da orientation metadata sorunu olabiliyor.
-      // Canvas ile 9:16 (720x1280) bir frame oluşturup, videoyu içine "cover" etmeden
-      // "contain" de etmeden, doğrudan kameradan gelen görüntüyü dikey canvas'a çizeceğiz.
-      // Böylece görüntü ne gelirse gelsin (yatay/dikey), dikey canvas'ta full gözükecek.
-      const buildPortraitRecordingStream = async (sourceStream) => {
-        // Use the hidden DOM canvas so preview & recorder are stable across renders.
-        const canvas = recordCanvasRef.current || document.createElement('canvas');
-        
-        // Target: Polithane "Polit stage" portrait frame (shared aspect across Polit/Fast)
-        const targetW = 720;
-        const targetH = 1280;
-        
-        canvas.width = targetW;
-        canvas.height = targetH;
-        if (!recordCanvasRef.current) recordCanvasRef.current = canvas;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return { outStream: sourceStream };
-
-        // Use the SAME preview <video> element as the draw source.
-        const srcVideo = previewRef.current || document.createElement('video');
-        if (!previewRef.current) {
-          srcVideo.muted = true;
-          srcVideo.playsInline = true;
-          try {
-            srcVideo.setAttribute('playsinline', 'true');
-            srcVideo.setAttribute('webkit-playsinline', 'true');
-          } catch {
-            // ignore
-          }
-          srcVideo.srcObject = sourceStream;
-          try {
-            await srcVideo.play();
-          } catch {
-            // ignore
-          }
-        }
-
-        // Compose output stream: canvas video + original audio (if any)
-        const fps = 30;
-        const canvasStream = canvas.captureStream?.(fps);
-        const out = new MediaStream();
-        try {
-          const vTrack = canvasStream?.getVideoTracks?.()?.[0];
-          if (vTrack) out.addTrack(vTrack);
-        } catch {
-          // ignore
-        }
-        try {
-          const aTrack = sourceStream?.getAudioTracks?.()?.[0];
-          if (aTrack) out.addTrack(aTrack);
-        } catch {
-          // ignore
-        }
-
-        // Draw loop:
-        // - Always "cover" the 9:16 frame to fill the background (user request).
-        // - This ensures NO black bars on PC or mobile.
-        const fitMode = 'cover';
-        
-        const draw = () => {
-          try {
-            // Background (failsafe black, though cover should fill it)
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, targetW, targetH);
-
-            const vw = Number(srcVideo.videoWidth || 0) || 0;
-            const vh = Number(srcVideo.videoHeight || 0) || 0;
-            if (!vw || !vh) {
-              recordCanvasRafRef.current = requestAnimationFrame(draw);
-              return;
-            }
-
-            // Just draw centered with cover logic to ensure full screen vertical video
-            // This crops the sides of horizontal video (PC) to make it vertical (Reels style).
-            // This keeps vertical video vertical.
-            const s = Math.max(targetW / vw, targetH / vh);
-            const dw = vw * s;
-            const dh = vh * s;
-            const dx = (targetW - dw) / 2;
-            const dy = (targetH - dh) / 2;
-            
-            ctx.drawImage(srcVideo, dx, dy, dw, dh);
-            
-          } catch {
-            // ignore draw errors; keep loop alive
-          }
-          recordCanvasRafRef.current = requestAnimationFrame(draw);
-        };
-        
-        if (recordCanvasRafRef.current) {
-          try { cancelAnimationFrame(recordCanvasRafRef.current); } catch { /* ignore */ }
-        }
-        recordCanvasRafRef.current = requestAnimationFrame(draw);
-
-        // Keep refs for cleanup
-        recordOutStreamRef.current = {
-          canvasStream,
-          sourceEl: srcVideo,
-          stop: () => {
-            try {
-              if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
-            } catch {
-              // ignore
-            }
-            recordCanvasRafRef.current = null;
-            try {
-              canvasStream?.getTracks?.()?.forEach?.((t) => t.stop());
-            } catch {
-              // ignore
-            }
-            try {
-              srcVideo.pause?.();
-              srcVideo.srcObject = null;
-            } catch {
-              // ignore
-            }
-          },
-        };
-
-        return { outStream: out };
-      };
-
-      const recorderStream =
-        contentType === 'video' ? (await buildPortraitRecordingStream(stream)).outStream : stream;
+      // Canvas kullanımı performansı düşürebilir ve crop/zoom sorunlarına yol açabilir.
+      // Mobilde zaten modern tarayıcılar portrait video verir.
+      // PC'de ise webcam yataydır; bunu olduğu gibi alıp (yatay), <video style={{ objectFit: 'cover' }}>
+      // ile dikey gösterip, upload sonrasında sunucuda veya oynatıcıda işlenmesini beklemek daha sağlıklıdır.
+      // Ancak kullanıcı "Reels gibi dikey" istiyor.
+      // Burada native stream'i doğrudan kaydediciye vereceğiz.
+      const recorderStream = stream;
 
       const recorder = new MediaRecorder(recorderStream, { mimeType });
       recorderRef.current = recorder;
@@ -1332,6 +1214,17 @@ export const CreatePolitPage = () => {
       // ignore
     }
     recordOutStreamRef.current = null;
+    
+    // Stop preview playback and reset
+    const el = previewRef.current;
+    if (el) {
+      try {
+        el.pause();
+        el.currentTime = 0;
+      } catch {
+        // ignore
+      }
+    }
     try {
       if (recordCanvasRafRef.current) cancelAnimationFrame(recordCanvasRafRef.current);
     } catch {
@@ -1950,18 +1843,12 @@ export const CreatePolitPage = () => {
 
                   {/* Önizleme Resimleri Seçeceği */}
                   {recordedUrl && !isRecording && (
-                    isCoverPreparing || videoThumbs.length === 0 ? (
-                       <div className="py-6 rounded-2xl border border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-3">
-                        <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
-                        <div className="text-xs font-black text-gray-600">Kapak resimleri hazırlanıyor, lütfen bekleyin!</div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
+                    <div className="space-y-2">
                         <div className="flex items-center justify-between px-1">
                            <span className={['text-[10px] font-black uppercase tracking-tighter', selectedVideoThumbIdx < 0 ? 'text-rose-600 animate-pulse' : 'text-gray-400'].join(' ')}>
-                             {selectedVideoThumbIdx < 0 ? 'Lütfen bir kapak fotoğrafı seçin!' : 'Kapak Seçildi'}
+                             {videoThumbs.length > 0 && selectedVideoThumbIdx < 0 ? 'Lütfen bir kapak fotoğrafı seçin!' : (videoThumbs.length > 0 ? 'Kapak Seçildi' : '')}
                            </span>
-                           {videoThumbRefreshCount < 1 && (
+                           {videoThumbs.length > 0 && videoThumbRefreshCount < 1 && (
                              <button type="button" onClick={() => {
                                setVideoThumbGenSeed(s => s+1);
                                setVideoThumbRefreshCount(c => c+1);
@@ -1971,29 +1858,48 @@ export const CreatePolitPage = () => {
                              </button>
                            )}
                         </div>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {videoThumbs.map((t, i) => (
-                            <button key={i} type="button" onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all relative', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-60 hover:opacity-100'].join(' ')}>
-                              <img src={t.previewUrl} className="w-full aspect-video object-cover" />
-                              {selectedVideoThumbIdx === i && (
-                                <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-                                   <div className="w-2 h-2 bg-white rounded-full shadow-sm" />
-                                </div>
-                              )}
-                            </button>
-                          ))}
-                        </div>
+                        {/* Eğer kapaklar henüz yoksa (yükleniyorsa) placeholder göster, varsa grid göster */}
+                        {videoThumbs.length === 0 ? (
+                           // Burayı boş bırakıyoruz çünkü yükleme mesajı artık buton alanında
+                           <div className="grid grid-cols-3 gap-1.5 opacity-50 pointer-events-none">
+                              {[1,2,3].map(i => (
+                                <div key={i} className="aspect-video bg-gray-100 rounded-lg animate-pulse" />
+                              ))}
+                           </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {videoThumbs.map((t, i) => (
+                              <button key={i} type="button" onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all relative', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-60 hover:opacity-100'].join(' ')}>
+                                <img src={t.previewUrl} className="w-full aspect-video object-cover" />
+                                {selectedVideoThumbIdx === i && (
+                                  <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                                     <div className="w-2 h-2 bg-white rounded-full shadow-sm" />
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )
                   )}
                   
-                  {/* Dinamik Gönder Butonu */}
-                  {canShowSubmitInMediaStep && (
+                  {/* Dinamik Gönder Butonu ve Yükleme Durumu */}
+                  {canShowSubmitInMediaStep ? (
                     <div className="pt-2">
                       <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight">
                         {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'GÖNDER'}
                       </button>
                     </div>
+                  ) : (
+                    // Yükleme durumu veya kapak seçimi bekleniyor
+                    (recordedUrl && !isRecording && contentType === 'video' && (isCoverPreparing || videoThumbs.length === 0)) ? (
+                      <div className="pt-2">
+                        <div className="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-bold text-xs flex items-center justify-center gap-2 border border-gray-200">
+                          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                          <span>Kapak resimleri yükleniyor, lütfen bekleyin!</span>
+                        </div>
+                      </div>
+                    ) : null
                   )}
                 </div>
                   ) : contentType === 'image' ? (
