@@ -31,6 +31,14 @@ export const ForgotPasswordPage = () => {
     setLoading(true);
 
     try {
+      // Check if email exists (explicit UX requested)
+      const chk = await apiCall(`/api/auth/check-availability?email=${encodeURIComponent(String(email || '').trim().toLowerCase())}`).catch(() => null);
+      if (chk?.success && chk?.emailAvailable === true) {
+        setError('Bu e-posta adresi sistemde kayıtlı değil.');
+        setLoading(false);
+        return;
+      }
+
       const response = await apiCall('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),

@@ -4397,7 +4397,9 @@ async function sendEmail({ to, subject, html, text }) {
       process.env.MAIL_SENDER_EMAIL ||
         process.env.BREVO_FROM_EMAIL ||
         get('mail_sender_email', '') ||
-        get('email_from_address', '')
+        get('email_from_address', '') ||
+        process.env.EMAIL_FROM ||
+        ''
     ).trim();
   const senderName = String(process.env.MAIL_SENDER_NAME || process.env.BREVO_FROM_NAME || get('mail_sender_name', 'Polithane') || 'Polithane').trim() || 'Polithane';
 
@@ -4684,7 +4686,7 @@ async function sendWelcomeEmailToUser(req, { toEmail, fullName }) {
     fallbackHtml: html,
     fallbackText: text,
   }).catch(() => null);
-  await safeSendEmail({ to: toEmail, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+  await sendEmail({ to: toEmail, subject: rendered?.subject || subject, html: rendered?.html || html, text });
 }
 
 async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
@@ -4772,7 +4774,7 @@ async function sendNotificationEmail(req, { userId, type, actorId, postId }) {
       fallbackHtml: html,
       fallbackText: text,
     }).catch(() => null);
-    await safeSendEmail({ to: u.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+    await sendEmail({ to: u.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
   } catch {
     // best-effort
   }
@@ -4818,7 +4820,7 @@ async function sendMessageEmail(req, { receiverId, senderId, messagePreview }) {
       fallbackHtml: html,
       fallbackText: text,
     }).catch(() => null);
-    await safeSendEmail({ to: recv.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+    await sendEmail({ to: recv.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
   } catch {
     // best-effort
   }
@@ -9440,16 +9442,15 @@ async function authForgotPassword(req, res) {
       return res.status(429).json({ success: false, error: 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyin.' });
     }
 
-    // Keep response generic to prevent user enumeration.
-    const okResponse = () =>
-      res.json({ success: true, message: 'Eğer bu e-posta kayıtlıysa, sıfırlama bağlantısı gönderilecektir.' });
-    if (!emailRaw) return okResponse();
+    if (!emailRaw) return res.status(400).json({ success: false, error: 'E-posta adresi gerekli.' });
 
     try {
       const email = emailLower;
       const rows = await supabaseRestGet('users', { select: 'id,email,metadata', email: `eq.${email}`, limit: '1' }).catch(() => []);
       const u = rows?.[0] || null;
-      if (!u?.id || !u?.email) return okResponse();
+      if (!u?.id || !u?.email) {
+        return res.status(404).json({ success: false, error: 'Bu e-posta adresi sistemde kayıtlı değil.' });
+      }
 
       // eslint-disable-next-line global-require
       const crypto = require('crypto');
@@ -9510,13 +9511,16 @@ async function authForgotPassword(req, res) {
           fallbackHtml: html,
           fallbackText: text,
         }).catch(() => null);
-        await safeSendEmail({ to: u.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+        await sendEmail({ to: u.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
       }
-    } catch {
-      // best-effort only
+      return res.json({ success: true, message: 'Şifre sıfırlama bağlantısı gönderildi.' });
+    } catch (e) {
+      return res.status(500).json({
+        success: false,
+        error: 'Şifre sıfırlama e-postası gönderilemedi. Lütfen Mail Ayarları’nı kontrol edin.',
+        debug: String(e?.message || 'mail send failed').slice(0, 900),
+      });
     }
-
-    return okResponse();
 }
 
 async function authResetPassword(req, res) {
@@ -9669,7 +9673,7 @@ async function authResendVerification(req, res) {
   } catch (e) {
     return res.status(503).json({
       success: false,
-      error: 'Doğrulama e-postası gönderilemedi. Lütfen Mail Ayarları’nı kontrol edin.',
+      error: 'İşlem şu an tamamlanamadı. Lütfen tekrar deneyin.',
       code: 'MAIL_SEND_FAILED',
       debug: String(e?.message || 'mail send failed').slice(0, 900),
     });
@@ -9976,7 +9980,7 @@ async function authRegister(req, res) {
         }
         return res.status(503).json({
           success: false,
-          error: 'Doğrulama e-postası gönderilemedi. Lütfen Mail Ayarları’nı kontrol edin.',
+          error: 'İşlem şu an tamamlanamadı. Lütfen tekrar deneyin.',
           code: 'MAIL_SEND_FAILED',
           debug: errMsg.slice(0, 900),
         });
