@@ -131,7 +131,7 @@ export const MailSettings = () => {
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900">Mail Ayarları</h1>
-          <p className="text-gray-600 mt-1">Tüm mail sistemi burada yönetilir (Brevo Transactional).</p>
+          <p className="text-gray-600 mt-1">Tüm mail sistemi burada yönetilir (Brevo Transactional API).</p>
         </div>
         <div className="flex gap-2">
           <button
