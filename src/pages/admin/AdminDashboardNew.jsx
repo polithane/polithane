@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { admin as adminApi } from '../../utils/api';
 import { getUserTitle } from '../../utils/titleHelpers';
 import { Avatar } from '../../components/common/Avatar';
+import { getProfilePath } from '../../utils/paths';
 
 export const AdminDashboardNew = () => {
   const [loading, setLoading] = useState(true);
@@ -165,14 +166,19 @@ export const AdminDashboardNew = () => {
               <div className="text-sm text-gray-500">Henüz veri yok.</div>
             ) : (
               recentUsers.map(user => (
-                <div key={user.user_id || user.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                <Link
+                  key={user.user_id || user.id}
+                  to={getProfilePath(user)}
+                  className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                  title="Profiline git"
+                >
                   <Avatar src={user.avatar_url || user.profile_image} alt={user.full_name} size="40px" />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-900 truncate">{user.full_name}</div>
                     <div className="text-xs text-gray-500">{getUserTitle(user, true) || 'Üye'}</div>
                   </div>
                   <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-semibold">Yeni</span>
-                </div>
+                </Link>
               ))
             )}
           </div>
@@ -192,7 +198,12 @@ export const AdminDashboardNew = () => {
               <div className="text-sm text-gray-500">Henüz veri yok.</div>
             ) : (
               topPosts.map(post => (
-                <div key={post.post_id ?? post.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                <Link
+                  key={post.post_id ?? post.id}
+                  to={getProfilePath(post.user || {})}
+                  className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                  title="Profiline git"
+                >
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-900 truncate">{post.user?.full_name}</div>
                     <div className="text-xs text-gray-500 truncate">{String(post.content_text ?? post.content ?? '').slice(0, 50)}...</div>
@@ -201,7 +212,7 @@ export const AdminDashboardNew = () => {
                     <div className="text-lg font-bold text-primary-blue">{(post.polit_score / 1000).toFixed(1)}K</div>
                     <div className="text-xs text-gray-500">Polit Puan</div>
                   </div>
-                </div>
+                </Link>
               ))
             )}
           </div>
