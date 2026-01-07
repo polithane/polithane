@@ -4665,7 +4665,14 @@ async function sendVerificationEmailForUser(req, { toEmail, token }) {
     fallbackText: text,
   }).catch(() => null);
   // STRICT: verification email must be delivered (uses centralized mail settings).
-  await sendEmail({ to: toEmail, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+  // Safety: if a customized template breaks Brevo payload, retry once with the built-in fallback.
+  try {
+    await sendEmail({ to: toEmail, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('sendVerificationEmailForUser: template send failed, retrying fallback:', String(e?.message || e || 'mail send failed'));
+    await sendEmail({ to: toEmail, subject, html, text });
+  }
 }
 
 async function sendWelcomeEmailToUser(req, { toEmail, fullName }) {
@@ -9512,13 +9519,21 @@ async function authForgotPassword(req, res) {
           fallbackHtml: html,
           fallbackText: text,
         }).catch(() => null);
-        await sendEmail({ to: u.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+        // STRICT for membership flows: if template is broken, retry once with fallback.
+        try {
+          await sendEmail({ to: u.email, subject: rendered?.subject || subject, html: rendered?.html || html, text });
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('authForgotPassword: template send failed, retrying fallback:', String(e?.message || e || 'mail send failed'));
+          await sendEmail({ to: u.email, subject, html, text });
+        }
       }
       return res.json({ success: true, message: 'Şifre sıfırlama bağlantısı gönderildi.' });
     } catch (e) {
-      return res.status(500).json({
+      return res.status(503).json({
         success: false,
-        error: 'Şifre sıfırlama e-postası gönderilemedi. Lütfen Mail Ayarları’nı kontrol edin.',
+        error: 'İşlem şu an tamamlanamadı. Lütfen tekrar deneyin.',
+        code: 'MAIL_SEND_FAILED',
         debug: String(e?.message || 'mail send failed').slice(0, 900),
       });
     }
