@@ -140,12 +140,17 @@ router.post('/register', upload.single('document'), async (req, res) => {
 
     const password_hash = await bcrypt.hash(password, 10);
     
-    const emailVerificationEnabled = user_type !== 'citizen';
+    const emailVerificationEnabled = (await getSetting('email_verification_enabled').catch(() => null)) === 'true';
     let isActive = true;
     let isVerified = user_type === 'citizen';
     let verificationToken = null;
     let tokenExpires = null;
-    let emailVerified = true;
+    let emailVerified = !emailVerificationEnabled;
+
+    if (emailVerificationEnabled) {
+      verificationToken = generateVerificationToken();
+      tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
 
     const metadataJson = JSON.stringify(metadata);
 
@@ -177,7 +182,10 @@ router.post('/register', upload.single('document'), async (req, res) => {
       VALUES (${user.id}, 'system', 'Aramıza hoş geldiniz! Profilinizi düzenleyerek eksik bilgilerinizi tamamlayabilir ve kullanıcı adınızı belirleyebilirsiniz.', false)
     `.catch(err => console.error('Notification create error:', err));
 
-    if (user_type === 'citizen') {
+    if (emailVerificationEnabled && verificationToken) {
+      sendVerificationEmail(email, verificationToken).catch(console.error);
+    } else if (user_type === 'citizen') {
+      // Verification kapalıysa direkt hoş geldiniz
       sendWelcomeEmail(email, full_name).catch(console.error);
     }
 
@@ -185,8 +193,16 @@ router.post('/register', upload.single('document'), async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: user_type === 'citizen' ? 'Kayıt başarılı! Hoş geldiniz.' : 'Başvurunuz alınmıştır. En kısa sürede incelenip tarafınıza dönüş yapılacaktır.',
-      data: { user, token, requiresApproval: user_type !== 'citizen' }
+      message:
+        user_type === 'citizen'
+          ? (emailVerificationEnabled ? 'Kayıt başarılı! Lütfen email adresinizi doğrulayın.' : 'Kayıt başarılı! Hoş geldiniz.')
+          : 'Başvurunuz alınmıştır. En kısa sürede incelenip tarafınıza dönüş yapılacaktır.',
+      data: {
+        user,
+        token,
+        requiresApproval: user_type !== 'citizen',
+        requiresEmailVerification: emailVerificationEnabled && !emailVerified,
+      }
     });
 
   } catch (error) {
@@ -324,9 +340,58 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-router.post('/verify-email', async (req, res) => {
-    // Implement verification logic similar to previous code if needed
-    res.json({ success: true, message: 'Email doğrulama.' });
+// Frontend /verify-email sayfası burayı çağırıyor: GET /api/auth/verify-email?token=...
+router.get('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Doğrulama token\'ı bulunamadı.' });
+    }
+
+    const [user] = await sql`
+      SELECT id, username, email, full_name, verification_token_expires, email_verified
+      FROM users
+      WHERE verification_token = ${token}
+    `;
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Geçersiz doğrulama linki.' });
+    }
+
+    if (user.email_verified) {
+      return res.status(200).json({ success: true, message: 'Email adresi zaten doğrulanmış.', alreadyVerified: true });
+    }
+
+    if (user.verification_token_expires && new Date() > new Date(user.verification_token_expires)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Doğrulama linkinin süresi dolmuş. Lütfen yeni bir link talep edin.',
+        expired: true,
+      });
+    }
+
+    await sql`
+      UPDATE users
+      SET 
+        email_verified = TRUE,
+        verified_at = CURRENT_TIMESTAMP,
+        verification_token = NULL,
+        verification_token_expires = NULL
+      WHERE id = ${user.id}
+    `;
+
+    // Hoş geldiniz e-postası (doğrulama sonrası)
+    sendWelcomeEmail(user.email, user.full_name || user.username).catch(console.error);
+
+    res.json({
+      success: true,
+      message: 'Email adresiniz başarıyla doğrulandı!',
+      data: { username: user.username, email: user.email },
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ success: false, error: 'Email doğrulama sırasında bir hata oluştu.' });
+  }
 });
 
 export default router;

@@ -653,9 +653,16 @@ export const admin = {
 
   // Email
   sendTestEmail: ({ to, subject, text, html } = {}) =>
-    apiCall('/api/admin/email/test', {
+    apiCall('/api/admin/mail/test', {
       method: 'POST',
       body: JSON.stringify({ to, subject, text, html }),
+    }),
+
+  getMailSettings: () => apiCall('/api/admin/mail/settings'),
+  updateMailSettings: (payload = {}) =>
+    apiCall('/api/admin/mail/settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload || {}),
     }),
 };
 

@@ -139,7 +139,7 @@ router.post('/resend-verification', async (req, res) => {
     `;
 
     // Email gönder
-    await sendVerificationEmail(user.email, user.username, verificationToken);
+    await sendVerificationEmail(user.email, verificationToken);
 
     res.json({
       success: true,
