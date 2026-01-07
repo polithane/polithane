@@ -1053,8 +1053,10 @@ export const CreatePolitPage = () => {
         } : false,
         audio: true,
       };
-      const stream = opts?.stream || (await navigator.mediaDevices.getUserMedia(constraints));
-      streamRef.current = stream;
+      // Eski koddan kalan constraints tanımını temizle (zaten yukarıda targetConstraints içinde tanımlandı)
+      // const constraints = ... 
+      // const stream = ... 
+
 
       try {
         const vt = stream.getVideoTracks?.()?.[0] || null;
@@ -1136,14 +1138,54 @@ export const CreatePolitPage = () => {
       const mimeType = getRecorderMimeType(contentType);
 
       // --------------------------------------------
-      // Native Portrait Recording (No Canvas)
+      // Native Portrait Recording
       // --------------------------------------------
-      // Canvas kullanımı performansı düşürebilir ve crop/zoom sorunlarına yol açabilir.
-      // Mobilde zaten modern tarayıcılar portrait video verir.
-      // PC'de ise webcam yataydır; bunu olduğu gibi alıp (yatay), <video style={{ objectFit: 'cover' }}>
-      // ile dikey gösterip, upload sonrasında sunucuda veya oynatıcıda işlenmesini beklemek daha sağlıklıdır.
-      // Ancak kullanıcı "Reels gibi dikey" istiyor.
-      // Burada native stream'i doğrudan kaydediciye vereceğiz.
+      // Kullanıcı dikey (9:16) video kaydı istiyor (Reels benzeri).
+      // Canvas kullanımı (önceki denemeler) mobilde zoom/crop sorunlarına yol açtı.
+      // Bu yüzden doğrudan stream'i MediaRecorder'a vereceğiz.
+      //
+      // constraints ayarları ile (aspectRatio: { exact: 0.5625 }) donanımdan
+      // doğrudan dikey stream istiyoruz.
+      //
+      // HATA YÖNETİMİ: Eğer kamera 'exact' 9:16 oranını desteklemiyorsa (PC webcamleri genelde desteklemez),
+      // getUserMedia hata fırlatır (OverconstrainedError). Bu durumda 'ideal' ayarlarla
+      // tekrar deneyeceğiz (fallback). Fallback durumunda PC'de yatay gelebilir ama en azından çalışır.
+      
+      let stream = null;
+      const targetConstraints = {
+        video: contentType === 'video' ? {
+          facingMode: { ideal: String(opts?.facingMode || videoFacingMode || 'user') },
+          width: { ideal: 720 },
+          height: { ideal: 1280 },
+          aspectRatio: { exact: 0.5625 } // 9/16 zorla
+        } : false,
+        audio: true,
+      };
+
+      try {
+        stream = opts?.stream || (await navigator.mediaDevices.getUserMedia(targetConstraints));
+      } catch (err) {
+        // Eğer 'exact' aspect ratio desteklenmiyorsa (örn. PC webcam), 'ideal' ile dene
+        if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+           console.warn('Dikey video (exact 9:16) desteklenmiyor, esnek ayarlarla deneniyor...');
+           const fallbackConstraints = {
+             video: contentType === 'video' ? {
+                facingMode: { ideal: String(opts?.facingMode || videoFacingMode || 'user') },
+                width: { ideal: 720 },
+                height: { ideal: 1280 },
+                aspectRatio: { ideal: 0.5625 } // Zorlama yok, ideal olanı ver
+             } : false,
+             audio: true
+           };
+           stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        } else {
+           throw err; // Diğer hataları (izin reddi vb.) yukarı fırlat
+        }
+      }
+      
+      streamRef.current = stream;
+      
+      // ... (Geri kalan kod aynı, recorderStream = stream)
       const recorderStream = stream;
 
       const recorder = new MediaRecorder(recorderStream, { mimeType });
