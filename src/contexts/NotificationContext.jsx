@@ -28,7 +28,7 @@ export const NotificationProvider = ({ children }) => {
     (n) => {
       const t = String(n?.type || 'system');
       if (t === 'like') return notifSettings.likes !== false;
-      if (t === 'comment_like') return notifSettings.likes !== false;
+      if (t === 'comment_like') return (notifSettings.commentLikes ?? notifSettings.likes) !== false;
       if (t === 'comment') return notifSettings.comments !== false;
       if (t === 'follow') return notifSettings.follows !== false;
       if (t === 'mention') return notifSettings.mentions !== false;

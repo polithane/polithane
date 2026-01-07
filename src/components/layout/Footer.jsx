@@ -4,6 +4,7 @@ import { apiCall } from '../../utils/api';
 
 export const Footer = () => {
   const [contactEmail, setContactEmail] = useState('info@polithane.com');
+  const [footerLogo, setFooterLogo] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -12,6 +13,8 @@ export const Footer = () => {
         const r = await apiCall('/api/public/site', { method: 'GET' }).catch(() => null);
         const email = String(r?.data?.contactEmail || '').trim();
         if (mounted && email) setContactEmail(email);
+        const logo = String(r?.data?.branding?.logoFooterUrl || '').trim();
+        if (mounted) setFooterLogo(logo);
       } catch {
         // ignore
       }
@@ -26,7 +29,11 @@ export const Footer = () => {
       <div className="container-main">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-xl font-bold mb-4">POLITHANE</h3>
+            {footerLogo ? (
+              <img src={footerLogo} alt="Polithane" className="h-10 w-auto object-contain mb-4" />
+            ) : (
+              <h3 className="text-xl font-bold mb-4">POLITHANE</h3>
+            )}
             <p className="text-gray-400 text-sm">
               Özgür, açık, şeffaf siyaset, bağımsız medya!
             </p>

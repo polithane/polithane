@@ -1,14 +1,28 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, FileText, TrendingUp, Settings, Palette, 
   Shield, Search, DollarSign, Megaphone, Bot, BarChart3, Mail, 
   Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark, Wrench, ListChecks
 } from 'lucide-react';
+import { usePublicSite } from '../../contexts/PublicSiteContext';
 
 export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) => {
   const location = useLocation();
   const [logoFailed, setLogoFailed] = useState(false);
+  const { site } = usePublicSite();
+
+  const logoSrc = useMemo(() => {
+    const s = site && typeof site === 'object' ? site : null;
+    const url = s?.branding?.logoAdminTopUrl || s?.branding?.logoHeaderUrl;
+    return String(url || '').trim() || '/logo.png';
+  }, [site]);
+
+  const bottomLogoSrc = useMemo(() => {
+    const s = site && typeof site === 'object' ? site : null;
+    const url = s?.branding?.logoAdminBottomUrl;
+    return String(url || '').trim();
+  }, [site]);
   
   const menuSections = [
     {
@@ -70,12 +84,12 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
   ];
   
   return (
-    <div className="w-full bg-white border-r border-gray-200 h-[100dvh] overflow-y-auto lg:h-screen">
+    <div className="w-full bg-white border-r border-gray-200 h-[100dvh] overflow-y-auto lg:h-screen flex flex-col">
       <div className="p-6 border-b border-gray-200 flex items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" aria-label="Ana sayfaya git">
           {!logoFailed ? (
             <img
-              src="/logo.png"
+              src={logoSrc}
               alt="Polithane"
               className="w-12 h-12 rounded-2xl object-contain drop-shadow"
               onError={() => setLogoFailed(true)}
@@ -102,7 +116,7 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
         ) : null}
       </div>
       
-      <nav className="p-4">
+      <nav className="p-4 flex-1">
         {menuSections.map((section, idx) => (
           <div key={idx} className="mb-6">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">
@@ -128,6 +142,12 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
           </div>
         ))}
       </nav>
+
+      {bottomLogoSrc ? (
+        <div className="p-4 border-t border-gray-200">
+          <img src={bottomLogoSrc} alt="Admin Logo" className="h-8 w-auto object-contain opacity-90" />
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -1,13 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { apiCall } from '../../utils/api';
+import { usePublicSite } from '../../contexts/PublicSiteContext';
 
 export const ResetPasswordPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const [logoFailed, setLogoFailed] = useState(false);
+  const { site } = usePublicSite();
+
+  const logoSrc = useMemo(() => {
+    const url = site?.branding?.logoAuthUrl;
+    return String(url || '').trim() || '/logo.png';
+  }, [site]);
   
   const [formData, setFormData] = useState({
     password: '',
@@ -89,7 +96,7 @@ export const ResetPasswordPage = () => {
             >
               {!logoFailed ? (
                 <img
-                  src="/logo.png"
+                  src={logoSrc}
                   alt="Polithane"
                   width={96}
                   height={96}

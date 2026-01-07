@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Save, Mail, Phone, MapPin, Calendar, AtSign, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiCall } from '../../utils/api';
 
 export const AccountSettings = () => {
   const { user, updateUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     username: user?.username || '',
     email: user?.email || '',
@@ -24,6 +26,15 @@ export const AccountSettings = () => {
   });
   
   const usernameTimeout = useRef(null);
+
+  const showIncompleteHint = useMemo(() => String(searchParams.get('incomplete') || '') === '1', [searchParams]);
+  const missing = useMemo(() => {
+    const out = [];
+    if (!String(formData.phone || '').trim()) out.push('Telefon');
+    if (!String(formData.city_code || '').trim()) out.push('Şehir');
+    if (!String(formData.birth_date || '').trim()) out.push('Doğum tarihi');
+    return out;
+  }, [formData.birth_date, formData.city_code, formData.phone]);
 
   // Username değiştiğinde availability check
   useEffect(() => {
@@ -153,6 +164,21 @@ export const AccountSettings = () => {
   return (
     <div>
       <h2 className="text-2xl font-black text-gray-900 mb-6">Hesap Ayarları</h2>
+
+      {showIncompleteHint ? (
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900">
+          <div className="font-black">Eksik bilgileriniz var</div>
+          <div className="text-sm mt-1">
+            {missing.length > 0 ? (
+              <>
+                Lütfen şu alanları tamamlayın: <span className="font-bold">{missing.join(', ')}</span>
+              </>
+            ) : (
+              <>Harika! Eksik bir alan görünmüyor. Kaydet’e basarak onaylayabilirsiniz.</>
+            )}
+          </div>
+        </div>
+      ) : null}
       
       <form onSubmit={handleSubmit} className="space-y-6">
         {success && (

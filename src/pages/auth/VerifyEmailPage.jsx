@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import { apiCall } from '../../utils/api';
+import { usePublicSite } from '../../contexts/PublicSiteContext';
 
 export const VerifyEmailPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const [logoFailed, setLogoFailed] = useState(false);
+  const { site } = usePublicSite();
+
+  const logoSrc = useMemo(() => {
+    const url = site?.branding?.logoAuthUrl;
+    return String(url || '').trim() || '/logo.png';
+  }, [site]);
 
   const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState(false);
@@ -53,7 +60,7 @@ export const VerifyEmailPage = () => {
           <div className="inline-flex items-center justify-center mb-4 cursor-pointer hover:scale-105 transition-transform" onClick={() => navigate('/')}>
             {!logoFailed && (
               <img
-                src="/logo.png"
+                src={logoSrc}
                 alt="Polithane"
                 width={96}
                 height={96}

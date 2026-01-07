@@ -117,6 +117,14 @@ export const Header = () => {
     if (n?.post?.content_text || n?.post?.content) return String(n.post.content_text ?? n.post.content);
     return '';
   };
+
+  const getNotifNavTarget = (n) => {
+    const t = String(n?.type || '').trim().toLowerCase();
+    // New user onboarding shortcuts
+    if (t === 'welcome') return { kind: 'route', to: '/welcome' };
+    if (t === 'profile_reminder') return { kind: 'route', to: '/settings/account?incomplete=1' };
+    return { kind: 'auto' };
+  };
   const onOpenNotif = async () => {
     // Position dropdown relative to viewport, not the bell's container.
     try {
@@ -350,6 +358,13 @@ export const Header = () => {
                               onClick={async () => {
                                 if (id) await markAsRead?.(id);
                                 setShowNotifMenu(false);
+
+                                const nav = getNotifNavTarget(n);
+                                if (nav?.kind === 'route' && nav?.to) {
+                                  navigate(nav.to);
+                                  return;
+                                }
+
                                 if (targetPostId) {
                                   const t = String(n?.type || '');
                                   const isCommentShortcut = t === 'comment' || t === 'comment_like';

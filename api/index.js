@@ -5109,7 +5109,7 @@ async function storageUploadMedia(req, res) {
   if (safeFolder.includes('..')) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
   if (!/^[a-z0-9/_-]{1,80}$/i.test(safeFolder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
   const root = safeFolder.split('/')[0];
-  const allowedRoots = new Set(['posts', 'avatars', 'politfest', 'messages']);
+  const allowedRoots = new Set(['posts', 'avatars', 'politfest', 'messages', 'branding']);
   if (!allowedRoots.has(root)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
 
   // Approval gate: pending accounts can browse/login but cannot upload post media yet.
@@ -5140,6 +5140,7 @@ async function storageUploadMedia(req, res) {
     'image/jpeg',
     'image/png',
     'image/webp',
+    'image/svg+xml',
     'video/webm',
     'audio/webm',
     'audio/mpeg',
@@ -5195,6 +5196,8 @@ async function storageUploadMedia(req, res) {
         ? 'webp'
         : ct === 'image/jpeg'
           ? 'jpg'
+          : ct === 'image/svg+xml'
+            ? 'svg'
           : ct === 'video/mp4'
             ? 'mp4'
             : ct === 'video/webm'
@@ -5241,7 +5244,7 @@ async function storageCreateSignedUpload(req, res) {
   if (safeFolder.includes('..')) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
   if (!/^[a-z0-9/_-]{1,80}$/i.test(safeFolder)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
   const root = safeFolder.split('/')[0];
-  const allowedRoots = new Set(['posts', 'avatars', 'politfest', 'messages']);
+  const allowedRoots = new Set(['posts', 'avatars', 'politfest', 'messages', 'branding']);
   if (!allowedRoots.has(root)) return res.status(400).json({ success: false, error: 'Geçersiz klasör.' });
 
   // Approval gate: pending accounts can browse/login but cannot upload post media yet.
@@ -5280,6 +5283,7 @@ async function storageCreateSignedUpload(req, res) {
     'image/png',
     'image/webp',
     'image/gif',
+    'image/svg+xml',
     'video/webm',
     'video/mp4',
     'video/x-m4v',
@@ -5328,6 +5332,8 @@ async function storageCreateSignedUpload(req, res) {
           ? 'gif'
         : contentType === 'image/jpeg' || contentType === 'image/jpg'
           ? 'jpg'
+          : contentType === 'image/svg+xml'
+            ? 'svg'
           : contentType === 'video/quicktime'
             ? 'mov'
           : contentType === 'video/mp4'
@@ -11228,6 +11234,14 @@ async function getPublicSite(req, res) {
       headHtml: String(map.seo_head_html || '').trim(),
       bodyHtml: String(map.seo_body_html || '').trim(),
     },
+    branding: {
+      logoHeaderUrl: String(map.logo_header_url || '').trim(),
+      logoFooterUrl: String(map.logo_footer_url || '').trim(),
+      logoAuthUrl: String(map.logo_auth_url || '').trim(),
+      logoAdminTopUrl: String(map.logo_admin_top_url || '').trim(),
+      logoAdminBottomUrl: String(map.logo_admin_bottom_url || '').trim(),
+    },
+    welcomePageHtml: String(map.welcome_page_html || '').trim(),
   };
 
   publicSiteCache = out;

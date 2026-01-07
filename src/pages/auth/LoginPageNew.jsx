@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePublicSite } from '../../contexts/PublicSiteContext';
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export const LoginPageNew = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { site } = usePublicSite();
   const [logoFailed, setLogoFailed] = useState(false);
+
+  const logoSrc = useMemo(() => {
+    const url = site?.branding?.logoAuthUrl;
+    return String(url || '').trim() || '/favicon.ico';
+  }, [site]);
   
   const [formData, setFormData] = useState({
     identifier: '',
@@ -64,7 +71,7 @@ export const LoginPageNew = () => {
           >
             {!logoFailed && (
               <img 
-                src="/favicon.ico" 
+                src={logoSrc} 
                 alt="Polithane" 
                 className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-lg"
                 onError={() => setLogoFailed(true)}

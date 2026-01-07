@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Eye, EyeOff, Check, X, ChevronRight, AlertCircle, Search, 
@@ -75,7 +75,12 @@ export const RegisterPageNew = () => {
   const [logoFailed, setLogoFailed] = useState(false);
   const [searchParams] = useSearchParams();
   const { register } = useAuth();
-  const { allowRegistration } = usePublicSite();
+  const { allowRegistration, site } = usePublicSite();
+
+  const logoSrc = useMemo(() => {
+    const url = site?.branding?.logoAuthUrl;
+    return String(url || '').trim() || '/favicon.ico';
+  }, [site]);
   
   // URL Params
   const initialMode = searchParams.get('mode'); // 'claim'
@@ -863,7 +868,7 @@ export const RegisterPageNew = () => {
           >
             {!logoFailed && (
               <img 
-                src="/favicon.ico" 
+                src={logoSrc} 
                 alt="Polithane" 
                 className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-lg"
                 onError={() => setLogoFailed(true)}

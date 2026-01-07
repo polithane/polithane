@@ -85,6 +85,7 @@ import { ScrollToTop } from './components/system/ScrollToTop';
 import { MaintenancePage } from './pages/MaintenancePage';
 import { usePublicSite } from './contexts/PublicSiteContext';
 import { useAuth } from './contexts/AuthContext';
+import { WelcomePage } from './pages/WelcomePage';
 
 function App() {
   const location = useLocation();
@@ -157,6 +158,7 @@ function App() {
         <Route path="/delete-confirm" element={<DeleteConfirmPage />} />
         <Route path="/about" element={<><Header /><AboutPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/mission" element={<><Header /><MissionPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        <Route path="/welcome" element={<><Header /><WelcomePage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/contact" element={<><Header /><ContactPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/parliament" element={<><Header /><ParliamentInfoPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/parties" element={<><Header /><PartiesDirectoryPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />

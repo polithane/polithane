@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePublicSite } from '../../contexts/PublicSiteContext';
 
 export const AnimatedSlogan = () => {
   const navigate = useNavigate();
+  const { site } = usePublicSite();
   const [logoFailed, setLogoFailed] = useState(false);
   // NOTE (per product request):
   // - No full sentence mode
@@ -33,12 +35,18 @@ export const AnimatedSlogan = () => {
     };
   }, [currentIndex, words.length]);
 
+  const logoSrc = useMemo(() => {
+    const s = site && typeof site === 'object' ? site : null;
+    const url = s?.branding?.logoHeaderUrl;
+    return String(url || '').trim() || '/logo.png';
+  }, [site]);
+
   return (
     <div className="flex items-center gap-3 min-w-0">
       {/* Logo - Tıklanabilir */}
       {!logoFailed && (
         <img
-          src="/logo.png"
+          src={logoSrc}
           alt="Polithane"
           width={40}
           height={40}

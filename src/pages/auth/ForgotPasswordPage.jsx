@@ -1,11 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 import { apiCall } from '../../utils/api';
+import { usePublicSite } from '../../contexts/PublicSiteContext';
 
 export const ForgotPasswordPage = () => {
   const navigate = useNavigate();
   const [logoFailed, setLogoFailed] = useState(false);
+  const { site } = usePublicSite();
+
+  const logoSrc = useMemo(() => {
+    const url = site?.branding?.logoAuthUrl;
+    return String(url || '').trim() || '/logo.png';
+  }, [site]);
   
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -46,7 +53,7 @@ export const ForgotPasswordPage = () => {
             >
               {!logoFailed && (
                 <img 
-                  src="/logo.png" 
+                  src={logoSrc} 
                   alt="Polithane" 
                   width={96}
                   height={96}
@@ -110,7 +117,7 @@ export const ForgotPasswordPage = () => {
           >
             {!logoFailed && (
               <img 
-                src="/logo.png" 
+                src={logoSrc} 
                 alt="Polithane" 
                 width={80}
                 height={80}
