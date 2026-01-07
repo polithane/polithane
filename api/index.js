@@ -4039,7 +4039,8 @@ function getPublicAppUrl(req) {
   const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
   if (host) return `${proto}://${host}`.replace(/\/+$/, '');
-  return 'https://polithane.vercel.app';
+  // Prefer primary domain in absence of host (safety)
+  return 'https://www.polithane.com';
 }
 
 function sha256Hex(input) {
@@ -4172,7 +4173,7 @@ async function sendEmailViaBrevo({ to, subject, html, text, fromEmail, fromName,
     const msg = String(data?.message || data?.error || raw || `BREVO error (${resp.status})`).slice(0, 900);
     throw new Error(msg);
   }
-  return true;
+  return { messageId: data?.messageId || null, raw: data || null };
 }
 
 async function sendEmailViaRelay({ to, subject, html, text, fromEmail }) {
@@ -10508,7 +10509,7 @@ async function adminSendTestEmail(req, res) {
 
     const a = { provider: 'brevo', sent: false, error: null };
     try {
-      await sendEmailViaBrevo({
+      const out = await sendEmailViaBrevo({
         to,
         subject,
         html: html || undefined,
@@ -10518,6 +10519,7 @@ async function adminSendTestEmail(req, res) {
         apiKey: cfgKey,
       });
       a.sent = true;
+      a.messageId = out?.messageId || null;
       attempts.push(a);
       debug.attempts = attempts;
       debug.usedProvider = 'brevo';
@@ -10525,6 +10527,7 @@ async function adminSendTestEmail(req, res) {
     } catch (e) {
       a.sent = false;
       a.error = String(e?.message || e || '').slice(0, 900);
+      a.messageId = null;
       attempts.push(a);
       debug.attempts = attempts;
       return res.status(500).json({ success: false, error: a.error || 'Brevo send failed', debug });

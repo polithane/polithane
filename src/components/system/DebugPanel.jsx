@@ -44,6 +44,9 @@ const diagnose = (r) => {
   if (brevoCfg && brevoAttempt && brevoAttempt.sent === false && brevoAttempt.error) {
     return `Brevo hata verdi: "${brevoAttempt.error}". (Genelde sender doğrulaması, API key yetkisi veya Brevo Transactional limiti ile ilgilidir.)`;
   }
+  if (brevoAttempt?.sent === true && brevoAttempt?.messageId) {
+    return `Brevo kabul etti (messageId: ${brevoAttempt.messageId}). Mail gelmiyorsa spam/suppression kontrolü için Brevo Transactional Logs’ta bu ID ile arayın.`;
+  }
   if (!used) {
     const last = attempts[attempts.length - 1];
     const lastErr = last?.sendError || last?.error || null;
