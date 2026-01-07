@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Bug, RefreshCw, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -45,12 +45,10 @@ const diagnose = (r) => {
     return `Brevo hata verdi: "${brevoAttempt.error}". (Genelde sender doğrulaması, API key yetkisi veya Brevo Transactional limiti ile ilgilidir.)`;
   }
   if (!used) {
-    // likely fell back and still failed
     const last = attempts[attempts.length - 1];
-    const lastErr = last?.sendError || last?.error || debug?.relay?.error || null;
+    const lastErr = last?.sendError || last?.error || null;
     return lastErr ? `Gönderim başarısız: "${String(lastErr)}"` : 'Gönderim başarısız: debug içinde net hata yok.';
   }
-  if (used === 'smtp') return 'Brevo devre dışı kalmış, SMTP denenmiş. Vercel SMTP portları genelde bloklu olur; Brevo kullanılmalı.';
   return null;
 };
 
@@ -72,9 +70,27 @@ export const DebugPanel = () => {
   const [env, setEnv] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const lastMail = useMemo(() => readLastMailTest(), []);
-  const lastErr = useMemo(() => readLastApiError(), []);
+  const [lastMail, setLastMail] = useState(() => readLastMailTest());
+  const [lastErr, setLastErr] = useState(() => readLastApiError());
   const diagnosis = useMemo(() => diagnose(lastMail), [lastMail]);
+
+  // Keep panel live (admin will trigger actions on other pages).
+  useEffect(() => {
+    const tick = () => {
+      setLastMail(readLastMailTest());
+      setLastErr(readLastApiError());
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    const onStorage = (e) => {
+      if (e?.key === 'debug:lastMailTest') tick();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   if (!enabled) return null;
   if (!isAdmin?.()) return null;

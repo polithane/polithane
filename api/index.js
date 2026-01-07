@@ -3697,18 +3697,14 @@ async function adminEnvCheck(req, res) {
     'SUPABASE_URL',
     'SUPABASE_SERVICE_ROLE_KEY',
     'SUPABASE_ANON_KEY',
-    'SMTP_HOST',
-    'SMTP_PORT',
-    'SMTP_PORTS',
-    'SMTP_USER',
-    'SMTP_PASS',
-    'SMTP_FROM',
-    'SMTP_TLS_REJECT_UNAUTHORIZED',
-    'MAIL_RELAY_URL',
-    'MAIL_RELAY_TOKEN',
+    // Mail (Brevo-only)
+    'MAIL_ENABLED',
+    'MAIL_PROVIDER',
+    'MAIL_SENDER_EMAIL',
+    'MAIL_SENDER_NAME',
+    'MAIL_REPLY_TO_EMAIL',
+    'MAIL_REPLY_TO_NAME',
     'BREVO_API_KEY',
-    'BREVO_FROM_EMAIL',
-    'BREVO_FROM_NAME',
     'ADMIN_BOOTSTRAP_TOKEN',
     'ADMIN_BOOTSTRAP_ALLOW_RESET',
     'PUBLIC_APP_URL',
@@ -3721,9 +3717,8 @@ async function adminEnvCheck(req, res) {
 
   // Convenience flags
   present.SUPABASE_KEY_OK = present.SUPABASE_SERVICE_ROLE_KEY || present.SUPABASE_ANON_KEY;
-  present.SMTP_OK = present.SMTP_HOST && present.SMTP_USER && present.SMTP_PASS && present.SMTP_FROM;
-  present.MAIL_RELAY_OK = present.MAIL_RELAY_URL && present.MAIL_RELAY_TOKEN;
-  present.BREVO_OK = present.BREVO_API_KEY && (present.BREVO_FROM_EMAIL || present.SMTP_FROM || present.EMAIL_FROM);
+  // Brevo is the only supported provider
+  present.BREVO_OK = present.BREVO_API_KEY && (present.MAIL_SENDER_EMAIL || present.EMAIL_FROM || present.SMTP_FROM);
 
   return res.json({ success: true, data: { present } });
 }
@@ -10456,59 +10451,40 @@ async function adminSendTestEmail(req, res) {
 
   const body = await readJsonBody(req);
   const to = String(body?.to || '').trim();
-  const subject = String(body?.subject || 'Polithane SMTP Test').trim().slice(0, 200);
+  const subject = String(body?.subject || 'Polithane Mail Test').trim().slice(0, 200);
   const text = String(body?.text || '').trim().slice(0, 10_000);
   const html = body?.html ? String(body.html).slice(0, 50_000) : null;
 
   if (!to || !to.includes('@')) return res.status(400).json({ success: false, error: 'Geçerli bir alıcı e-posta gerekli.' });
   if (!text && !html) return res.status(400).json({ success: false, error: 'Mesaj (text veya html) gerekli.' });
 
-  const host = String(process.env.SMTP_HOST || '').trim();
-  const port = parseInt(String(process.env.SMTP_PORT || ''), 10) || null;
-  const user = String(process.env.SMTP_USER || '').trim();
   // Prefer centralized config values first
   const map = await getSiteSettingsMapCached().catch(() => ({}));
   const get = (k, fallback = '') => (map && Object.prototype.hasOwnProperty.call(map, k) ? String(map[k] ?? '') : fallback);
   const cfgSender = String(
     process.env.MAIL_SENDER_EMAIL ||
-      process.env.BREVO_FROM_EMAIL ||
       get('mail_sender_email', '') ||
       get('email_from_address', '') ||
-      process.env.SMTP_FROM ||
       process.env.EMAIL_FROM ||
       ''
   ).trim();
   const cfgName = String(process.env.MAIL_SENDER_NAME || process.env.BREVO_FROM_NAME || get('mail_sender_name', 'Polithane') || 'Polithane').trim() || 'Polithane';
   const cfgKey = String(process.env.BREVO_API_KEY || get('mail_brevo_api_key', '') || '').trim();
 
-  const from = String(cfgSender || process.env.SMTP_FROM || process.env.EMAIL_FROM || '').trim() || user;
-  const secure = port === 465;
-  const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').trim().toLowerCase() !== 'false';
-  const portCandidates = getSmtpPortCandidates();
-  const relayConfigured = isMailRelayConfigured();
-  const brevoConfigured = !!(cfgKey && cfgSender) || isBrevoConfigured();
+  const mailEnabled = String(process.env.MAIL_ENABLED || get('mail_enabled', 'true') || 'true').trim().toLowerCase() !== 'false';
+  const provider = String(process.env.MAIL_PROVIDER || get('mail_provider', 'brevo') || 'brevo').trim().toLowerCase();
+  const brevoConfigured = !!(cfgKey && cfgSender);
 
   const debug = {
     brevo: {
       configured: brevoConfigured,
       keyPresent: !!cfgKey || !!String(process.env.BREVO_API_KEY || '').trim(),
-      fromEmailPresent: !!cfgSender || !!String(process.env.BREVO_FROM_EMAIL || '').trim() || !!String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '').trim(),
+      fromEmailPresent: !!cfgSender || !!String(process.env.EMAIL_FROM || '').trim(),
       fromName: String(cfgName || process.env.BREVO_FROM_NAME || 'Polithane').trim() || 'Polithane',
     },
-    smtp: {
-      host: host || null,
-      port,
-      secure,
-      hasUser: !!user,
-      hasPass: !!String(process.env.SMTP_PASS || '').trim(),
-      hasFrom: !!from,
-      tlsRejectUnauthorized: rejectUnauthorized,
-      portCandidates,
-    },
-    relay: {
-      configured: relayConfigured,
-      urlPresent: !!String(process.env.MAIL_RELAY_URL || '').trim(),
-      tokenPresent: !!String(process.env.MAIL_RELAY_TOKEN || '').trim(),
+    config: {
+      enabled: mailEnabled,
+      provider,
     },
     appUrl: getPublicAppUrl(req),
     time: new Date().toISOString(),
@@ -10517,88 +10493,42 @@ async function adminSendTestEmail(req, res) {
   try {
     const attempts = [];
 
-    // 1) Brevo first (preferred on Vercel)
-    if (brevoConfigured) {
-      const a = { provider: 'brevo', sent: false, error: null };
-      try {
-        await sendEmailViaBrevo({
-          to,
-          subject,
-          html: html || undefined,
-          text: text || undefined,
-          fromEmail: String(cfgSender || process.env.BREVO_FROM_EMAIL || from).trim() || from,
-          fromName: String(cfgName || process.env.BREVO_FROM_NAME || 'Polithane').trim() || 'Polithane',
-          apiKey: cfgKey || undefined,
-        });
-        a.sent = true;
-        attempts.push(a);
-        debug.attempts = attempts;
-        debug.usedProvider = 'brevo';
-        return res.json({ success: true, debug });
-      } catch (e) {
-        a.sent = false;
-        a.error = String(e?.message || e || '').slice(0, 900);
-        attempts.push(a);
-      }
+    if (!mailEnabled) {
+      return res.status(400).json({ success: false, error: 'Mail sistemi kapalı (mail_enabled=false).', debug });
+    }
+    if (provider !== 'brevo') {
+      return res.status(400).json({ success: false, error: `Desteklenmeyen provider: ${provider}`, debug });
+    }
+    if (!cfgKey) {
+      return res.status(400).json({ success: false, error: 'Brevo API key eksik (BREVO_API_KEY / mail_brevo_api_key).', debug });
+    }
+    if (!cfgSender) {
+      return res.status(400).json({ success: false, error: 'Gönderici email eksik (mail_sender_email).', debug });
     }
 
-    for (const p of portCandidates) {
-      const attempt = { port: p, verified: null, verifyError: null, sent: false, sendError: null };
-      try {
-        const transporter = createSmtpTransporter({ port: p });
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          await withTimeout(transporter.verify(), 4_000, `SMTP verify:${p}`);
-          attempt.verified = true;
-        } catch (e) {
-          attempt.verified = false;
-          attempt.verifyError = String(e?.message || e || '').slice(0, 600);
-        }
-
-        // eslint-disable-next-line no-await-in-loop
-        await withTimeout(
-          transporter.sendMail({
-            from: `Polithane <${from}>`,
-            to,
-            subject,
-            text: text || undefined,
-            html: html || undefined,
-          }),
-          6_000,
-          `SMTP sendMail:${p}`
-        );
-        attempt.sent = true;
-        attempts.push(attempt);
-        debug.attempts = attempts;
-        debug.usedPort = p;
-        debug.usedProvider = 'smtp';
-        return res.json({ success: true, debug });
-      } catch (e) {
-        attempt.sendError = String(e?.message || e || '').slice(0, 900);
-        attempts.push(attempt);
-      }
+    const a = { provider: 'brevo', sent: false, error: null };
+    try {
+      await sendEmailViaBrevo({
+        to,
+        subject,
+        html: html || undefined,
+        text: text || undefined,
+        fromEmail: cfgSender,
+        fromName: cfgName,
+        apiKey: cfgKey,
+      });
+      a.sent = true;
+      attempts.push(a);
+      debug.attempts = attempts;
+      debug.usedProvider = 'brevo';
+      return res.json({ success: true, debug });
+    } catch (e) {
+      a.sent = false;
+      a.error = String(e?.message || e || '').slice(0, 900);
+      attempts.push(a);
+      debug.attempts = attempts;
+      return res.status(500).json({ success: false, error: a.error || 'Brevo send failed', debug });
     }
-
-    debug.attempts = attempts;
-    // If relay is configured, try it as final fallback (and report outcome).
-    if (relayConfigured) {
-      try {
-        await sendEmailViaRelay({ to, subject, html, text, fromEmail: from });
-        debug.relay.sent = true;
-        debug.usedProvider = 'mail_relay';
-        return res.json({ success: true, debug });
-      } catch (e) {
-        debug.relay.sent = false;
-        debug.relay.error = String(e?.message || e || '').slice(0, 900);
-      }
-    }
-
-    return res.status(500).json({
-      success: false,
-      error:
-        (debug.relay?.error || attempts[attempts.length - 1]?.sendError || 'SMTP send failed').slice(0, 900),
-      debug,
-    });
   } catch (e) {
     const msg = String(e?.message || e || 'SMTP send failed');
     return res.status(500).json({
