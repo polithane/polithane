@@ -128,7 +128,7 @@ export const CreatePolitPage = () => {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [mediaDurationSec, setMediaDurationSec] = useState(0);
   const [videoThumbs, setVideoThumbs] = useState([]); // [{ timeSec, previewUrl, blob }]
-  const [selectedVideoThumbIdx, setSelectedVideoThumbIdx] = useState(0);
+  const [selectedVideoThumbIdx, setSelectedVideoThumbIdx] = useState(-1);
   const [videoThumbRefreshCount, setVideoThumbRefreshCount] = useState(0);
   const [videoThumbGenSeed, setVideoThumbGenSeed] = useState(0);
 
@@ -226,8 +226,15 @@ export const CreatePolitPage = () => {
     if (step !== 'media') return false;
     if (isRecording) return false;
     if (preparingMedia) return false;
-    return hasMedia;
-  }, [hasMedia, isRecording, preparingMedia, step]);
+    if (!hasMedia) return false;
+    
+    // For video, enforce thumbnail selection before showing submit button
+    if (contentType === 'video') {
+       return selectedVideoThumbIdx >= 0;
+    }
+    
+    return true;
+  }, [hasMedia, isRecording, preparingMedia, step, contentType, selectedVideoThumbIdx]);
 
   // While cover thumbnails are being prepared, don't let the recorded preview play.
   useEffect(() => {
@@ -1038,9 +1045,11 @@ export const CreatePolitPage = () => {
       const constraints = {
         video: contentType === 'video' ? {
           facingMode: { ideal: facingMode },
+          // Force vertical aspect ratio request (even on desktop/webcam if supported)
+          // 9/16 = 0.5625
+          aspectRatio: { ideal: 0.5625 },
           width: { ideal: 720 },
-          height: { ideal: 1280 },
-          aspectRatio: { ideal: 9/16 }
+          height: { ideal: 1280 }
         } : false,
         audio: true,
       };
@@ -1129,11 +1138,11 @@ export const CreatePolitPage = () => {
       // --------------------------------------------
       // Kalıcı çözüm: Video kaydını "gerçek dikey" üret
       // --------------------------------------------
-      // Kullanıcı dikey video istiyor. Ancak MediaRecorder mobilde bazen yatay (landscape)
-      // kaydediyor. Biz de canvas'a 9:16 (720x1280) çizip, oradan stream alarak kaydedeceğiz.
-      // 
-      // ÖNEMLİ: "aspectRatio" kısıtlamasını getUserMedia'ya versek bile mobil cihazlar
-      // sensör durumuna göre yine yatay verebiliyor. Bu yüzden canvas ile dikey zorlaması yapıyoruz.
+      // Kullanıcı dikey video istiyor. Mobil tarayıcılar portrait modda çalışırken
+      // bazen aspect ratio doğru olsa da orientation metadata sorunu olabiliyor.
+      // Canvas ile 9:16 (720x1280) bir frame oluşturup, videoyu içine "cover" etmeden
+      // "contain" de etmeden, doğrudan kameradan gelen görüntüyü dikey canvas'a çizeceğiz.
+      // Böylece görüntü ne gelirse gelsin (yatay/dikey), dikey canvas'ta full gözükecek.
       const buildPortraitRecordingStream = async (sourceStream) => {
         // Use the hidden DOM canvas so preview & recorder are stable across renders.
         const canvas = recordCanvasRef.current || document.createElement('canvas');
@@ -1186,7 +1195,7 @@ export const CreatePolitPage = () => {
 
         // Draw loop:
         // - Always "cover" the 9:16 frame to fill the background (user request).
-        // - This ensures NO black bars on PC or mobile, effectively "cropping" to portrait if source is landscape.
+        // - This ensures NO black bars on PC or mobile.
         const fitMode = 'cover';
         
         const draw = () => {
@@ -1202,24 +1211,15 @@ export const CreatePolitPage = () => {
               return;
             }
 
-            // AUTO-ROTATE LOGIC:
-            // Modern mobile browsers often report video dimensions correctly (e.g. 1080x1920 for portrait).
-            // However, PC webcams are landscape (1280x720).
-            // If we receive a landscape source (width > height), we assume it's a PC webcam
-            // and we rely on 'cover' fitMode to center-crop it to vertical.
-            // If it's a mobile device sending landscape frames but rotated via metadata (rare now),
-            // the 'cover' mode will still fill the screen, preventing black bars.
-            // WE DO NOT MANUALLY ROTATE THE CONTEXT anymore, as that caused the "sideways" issue.
-            
-            // Just draw centered with cover
+            // Just draw centered with cover logic to ensure full screen vertical video
+            // This crops the sides of horizontal video (PC) to make it vertical (Reels style).
+            // This keeps vertical video vertical.
             const s = Math.max(targetW / vw, targetH / vh);
             const dw = vw * s;
             const dh = vh * s;
             const dx = (targetW - dw) / 2;
             const dy = (targetH - dh) / 2;
             
-            // Flip horizontally if using user-facing camera (mirror effect) - Optional UX polish
-            // But let's keep it simple first: just draw.
             ctx.drawImage(srcVideo, dx, dy, dw, dh);
             
           } catch {
@@ -1890,7 +1890,7 @@ export const CreatePolitPage = () => {
                       style={videoRotate ? { transform: 'rotate(90deg)', transformOrigin: 'center center' } : undefined}
                       playsInline
                       muted={isRecording}
-                      autoPlay={!isRecording && !!recordedUrl && !isCoverPreparing}
+                      autoPlay={isRecording}
                       controls={!isRecording && !!recordedUrl && !isCoverPreparing}
                       onEnded={(e) => {
                         // Stop looping by default
@@ -1950,23 +1950,36 @@ export const CreatePolitPage = () => {
 
                   {/* Önizleme Resimleri Seçeceği */}
                   {recordedUrl && !isRecording && (
-                    isCoverPreparing ? (
-                      <div className="py-6 rounded-2xl border border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-3">
-                        <div className="text-xs font-black text-gray-600">Kapak resimleri hazırlanıyor, lütfen bekleyin!</div>
+                    isCoverPreparing || videoThumbs.length === 0 ? (
+                       <div className="py-6 rounded-2xl border border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-3">
                         <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+                        <div className="text-xs font-black text-gray-600">Kapak resimleri hazırlanıyor, lütfen bekleyin!</div>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Kapak Seç</span>
-                          {videoThumbs.length > 0 && (
-                             <button type="button" onClick={() => setVideoThumbGenSeed(s => s+1)} className="text-primary-blue text-[9px] font-bold flex items-center gap-1"><RotateCcw className="w-3 h-3"/> Yenile</button>
-                          )}
+                           <span className={['text-[10px] font-black uppercase tracking-tighter', selectedVideoThumbIdx < 0 ? 'text-rose-600 animate-pulse' : 'text-gray-400'].join(' ')}>
+                             {selectedVideoThumbIdx < 0 ? 'Lütfen bir kapak fotoğrafı seçin!' : 'Kapak Seçildi'}
+                           </span>
+                           {videoThumbRefreshCount < 1 && (
+                             <button type="button" onClick={() => {
+                               setVideoThumbGenSeed(s => s+1);
+                               setVideoThumbRefreshCount(c => c+1);
+                               setVideoThumbs([]); // clear to show loading state again
+                             }} className="text-primary-blue text-[9px] font-bold flex items-center gap-1">
+                               <RotateCcw className="w-3 h-3"/> Yenile
+                             </button>
+                           )}
                         </div>
                         <div className="grid grid-cols-3 gap-1.5">
                           {videoThumbs.map((t, i) => (
-                            <button key={i} type="button" onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-40'].join(' ')}>
+                            <button key={i} type="button" onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all relative', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-60 hover:opacity-100'].join(' ')}>
                               <img src={t.previewUrl} className="w-full aspect-video object-cover" />
+                              {selectedVideoThumbIdx === i && (
+                                <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                                   <div className="w-2 h-2 bg-white rounded-full shadow-sm" />
+                                </div>
+                              )}
                             </button>
                           ))}
                         </div>
