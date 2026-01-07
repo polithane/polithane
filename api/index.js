@@ -4346,6 +4346,35 @@ async function sendEmailViaBrevo({ to, subject, html, text, fromEmail, fromName,
   return { messageId: data?.messageId || null, raw: data || null };
 }
 
+async function getCentralMailConfig() {
+  // Single source of truth: ENV overrides, otherwise site_settings (admin Mail Ayarları).
+  const map = await getSiteSettingsMapCached().catch(() => ({}));
+  const get = (k, fallback = '') => (map && Object.prototype.hasOwnProperty.call(map, k) ? String(map[k] ?? '') : fallback);
+
+  const enabled = String(process.env.MAIL_ENABLED || get('mail_enabled', 'true') || 'true').trim().toLowerCase() !== 'false';
+  if (!enabled) throw new Error('Mail sistemi kapalı (mail_enabled=false).');
+
+  const provider = String(process.env.MAIL_PROVIDER || get('mail_provider', 'brevo') || 'brevo').trim().toLowerCase();
+  if (provider !== 'brevo') throw new Error(`Desteklenmeyen mail provider: ${provider}. (Sadece brevo)`);
+
+  const apiKey = String(process.env.BREVO_API_KEY || get('mail_brevo_api_key', '') || '').trim();
+  if (!apiKey) throw new Error('Brevo API key eksik (BREVO_API_KEY / mail_brevo_api_key).');
+
+  const senderEmail = String(
+    process.env.MAIL_SENDER_EMAIL ||
+      get('mail_sender_email', '') ||
+      get('email_from_address', '') ||
+      process.env.EMAIL_FROM ||
+      process.env.BREVO_FROM_EMAIL ||
+      ''
+  ).trim();
+  if (!senderEmail) throw new Error('Gönderici e-posta eksik (MAIL_SENDER_EMAIL / mail_sender_email).');
+
+  const senderName = String(process.env.MAIL_SENDER_NAME || process.env.BREVO_FROM_NAME || get('mail_sender_name', 'Polithane') || 'Polithane').trim() || 'Polithane';
+
+  return { provider, apiKey, senderEmail, senderName };
+}
+
 async function sendEmailViaRelay({ to, subject, html, text, fromEmail }) {
   const relayUrl = String(process.env.MAIL_RELAY_URL || '').trim();
   const relayToken = String(process.env.MAIL_RELAY_TOKEN || '').trim();
@@ -4381,33 +4410,8 @@ async function sendEmailViaRelay({ to, subject, html, text, fromEmail }) {
 }
 
 async function sendEmail({ to, subject, html, text }) {
-  // Centralized config (ENV overrides, otherwise site_settings).
-  const map = await getSiteSettingsMapCached().catch(() => ({}));
-  const get = (k, fallback = '') => (map && Object.prototype.hasOwnProperty.call(map, k) ? String(map[k] ?? '') : fallback);
-
-  const enabled = String(process.env.MAIL_ENABLED || get('mail_enabled', 'true') || 'true').trim().toLowerCase() !== 'false';
-  if (!enabled) throw new Error('Mail sistemi kapalı (mail_enabled=false).');
-
-  const provider = String(process.env.MAIL_PROVIDER || get('mail_provider', 'brevo') || 'brevo').trim().toLowerCase();
-  if (provider !== 'brevo') throw new Error(`Desteklenmeyen mail provider: ${provider}. (Sadece brevo)`);
-
-  const apiKey = String(process.env.BREVO_API_KEY || get('mail_brevo_api_key', '') || '').trim();
-  const senderEmail =
-    String(
-      process.env.MAIL_SENDER_EMAIL ||
-        get('mail_sender_email', '') ||
-        get('email_from_address', '') ||
-        process.env.EMAIL_FROM ||
-        // Keep legacy env as a last-resort fallback only (admin panel should be the source of truth).
-        process.env.BREVO_FROM_EMAIL ||
-        ''
-    ).trim();
-  const senderName = String(process.env.MAIL_SENDER_NAME || process.env.BREVO_FROM_NAME || get('mail_sender_name', 'Polithane') || 'Polithane').trim() || 'Polithane';
-
-  if (!apiKey) throw new Error('Brevo API key eksik (BREVO_API_KEY / mail_brevo_api_key).');
-  if (!senderEmail) throw new Error('Gönderici e-posta eksik (MAIL_SENDER_EMAIL / mail_sender_email).');
-
-  await sendEmailViaBrevo({ to, subject, html, text, fromEmail: senderEmail, fromName: senderName, apiKey });
+  const cfg = await getCentralMailConfig();
+  await sendEmailViaBrevo({ to, subject, html, text, fromEmail: cfg.senderEmail, fromName: cfg.senderName, apiKey: cfg.apiKey });
 }
 
 function isSmtpConfigured() {
@@ -10875,33 +10879,24 @@ async function adminSendTestEmail(req, res) {
   if (!to || !to.includes('@')) return res.status(400).json({ success: false, error: 'Geçerli bir alıcı e-posta gerekli.' });
   if (!text && !html) return res.status(400).json({ success: false, error: 'Mesaj (text veya html) gerekli.' });
 
-  // Prefer centralized config values first
-  const map = await getSiteSettingsMapCached().catch(() => ({}));
-  const get = (k, fallback = '') => (map && Object.prototype.hasOwnProperty.call(map, k) ? String(map[k] ?? '') : fallback);
-  const cfgSender = String(
-    process.env.MAIL_SENDER_EMAIL ||
-      get('mail_sender_email', '') ||
-      get('email_from_address', '') ||
-      process.env.EMAIL_FROM ||
-      ''
-  ).trim();
-  const cfgName = String(process.env.MAIL_SENDER_NAME || process.env.BREVO_FROM_NAME || get('mail_sender_name', 'Polithane') || 'Polithane').trim() || 'Polithane';
-  const cfgKey = String(process.env.BREVO_API_KEY || get('mail_brevo_api_key', '') || '').trim();
-
-  const mailEnabled = String(process.env.MAIL_ENABLED || get('mail_enabled', 'true') || 'true').trim().toLowerCase() !== 'false';
-  const provider = String(process.env.MAIL_PROVIDER || get('mail_provider', 'brevo') || 'brevo').trim().toLowerCase();
-  const brevoConfigured = !!(cfgKey && cfgSender);
+  let cfg = null;
+  try {
+    cfg = await getCentralMailConfig();
+  } catch (e) {
+    cfg = null;
+  }
+  const brevoConfigured = !!(cfg?.apiKey && cfg?.senderEmail);
 
   const debug = {
     brevo: {
       configured: brevoConfigured,
-      keyPresent: !!cfgKey || !!String(process.env.BREVO_API_KEY || '').trim(),
-      fromEmailPresent: !!cfgSender || !!String(process.env.EMAIL_FROM || '').trim(),
-      fromName: String(cfgName || process.env.BREVO_FROM_NAME || 'Polithane').trim() || 'Polithane',
+      keyPresent: !!cfg?.apiKey || !!String(process.env.BREVO_API_KEY || '').trim(),
+      fromEmailPresent: !!cfg?.senderEmail || !!String(process.env.EMAIL_FROM || '').trim(),
+      fromName: String(cfg?.senderName || process.env.BREVO_FROM_NAME || 'Polithane').trim() || 'Polithane',
     },
     config: {
-      enabled: mailEnabled,
-      provider,
+      enabled: cfg ? true : false,
+      provider: cfg?.provider || 'brevo',
     },
     appUrl: getPublicAppUrl(req),
     time: new Date().toISOString(),
@@ -10910,17 +10905,8 @@ async function adminSendTestEmail(req, res) {
   try {
     const attempts = [];
 
-    if (!mailEnabled) {
-      return res.status(400).json({ success: false, error: 'Mail sistemi kapalı (mail_enabled=false).', debug });
-    }
-    if (provider !== 'brevo') {
-      return res.status(400).json({ success: false, error: `Desteklenmeyen provider: ${provider}`, debug });
-    }
-    if (!cfgKey) {
-      return res.status(400).json({ success: false, error: 'Brevo API key eksik (BREVO_API_KEY / mail_brevo_api_key).', debug });
-    }
-    if (!cfgSender) {
-      return res.status(400).json({ success: false, error: 'Gönderici email eksik (mail_sender_email).', debug });
+    if (!cfg) {
+      return res.status(400).json({ success: false, error: 'Mail ayarları eksik veya hatalı.', debug });
     }
 
     const a = { provider: 'brevo', sent: false, error: null };
@@ -10930,9 +10916,9 @@ async function adminSendTestEmail(req, res) {
         subject,
         html: html || undefined,
         text: text || undefined,
-        fromEmail: cfgSender,
-        fromName: cfgName,
-        apiKey: cfgKey,
+        fromEmail: cfg.senderEmail,
+        fromName: cfg.senderName,
+        apiKey: cfg.apiKey,
       });
       a.sent = true;
       a.messageId = out?.messageId || null;
