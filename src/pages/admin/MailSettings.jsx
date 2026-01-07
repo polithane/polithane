@@ -136,11 +136,22 @@ export const MailSettings = () => {
     try {
       const r = await api.admin.sendTestEmail(payload);
       setResult(r);
+      try {
+        localStorage.setItem('debug:lastMailTest', JSON.stringify(r || null));
+      } catch {
+        // ignore
+      }
       if (r?.success) toast.success('Test e-postası gönderildi.');
       else toast.error(r?.error || 'E-posta gönderilemedi.');
     } catch (e) {
       const msg = String(e?.message || 'E-posta gönderilemedi.');
-      setResult({ success: false, error: msg });
+      const errPayload = { success: false, error: msg, debug: e?.data?.debug || null };
+      setResult(errPayload);
+      try {
+        localStorage.setItem('debug:lastMailTest', JSON.stringify(errPayload));
+      } catch {
+        // ignore
+      }
       toast.error(msg);
     } finally {
       setTestSending(false);

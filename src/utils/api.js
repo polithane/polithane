@@ -159,6 +159,19 @@ export const apiCall = async (endpoint, options = {}) => {
       // (Backward compatible: message remains the same.)
       err.status = response.status;
       err.data = data;
+      // Keep last error for debug panel (admin only UI will read this).
+      try {
+        window.__lastApiError = {
+          ts: new Date().toISOString(),
+          endpoint,
+          url,
+          status: response.status,
+          message: errorMessage,
+          data,
+        };
+      } catch {
+        // ignore
+      }
       throw err;
     }
 
