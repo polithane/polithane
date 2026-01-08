@@ -131,6 +131,7 @@ export const CreatePolitPage = () => {
   const [selectedVideoThumbIdx, setSelectedVideoThumbIdx] = useState(-1);
   const [videoThumbRefreshCount, setVideoThumbRefreshCount] = useState(0);
   const [videoThumbGenSeed, setVideoThumbGenSeed] = useState(0);
+  const [isGeneratingThumbs, setIsGeneratingThumbs] = useState(false);
 
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -230,11 +231,14 @@ export const CreatePolitPage = () => {
     
     // For video, enforce thumbnail selection before showing submit button
     if (contentType === 'video') {
-       return selectedVideoThumbIdx >= 0;
+       // Don't show submit while generating thumbnails
+       if (isGeneratingThumbs) return false;
+       // Must have thumbnails and one must be selected
+       return videoThumbs.length > 0 && selectedVideoThumbIdx >= 0;
     }
     
     return true;
-  }, [hasMedia, isRecording, preparingMedia, step, contentType, selectedVideoThumbIdx]);
+  }, [hasMedia, isRecording, preparingMedia, step, contentType, selectedVideoThumbIdx, videoThumbs.length, isGeneratingThumbs]);
 
   // While cover thumbnails are being prepared, don't let the recorded preview play.
   useEffect(() => {
@@ -710,7 +714,8 @@ export const CreatePolitPage = () => {
       const prev = videoThumbs;
       cleanupPrev(prev);
       setVideoThumbs([]);
-      setSelectedVideoThumbIdx(0);
+      setSelectedVideoThumbIdx(-1); // -1 = nothing selected yet
+      setIsGeneratingThumbs(true); // Start loading state
 
       try {
         const videoEl = document.createElement('video');
@@ -805,10 +810,12 @@ export const CreatePolitPage = () => {
         // IMPORTANT: Do NOT duplicate the same frame; if seeking fails, show fewer thumbs.
         if (cancelled) {
           cleanupPrev(captured);
+          setIsGeneratingThumbs(false);
           return;
         }
         setVideoThumbs(captured.slice(0, 3));
-        setSelectedVideoThumbIdx(0);
+        setSelectedVideoThumbIdx(-1); // Keep -1 so user must select
+        setIsGeneratingThumbs(false); // Generation complete
         try {
           videoEl.pause?.();
           videoEl.removeAttribute?.('src');
@@ -819,6 +826,7 @@ export const CreatePolitPage = () => {
         }
       } catch {
         // ignore
+        setIsGeneratingThumbs(false);
       }
     })();
 
@@ -1123,72 +1131,108 @@ export const CreatePolitPage = () => {
         }
       }
 
-      // Helper function to get the best supported MIME type
+      // Helper function to get the best supported MIME type with high quality settings
       const getRecorderMimeType = (type) => {
         if (type === 'audio') {
           if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
           if (MediaRecorder.isTypeSupported('audio/webm')) return 'audio/webm';
           return 'audio/wav';
         }
-        // video
+        // video - prefer VP9 for better quality
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')) return 'video/webm;codecs=vp9,opus';
         if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) return 'video/webm;codecs=vp9';
-        return 'video/webm';
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) return 'video/webm;codecs=vp8,opus';
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) return 'video/webm;codecs=vp8';
+        if (MediaRecorder.isTypeSupported('video/webm')) return 'video/webm';
+        return 'video/mp4'; // fallback
       };
 
       const mimeType = getRecorderMimeType(contentType);
 
       // --------------------------------------------
-      // Native Portrait Recording
+      // NATIVE VERTICAL (PORTRAIT) VIDEO RECORDING
       // --------------------------------------------
-      // Kullanıcı dikey (9:16) video kaydı istiyor (Reels benzeri).
-      // Canvas kullanımı (önceki denemeler) mobilde zoom/crop sorunlarına yol açtı.
-      // Bu yüzden doğrudan stream'i MediaRecorder'a vereceğiz.
-      //
-      // constraints ayarları ile (aspectRatio: { exact: 0.5625 }) donanımdan
-      // doğrudan dikey stream istiyoruz.
-      //
-      // HATA YÖNETİMİ: Eğer kamera 'exact' 9:16 oranını desteklemiyorsa (PC webcamleri genelde desteklemez),
-      // getUserMedia hata fırlatır (OverconstrainedError). Bu durumda 'ideal' ayarlarla
-      // tekrar deneyeceğiz (fallback). Fallback durumunda PC'de yatay gelebilir ama en azından çalışır.
+      // Sosyal medya standardı: Dikey video (9:16 - YouTube Shorts/Instagram Reels gibi)
+      // 
+      // ÖNCELİK SIRASI:
+      // 1. Önce 9:16 dikey stream almayı dene (mobil cihazlar için ideal)
+      // 2. Başarısız olursa (PC webcam), yatay stream al + üst/alt siyah ekle
+      // 
+      // ÖNEMLİ: Yatay çekip crop YAPMIYORUZ! Bu kalite kaybına ve zoom sorununa neden oluyor.
+      // Canvas kullanımı mobilde rotation bug'larına yol açıyor, direkt stream kullanıyoruz.
       
       let stream = null;
-      const targetConstraints = {
+      let isVerticalStream = true; // Track if we got vertical stream
+      
+      // Try 1: Strict vertical (9:16) - Mobile phones support this natively
+      const verticalConstraints = {
         video: contentType === 'video' ? {
           facingMode: { ideal: String(opts?.facingMode || videoFacingMode || 'user') },
           width: { ideal: 720 },
           height: { ideal: 1280 },
-          aspectRatio: { exact: 0.5625 } // 9/16 zorla
+          aspectRatio: { ideal: 0.5625 }, // 9/16 ideal (not exact to avoid errors)
+          frameRate: { ideal: 30, max: 60 } // Better quality
         } : false,
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 48000 // Higher quality audio
+        },
       };
 
       try {
-        stream = opts?.stream || (await navigator.mediaDevices.getUserMedia(targetConstraints));
-      } catch (err) {
-        // Eğer 'exact' aspect ratio desteklenmiyorsa (örn. PC webcam), 'ideal' ile dene
-        if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
-           console.warn('Dikey video (exact 9:16) desteklenmiyor, esnek ayarlarla deneniyor...');
-           const fallbackConstraints = {
-             video: contentType === 'video' ? {
-                facingMode: { ideal: String(opts?.facingMode || videoFacingMode || 'user') },
-                width: { ideal: 720 },
-                height: { ideal: 1280 },
-                aspectRatio: { ideal: 0.5625 } // Zorlama yok, ideal olanı ver
-             } : false,
-             audio: true
-           };
-           stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
-        } else {
-           throw err; // Diğer hataları (izin reddi vb.) yukarı fırlat
+        stream = opts?.stream || (await navigator.mediaDevices.getUserMedia(verticalConstraints));
+        
+        // Check if we actually got vertical stream
+        if (contentType === 'video' && stream) {
+          const videoTrack = stream.getVideoTracks()[0];
+          const settings = videoTrack?.getSettings?.() || {};
+          const actualWidth = settings.width || 0;
+          const actualHeight = settings.height || 0;
+          const actualRatio = actualWidth / actualHeight;
+          
+          // If ratio > 1, it's landscape (horizontal)
+          isVerticalStream = actualRatio <= 1;
+          
+          if (!isVerticalStream) {
+            console.log('📱 Yatay stream alındı (PC webcam). Kabul ediliyor, üst/alt siyah eklenecek.');
+          } else {
+            console.log('📱 Dikey stream alındı! ✅');
+          }
         }
+      } catch (err) {
+        // Fallback: Accept any stream (for PC webcams that don't support portrait)
+        console.warn('⚠️ Dikey video alınamadı, yatay kabul ediliyor:', err.name);
+        const fallbackConstraints = {
+          video: contentType === 'video' ? {
+            facingMode: { ideal: String(opts?.facingMode || videoFacingMode || 'user') },
+            width: { ideal: 1280 }, // Higher for better quality
+            height: { ideal: 720 },
+            frameRate: { ideal: 30, max: 60 }
+          } : false,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 48000
+          }
+        };
+        stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        isVerticalStream = false;
       }
       
       streamRef.current = stream;
       
-      // ... (Geri kalan kod aynı, recorderStream = stream)
+      // Use the stream directly for recording
       const recorderStream = stream;
 
-      const recorder = new MediaRecorder(recorderStream, { mimeType });
+      // High-quality recording options
+      const recorderOptions = {
+        mimeType,
+        videoBitsPerSecond: 2500000, // 2.5 Mbps - Higher quality (default is usually 2.5Mbps or less)
+        audioBitsPerSecond: 128000   // 128 kbps - Good audio quality
+      };
+
+      const recorder = new MediaRecorder(recorderStream, recorderOptions);
       recorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
@@ -1883,39 +1927,76 @@ export const CreatePolitPage = () => {
                     </div>
                   )}
 
-                  {/* Önizleme Resimleri Seçeceği */}
+                  {/* Thumbnail Selection Area */}
                   {recordedUrl && !isRecording && (
                     <div className="space-y-2">
                         <div className="flex items-center justify-between px-1">
-                           <span className={['text-[10px] font-black uppercase tracking-tighter', selectedVideoThumbIdx < 0 ? 'text-rose-600 animate-pulse' : 'text-gray-400'].join(' ')}>
-                             {videoThumbs.length > 0 && selectedVideoThumbIdx < 0 ? 'Lütfen bir kapak fotoğrafı seçin!' : (videoThumbs.length > 0 ? 'Kapak Seçildi' : '')}
-                           </span>
-                           {videoThumbs.length > 0 && videoThumbRefreshCount < 1 && (
-                             <button type="button" onClick={() => {
-                               setVideoThumbGenSeed(s => s+1);
-                               setVideoThumbRefreshCount(c => c+1);
-                               setVideoThumbs([]); // clear to show loading state again
-                             }} className="text-primary-blue text-[9px] font-bold flex items-center gap-1">
+                           {/* Loading State */}
+                           {isGeneratingThumbs && (
+                             <span className="text-[10px] font-black uppercase tracking-tighter text-gray-600 flex items-center gap-2">
+                               <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                               Kapak resimleri oluşturuluyor...
+                             </span>
+                           )}
+                           {/* Must Select State */}
+                           {!isGeneratingThumbs && videoThumbs.length > 0 && selectedVideoThumbIdx < 0 && (
+                             <span className="text-[10px] font-black uppercase tracking-tighter text-rose-600 animate-pulse">
+                               Lütfen bir kapak resmi seçin!
+                             </span>
+                           )}
+                           {/* Selected State */}
+                           {!isGeneratingThumbs && videoThumbs.length > 0 && selectedVideoThumbIdx >= 0 && (
+                             <span className="text-[10px] font-black uppercase tracking-tighter text-green-600">
+                               ✓ Kapak Seçildi
+                             </span>
+                           )}
+                           {/* Refresh Button - Only once, bottom right */}
+                           {!isGeneratingThumbs && videoThumbs.length > 0 && videoThumbRefreshCount < 1 && (
+                             <button 
+                               type="button" 
+                               onClick={() => {
+                                 setVideoThumbGenSeed(s => s + 1);
+                                 setVideoThumbRefreshCount(c => c + 1);
+                                 setVideoThumbs([]); // clear to trigger regeneration
+                                 setSelectedVideoThumbIdx(-1);
+                               }} 
+                               className="text-primary-blue text-[9px] font-bold flex items-center gap-1 hover:opacity-70 transition-opacity"
+                               title="Farklı kapak resimleri oluştur (sadece 1 kez)"
+                             >
                                <RotateCcw className="w-3 h-3"/> Yenile
                              </button>
                            )}
                         </div>
                         {/* Eğer kapaklar henüz yoksa (yükleniyorsa) placeholder göster, varsa grid göster */}
-                        {videoThumbs.length === 0 ? (
-                           // Burayı boş bırakıyoruz çünkü yükleme mesajı artık buton alanında
-                           <div className="grid grid-cols-3 gap-1.5 opacity-50 pointer-events-none">
-                              {[1,2,3].map(i => (
-                                <div key={i} className="aspect-video bg-gray-100 rounded-lg animate-pulse" />
+                        {/* Loading State */}
+                        {isGeneratingThumbs && (
+                           <div className="grid grid-cols-3 gap-2">
+                              {[0,1,2].map(i => (
+                                <div key={i} className="aspect-[9/16] bg-gray-100 rounded-lg animate-pulse flex items-center justify-center border-2 border-gray-200">
+                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                </div>
                               ))}
                            </div>
-                        ) : (
-                          <div className="grid grid-cols-3 gap-1.5">
+                        )}
+                        {/* Thumbnail Grid */}
+                        {!isGeneratingThumbs && videoThumbs.length > 0 && (
+                          <div className="grid grid-cols-3 gap-2">
                             {videoThumbs.map((t, i) => (
-                              <button key={i} type="button" onClick={() => setSelectedVideoThumbIdx(i)} className={['rounded-lg overflow-hidden border-2 transition-all relative', selectedVideoThumbIdx === i ? theme.borderClass : 'border-transparent opacity-60 hover:opacity-100'].join(' ')}>
-                                <img src={t.previewUrl} className="w-full aspect-video object-cover" />
+                              <button 
+                                key={i} 
+                                type="button" 
+                                onClick={() => setSelectedVideoThumbIdx(i)} 
+                                className={[
+                                  'rounded-lg overflow-hidden border-2 transition-all relative aspect-[9/16]', 
+                                  selectedVideoThumbIdx === i 
+                                    ? `${theme.borderClass} ring-2 ${theme.ringClass} scale-105` 
+                                    : 'border-gray-200 opacity-70 hover:opacity-100 hover:scale-102'
+                                ].join(' ')}
+                              >
+                                <img src={t.previewUrl} alt={`Kapak ${i+1}`} className="w-full h-full object-cover" />
                                 {selectedVideoThumbIdx === i && (
-                                  <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-                                     <div className="w-2 h-2 bg-white rounded-full shadow-sm" />
+                                  <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center shadow-lg" style={{backgroundColor: theme.primary}}>
+                                     <div className="w-2.5 h-2.5 bg-white rounded-full" />
                                   </div>
                                 )}
                               </button>

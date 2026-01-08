@@ -1908,7 +1908,9 @@ async function createPost(req, res) {
     // Try schema variants (content/content_text) and optional fields (is_trending, media_duration)
     let inserted;
     try {
-      const willProcessVideo = content_type === 'video' && Array.isArray(media_urls) && media_urls.length > 0;
+      // Worker-based video processing is disabled (client-side thumbnails used instead)
+      // const willProcessVideo = content_type === 'video' && Array.isArray(media_urls) && media_urls.length > 0;
+      const willProcessVideo = false; // DISABLED: FFmpeg worker not active
       const payload = {
         user_id: auth.id,
         party_id,

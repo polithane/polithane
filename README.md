@@ -29,8 +29,8 @@ npm run preview
 ## 🔒 Altyapı Kararı (Sabit)
 
 - **DB/Auth/Storage/Realtime**: Supabase
-- **Web hosting**: Vercel
-- **Harici e-posta**: SMTP (mail.polithane.com)
+- **Web hosting**: Vercel (otomatik CDN dahil)
+- **E-posta servisi**: Brevo API (transactional email)
 - **Kural**: Bu karar sabittir; projeye başka bir veritabanı/hosting sağlayıcısı eklenmez ve migrasyon önerilmez.
 
 ## 📦 Teknolojiler
@@ -95,11 +95,9 @@ Bu proje Vercel’de **Frontend (Vite)** + **Serverless API (`/api`)** olarak ç
 - **SUPABASE_URL**: Supabase project URL
 - **SUPABASE_SERVICE_ROLE_KEY**: Supabase service role key (**gizli**, server-only)
 - **JWT_SECRET**: JWT imzalama anahtarı (**gizli**)
-- **SMTP_HOST**: `mail.polithane.com`
-- **SMTP_PORT**: `587`
-- **SMTP_USER**: SMTP kullanıcı adı (örn. `bilgi@polithane.com` / `noreply@polithane.com`)
-- **SMTP_PASS**: SMTP şifresi (**gizli**)
-- **SMTP_FROM**: Gönderici adresi (örn. `bilgi@polithane.com`)
+- **BREVO_API_KEY**: Brevo API anahtarı (**gizli**, transactional email için)
+- **MAIL_SENDER_EMAIL**: Gönderici email adresi (örn. `noreply@polithane.com`)
+- **MAIL_SENDER_NAME**: Gönderici adı (örn. `Polithane`)
 
 #### Backend – Opsiyonel (ama önerilir)
 - **ADMIN_BOOTSTRAP_TOKEN**: ilk admin erişimi + üretimde debug kontrol endpoint’leri için token (**gizli**)

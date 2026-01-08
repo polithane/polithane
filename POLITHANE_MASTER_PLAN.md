@@ -2,8 +2,8 @@
 
 **Belge amacı**: Bu dosya, Polithane projesinin “tek kaynak/tek plan” dokümanıdır. İleride sohbetimiz kesilse bile, **ne yaptığımızı, neden yaptığımızı ve sıradaki adımlarımızı** buradan takip edeceğiz.
 
-**Son güncelleme**: 2025-12-21  
-**Durum**: Prod: Vercel / DB+Auth+Storage: Supabase / Mail: SMTP (mail.polithane.com)
+**Son güncelleme**: 2025-01-08  
+**Durum**: Prod: Vercel / DB+Auth+Storage: Supabase / Mail: Brevo API
 
 ---
 
@@ -140,7 +140,7 @@ Admin panel Polithane’nin üretim gücüdür. Minimum modüller:
 - **Mesajlaşma yönetimi**: abuse raporları, içerik inceleme (gerekli yasal sınırlar içinde)
 - **İstatistik/Analitik**: DAU/MAU, içerik üretimi, etkileşim, trend gündemler
 - **Reklam alanları**: yerleşimler, kampanyalar, sponsorlu içerik yönetimi
-- **Pazarlama**: duyurular, e-posta kampanyaları (SMTP)
+- **Pazarlama**: duyurular, e-posta kampanyaları (Brevo API)
 - **Sistem sağlığı**: hata oranı, performans, log/audit, storage tüketimi
 
 ---
@@ -149,8 +149,10 @@ Admin panel Polithane’nin üretim gücüdür. Minimum modüller:
 
 ### 7.1 Bugünkü kesin karar (SCOPE-INFRA-01)
 - **DB/Auth/Storage/Realtime**: Supabase
-- **Web hosting**: Vercel
-- **Harici e-posta**: SMTP (mail.polithane.com)
+- **Web hosting**: Vercel (otomatik CDN dahil)
+- **E-posta servisi**: Brevo API (transactional email)
+- **CDN**: Vercel built-in CDN (static assets için otomatik)
+- **Cache**: Frontend sessionStorage + Backend in-memory (30s TTL)
 - Başka bir veritabanı/hosting sağlayıcısı **kullanılmıyor** ve bu karar **sabit** (migrasyon önerme/ekleme).
 
 ### 7.2 Repodaki bazı dokümanlar
@@ -251,14 +253,15 @@ Bu tablo, “neden böyle yaptık?” sorusunun cevabıdır.
 | ID | Tarih | Karar | Gerekçe | Etkilenen Bölüm |
 |---|---|---|---|---|
 | DEC-001 | 2025-12-14 | Altyapı Supabase + Vercel olarak sabitlendi | Operasyonel sadeleşme ve hızlı ölçekleme | 7, 8 |
-| DEC-002 | 2025-12-17 | SendGrid tamamen kaldırıldı, tek e-posta kanalı SMTP oldu | Kontrol + maliyet + vendor bağımsızlığı | 7, 12, 14 |
+| DEC-002 | 2025-12-17 | SendGrid tamamen kaldırıldı, Brevo API'ye geçildi | API kontrol + maliyet optimizasyonu + güvenilir teslimat | 7, 12, 14 |
 | DEC-003 | 2025-12-18 | PolitFast adı “Fast” olarak standartlaştırıldı | Ürün dili sadeleşmesi | 3, 12 |
 | DEC-004 | 2025-12-18 | iOS Safari uyumluluğu için Vite legacy plugin etkinleştirildi | Mobil açılış sorunlarını çözmek | 12, 13 |
 | DEC-005 | 2025-12-18 | Supabase avatar URL’leri için `/api/avatar` proxy eklendi | URL encoding/400 spam + stabil UX | 12, 14 |
+| DEC-006 | 2025-01-08 | Vercel otomatik CDN aktif, minimal cache stratejisi (MODE 0) | Basitlik + hız, Redis/harici cache MODE 1'e kadar bekliyor | 7, 8 |
 
 ---
 
-## 12) Projenin Güncel Durumu (2025-12-21) — “Bugün ne var?”
+## 12) Projenin Güncel Durumu (2025-01-08) — “Bugün ne var?”
 
 Bu bölüm **yeni gelen agent’ın** projeyi tek okumada devralması için “gerçek durum” özetidir.
 
@@ -303,9 +306,9 @@ Bu projede production backend **tek dosyadır**:
 - **Comment**: `POST /api/posts/:id/comments` → post sahibine bildirim/e-posta (self-notify yok)
 - **Notifications**: `/api/notifications` ile çekilir, “okundu” durumları vardır
 
-### 12.7 E-posta sistemi (SMTP)
-- **Kural**: SendGrid yok. Her e-posta (üyelik, şifre sıfırlama, hesap silme, bildirimler, mesaj vb.) **SMTP** üzerinden gider.
-- **SMTP kaynağı**: `mail.polithane.com` (587)
+### 12.7 E-posta sistemi (Brevo API)
+- **Kural**: SendGrid yok. Her e-posta (üyelik, şifre sıfırlama, hesap silme, bildirimler, mesaj vb.) **Brevo API** üzerinden gider.
+- **Brevo transactional email API (https://api.brevo.com/v3)
 
 ### 12.8 Safari / eski tarayıcı uyumluluğu
 - **`@vitejs/plugin-legacy`** aktiftir (`vite.config.js`, hedef: `safari >= 12`)
@@ -345,11 +348,9 @@ Bu bölüm **yanlış API/env kullanımını** önlemek içindir. Değerler bura
 - **PUBLIC_APP_URL** (Production, Preview)
 - **ADMIN_BOOTSTRAP_TOKEN** (Production, Preview)
 - **INITIAL_ADMIN_PASSWORD** (All Environments)
-- **SMTP_FROM** (All Environments)
-- **SMTP_PASS** (All Environments)
-- **SMTP_USER** (All Environments)
-- **SMTP_PORT** (All Environments)
-- **SMTP_HOST** (All Environments)
+- **BREVO_API_KEY** (All Environments)
+- **MAIL_SENDER_EMAIL** (All Environments)
+- **MAIL_SENDER_NAME** (All Environments)
 - **VITE_SUPABASE_ANON_KEY** (All Environments)
 - **VITE_SUPABASE_URL** (All Environments)
 - **SUPABASE_SERVICE_ROLE_KEY** (All Environments)
@@ -370,7 +371,8 @@ Bu bölüm **yanlış API/env kullanımını** önlemek içindir. Değerler bura
 - **`SUPABASE_URL`**: Supabase Project URL (server)
 - **`SUPABASE_SERVICE_ROLE_KEY`**: server-only (Storage upload, admin işlemleri, RLS bypass gereken yerler)
 - **`JWT_SECRET`**: app JWT’lerini imzalama/verify
-- **`SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`**: Nodemailer SMTP
+- **`BREVO_API_KEY`**: Brevo transactional email API anahtarı
+- **`MAIL_SENDER_EMAIL` / `MAIL_SENDER_NAME`**: Gönderici bilgileri
 - **`PUBLIC_APP_URL`** veya **`APP_URL`**: e-posta linklerinde “site base url” (örn: şifre sıfırlama linki)
 - **`ADMIN_BOOTSTRAP_TOKEN`**: production debug/bootstrapping endpoint güvenliği (header ile)
 
