@@ -101,6 +101,7 @@ app.use('/api/', limiter);
 // Import routes
 import authRoutes from './routes/auth.js';
 import postsRoutes from './routes/posts.js';
+import fastRoutes from './routes/fast.js';
 import messagesRoutes from './routes/messages.js';
 import usersRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
@@ -112,6 +113,7 @@ import publicRoutes from './routes/public.js';
 app.use('/api/public', publicRoutes); // Public endpoints (no auth required)
 app.use('/api/auth', authLimiter, authRoutes); // Auth için sıkı rate limit
 app.use('/api/posts', postsRoutes);
+app.use('/api/fast', fastRoutes); // Fast (Stories) endpoints
 app.use('/api/messages', messagesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/admin', adminRoutes);
@@ -800,6 +802,24 @@ app.get('/api/trending/posts', async (req, res) => {
     res.json({ success: true, data: posts });
   } catch (error) {
     console.error('Get trending posts error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get all agendas
+app.get('/api/agendas', async (req, res) => {
+  try {
+    const { limit = 80 } = req.query;
+    
+    const agendas = await sql`
+      SELECT * FROM agendas
+      ORDER BY created_at DESC
+      LIMIT ${parseInt(limit)}
+    `;
+
+    res.json({ success: true, data: agendas });
+  } catch (error) {
+    console.error('Get agendas error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
