@@ -136,15 +136,22 @@ export const ForgotPasswordPage = () => {
         setLoading(false);
       }
     } catch (err) {
-      // DEBUG: Hata durumu
+      // DEBUG: Hata durumu (err.data backend response içeriyor!)
       setDebugInfo({
         timestamp: new Date().toISOString(),
         email: email,
         error: err.message,
         errorStack: err.stack,
         errorString: err.toString(),
+        backendData: err.data || null, // Backend'den gelen tüm data (debug dahil)
+        backendDebug: err.data?.debug || null, // Backend debug field
+        backendCode: err.data?.code || null,
       });
-      setError(err.message || 'Bir hata oluştu. Lütfen tekrar deneyin.');
+      
+      // Backend debug varsa mesaja ekle
+      const errorMsg = err.message || 'Bir hata oluştu. Lütfen tekrar deneyin.';
+      const debugMsg = err.data?.debug ? ` [DEBUG: ${err.data.debug}]` : '';
+      setError(errorMsg + debugMsg);
       setLoading(false);
     }
   };
