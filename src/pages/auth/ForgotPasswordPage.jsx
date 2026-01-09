@@ -282,16 +282,16 @@ export const ForgotPasswordPage = () => {
                   }`}
                   required
                 />
-                {/* Status Icons - HUGE (3x bigger than before) */}
+                {/* Status Icons - MASSIVE (2x bigger = 6x from original) */}
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
                   {emailStatus === 'checking' && (
-                    <Loader2 className="w-12 h-12 text-gray-400 animate-spin" />
+                    <Loader2 className="w-24 h-24 text-gray-400 animate-spin" />
                   )}
                   {emailStatus === 'found' && (
-                    <CheckCircle className="w-12 h-12 text-green-500" />
+                    <CheckCircle className="w-24 h-24 text-green-500" />
                   )}
                   {emailStatus === 'not-found' && (
-                    <XCircle className="w-12 h-12 text-red-500" />
+                    <XCircle className="w-24 h-24 text-red-500" />
                   )}
                 </div>
               </div>
