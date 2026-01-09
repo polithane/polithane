@@ -14,11 +14,22 @@ function getPool() {
     if (!connectionString) {
       throw new Error('DATABASE_URL is not set');
     }
+    
+    // Check if running in Vercel/serverless
+    const isServerless = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
+    
     pool = new Pool({
       connectionString,
-      // Supabase uses SSL in production; allow local without SSL.
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-      max: Number(process.env.PG_POOL_MAX || 10),
+      max: isServerless ? 1 : Number(process.env.PG_POOL_MAX || 10), // 1 for serverless, 10 for local
+      idleTimeoutMillis: isServerless ? 10000 : 30000,
+      connectionTimeoutMillis: 5000,
+      allowExitOnIdle: isServerless,
+    });
+    
+    // Handle pool errors
+    pool.on('error', (err) => {
+      console.error('Unexpected pool error:', err);
     });
   }
   return pool;
