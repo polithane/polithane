@@ -18,22 +18,16 @@ function getPool() {
     // Check if running in Vercel/serverless
     const isServerless = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
     
-    // For serverless: Use Supabase Transaction mode (?pgbouncer=true)
-    // This allows higher connection limits without MaxClientsInSessionMode error
-    const finalConnectionString = isServerless && !connectionString.includes('pgbouncer')
-      ? (connectionString.includes('?') 
-          ? `${connectionString}&pgbouncer=true` 
-          : `${connectionString}?pgbouncer=true`)
-      : connectionString;
-    
     pool = new Pool({
-      connectionString: finalConnectionString,
+      connectionString,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-      max: Number(process.env.PG_POOL_MAX || 10),
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      max: isServerless ? 1 : Number(process.env.PG_POOL_MAX || 10), // 1 for serverless, 10 for local
+      idleTimeoutMillis: isServerless ? 10000 : 30000,
+      connectionTimeoutMillis: 5000,
+      allowExitOnIdle: isServerless,
     });
     
+    // Handle pool errors
     pool.on('error', (err) => {
       console.error('Unexpected pool error:', err);
     });
