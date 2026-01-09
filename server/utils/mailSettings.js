@@ -53,13 +53,16 @@ export async function getMailRuntimeConfig({ force = false } = {}) {
   const enabled = envEnabled != null ? asBool(envEnabled, true) : asBool(db.mail_enabled, true);
   const dbProvider = String(db.mail_provider || '').trim().toLowerCase();
 
+  // Support both old (BREVO_*) and new (MAIL_*) environment variable names
   const senderEmail =
     envStr('MAIL_SENDER_EMAIL') ||
+    envStr('BREVO_FROM_EMAIL') || // Backward compatibility
     (db.mail_sender_email ? String(db.mail_sender_email).trim() : null) ||
     (db.email_from_address ? String(db.email_from_address).trim() : null) ||
     null;
   const senderName =
     envStr('MAIL_SENDER_NAME') ||
+    envStr('BREVO_FROM_NAME') || // Backward compatibility
     (db.mail_sender_name ? String(db.mail_sender_name).trim() : null) ||
     (db.email_from_name ? String(db.email_from_name).trim() : null) ||
     'Polithane';
