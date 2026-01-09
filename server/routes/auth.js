@@ -334,57 +334,67 @@ router.post('/change-password', authenticateToken, async (req, res) => {
   }
 });
 
+// FORCE CACHE BUST: 2026-01-09-21:55:00
 router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email gerekli.' });
 
-    console.log('🔍 [v2.0 - 2026-01-09 21:50] Password reset requested for:', email);
+    console.log('🔍 [v3.0 FINAL - 2026-01-09 21:55] Password reset requested for:', email);
 
     // Kullanıcıyı kontrol et
     const [user] = await sql`SELECT id, email, full_name FROM users WHERE LOWER(email) = LOWER(${email})`;
     
     if (!user) {
-      console.log('❌ User not found:', email);
-      // Güvenlik: Kullanıcı var mı yok mu belli etme (timing attack'a karşı)
-      // Ama yine de 404 dön
+      console.log('❌ [v3.0] User not found:', email);
       return res.status(404).json({ 
         success: false, 
-        error: 'Bu email adresi ile kayıtlı kullanıcı bulunamadı.' 
+        error: 'Bu email adresi ile kayıtlı kullanıcı bulunamadı.',
+        _debug: { version: 'v3.0', userFound: false }
       });
     }
 
-    console.log('✅ User found:', user.id, user.email);
+    console.log('✅ [v3.0] User found:', user.id, user.email);
 
     const token = generateVerificationToken();
     const expires = new Date(Date.now() + 3600000);
     await sql`UPDATE users SET password_reset_token = ${token}, password_reset_expires = ${expires} WHERE id = ${user.id}`;
 
-    console.log('🔑 Reset token generated and saved');
+    console.log('🔑 [v3.0] Reset token generated and saved');
 
     // Mail gönderimini bekle ve hata kontrolü yap
-    console.log('📧 Attempting to send password reset email...');
+    console.log('📧 [v3.0] Attempting to send password reset email...');
     const mailResult = await sendPasswordResetEmail(email, token);
     
-    console.log('📬 Mail result:', JSON.stringify(mailResult, null, 2));
+    console.log('📬 [v3.0] Mail result:', JSON.stringify(mailResult, null, 2));
     
     if (!mailResult?.success) {
-      console.error('❌ Password reset email failed:', mailResult?.error);
+      console.log('❌ [v3.0] Password reset email FAILED:', mailResult?.error);
       return res.status(500).json({ 
         success: false, 
-        error: `Email gönderilemedi: ${mailResult?.error || 'Bilinmeyen hata'}` 
+        error: `Email gönderilemedi: ${mailResult?.error || 'Bilinmeyen hata'}`,
+        _debug: { version: 'v3.0', mailSent: false, mailError: mailResult?.error }
       });
     }
 
-    console.log('✅ [v2.0] Password reset email sent successfully to:', email);
+    console.log('✅ [v3.0] Password reset email sent successfully to:', email);
     res.json({ 
       success: true, 
-      message: 'Şifre sıfırlama linki email adresinize gönderildi.',
-      _debug: { version: 'v2.0', timestamp: new Date().toISOString(), mailSent: true }
+      message: '✅ [v3.0] Şifre sıfırlama linki email adresinize gönderildi.',
+      _debug: { 
+        version: 'v3.0', 
+        timestamp: new Date().toISOString(), 
+        mailSent: true,
+        messageId: mailResult?.messageId 
+      }
     });
   } catch (err) {
-    console.error('❌ Forgot password error:', err);
-    res.status(500).json({ success: false, error: 'Hata oluştu: ' + err.message });
+    console.log('❌ [v3.0] Forgot password error:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Hata oluştu: ' + err.message,
+      _debug: { version: 'v3.0', error: err.message }
+    });
   }
 });
 
