@@ -514,8 +514,10 @@ export const FastViewerPage = () => {
     if (!current?.id) return false;
     const ownerId = String(current?.user_id || '').trim();
     const myId = String(me?.id || me?.user_id || '').trim();
-    return !!ownerId && !!myId && ownerId === myId;
-  }, [current?.id, current?.user_id, me?.id, me?.user_id]);
+    const isOwner = !!ownerId && !!myId && ownerId === myId;
+    const isAdmin = me?.is_admin || false;
+    return isOwner || isAdmin;
+  }, [current?.id, current?.user_id, me?.id, me?.is_admin, me?.user_id]);
 
   const deleteCurrent = useCallback(async () => {
     if (!current?.id) return;
@@ -1413,7 +1415,7 @@ export const FastViewerPage = () => {
             {/* Note: autoplay may be blocked on mobile. We intentionally avoid any dark overlay or play controls. */}
           </div>
 
-          {/* bottom right actions: delete (owner) + like */}
+          {/* bottom right actions: delete (owner or admin) + like */}
           {current?.id ? (
             <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+16px)] right-4 z-30 flex items-end gap-3">
               {canDelete ? (

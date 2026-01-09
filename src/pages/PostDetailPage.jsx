@@ -713,6 +713,8 @@ export const PostDetailPage = () => {
   }, [isReady, location.search]);
 
   const isOwnPost = isAuthenticated && currentUser?.id && String(uiPost.user_id) === String(currentUser.id);
+  const isAdmin = isAuthenticated && currentUser?.is_admin;
+  const canManagePost = isOwnPost || isAdmin;
 
   // IMPORTANT: don't use hooks after early returns (React error #310).
   const imageList =
@@ -808,9 +810,9 @@ export const PostDetailPage = () => {
     };
   }, [uiPost.view_count, uiPost.like_count, uiPost.comment_count, uiPost.share_count, uiPost.polit_score]);
 
-  // Allow deep-linking to edit/delete for the owner (e.g. from Profile).
+  // Allow deep-linking to edit/delete for the owner or admin (e.g. from Profile).
   useEffect(() => {
-    if (!isReady || !isOwnPost) return;
+    if (!isReady || !canManagePost) return;
     if (queryFlags.openEdit && !showEditPost) {
       setEditPostText(uiPost.content_text || '');
       setShowEditPost(true);
@@ -819,7 +821,7 @@ export const PostDetailPage = () => {
       setShowDeletePost(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, isOwnPost, queryFlags.openEdit, queryFlags.openDelete]);
+  }, [isReady, canManagePost, queryFlags.openEdit, queryFlags.openDelete]);
 
   const handleToggleLike = async () => {
     if (!uiPost.post_id) return;
@@ -1275,8 +1277,8 @@ export const PostDetailPage = () => {
               </button>
             </div>
 
-            {/* Yönetim (sadece kendi postu) */}
-            {isOwnPost && (
+            {/* Yönetim (kendi postu veya admin) */}
+            {canManagePost && (
               <div className="flex justify-end gap-2 mt-3">
                 <button
                   type="button"
