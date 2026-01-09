@@ -52,17 +52,23 @@ export const ForgotPasswordPage = () => {
           const apiBase = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000'))
             .replace(/\/+$/, '')
             .replace(/\/api$/, '');
+          console.log('🔍 Checking email:', emailValue);
           const response = await fetch(`${apiBase}/api/auth/check-availability?email=${encodeURIComponent(emailValue)}`);
+          console.log('📥 Response status:', response.status);
           const data = await response.json();
+          console.log('📄 Response data:', data);
           
           if (data.success) {
             // In forgot password, we want TAKEN emails (users that exist)
-            setEmailStatus(data.emailAvailable ? 'not-found' : 'found');
+            const newStatus = data.emailAvailable ? 'not-found' : 'found';
+            console.log('✅ Setting email status:', newStatus);
+            setEmailStatus(newStatus);
           } else {
+            console.log('❌ Check failed, clearing status');
             setEmailStatus('');
           }
         } catch (err) {
-          console.error('Email check error:', err);
+          console.error('❌ Email check error:', err);
           setEmailStatus('');
         }
       }, 500);
@@ -276,16 +282,16 @@ export const ForgotPasswordPage = () => {
                   }`}
                   required
                 />
-                {/* Status Icons - 3x bigger */}
+                {/* Status Icons - HUGE (3x bigger than before) */}
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
                   {emailStatus === 'checking' && (
-                    <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                    <Loader2 className="w-12 h-12 text-gray-400 animate-spin" />
                   )}
                   {emailStatus === 'found' && (
-                    <CheckCircle className="w-8 h-8 text-green-500" />
+                    <CheckCircle className="w-12 h-12 text-green-500" />
                   )}
                   {emailStatus === 'not-found' && (
-                    <XCircle className="w-8 h-8 text-red-500" />
+                    <XCircle className="w-12 h-12 text-red-500" />
                   )}
                 </div>
               </div>
