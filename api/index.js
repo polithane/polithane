@@ -1,6 +1,6 @@
 // Vercel Serverless Function Entry Point
-// Import Express app from server directory
+// Import Express app from _server directory (inside api for Vercel compatibility)
 
-import app from '../server/index.js';
+import app from './_server/index.js';
 
 export default app;

@@ -9,10 +9,9 @@
     }
   },
   "functions": {
-    "api/**/*.js": {
+    "api/index.js": {
       "memory": 1024,
-      "maxDuration": 30,
-      "includeFiles": "{server/**,package.json}"
+      "maxDuration": 30
     }
   },
   "routes": [
