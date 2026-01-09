@@ -12180,3 +12180,4 @@ export default async function handler(req, res) {
       res.status(500).json({ error: error.message, stack: error.stack, requestId });
   }
 }
+// Cache bust for mail config - Sat Jan 10 02:05:49 +03 2026
