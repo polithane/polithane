@@ -161,6 +161,14 @@ export const ForgotPasswordPage = () => {
             </div>
           </div>
 
+          {/* DEBUG INFO - Success sayfasında da göster */}
+          {debugInfo && (
+            <div className="mb-6 bg-gray-900 text-green-400 rounded-lg p-4 text-xs font-mono overflow-auto max-h-96">
+              <div className="font-bold text-yellow-400 mb-2">🔍 DEBUG INFO (GEÇİCİ - SİLİNECEK):</div>
+              <pre className="whitespace-pre-wrap break-all">{JSON.stringify(debugInfo, null, 2)}</pre>
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
@@ -266,16 +274,16 @@ export const ForgotPasswordPage = () => {
                   }`}
                   required
                 />
-                {/* Status Icons */}
+                {/* Status Icons - 3x bigger */}
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
                   {emailStatus === 'checking' && (
-                    <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                    <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
                   )}
                   {emailStatus === 'found' && (
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <CheckCircle className="w-8 h-8 text-green-500" />
                   )}
                   {emailStatus === 'not-found' && (
-                    <XCircle className="w-5 h-5 text-red-500" />
+                    <XCircle className="w-8 h-8 text-red-500" />
                   )}
                 </div>
               </div>
