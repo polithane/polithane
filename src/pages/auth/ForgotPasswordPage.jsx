@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Mail, AlertCircle, CheckCircle, ArrowLeft, XCircle, Loader2 } from 'lucide-react';
 import { apiCall } from '../../utils/api';
 
 export const ForgotPasswordPage = () => {
@@ -11,10 +11,82 @@ export const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  
+  // Email validation states
+  const [emailStatus, setEmailStatus] = useState(''); // 'checking', 'found', 'not-found'
+  const [emailCheckTimeout, setEmailCheckTimeout] = useState(null);
+
+  // Check if email exists in system
+  const checkEmailExists = async (emailValue) => {
+    if (!emailValue || emailValue.length < 5) {
+      setEmailStatus('');
+      return;
+    }
+
+    // Basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      setEmailStatus('');
+      return;
+    }
+
+    // Turkish character check
+    const hasTurkish = /[çğıöşüİÇĞÖŞÜ]/.test(emailValue);
+    if (hasTurkish) {
+      setEmailStatus('not-found');
+      return;
+    }
+
+    setEmailStatus('checking');
+
+    if (emailCheckTimeout) clearTimeout(emailCheckTimeout);
+
+    const timeout = setTimeout(async () => {
+      try {
+        const apiBase = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000'))
+          .replace(/\/+$/, '')
+          .replace(/\/api$/, '');
+        const response = await fetch(`${apiBase}/api/auth/check-availability?email=${encodeURIComponent(emailValue)}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          // In forgot password, we want TAKEN emails (users that exist)
+          setEmailStatus(data.emailAvailable ? 'not-found' : 'found');
+        } else {
+          setEmailStatus('');
+        }
+      } catch (err) {
+        console.error('Email check error:', err);
+        setEmailStatus('');
+      }
+    }, 500);
+
+    setEmailCheckTimeout(timeout);
+  };
+
+  // Check email when it changes
+  useEffect(() => {
+    checkEmailExists(email);
+    return () => {
+      if (emailCheckTimeout) clearTimeout(emailCheckTimeout);
+    };
+  }, [email]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Check email status before submitting
+    if (emailStatus === 'not-found') {
+      setError('Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı.');
+      return;
+    }
+
+    if (emailStatus === 'checking') {
+      setError('E-posta kontrolü yapılıyor, lütfen bekleyin...');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -148,13 +220,44 @@ export const ForgotPasswordPage = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="eposta@ornek.com"
-                  className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                  className={`w-full pl-14 pr-12 py-3 border rounded-lg outline-none transition-all ${
+                    emailStatus === 'found'
+                      ? 'border-green-500 focus:ring-2 focus:ring-green-500'
+                      : emailStatus === 'not-found'
+                      ? 'border-red-500 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-300 focus:ring-2 focus:ring-primary-blue focus:border-primary-blue'
+                  }`}
                   required
                 />
+                {/* Status Icons */}
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  {emailStatus === 'checking' && (
+                    <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                  )}
+                  {emailStatus === 'found' && (
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  )}
+                  {emailStatus === 'not-found' && (
+                    <XCircle className="w-5 h-5 text-red-500" />
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Kayıtlı e-posta adresinizi girin. Size şifre sıfırlama linki göndereceğiz.
-              </p>
+              {/* Status Messages */}
+              {emailStatus === 'found' && (
+                <p className="text-xs text-green-600 mt-2 font-semibold">
+                  ✓ E-posta kayıtlı, şifre sıfırlama linki gönderilebilir.
+                </p>
+              )}
+              {emailStatus === 'not-found' && (
+                <p className="text-xs text-red-600 mt-2 font-semibold">
+                  ✗ Bu e-posta adresi sistemde kayıtlı değil.
+                </p>
+              )}
+              {!emailStatus && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Kayıtlı e-posta adresinizi girin. Size şifre sıfırlama linki göndereceğiz.
+                </p>
+              )}
             </div>
 
             {/* Submit Button */}
