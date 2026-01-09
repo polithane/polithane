@@ -334,8 +334,8 @@ router.post('/change-password', authenticateToken, async (req, res) => {
   }
 });
 
-// FORCE CACHE BUST: 2026-01-09-21:55:00
-router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
+// NEW ENDPOINT - Cache bypass garantili
+router.post('/password-reset-request', forgotPasswordLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email gerekli.' });

@@ -101,7 +101,7 @@ export const ForgotPasswordPage = () => {
         emailStatus: emailStatus,
       };
 
-      const response = await apiCall('/api/auth/forgot-password', {
+      const response = await apiCall('/api/auth/password-reset-request', {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
