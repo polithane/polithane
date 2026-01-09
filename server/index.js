@@ -19,6 +19,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// FORCE REBUILD: 2026-01-09-22:05 - v3.0 with working mail system
 const app = express();
 const PORT = process.env.PORT || 5000;
 
