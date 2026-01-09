@@ -4215,8 +4215,6 @@ function getPublicAppUrl(req) {
 
 function sha256Hex(input) {
   // Node runtime includes crypto
-  // eslint-disable-next-line global-require
-  const crypto = require('crypto');
   return crypto.createHash('sha256').update(String(input)).digest('hex');
 }
 
@@ -5049,8 +5047,6 @@ async function usersRequestDeleteMe(req, res) {
   const meta = me?.metadata && typeof me.metadata === 'object' ? me.metadata : {};
 
   // Generate confirmation token (stored as hash in metadata)
-  // eslint-disable-next-line global-require
-  const crypto = require('crypto');
   const token = crypto.randomBytes(32).toString('base64url');
   const tokenHash = sha256Hex(token);
 
@@ -9464,8 +9460,6 @@ async function authForgotPassword(req, res) {
         return res.status(404).json({ success: false, error: 'Bu e-posta adresi sistemde kayıtlı değil.' });
       }
 
-      // eslint-disable-next-line global-require
-      const crypto = require('crypto');
       const token = crypto.randomBytes(32).toString('base64url');
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
       const expiresIso = expiresAt.toISOString();
@@ -9676,8 +9670,6 @@ async function authResendVerification(req, res) {
   const verified = u?.email_verified === true || meta?.email_verified === true;
   if (verified) return res.json({ success: true, message: 'E-posta zaten doğrulanmış.' });
 
-  // eslint-disable-next-line global-require
-  const crypto = require('crypto');
   const tokenRaw = crypto.randomBytes(32).toString('base64url');
   const expiresIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const nextMeta = {
@@ -9924,8 +9916,6 @@ async function authRegister(req, res) {
       // Also send email verification when enabled (claim users should still verify their email).
       if (emailVerificationRequired) {
         try {
-          // eslint-disable-next-line global-require
-          const crypto = require('crypto');
           const tokenRaw = crypto.randomBytes(32).toString('base64url');
           const expiresIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
           const baseMeta = user?.metadata && typeof user.metadata === 'object' ? user.metadata : (metadata && typeof metadata === 'object' ? metadata : {});
@@ -9951,8 +9941,6 @@ async function authRegister(req, res) {
 
     // Email verification (STRICT). If enabled, registration must successfully send the verification email.
     if (emailVerificationRequired) {
-      // eslint-disable-next-line global-require
-      const crypto = require('crypto');
       const tokenRaw = crypto.randomBytes(32).toString('base64url');
       const expiresIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
       // Store in metadata so we don't depend on optional columns.
