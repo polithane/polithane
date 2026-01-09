@@ -8,14 +8,8 @@
       "main": true
     }
   },
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "server/**"
-    }
-  },
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/api/(.*)", "dest": "/api/index" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
