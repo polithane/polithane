@@ -15,6 +15,9 @@ export const ForgotPasswordPage = () => {
   // Email validation states
   const [emailStatus, setEmailStatus] = useState(''); // 'checking', 'found', 'not-found'
   const [emailCheckTimeout, setEmailCheckTimeout] = useState(null);
+  
+  // DEBUG: Geçici debug log'ları
+  const [debugInfo, setDebugInfo] = useState(null);
 
   // Check if email exists in system
   const checkEmailExists = async (emailValue) => {
@@ -75,6 +78,7 @@ export const ForgotPasswordPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setDebugInfo(null); // Clear previous debug info
 
     // Check email status before submitting
     if (emailStatus === 'not-found') {
@@ -90,9 +94,26 @@ export const ForgotPasswordPage = () => {
     setLoading(true);
 
     try {
+      // DEBUG: API çağrısı öncesi
+      const debugStart = {
+        timestamp: new Date().toISOString(),
+        email: email,
+        emailStatus: emailStatus,
+      };
+
       const response = await apiCall('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
+      });
+
+      // DEBUG: API response'u kaydet
+      setDebugInfo({
+        ...debugStart,
+        response: response,
+        responseTime: new Date().toISOString(),
+        success: response.success,
+        error: response.error,
+        rawResponse: JSON.stringify(response, null, 2),
       });
 
       if (response.success) {
@@ -102,6 +123,14 @@ export const ForgotPasswordPage = () => {
         setLoading(false);
       }
     } catch (err) {
+      // DEBUG: Hata durumu
+      setDebugInfo({
+        timestamp: new Date().toISOString(),
+        email: email,
+        error: err.message,
+        errorStack: err.stack,
+        errorString: err.toString(),
+      });
       setError(err.message || 'Bir hata oluştu. Lütfen tekrar deneyin.');
       setLoading(false);
     }
@@ -200,6 +229,14 @@ export const ForgotPasswordPage = () => {
 
         {/* Form */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          {/* DEBUG INFO - Geçici */}
+          {debugInfo && (
+            <div className="mb-6 bg-gray-900 text-green-400 rounded-lg p-4 text-xs font-mono overflow-auto max-h-96">
+              <div className="font-bold text-yellow-400 mb-2">🔍 DEBUG INFO (GEÇİCİ - SİLİNECEK):</div>
+              <pre className="whitespace-pre-wrap">{JSON.stringify(debugInfo, null, 2)}</pre>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
