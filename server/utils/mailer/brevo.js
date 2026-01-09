@@ -12,12 +12,12 @@ export async function sendWithBrevo({
   tags,
   params,
 } = {}) {
-  console.error('🔧 sendWithBrevo called');
-  console.error('  - Has API Key:', !!apiKey, 'Length:', apiKey?.length);
-  console.error('  - Sender:', sender);
-  console.error('  - To:', to);
-  console.error('  - Subject:', subject);
-  console.error('  - Has HTML:', !!html);
+  console.log('🔧 sendWithBrevo called');
+  console.log('  - Has API Key:', !!apiKey, 'Length:', apiKey?.length);
+  console.log('  - Sender:', sender);
+  console.log('  - To:', to);
+  console.log('  - Subject:', subject);
+  console.log('  - Has HTML:', !!html);
   
   const fetchFn = globalThis.fetch;
   if (typeof fetchFn !== 'function') throw new Error('fetch() bulunamadı (Node 18+ gerekli).');
@@ -42,7 +42,7 @@ export async function sendWithBrevo({
     params: params && typeof params === 'object' ? params : undefined,
   };
 
-  console.error('📤 Sending to Brevo API...');
+  console.log('📤 Sending to Brevo API...');
   
   const r = await fetchFn(`${BREVO_API_BASE}/smtp/email`, {
     method: 'POST',
@@ -54,7 +54,7 @@ export async function sendWithBrevo({
     body: JSON.stringify(payload),
   });
 
-  console.error('📥 Brevo response status:', r.status, r.statusText);
+  console.log('📥 Brevo response status:', r.status, r.statusText);
 
   const bodyText = await r.text().catch(() => '');
   let bodyJson = null;
@@ -64,7 +64,7 @@ export async function sendWithBrevo({
     bodyJson = null;
   }
 
-  console.error('📄 Brevo response body:', bodyJson || bodyText);
+  console.log('📄 Brevo response body:', bodyJson || bodyText);
 
   if (!r.ok) {
     const msg =
@@ -72,14 +72,14 @@ export async function sendWithBrevo({
       bodyJson?.error ||
       bodyText ||
       `Brevo API error (HTTP ${r.status})`;
-    console.error('❌ Brevo API error:', msg);
+    console.log('❌ Brevo API error:', msg);
     const e = new Error(msg);
     e.status = r.status;
     e.details = bodyJson || bodyText;
     throw e;
   }
 
-  console.error('✅ Brevo email sent successfully. MessageId:', bodyJson?.messageId);
+  console.log('✅ Brevo email sent successfully. MessageId:', bodyJson?.messageId);
 
   return {
     success: true,

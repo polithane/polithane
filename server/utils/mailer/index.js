@@ -11,10 +11,10 @@ export async function sendEmail({
   tags,
   params,
 } = {}) {
-  console.error('📬 sendEmail called with:', { to: to?.map(t => t.email), subject });
+  console.log('📬 sendEmail called with:', { to: to?.map(t => t.email), subject });
   
   const cfg = await getMailRuntimeConfig();
-  console.error('⚙️ Mail config:', {
+  console.log('⚙️ Mail config:', {
     enabled: cfg.enabled,
     provider: cfg.provider,
     senderEmail: cfg.senderEmail,
@@ -23,11 +23,11 @@ export async function sendEmail({
   });
   
   if (!cfg.enabled) {
-    console.error('❌ Mail system disabled');
+    console.log('❌ Mail system disabled');
     return { success: false, error: 'Mail sistemi kapalı (mail_enabled=false).' };
   }
   if (cfg.provider !== 'brevo') {
-    console.error('❌ Unsupported provider:', cfg.provider);
+    console.log('❌ Unsupported provider:', cfg.provider);
     return { success: false, error: `Desteklenmeyen provider: ${cfg.provider}` };
   }
 
@@ -44,10 +44,10 @@ export async function sendEmail({
       tags,
       params,
     });
-    console.error('✅ sendEmail SUCCESS:', result);
+    console.log('✅ sendEmail SUCCESS:', result);
     return result;
   } catch (error) {
-    console.error('❌ sendEmail FAILED:', error.message, error.stack);
+    console.log('❌ sendEmail FAILED:', error.message, error.stack);
     return { success: false, error: error.message };
   }
 }
