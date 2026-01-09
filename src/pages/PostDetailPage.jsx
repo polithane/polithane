@@ -190,7 +190,7 @@ const SmartVideo = ({ src, autoPlay = false, overlay = null }) => {
 
   return (
     <div className="w-full">
-      <div className="relative w-full bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ aspectRatio: '9 / 16' }}>
+      <div className="relative w-full bg-black rounded-lg overflow-hidden flex items-center justify-center">
         <video
           ref={videoRef}
           src={url}
@@ -200,7 +200,7 @@ const SmartVideo = ({ src, autoPlay = false, overlay = null }) => {
           controls={false}
           autoPlay={autoPlay}
           preload="auto"
-          className="max-w-full max-h-full w-auto h-auto object-contain"
+          className="w-full h-auto object-contain"
           onClick={togglePlay}
         />
         {overlay ? <div className="absolute inset-0 pointer-events-none">{overlay}</div> : null}
@@ -935,7 +935,7 @@ export const PostDetailPage = () => {
         ) : error || !post ? (
           <div className="text-center text-gray-700">{error || 'Paylaşım bulunamadı.'}</div>
         ) : (
-          <div ref={detailBoxRef} className="mx-auto w-full max-w-[533px]">
+          <div ref={detailBoxRef} className="mx-auto w-full max-w-[693px]">
             {/* Kullanıcı Bilgisi */}
             <div className="card mb-6">
               <div className="flex items-center gap-4 mb-4">
