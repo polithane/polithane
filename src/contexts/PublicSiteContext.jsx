@@ -47,6 +47,18 @@ export const PublicSiteProvider = ({ children }) => {
       allowRegistration: site?.allowRegistration !== false,
       allowComments: site?.allowComments !== false,
       allowMessages: site?.allowMessages !== false,
+      gridSettings: site?.gridSettings || {
+        home_desktop: 5,
+        home_mobile: 2,
+        profile_desktop: 5,
+        profile_mobile: 2,
+        city_desktop: 5,
+        city_mobile: 2,
+        agenda_desktop: 5,
+        agenda_mobile: 2,
+        category_desktop: 5,
+        category_mobile: 2,
+      },
     }),
     [loading, error, site]
   );

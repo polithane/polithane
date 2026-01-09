@@ -16,7 +16,14 @@ export const getSettings = async (category = null) => {
   const settings = await sql`SELECT key, value FROM site_settings`;
 
   settingsCache = settings.reduce((acc, s) => {
-    acc[s.key] = { value: s.value };
+    // JSON değerleri parse et
+    let parsedValue = s.value;
+    try {
+      parsedValue = JSON.parse(s.value);
+    } catch (e) {
+      // JSON değilse string olarak bırak
+    }
+    acc[s.key] = { value: parsedValue };
     return acc;
   }, {});
   cacheTimestamp = now;
@@ -30,9 +37,12 @@ export const getSetting = async (key) => {
 };
 
 export const updateSetting = async (key, value) => {
+  // JSON değerler için stringify
+  const finalValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  
   await sql`
     INSERT INTO site_settings (key, value, updated_at)
-    VALUES (${key}, ${String(value)}, CURRENT_TIMESTAMP)
+    VALUES (${key}, ${finalValue}, CURRENT_TIMESTAMP)
     ON CONFLICT (key) DO UPDATE
     SET value = EXCLUDED.value,
         updated_at = CURRENT_TIMESTAMP

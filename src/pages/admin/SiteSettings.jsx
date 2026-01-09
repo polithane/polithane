@@ -84,6 +84,20 @@ export const SiteSettings = () => {
             allowMessages: fromSettingBool(d.allow_messages, prev.allowMessages),
             homePostsPerRow: Math.max(1, Math.min(3, parseInt(String(d.home_posts_per_row ?? prev.homePostsPerRow), 10) || prev.homePostsPerRow)),
 
+            // Grid settings'leri yükle
+            gridSettings: d.grid_settings && typeof d.grid_settings === 'object' ? {
+              home_desktop: Math.max(1, Math.min(8, parseInt(d.grid_settings.home_desktop, 10) || prev.gridSettings.home_desktop)),
+              home_mobile: Math.max(1, Math.min(8, parseInt(d.grid_settings.home_mobile, 10) || prev.gridSettings.home_mobile)),
+              profile_desktop: Math.max(1, Math.min(8, parseInt(d.grid_settings.profile_desktop, 10) || prev.gridSettings.profile_desktop)),
+              profile_mobile: Math.max(1, Math.min(8, parseInt(d.grid_settings.profile_mobile, 10) || prev.gridSettings.profile_mobile)),
+              city_desktop: Math.max(1, Math.min(8, parseInt(d.grid_settings.city_desktop, 10) || prev.gridSettings.city_desktop)),
+              city_mobile: Math.max(1, Math.min(8, parseInt(d.grid_settings.city_mobile, 10) || prev.gridSettings.city_mobile)),
+              agenda_desktop: Math.max(1, Math.min(8, parseInt(d.grid_settings.agenda_desktop, 10) || prev.gridSettings.agenda_desktop)),
+              agenda_mobile: Math.max(1, Math.min(8, parseInt(d.grid_settings.agenda_mobile, 10) || prev.gridSettings.agenda_mobile)),
+              category_desktop: Math.max(1, Math.min(8, parseInt(d.grid_settings.category_desktop, 10) || prev.gridSettings.category_desktop)),
+              category_mobile: Math.max(1, Math.min(8, parseInt(d.grid_settings.category_mobile, 10) || prev.gridSettings.category_mobile)),
+            } : prev.gridSettings,
+
             socialLinks: social && typeof social === 'object' ? { ...prev.socialLinks, ...social } : prev.socialLinks,
           }));
         }
@@ -106,6 +120,13 @@ export const SiteSettings = () => {
     }));
   };
 
+  const handleGridChange = (gridKey, value) => {
+    setSettings(prev => ({
+      ...prev,
+      gridSettings: { ...prev.gridSettings, [gridKey]: Math.max(1, Math.min(8, parseInt(value, 10) || 2)) }
+    }));
+  };
+
   const handleSave = async () => {
     setLoading(true);
     setSaveMessage('');
@@ -125,6 +146,7 @@ export const SiteSettings = () => {
           allow_messages: !!settings.allowMessages,
           home_posts_per_row: Math.max(1, Math.min(3, Number(settings.homePostsPerRow) || 2)),
           social_links: settings.socialLinks || {},
+          grid_settings: settings.gridSettings || {},
         })
       });
       
@@ -178,25 +200,209 @@ export const SiteSettings = () => {
       <div className="space-y-6">
         {/* Home feed layout */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
             <Globe className="w-5 h-5 text-primary-blue" />
-            Ana Sayfa Görünümü
+            Grid Görünüm Ayarları
           </h3>
-
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div>
-              <p className="font-semibold">Ana sayfada satır başına Polit</p>
-              <p className="text-sm text-gray-600">Mobilde bir satırda kaç Polit kartı görünsün?</p>
+          
+          <div className="space-y-6">
+            {/* Ana Sayfa */}
+            <div className="border-b border-gray-200 pb-6">
+              <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 bg-primary-blue rounded-full"></span>
+                Ana Sayfa
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💻 Bilgisayar (PC)
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.home_desktop)}
+                    onChange={(e) => handleGridChange('home_desktop', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    📱 Mobil
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.home_mobile)}
+                    onChange={(e) => handleGridChange('home_mobile', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-            <select
-              value={String(settings.homePostsPerRow)}
-              onChange={(e) => handleChange('homePostsPerRow', parseInt(e.target.value, 10) || 2)}
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
-            >
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-            </select>
+
+            {/* Profil Detay */}
+            <div className="border-b border-gray-200 pb-6">
+              <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 bg-emerald-600 rounded-full"></span>
+                Profil Detay Sayfası
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💻 Bilgisayar (PC)
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.profile_desktop)}
+                    onChange={(e) => handleGridChange('profile_desktop', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    📱 Mobil
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.profile_mobile)}
+                    onChange={(e) => handleGridChange('profile_mobile', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Şehir Detay */}
+            <div className="border-b border-gray-200 pb-6">
+              <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 bg-amber-600 rounded-full"></span>
+                Şehir Detay Sayfası
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💻 Bilgisayar (PC)
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.city_desktop)}
+                    onChange={(e) => handleGridChange('city_desktop', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    📱 Mobil
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.city_mobile)}
+                    onChange={(e) => handleGridChange('city_mobile', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Gündem */}
+            <div className="border-b border-gray-200 pb-6">
+              <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 bg-red-600 rounded-full"></span>
+                Gündem Sayfası
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💻 Bilgisayar (PC)
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.agenda_desktop)}
+                    onChange={(e) => handleGridChange('agenda_desktop', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    📱 Mobil
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.agenda_mobile)}
+                    onChange={(e) => handleGridChange('agenda_mobile', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Kategori */}
+            <div>
+              <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 bg-purple-600 rounded-full"></span>
+                Kategori Sayfaları
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💻 Bilgisayar (PC)
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.category_desktop)}
+                    onChange={(e) => handleGridChange('category_desktop', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    📱 Mobil
+                  </label>
+                  <select
+                    value={String(settings.gridSettings.category_mobile)}
+                    onChange={(e) => handleGridChange('category_mobile', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold"
+                  >
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n}>{n} Polit / Satır</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Bilgi Notu */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+              <p className="text-sm text-blue-800">
+                <strong>💡 Not:</strong> Her sayfa için PC ve mobil görünümde ayrı ayrı polit kart sayısı ayarlayabilirsiniz. 
+                Kart boyutları otomatik olarak seçilen sayıya göre ayarlanır. SVG ikonlar da dinamik olarak boyutlandırılır.
+              </p>
+            </div>
           </div>
         </div>
 

@@ -15,10 +15,12 @@ import { filterConsecutiveTextAudio } from '../utils/postFilters';
 import api from '../utils/api';
 import { apiCall } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { usePublicSite } from '../contexts/PublicSiteContext';
 import { readSessionCache, writeSessionCache } from '../utils/pageCache';
 
 export const HomePage = () => {
   const { user, isAuthenticated } = useAuth();
+  const { gridSettings } = usePublicSite();
   const navType = useNavigationType();
 
   const cacheKey = `pagecache:home:${isAuthenticated ? String(user?.id || 'me') : 'anon'}`;
@@ -751,10 +753,10 @@ export const HomePage = () => {
                 <section className="min-w-0 rounded-lg p-2" style={{ backgroundColor: activeTab.color }}>
                   {/* Mobil grid (admin ayarlı): satır başına Polit sayısı */}
                   <div
-                    className={[
-                      'grid gap-3',
-                      homePostsPerRow >= 3 ? 'grid-cols-3' : homePostsPerRow === 2 ? 'grid-cols-2' : 'grid-cols-1',
-                    ].join(' ')}
+                    className="grid gap-3"
+                    style={{
+                      gridTemplateColumns: `repeat(${gridSettings?.home_mobile || 2}, 1fr)`
+                    }}
                   >
                     {activeTab.posts.slice(0, mobileVisibleCount).map(post => (
                       <PostCardHorizontal 
@@ -789,8 +791,8 @@ export const HomePage = () => {
                 <HorizontalScroll 
                   autoScroll={true} 
                   scrollInterval={4000}
-                  itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
-                  manualScrollItems={{ desktop: 5, tablet: 3, mobile: 2 }}
+                  itemsPerView={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
+                  manualScrollItems={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
                   onAdvance={({ screenSize, by }) => {
                     if (screenSize !== 'desktop') return;
                     const inc = Number(by || 0) || 0;
@@ -825,8 +827,8 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
-                manualScrollItems={{ desktop: 5, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
+                manualScrollItems={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
                 onAdvance={({ screenSize, by }) => {
                   if (screenSize !== 'desktop') return;
                   const inc = Number(by || 0) || 0;
@@ -861,8 +863,8 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
-                manualScrollItems={{ desktop: 5, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
+                manualScrollItems={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
                 onAdvance={({ screenSize, by }) => {
                   if (screenSize !== 'desktop') return;
                   const inc = Number(by || 0) || 0;
@@ -896,8 +898,8 @@ export const HomePage = () => {
               <HorizontalScroll 
                 autoScroll={true} 
                 scrollInterval={5000}
-                itemsPerView={{ desktop: 5, tablet: 3, mobile: 2 }}
-                manualScrollItems={{ desktop: 5, tablet: 3, mobile: 2 }}
+                itemsPerView={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
+                manualScrollItems={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
                 onAdvance={({ screenSize, by }) => {
                   if (screenSize !== 'desktop') return;
                   const inc = Number(by || 0) || 0;

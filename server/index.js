@@ -105,8 +105,10 @@ import usersRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
 import verificationRoutes from './routes/verification.js';
 import settingsRoutes from './routes/settings.js';
+import publicRoutes from './routes/public.js';
 
 // Use routes
+app.use('/api/public', publicRoutes); // Public endpoints (no auth required)
 app.use('/api/auth', authLimiter, authRoutes); // Auth için sıkı rate limit
 app.use('/api/posts', postsRoutes);
 app.use('/api/messages', messagesRoutes);
