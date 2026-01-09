@@ -15,17 +15,20 @@ function getPool() {
       throw new Error('DATABASE_URL is not set');
     }
     
-    // Vercel Serverless: Minimal pool for session mode
+    // Vercel Serverless: Use connection string with ?pgbouncer=true for pooling
+    // This tells Supabase to use Transaction mode (not Session mode)
+    const pooledConnectionString = connectionString.includes('?')
+      ? `${connectionString}&pgbouncer=true`
+      : `${connectionString}?pgbouncer=true`;
+    
     pool = new Pool({
-      connectionString,
+      connectionString: pooledConnectionString,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-      max: 1, // CRITICAL: Only 1 connection per serverless function instance
-      idleTimeoutMillis: 10000, // Close idle connections after 10s
-      connectionTimeoutMillis: 5000, // Fail fast if can't connect in 5s
-      allowExitOnIdle: true, // Allow process to exit if pool is idle
+      max: 10, // Back to 10 (safe with Transaction mode)
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
     });
     
-    // Handle pool errors
     pool.on('error', (err) => {
       console.error('Unexpected pool error:', err);
     });
