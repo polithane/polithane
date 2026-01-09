@@ -121,13 +121,18 @@ export const ForgotPasswordPage = () => {
         responseTime: new Date().toISOString(),
         success: response.success,
         error: response.error,
+        backendDebug: response.debug || null, // Backend'den gelen detaylı hata
+        backendCode: response.code || null,
         rawResponse: JSON.stringify(response, null, 2),
       });
 
       if (response.success) {
         setSuccess(true);
       } else {
-        setError(response.error || 'Bir hata oluştu');
+        // Backend debug varsa onu da göster
+        const errorMsg = response.error || 'Bir hata oluştu';
+        const debugMsg = response.debug ? ` (Detay: ${response.debug})` : '';
+        setError(errorMsg + debugMsg);
         setLoading(false);
       }
     } catch (err) {
