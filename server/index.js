@@ -876,28 +876,34 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================
 
-// Run migrations on startup
-(async () => {
-  try {
-    console.log('🔄 Checking database migrations...');
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'`;
-    await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS content TEXT`;
-    console.log('✅ Migrations checked/applied');
-  } catch (err) {
-    console.error('⚠️ Migration warning:', err.message);
-  }
-})();
+// Run migrations and start server ONLY in local development (not in Vercel)
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`
-  🚀 Polithane Backend başlatıldı!
-  📍 Port: ${PORT}
-  🗄️  Database: PostgreSQL (Supabase) (Connected)
-  🌍 CORS: Multiple origins supported
-  ⚡ Environment: ${process.env.NODE_ENV}
-  🔒 Allowed Origins: localhost, vercel, polithane.com
-  `);
-});
+if (!isVercel) {
+  // Run migrations on startup (local only)
+  (async () => {
+    try {
+      console.log('🔄 Checking database migrations...');
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'`;
+      await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS content TEXT`;
+      console.log('✅ Migrations checked/applied');
+    } catch (err) {
+      console.error('⚠️ Migration warning:', err.message);
+    }
+  })();
+
+  // Start Express server (local only)
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`
+    🚀 Polithane Backend başlatıldı!
+    📍 Port: ${PORT}
+    🗄️  Database: PostgreSQL (Supabase) (Connected)
+    🌍 CORS: Multiple origins supported
+    ⚡ Environment: ${process.env.NODE_ENV}
+    🔒 Allowed Origins: localhost, vercel, polithane.com
+    `);
+  });
+}
 
 // Export app for Vercel serverless
 export default app;
