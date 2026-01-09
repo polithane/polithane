@@ -190,7 +190,7 @@ const SmartVideo = ({ src, autoPlay = false, overlay = null }) => {
 
   return (
     <div className="w-full">
-      <div className="relative w-full bg-black rounded-lg overflow-hidden flex items-center justify-center">
+      <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '9 / 16' }}>
         <video
           ref={videoRef}
           src={url}
@@ -200,7 +200,7 @@ const SmartVideo = ({ src, autoPlay = false, overlay = null }) => {
           controls={false}
           autoPlay={autoPlay}
           preload="auto"
-          className="w-full h-auto object-contain"
+          className="w-full h-full object-cover"
           onClick={togglePlay}
         />
         {overlay ? <div className="absolute inset-0 pointer-events-none">{overlay}</div> : null}

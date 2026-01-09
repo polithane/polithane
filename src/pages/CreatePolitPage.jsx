@@ -1870,7 +1870,7 @@ export const CreatePolitPage = () => {
                     <video
                       ref={previewRef}
                       src={!isRecording ? (recordedUrl || undefined) : undefined}
-                      className="w-full h-full object-contain bg-black"
+                      className="w-full h-full object-cover bg-black"
                       style={videoRotate ? { transform: 'rotate(90deg)', transformOrigin: 'center center' } : undefined}
                       playsInline
                       muted={isRecording}
@@ -1971,7 +1971,7 @@ export const CreatePolitPage = () => {
                            <div className="grid grid-cols-3 gap-2">
                               {[0,1,2].map(i => (
                                 <div key={i} className="aspect-[9/8] bg-gray-100 rounded-lg animate-pulse flex items-center justify-center border-2 border-gray-200">
-                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                  <div className="w-12 h-12 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
                                 </div>
                               ))}
                            </div>
@@ -2016,7 +2016,7 @@ export const CreatePolitPage = () => {
                     (recordedUrl && !isRecording && contentType === 'video' && (isCoverPreparing || videoThumbs.length === 0)) ? (
                       <div className="pt-2">
                         <div className="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-bold text-xs flex items-center justify-center gap-2 border border-gray-200">
-                          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                          <div className="w-12 h-12 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
                           <span>Kapak resimleri yükleniyor, lütfen bekleyin!</span>
                         </div>
                       </div>

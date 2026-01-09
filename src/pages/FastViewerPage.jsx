@@ -1360,7 +1360,7 @@ export const FastViewerPage = () => {
                   autoPlay
                   controls={false}
                   preload="auto"
-                  className="max-w-full max-h-full w-auto h-auto object-contain"
+                  className="w-full h-full object-cover"
                 />
               </div>
             ) : current.content_type === 'audio' ? (
