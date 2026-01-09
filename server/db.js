@@ -22,7 +22,7 @@ function getPool() {
     pool = new Pool({
       connectionString,
       ssl: isProduction ? { rejectUnauthorized: false } : undefined,
-      max: 2, // Minimal pool for serverless (was 10, caused MaxClients error)
+      max: 3, // Conservative pool for serverless (2 was too restrictive, 10 caused MaxClients)
       idleTimeoutMillis: 10000, // Close idle connections quickly
       connectionTimeoutMillis: 5000,
     });
