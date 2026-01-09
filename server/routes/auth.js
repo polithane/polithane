@@ -276,8 +276,26 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const [user] = await sql`SELECT * FROM users WHERE id = ${req.user.id}`;
     if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+    
+    // Token'daki is_admin ile DB'deki is_admin farklıysa yeni token oluştur
+    const tokenAdmin = req.user.is_admin === true || req.user.is_admin === 'true';
+    const dbAdmin = user.is_admin === true || user.is_admin === 'true';
+    
+    if (tokenAdmin !== dbAdmin) {
+      // Yetki değişmiş, yeni token oluştur
+      const newToken = generateToken(user);
+      console.log(`🔄 Token refreshed for user ${user.id}: is_admin changed from ${tokenAdmin} to ${dbAdmin}`);
+      return res.json({ 
+        success: true, 
+        data: user,
+        token: newToken,
+        tokenRefreshed: true 
+      });
+    }
+    
     res.json({ success: true, data: user });
   } catch (error) {
+    console.error('Get me error:', error);
     res.status(500).json({ success: false, error: 'Kullanıcı bilgisi alınamadı.' });
   }
 });
