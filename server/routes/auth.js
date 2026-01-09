@@ -183,10 +183,21 @@ router.post('/register', upload.single('document'), async (req, res) => {
     `.catch(err => console.error('Notification create error:', err));
 
     if (emailVerificationEnabled && verificationToken) {
-      sendVerificationEmail(email, verificationToken).catch(console.error);
+      // Verification email gönder (async - hata varsa log'la ama kayıttan sonra gönder)
+      sendVerificationEmail(email, verificationToken)
+        .then(r => {
+          if (r?.success) console.log('✅ Verification email sent to:', email);
+          else console.error('❌ Verification email failed:', r?.error);
+        })
+        .catch(err => console.error('❌ Verification email error:', err));
     } else if (user_type === 'citizen') {
       // Verification kapalıysa direkt hoş geldiniz
-      sendWelcomeEmail(email, full_name).catch(console.error);
+      sendWelcomeEmail(email, full_name)
+        .then(r => {
+          if (r?.success) console.log('✅ Welcome email sent to:', email);
+          else console.error('❌ Welcome email failed:', r?.error);
+        })
+        .catch(err => console.error('❌ Welcome email error:', err));
     }
 
     const token = generateToken(user);
@@ -335,9 +346,20 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     const expires = new Date(Date.now() + 3600000);
     await sql`UPDATE users SET password_reset_token = ${token}, password_reset_expires = ${expires} WHERE id = ${user.id}`;
 
-    sendPasswordResetEmail(email, token).catch(console.error);
+    // Mail gönderimini bekle ve hata kontrolü yap
+    const mailResult = await sendPasswordResetEmail(email, token);
+    if (!mailResult?.success) {
+      console.error('❌ Password reset email failed:', mailResult?.error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Email gönderilemedi. Lütfen daha sonra tekrar deneyin.' 
+      });
+    }
+
+    console.log('✅ Password reset email sent to:', email);
     res.json({ success: true, message: 'Şifre sıfırlama linki gönderildi.' });
   } catch (err) {
+    console.error('Forgot password error:', err);
     res.status(500).json({ success: false, error: 'Hata oluştu.' });
   }
 });
@@ -399,7 +421,12 @@ router.get('/verify-email', async (req, res) => {
     `;
 
     // Hoş geldiniz e-postası (doğrulama sonrası)
-    sendWelcomeEmail(user.email, user.full_name || user.username).catch(console.error);
+    sendWelcomeEmail(user.email, user.full_name || user.username)
+      .then(r => {
+        if (r?.success) console.log('✅ Welcome email sent to:', user.email);
+        else console.error('❌ Welcome email failed:', r?.error);
+      })
+      .catch(err => console.error('❌ Welcome email error:', err));
 
     res.json({
       success: true,
