@@ -26,7 +26,6 @@ export const MailSettings = () => {
     verification_channel: 'email',
     brevo_api_key_configured: false,
   });
-  const [brevoApiKeyDraft, setBrevoApiKeyDraft] = useState('');
 
   const [test, setTest] = useState({
     to: defaultTo,
@@ -94,11 +93,9 @@ export const MailSettings = () => {
         mail_reply_to_name: String(settings.mail_reply_to_name || '').trim(),
         email_verification_enabled: String(settings.email_verification_enabled),
         verification_channel: String(settings.verification_channel || 'email'),
-        brevo_api_key: String(brevoApiKeyDraft || '').trim() || undefined,
       };
       const r = await api.admin.updateMailSettings(payload);
       if (!r?.success) throw new Error(r?.error || 'Kaydedilemedi.');
-      setBrevoApiKeyDraft('');
       toast.success('Mail ayarları kaydedildi.');
       await load();
     } catch (e) {
@@ -266,18 +263,23 @@ export const MailSettings = () => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Brevo API Key</label>
-              <input
-                type="password"
-                value={brevoApiKeyDraft}
-                onChange={(e) => setBrevoApiKeyDraft(e.target.value)}
-                placeholder={settings.brevo_api_key_configured ? '•••••••• (kayıtlı)' : 'Brevo API Key girin'}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-blue"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                {settings.brevo_api_key_configured ? 'API key kayıtlı (gizli).' : 'API key henüz tanımlı değil.'}
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldCheck className="w-5 h-5 text-blue-600" />
+                <div className="font-black text-blue-900">🔒 API Key Güvenliği</div>
               </div>
+              <p className="text-sm text-blue-800 mb-2">
+                Güvenlik nedeniyle <strong>Brevo API Key</strong> artık sadece server environment'tan alınır.
+              </p>
+              <p className="text-xs text-blue-700">
+                Değiştirmek için sistem yöneticisine başvurun veya Vercel/hosting platformunda environment variable olarak ekleyin: <code className="bg-blue-100 px-1 rounded">BREVO_API_KEY</code>
+              </p>
+              {settings.brevo_api_key_configured && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-green-700 font-semibold">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  API Key aktif (environment'tan)
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
