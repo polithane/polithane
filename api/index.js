@@ -4203,13 +4203,11 @@ function requireAuth(req, res) {
 }
 
 function getPublicAppUrl(req) {
-  const envUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || '';
+  // Priority: FRONTEND_URL > PUBLIC_APP_URL > APP_URL (Vercel uses FRONTEND_URL)
+  const envUrl = process.env.FRONTEND_URL || process.env.PUBLIC_APP_URL || process.env.APP_URL || '';
   if (envUrl) return String(envUrl).replace(/\/+$/, '');
-  // best-effort from request
-  const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
-  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
-  if (host) return `${proto}://${host}`.replace(/\/+$/, '');
-  // Prefer primary domain in absence of host (safety)
+  // NEVER use request host (can be preview deployment)
+  // Always fallback to production domain
   return 'https://www.polithane.com';
 }
 

@@ -182,12 +182,7 @@ export const ForgotPasswordPage = () => {
           </div>
 
           {/* DEBUG INFO - Success sayfasında da göster */}
-          {debugInfo && (
-            <div className="mb-6 bg-gray-900 text-green-400 rounded-lg p-4 text-xs font-mono overflow-auto max-h-96">
-              <div className="font-bold text-yellow-400 mb-2">🔍 DEBUG INFO (GEÇİCİ - SİLİNECEK):</div>
-              <pre className="whitespace-pre-wrap break-all">{JSON.stringify(debugInfo, null, 2)}</pre>
-            </div>
-          )}
+          {/* DEBUG INFO - Removed (not needed anymore) */}
 
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <div className="text-center">
@@ -251,19 +246,13 @@ export const ForgotPasswordPage = () => {
               <span className="text-4xl font-black text-white">P</span>
             </div>
           </div>
-          <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane. Şifremi Unuttum</h1>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">Polithane</h1>
           <p className="text-gray-600">Özgür, açık, şeffaf siyaset, bağımsız medya!</p>
         </div>
 
         {/* Form */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
-          {/* DEBUG INFO - Geçici */}
-          {debugInfo && (
-            <div className="mb-6 bg-gray-900 text-green-400 rounded-lg p-4 text-xs font-mono overflow-auto max-h-96">
-              <div className="font-bold text-yellow-400 mb-2">🔍 DEBUG INFO (GEÇİCİ - SİLİNECEK):</div>
-              <pre className="whitespace-pre-wrap">{JSON.stringify(debugInfo, null, 2)}</pre>
-            </div>
-          )}
+          {/* DEBUG INFO - Removed (not needed anymore) */}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
