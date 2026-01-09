@@ -898,3 +898,6 @@ app.listen(PORT, '0.0.0.0', () => {
   🔒 Allowed Origins: localhost, vercel, polithane.com
   `);
 });
+
+// Export app for Vercel serverless
+export default app;
