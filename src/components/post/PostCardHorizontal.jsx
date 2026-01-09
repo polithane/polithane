@@ -336,31 +336,19 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
         </div>
       </div>
       
-      {/* İçerik - Standart 150px yükseklikte görsel */}
+      {/* İçerik - Kare media alanı */}
       <div className="mb-3">
-        {/* Görsel/İkon Alanı - Her zaman 150px yükseklikte */}
-        <div className="relative w-full rounded-lg overflow-hidden mb-2" style={{ height: '150px' }}>
+        {/* Görsel/İkon Alanı - Her zaman KARE (aspect-square) */}
+        <div className="relative w-full rounded-lg overflow-hidden mb-2 aspect-square">
           {post.content_type === CONTENT_TYPES.TEXT && (
-            // Yazı içeriği - Defter zemin + 3D kalem + ince border
-            <div className="w-full h-full bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 flex items-center justify-center relative border border-gray-300"
-                 style={{
-                   backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, #e5e7eb 24px, #e5e7eb 25px)',
-                   boxShadow: 'inset 0 0 0 1px rgba(229, 231, 235, 0.5)'
-                 }}>
-              {/* 3D Kalem İkonu */}
-              <div className="relative" style={{ filter: 'drop-shadow(4px 6px 8px rgba(0,0,0,0.3))' }}>
-                <svg width="80" height="80" viewBox="0 0 100 100" className="transform rotate-[-20deg]">
-                  {/* Kalem gövdesi */}
-                  <rect x="30" y="10" width="12" height="70" fill="#FCD34D" stroke="#F59E0B" strokeWidth="1"/>
-                  <rect x="30" y="10" width="6" height="70" fill="#FDE68A" opacity="0.6"/>
-                  {/* Kalem ucu */}
-                  <polygon points="36,80 30,90 42,90" fill="#78716C" stroke="#57534E" strokeWidth="1"/>
-                  <polygon points="36,80 30,90 36,90" fill="#A8A29E" opacity="0.5"/>
-                  {/* Silgi */}
-                  <rect x="30" y="5" width="12" height="8" fill="#EF4444" stroke="#DC2626" strokeWidth="1" rx="1"/>
-                  <rect x="30" y="5" width="6" height="8" fill="#FCA5A5" opacity="0.5" rx="1"/>
-                </svg>
-              </div>
+            // Yazı içeriği - Supabase'den yüklenen görsel
+            <div className="w-full h-full bg-gray-50 flex items-center justify-center relative">
+              <img 
+                src="https://nkwgnulilfzrzecwccep.supabase.co/storage/v1/object/public/icons/250x250metin.png"
+                alt="Metin"
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
             </div>
           )}
           {post.content_type === CONTENT_TYPES.IMAGE && (
@@ -469,34 +457,19 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             </>
           )}
           {post.content_type === CONTENT_TYPES.AUDIO && (
-            // Ses içeriği - 3D Mikrofon
-            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center relative">
-              <div className="text-center">
-                {/* 3D Mikrofon İkonu */}
-                <div className="relative inline-block mb-4" style={{ filter: 'drop-shadow(4px 6px 10px rgba(0,0,0,0.3))' }}>
-                  <svg width="60" height="80" viewBox="0 0 100 120">
-                    {/* Mikrofon başı */}
-                    <defs>
-                      <linearGradient id="micGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="1" />
-                        <stop offset="100%" stopColor="#1e40af" stopOpacity="1" />
-                      </linearGradient>
-                    </defs>
-                    <rect x="35" y="20" width="30" height="40" rx="15" fill="url(#micGradient)" stroke="#1e3a8a" strokeWidth="2"/>
-                    <rect x="35" y="20" width="15" height="40" rx="15" fill="#60a5fa" opacity="0.5"/>
-                    {/* Mikrofon gövdesi */}
-                    <path d="M 35 65 Q 35 80 50 80 Q 65 80 65 65" stroke="#1e3a8a" strokeWidth="3" fill="none"/>
-                    {/* Stand */}
-                    <line x1="50" y1="80" x2="50" y2="100" stroke="#1e3a8a" strokeWidth="3"/>
-                    <line x1="35" y1="100" x2="65" y2="100" stroke="#1e3a8a" strokeWidth="4" strokeLinecap="round"/>
-                    {/* Grid çizgileri */}
-                    <line x1="40" y1="30" x2="60" y2="30" stroke="#1e40af" strokeWidth="1" opacity="0.5"/>
-                    <line x1="40" y1="40" x2="60" y2="40" stroke="#1e40af" strokeWidth="1" opacity="0.5"/>
-                    <line x1="40" y1="50" x2="60" y2="50" stroke="#1e40af" strokeWidth="1" opacity="0.5"/>
-                  </svg>
+            // Ses içeriği - Supabase'den yüklenen görsel + süre
+            <div className="w-full h-full bg-gray-50 flex items-center justify-center relative">
+              <img 
+                src="https://nkwgnulilfzrzecwccep.supabase.co/storage/v1/object/public/icons/250x250ses.png"
+                alt="Ses"
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+              {post.media_duration && (
+                <div className="absolute bottom-2 right-2 bg-black/75 text-white text-xs font-bold px-2 py-1 rounded">
+                  {formatDuration(post.media_duration)}
                 </div>
-                <p className="text-sm text-gray-700 font-semibold">{formatDuration(post.media_duration)}</p>
-              </div>
+              )}
             </div>
           )}
         </div>

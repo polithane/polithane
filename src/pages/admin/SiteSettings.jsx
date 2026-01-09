@@ -32,7 +32,20 @@ export const SiteSettings = () => {
     allowRegistration: true,
     allowComments: true,
     allowMessages: true,
-    homePostsPerRow: 2,
+    homePostsPerRow: 2, // Eski uyumluluk için
+    // Yeni detaylı grid ayarları
+    gridSettings: {
+      home_desktop: 5,
+      home_mobile: 2,
+      profile_desktop: 5,
+      profile_mobile: 2,
+      city_desktop: 5,
+      city_mobile: 2,
+      agenda_desktop: 5,
+      agenda_mobile: 2,
+      category_desktop: 5,
+      category_mobile: 2,
+    },
     socialLinks: {
       twitter: 'https://twitter.com/polithane',
       facebook: 'https://facebook.com/polithane',
