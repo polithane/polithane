@@ -339,28 +339,48 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email gerekli.' });
 
+    console.log('🔍 Password reset requested for:', email);
+
+    // Kullanıcıyı kontrol et
     const [user] = await sql`SELECT id, email, full_name FROM users WHERE LOWER(email) = LOWER(${email})`;
-    if (!user) return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+    
+    if (!user) {
+      console.log('❌ User not found:', email);
+      // Güvenlik: Kullanıcı var mı yok mu belli etme (timing attack'a karşı)
+      // Ama yine de 404 dön
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Bu email adresi ile kayıtlı kullanıcı bulunamadı.' 
+      });
+    }
+
+    console.log('✅ User found:', user.id, user.email);
 
     const token = generateVerificationToken();
     const expires = new Date(Date.now() + 3600000);
     await sql`UPDATE users SET password_reset_token = ${token}, password_reset_expires = ${expires} WHERE id = ${user.id}`;
 
+    console.log('🔑 Reset token generated and saved');
+
     // Mail gönderimini bekle ve hata kontrolü yap
+    console.log('📧 Attempting to send password reset email...');
     const mailResult = await sendPasswordResetEmail(email, token);
+    
+    console.log('📬 Mail result:', JSON.stringify(mailResult, null, 2));
+    
     if (!mailResult?.success) {
       console.error('❌ Password reset email failed:', mailResult?.error);
       return res.status(500).json({ 
         success: false, 
-        error: 'Email gönderilemedi. Lütfen daha sonra tekrar deneyin.' 
+        error: `Email gönderilemedi: ${mailResult?.error || 'Bilinmeyen hata'}` 
       });
     }
 
-    console.log('✅ Password reset email sent to:', email);
-    res.json({ success: true, message: 'Şifre sıfırlama linki gönderildi.' });
+    console.log('✅ Password reset email sent successfully to:', email);
+    res.json({ success: true, message: 'Şifre sıfırlama linki email adresinize gönderildi.' });
   } catch (err) {
-    console.error('Forgot password error:', err);
-    res.status(500).json({ success: false, error: 'Hata oluştu.' });
+    console.error('❌ Forgot password error:', err);
+    res.status(500).json({ success: false, error: 'Hata oluştu: ' + err.message });
   }
 });
 

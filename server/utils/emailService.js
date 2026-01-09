@@ -42,15 +42,26 @@ export const sendWelcomeEmail = async (email, fullName) => {
 // Send password reset email
 export const sendPasswordResetEmail = async (email, resetToken) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://polithane.com';
+  
+  console.log('📧 sendPasswordResetEmail called with:');
+  console.log('  - Email:', email);
+  console.log('  - Token:', resetToken?.substring(0, 10) + '...');
+  console.log('  - Frontend URL:', frontendUrl);
 
   try {
-    return await sendEmail({
+    const htmlContent = passwordResetEmailTemplate(email, resetToken, frontendUrl);
+    console.log('📝 Template generated, length:', htmlContent?.length);
+    
+    const result = await sendEmail({
       to: [{ email }],
       subject: '🔐 Şifre Sıfırlama - Polithane',
-      html: passwordResetEmailTemplate(email, resetToken, frontendUrl),
+      html: htmlContent,
     });
+    
+    console.log('📮 sendEmail result:', result);
+    return result;
   } catch (error) {
-    console.error('Password reset email gönderme hatası:', error);
+    console.error('❌ Password reset email error:', error);
     return { success: false, error: error.message };
   }
 };
