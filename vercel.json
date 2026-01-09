@@ -8,8 +8,16 @@
       "main": true
     }
   },
+  "functions": {
+    "api/**/*.js": {
+      "memory": 1024,
+      "maxDuration": 30,
+      "includeFiles": "{server/**,package.json}"
+    }
+  },
   "routes": [
     { "handle": "filesystem" },
+    { "src": "/api/(.*)", "dest": "/api/index" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
