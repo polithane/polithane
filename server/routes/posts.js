@@ -221,7 +221,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Post bulunamadı' });
     }
 
-    if (post.user_id !== user_id && !req.user.is_admin) {
+    const isAdmin = req.user.is_admin === true || req.user.is_admin === 'true';
+    if (post.user_id !== user_id && !isAdmin) {
+      console.log('❌ Edit rejected: user_id:', user_id, 'post.user_id:', post.user_id, 'is_admin:', req.user.is_admin);
       return res.status(403).json({ success: false, error: 'Bu postu düzenleme yetkiniz yok' });
     }
 
@@ -257,9 +259,12 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Post bulunamadı' });
     }
 
-    if (post.user_id !== user_id && !req.user.is_admin) {
+    const isAdmin = req.user.is_admin === true || req.user.is_admin === 'true';
+    if (post.user_id !== user_id && !isAdmin) {
+      console.log('❌ Delete rejected: user_id:', user_id, 'post.user_id:', post.user_id, 'is_admin:', req.user.is_admin);
       return res.status(403).json({ success: false, error: 'Bu postu silme yetkiniz yok' });
     }
+    console.log('✅ Delete allowed: user_id:', user_id, 'post.user_id:', post.user_id, 'is_admin:', isAdmin);
 
     await sql`DELETE FROM posts WHERE id = ${id}`;
 

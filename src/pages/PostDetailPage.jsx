@@ -933,9 +933,34 @@ export const PostDetailPage = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="container-main py-8">
         {loading ? (
-          <div className="text-center">Yükleniyor...</div>
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-primary-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Yükleniyor...</p>
+            </div>
+          </div>
         ) : error || !post ? (
-          <div className="text-center text-gray-700">{error || 'Paylaşım bulunamadı.'}</div>
+          <div className="max-w-md mx-auto">
+            <div className="bg-white rounded-xl shadow-md p-8 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Paylaşım Bulunamadı</h2>
+              <p className="text-gray-600 mb-6">
+                {error || 'Bu paylaşım silinmiş olabilir veya mevcut değil.'}
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button variant="outline" onClick={() => navigate(-1)}>
+                  Geri Dön
+                </Button>
+                <Button onClick={() => navigate('/')}>
+                  Ana Sayfaya Git
+                </Button>
+              </div>
+            </div>
+          </div>
         ) : (
           <div ref={detailBoxRef} className="mx-auto w-full max-w-[693px]">
             {/* Kullanıcı Bilgisi */}
@@ -1875,7 +1900,24 @@ export const PostDetailPage = () => {
                   setCommentError('');
                   await postsApi.delete(uiPost.post_id);
                   setShowDeletePost(false);
-                  navigate('/');
+                  
+                  // Profil cache'ini temizle (sayılar güncellensin)
+                  if (uiPost.user_username) {
+                    try {
+                      const cacheKeys = Object.keys(sessionStorage).filter(k => k.includes(`profile:`) && k.includes(uiPost.user_username));
+                      cacheKeys.forEach(k => sessionStorage.removeItem(k));
+                    } catch (e) {
+                      // ignore
+                    }
+                  }
+                  
+                  // Eğer profil sayfasından geldiyse profil sayfasına dön, yoksa önceki sayfaya
+                  const fromProfile = document.referrer.includes('/profile/') || location.state?.from?.includes('/profile/');
+                  if (fromProfile && uiPost.user_username) {
+                    navigate(`/profile/${uiPost.user_username}`, { replace: true });
+                  } else {
+                    navigate(-1); // Önceki sayfaya dön
+                  }
                 } catch (e) {
                   setCommentError(e?.message || 'Paylaşım silinemedi.');
                   setShowDeletePost(false);
