@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, AlertCircle, CheckCircle, ArrowLeft, XCircle, Loader2 } from 'lucide-react';
 import { apiCall } from '../../utils/api';
@@ -14,64 +14,66 @@ export const ForgotPasswordPage = () => {
   
   // Email validation states
   const [emailStatus, setEmailStatus] = useState(''); // 'checking', 'found', 'not-found'
-  const [emailCheckTimeout, setEmailCheckTimeout] = useState(null);
+  const emailCheckTimeoutRef = useRef(null);
   
   // DEBUG: Geçici debug log'ları
   const [debugInfo, setDebugInfo] = useState(null);
 
-  // Check if email exists in system
-  const checkEmailExists = async (emailValue) => {
-    if (!emailValue || emailValue.length < 5) {
-      setEmailStatus('');
-      return;
-    }
-
-    // Basic email format check
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailValue)) {
-      setEmailStatus('');
-      return;
-    }
-
-    // Turkish character check
-    const hasTurkish = /[çğıöşüİÇĞÖŞÜ]/.test(emailValue);
-    if (hasTurkish) {
-      setEmailStatus('not-found');
-      return;
-    }
-
-    setEmailStatus('checking');
-
-    if (emailCheckTimeout) clearTimeout(emailCheckTimeout);
-
-    const timeout = setTimeout(async () => {
-      try {
-        const apiBase = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000'))
-          .replace(/\/+$/, '')
-          .replace(/\/api$/, '');
-        const response = await fetch(`${apiBase}/api/auth/check-availability?email=${encodeURIComponent(emailValue)}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          // In forgot password, we want TAKEN emails (users that exist)
-          setEmailStatus(data.emailAvailable ? 'not-found' : 'found');
-        } else {
-          setEmailStatus('');
-        }
-      } catch (err) {
-        console.error('Email check error:', err);
-        setEmailStatus('');
-      }
-    }, 500);
-
-    setEmailCheckTimeout(timeout);
-  };
-
   // Check email when it changes
   useEffect(() => {
+    const checkEmailExists = async (emailValue) => {
+      if (!emailValue || emailValue.length < 5) {
+        setEmailStatus('');
+        return;
+      }
+
+      // Basic email format check
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailValue)) {
+        setEmailStatus('');
+        return;
+      }
+
+      // Turkish character check
+      const hasTurkish = /[çğıöşüİÇĞÖŞÜ]/.test(emailValue);
+      if (hasTurkish) {
+        setEmailStatus('not-found');
+        return;
+      }
+
+      setEmailStatus('checking');
+
+      if (emailCheckTimeoutRef.current) {
+        clearTimeout(emailCheckTimeoutRef.current);
+      }
+
+      emailCheckTimeoutRef.current = setTimeout(async () => {
+        try {
+          const apiBase = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000'))
+            .replace(/\/+$/, '')
+            .replace(/\/api$/, '');
+          const response = await fetch(`${apiBase}/api/auth/check-availability?email=${encodeURIComponent(emailValue)}`);
+          const data = await response.json();
+          
+          if (data.success) {
+            // In forgot password, we want TAKEN emails (users that exist)
+            setEmailStatus(data.emailAvailable ? 'not-found' : 'found');
+          } else {
+            setEmailStatus('');
+          }
+        } catch (err) {
+          console.error('Email check error:', err);
+          setEmailStatus('');
+        }
+      }, 500);
+    };
+
     checkEmailExists(email);
+
     return () => {
-      if (emailCheckTimeout) clearTimeout(emailCheckTimeout);
+      if (emailCheckTimeoutRef.current) {
+        clearTimeout(emailCheckTimeoutRef.current);
+      }
     };
   }, [email]);
 
