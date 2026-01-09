@@ -561,4 +561,22 @@ router.delete('/email-templates/:id', async (req, res) => {
   }
 });
 
+// ============================================
+// SYNC USER POST COUNTS
+// ============================================
+router.post('/sync-post-counts', async (req, res) => {
+  try {
+    const { syncAllUserPostCounts } = await import('../utils/syncUserPostCount.js');
+    const count = await syncAllUserPostCounts();
+    res.json({ 
+      success: true, 
+      message: `${count} kullanıcının post sayısı senkronize edildi.`,
+      count 
+    });
+  } catch (error) {
+    console.error('Sync post counts error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

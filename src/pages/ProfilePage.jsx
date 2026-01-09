@@ -619,7 +619,7 @@ export const ProfilePage = () => {
                   className="cursor-pointer hover:opacity-80 transition-opacity"
                   title="Paylaşımları gör"
                 >
-                  <div className="text-xl font-bold">{formatNumber(user.post_count)}</div>
+                  <div className="text-xl font-bold">{formatNumber(Array.isArray(userPosts) ? userPosts.length : (user.post_count || 0))}</div>
                   <div className="text-sm text-gray-500">Paylaşım</div>
                 </div>
                 <div>

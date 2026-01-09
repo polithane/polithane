@@ -2,6 +2,7 @@ import express from 'express';
 import { sql } from '../index.js';
 import { upload } from '../utils/upload.js';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
+import { syncUserPostCount } from '../utils/syncUserPostCount.js';
 
 const router = express.Router();
 
@@ -268,12 +269,18 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
     await sql`DELETE FROM posts WHERE id = ${id}`;
 
-    // Update user post count
-    await sql`
-      UPDATE users 
-      SET post_count = GREATEST(post_count - 1, 0)
-      WHERE id = ${post.user_id}
-    `;
+    // Update user post count - sync with actual count for accuracy
+    try {
+      await syncUserPostCount(post.user_id);
+    } catch (e) {
+      console.error('Failed to sync post count:', e);
+      // Fallback to simple decrement if sync fails
+      await sql`
+        UPDATE users 
+        SET post_count = GREATEST(post_count - 1, 0)
+        WHERE id = ${post.user_id}
+      `;
+    }
 
     res.json({ success: true, message: 'Post silindi' });
   } catch (error) {
