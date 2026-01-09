@@ -1691,7 +1691,12 @@ export const CreatePolitPage = () => {
         // ignore
       }
       return navigate(`/fast/${encodeURIComponent(startKey)}`, {
-        state: { fastQueue: queue, fastStartKey: startKey, fastStartIndex: startIndex },
+        state: { 
+          fastQueue: queue, 
+          fastStartKey: startKey, 
+          fastStartIndex: startIndex,
+          startFromNewest: true, // Yeni eklenen fast için en yeni fast'ten başla
+        },
       });
     } catch {
       // Minimal fallback: open viewer for my key only.
@@ -1931,13 +1936,6 @@ export const CreatePolitPage = () => {
                   {recordedUrl && !isRecording && (
                     <div className="space-y-2">
                         <div className="flex items-center justify-between px-1">
-                           {/* Loading State */}
-                           {isGeneratingThumbs && (
-                             <span className="text-[10px] font-black uppercase tracking-tighter text-gray-600 flex items-center gap-2">
-                               <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                               Kapak resimleri oluşturuluyor...
-                             </span>
-                           )}
                            {/* Must Select State */}
                            {!isGeneratingThumbs && videoThumbs.length > 0 && selectedVideoThumbIdx < 0 && (
                              <span className="text-[10px] font-black uppercase tracking-tighter text-rose-600 animate-pulse">
@@ -1972,7 +1970,7 @@ export const CreatePolitPage = () => {
                         {isGeneratingThumbs && (
                            <div className="grid grid-cols-3 gap-2">
                               {[0,1,2].map(i => (
-                                <div key={i} className="aspect-[9/16] bg-gray-100 rounded-lg animate-pulse flex items-center justify-center border-2 border-gray-200">
+                                <div key={i} className="aspect-[9/8] bg-gray-100 rounded-lg animate-pulse flex items-center justify-center border-2 border-gray-200">
                                   <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                                 </div>
                               ))}
@@ -1987,7 +1985,7 @@ export const CreatePolitPage = () => {
                                 type="button" 
                                 onClick={() => setSelectedVideoThumbIdx(i)} 
                                 className={[
-                                  'rounded-lg overflow-hidden border-2 transition-all relative aspect-[9/16]', 
+                                  'rounded-lg overflow-hidden border-2 transition-all relative aspect-[9/8]', 
                                   selectedVideoThumbIdx === i 
                                     ? `${theme.borderClass} ring-2 ${theme.ringClass} scale-105` 
                                     : 'border-gray-200 opacity-70 hover:opacity-100 hover:scale-102'
@@ -2009,7 +2007,7 @@ export const CreatePolitPage = () => {
                   {/* Dinamik Gönder Butonu ve Yükleme Durumu */}
                   {canShowSubmitInMediaStep ? (
                     <div className="pt-2">
-                      <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight">
+                      <button onClick={() => isFastMode ? publishPrimary() : setStep('desc')} disabled={loading} className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight disabled:opacity-60 disabled:cursor-not-allowed">
                         {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'GÖNDER'}
                       </button>
                     </div>
@@ -2160,7 +2158,8 @@ export const CreatePolitPage = () => {
                         <div className="pt-2">
                           <button 
                             onClick={() => isFastMode ? publishPrimary() : setStep('desc')} 
-                            className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight"
+                            disabled={loading}
+                            className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-md active:scale-[0.98] transition-all uppercase tracking-tight disabled:opacity-60 disabled:cursor-not-allowed"
                           >
                             {loading ? `YÜKLENİYOR %${Math.round(uploadPct * 100)}` : 'GÖNDER'}
                           </button>
@@ -2310,10 +2309,10 @@ export const CreatePolitPage = () => {
                     ) : (
                       <button
                         type="button"
-                        disabled={loading}
+                        disabled={loading || preparingMedia}
                         onClick={publishPrimary}
                         className={[
-                          'w-full rounded-3xl text-white font-black disabled:opacity-60',
+                          'w-full rounded-3xl text-white font-black disabled:opacity-60 disabled:cursor-not-allowed',
                           'bg-emerald-600 hover:bg-emerald-700',
                           'py-5',
                         ].join(' ')}

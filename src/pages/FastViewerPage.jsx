@@ -386,6 +386,9 @@ export const FastViewerPage = () => {
     (async () => {
       const key = String(queue?.[userIdx]?.key || safeKey || '').trim();
       if (!key) return;
+      // Check if this is a newly posted fast (startFromNewest flag)
+      const startFromNewest = location?.state?.startFromNewest || false;
+      
       // Optimistic: show cached immediately if possible to reduce "did it click?" feeling.
       const cached = itemsCacheRef.current.get(key);
       if (cached && !cancelled) {
@@ -395,7 +398,7 @@ export const FastViewerPage = () => {
         pendingStartRef.current = null;
         pendingUserDirRef.current = 0;
         if (Array.isArray(cached.items) && cached.items.length) {
-          if (pending === 'last') setIdx(Math.max(0, cached.items.length - 1));
+          if (pending === 'last' || startFromNewest) setIdx(Math.max(0, cached.items.length - 1));
           else setIdx(0);
         }
       }
@@ -418,7 +421,8 @@ export const FastViewerPage = () => {
           closeToList();
           return;
         }
-        if (pending === 'last') setIdx(Math.max(0, list.length - 1));
+        // Yeni fast atıldığında en son fast'ten başla
+        if (pending === 'last' || startFromNewest) setIdx(Math.max(0, list.length - 1));
         else setIdx(0);
         // Seed local like counts
         try {
@@ -444,7 +448,7 @@ export const FastViewerPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [closeToList, fetchFastForKey, queue, safeKey, userIdx]);
+  }, [closeToList, fetchFastForKey, location?.state?.startFromNewest, queue, safeKey, userIdx]);
 
   // Prefetch neighbors to make edge transitions faster.
   useEffect(() => {
@@ -472,9 +476,17 @@ export const FastViewerPage = () => {
     if (!currentDuration) return;
     if (isPaused) return;
 
+    // Yeni fast atıldığında ve en son fast'teyse, otomatik ilerlemeyi geciktir
+    const startFromNewest = location?.state?.startFromNewest || false;
+    const isLastItem = idx === items.length - 1;
+    const shouldDelayAutoAdvance = startFromNewest && isLastItem;
+    
+    // Gecikme süresi: normal süre kadar (3 saniye) bekle
+    const delayMs = shouldDelayAutoAdvance ? currentDuration : 0;
+
     const start = performance.now();
     const tick = (now) => {
-      const elapsed = now - start;
+      const elapsed = now - start - delayMs;
       const p = Math.max(0, Math.min(1, elapsed / currentDuration));
       setProgress(p);
       if (p >= 1) {
@@ -484,12 +496,12 @@ export const FastViewerPage = () => {
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
-    timerRef.current = setTimeout(() => animateItem(1, () => goItem(1)), currentDuration + 30);
+    timerRef.current = setTimeout(() => animateItem(1, () => goItem(1)), currentDuration + delayMs + 30);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [animateItem, current?.id, currentDuration, goItem, isPaused, items.length]);
+  }, [animateItem, current?.id, currentDuration, goItem, idx, isPaused, items.length, location?.state?.startFromNewest]);
 
   const mediaUrl = (p) => {
     const m = p?.media_urls ?? p?.media_url ?? [];
@@ -1331,7 +1343,7 @@ export const FastViewerPage = () => {
                   src={itemSrc}
                   alt=""
                   draggable={false}
-                  className="max-w-full max-h-full w-auto h-auto object-contain"
+                  className="w-full h-full object-cover"
                 />
               </div>
             ) : current.content_type === 'video' ? (
