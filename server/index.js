@@ -876,22 +876,40 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================
 
+// Run database migrations on startup
+async function setupDatabase() {
+  try {
+    console.log('🔄 Checking database migrations...');
+    
+    // Add missing columns
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'`;
+    await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS content TEXT`;
+    
+    // Add password reset columns (needed for forgot password)
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMPTZ`;
+    
+    // Create index for faster token lookup
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_password_reset_token ON users(password_reset_token) WHERE password_reset_token IS NOT NULL`;
+    
+    console.log('✅ Migrations checked/applied');
+  } catch (err) {
+    console.error('⚠️ Migration warning:', err.message);
+  }
+}
+
+// Run migrations once on startup
+let migrationsRun = false;
+if (!migrationsRun) {
+  setupDatabase().then(() => {
+    migrationsRun = true;
+  });
+}
+
 // Run migrations and start server ONLY in local development (not in Vercel)
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
 
 if (!isVercel) {
-  // Run migrations on startup (local only)
-  (async () => {
-    try {
-      console.log('🔄 Checking database migrations...');
-      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'`;
-      await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS content TEXT`;
-      console.log('✅ Migrations checked/applied');
-    } catch (err) {
-      console.error('⚠️ Migration warning:', err.message);
-    }
-  })();
-
   // Start Express server (local only)
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`
