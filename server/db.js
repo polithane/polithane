@@ -14,11 +14,21 @@ function getPool() {
     if (!connectionString) {
       throw new Error('DATABASE_URL is not set');
     }
+    
+    // For Vercel serverless: Use minimal pool to avoid MaxClientsInSessionMode
+    // Consider upgrading to Supabase Pro for Transaction pooling mode
+    const isProduction = process.env.NODE_ENV === 'production';
+    
     pool = new Pool({
       connectionString,
-      // Supabase uses SSL in production; allow local without SSL.
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-      max: Number(process.env.PG_POOL_MAX || 10),
+      ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+      max: 2, // Minimal pool for serverless (was 10, caused MaxClients error)
+      idleTimeoutMillis: 10000, // Close idle connections quickly
+      connectionTimeoutMillis: 5000,
+    });
+    
+    pool.on('error', (err) => {
+      console.error('💥 Unexpected pool error:', err);
     });
   }
   return pool;
