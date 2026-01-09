@@ -938,7 +938,7 @@ export const HomePage = () => {
         {!isMdUp ? (
           <>
             <div ref={postsSentinelRef} className="h-10" />
-            {loadingMorePosts && <div className="text-center text-sm text-gray-600 py-4">Daha fazla içerik yükleniyor…</div>}
+            {loadingMorePosts && <div className="text-center text-sm text-gray-600 py-4">Daha fazla polit yükleniyor…</div>}
           </>
         ) : null}
       </div>

@@ -53,7 +53,7 @@ const getPlateCodeFromProvince = (provinceName) => {
  * - Autoplay with mobile-friendly fallback (muted if needed)
  * - Seek controls (±10s buttons, scrubber)
  * - Play/pause, mute/unmute
- * - Time display showing current/total duration
+ * - Time display showing current/total duration 
  * 
  * Note: We use a single control bar element to avoid redundancy and ensure
  * clean, predictable UI across all devices.
@@ -935,7 +935,7 @@ export const PostDetailPage = () => {
         ) : error || !post ? (
           <div className="text-center text-gray-700">{error || 'Paylaşım bulunamadı.'}</div>
         ) : (
-          <div ref={detailBoxRef} className="mx-auto w-full max-w-[410px]">
+          <div ref={detailBoxRef} className="mx-auto w-full max-w-[533px]">
             {/* Kullanıcı Bilgisi */}
             <div className="card mb-6">
               <div className="flex items-center gap-4 mb-4">
