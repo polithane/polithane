@@ -171,8 +171,8 @@ export const ForgotPasswordPage = () => {
 
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+              <div className="inline-flex items-center justify-center w-32 h-32 bg-green-100 rounded-full mb-4">
+                <CheckCircle className="w-24 h-24 text-green-600" />
               </div>
               
               <h2 className="text-2xl font-black text-gray-900 mb-3">

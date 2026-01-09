@@ -339,7 +339,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email gerekli.' });
 
-    console.log('🔍 Password reset requested for:', email);
+    console.log('🔍 [v2.0 - 2026-01-09 21:50] Password reset requested for:', email);
 
     // Kullanıcıyı kontrol et
     const [user] = await sql`SELECT id, email, full_name FROM users WHERE LOWER(email) = LOWER(${email})`;
@@ -376,8 +376,12 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
       });
     }
 
-    console.log('✅ Password reset email sent successfully to:', email);
-    res.json({ success: true, message: 'Şifre sıfırlama linki email adresinize gönderildi.' });
+    console.log('✅ [v2.0] Password reset email sent successfully to:', email);
+    res.json({ 
+      success: true, 
+      message: 'Şifre sıfırlama linki email adresinize gönderildi.',
+      _debug: { version: 'v2.0', timestamp: new Date().toISOString(), mailSent: true }
+    });
   } catch (err) {
     console.error('❌ Forgot password error:', err);
     res.status(500).json({ success: false, error: 'Hata oluştu: ' + err.message });
