@@ -16,6 +16,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
+  const [emailVerified, setEmailVerified] = useState(true); // Default true to avoid blocking until verified
+  const [requiresEmailVerification, setRequiresEmailVerification] = useState(false); // Admin setting
   const navigate = useNavigate();
 
   const ensureStorageBuckets = async () => {
@@ -87,6 +89,10 @@ export const AuthProvider = ({ children }) => {
       setUser(data.data.user);
       localStorage.setItem('auth_token', data.data.token);
       localStorage.setItem('user', JSON.stringify(data.data.user));
+      
+      // Update emailVerified status from backend response
+      setEmailVerified(data.data.emailVerified !== false);
+      
       await ensureStorageBuckets();
       
       return { success: true, user: data.data.user };
@@ -112,6 +118,10 @@ export const AuthProvider = ({ children }) => {
       setUser(data.data.user);
       localStorage.setItem('auth_token', data.data.token);
       localStorage.setItem('user', JSON.stringify(data.data.user));
+      
+      // New users may need email verification
+      setEmailVerified(data.data.emailVerified !== false);
+      
       await ensureStorageBuckets();
       
       return { success: true, user: data.data.user };
@@ -198,10 +208,32 @@ export const AuthProvider = ({ children }) => {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
+  // Helper: Check if interaction is allowed (considering email verification)
+  const canInteract = () => {
+    if (!user) return false;
+    if (!requiresEmailVerification) return true; // Email verification not required
+    return emailVerified === true; // Must be verified if required
+  };
+
+  // Helper: Resend verification email
+  const resendVerificationEmail = async () => {
+    try {
+      const response = await apiCall('/api/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: user?.email }),
+      });
+      return { success: true, message: response?.message || 'Doğrulama e-postası gönderildi!' };
+    } catch (error) {
+      return { success: false, error: error.message || 'E-posta gönderilemedi.' };
+    }
+  };
+
   const value = {
     user,
     token,
     loading,
+    emailVerified,
+    requiresEmailVerification,
     login,
     register,
     logout,
@@ -212,6 +244,8 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     getAuthHeader,
     isAuthenticated: !!user,
+    canInteract,
+    resendVerificationEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
