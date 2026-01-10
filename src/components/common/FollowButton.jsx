@@ -4,13 +4,15 @@ import { UserPlus, UserCheck, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { users as usersApi } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { ActivationReminderModal } from './ActivationReminderModal';
 
 export const FollowButton = ({ targetUserId, size = 'md', onChange, iconOnly = false }) => {
-  const { user: me, isAuthenticated } = useAuth();
+  const { user: me, isAuthenticated, canInteract } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [followStatus, setFollowStatus] = useState('not_following'); // not_following | following
   const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
+  const [showActivationReminder, setShowActivationReminder] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -34,6 +36,11 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange, iconOnly = f
     if (!isAuthenticated) {
       toast.error('Takip etmek için giriş yapmalısınız.');
       navigate('/login-new');
+      return;
+    }
+    // Check email verification
+    if (!canInteract()) {
+      setShowActivationReminder(true);
       return;
     }
     if (String(me?.id || '') === String(targetUserId)) return;
@@ -159,5 +166,12 @@ export const FollowButton = ({ targetUserId, size = 'md', onChange, iconOnly = f
     );
   }
   
-  return null;
+  return (
+    <>
+      <ActivationReminderModal
+        isOpen={showActivationReminder}
+        onClose={() => setShowActivationReminder(false)}
+      />
+    </>
+  );
 };

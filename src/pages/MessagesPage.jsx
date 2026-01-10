@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Avatar } from '../components/common/Avatar';
 import { Badge } from '../components/common/Badge';
+import { ActivationReminderModal } from '../components/common/ActivationReminderModal';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { Modal } from '../components/common/Modal';
@@ -16,7 +17,8 @@ import { supabase } from '../services/supabase';
 import { usePublicSite } from '../contexts/PublicSiteContext';
 
 export const MessagesPage = () => {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, canInteract } = useAuth();
+  const [showActivationReminder, setShowActivationReminder] = useState(false);
   const { allowMessages } = usePublicSite();
   const navigate = useNavigate();
   const location = useLocation();
@@ -497,6 +499,11 @@ export const MessagesPage = () => {
       setError('Mesajlaşma şu anda kapalı.');
       return;
     }
+    // Check email verification
+    if (!canInteract()) {
+      setShowActivationReminder(true);
+      return;
+    }
     
     try {
       setError(null);
@@ -561,6 +568,11 @@ export const MessagesPage = () => {
     if (!file || !selectedConv) return;
     if (!allowMessages) {
       setError('Mesajlaşma şu anda kapalı.');
+      return;
+    }
+    // Check email verification
+    if (!canInteract()) {
+      setShowActivationReminder(true);
       return;
     }
     try {
@@ -1352,6 +1364,12 @@ export const MessagesPage = () => {
           )}
         </div>
       </Modal>
+
+      {/* Activation Reminder Modal */}
+      <ActivationReminderModal
+        isOpen={showActivationReminder}
+        onClose={() => setShowActivationReminder(false)}
+      />
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { ActivationReminderModal } from '../components/common/ActivationReminderModal';
 import { useLocation, useNavigate, useNavigationType, useParams, Link } from 'react-router-dom';
 import { MoreVertical, Ban, AlertCircle, MessageCircle, Settings, Edit } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
@@ -44,7 +45,8 @@ export const ProfilePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const navType = useNavigationType();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, canInteract } = useAuth();
+  const [showActivationReminder, setShowActivationReminder] = useState(false);
   const [user, setUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
   const [activeTab, setActiveTab] = useState('posts');
@@ -1012,6 +1014,12 @@ export const ProfilePage = () => {
           </div>
         )}
       </div>
+
+      {/* Activation Reminder Modal */}
+      <ActivationReminderModal
+        isOpen={showActivationReminder}
+        onClose={() => setShowActivationReminder(false)}
+      />
     </div>
   );
 };

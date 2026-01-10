@@ -16,7 +16,8 @@ import { useAuth } from '../../contexts/AuthContext';
 export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPosition = false }) => {
   const navigate = useNavigate();
   const [showScoreModal, setShowScoreModal] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, canInteract } = useAuth();
+  const [showActivationReminder, setShowActivationReminder] = useState(false);
   const postId = post?.post_id ?? post?.id;
 
   const [shareOpen, setShareOpen] = useState(false);
