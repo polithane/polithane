@@ -31,6 +31,7 @@ import { OrganizationPage } from './pages/OrganizationPage';
 import { OrgMessagesPage } from './pages/organization/MessagesPage';
 import { OrgEventsPage } from './pages/organization/EventsPage';
 import { OrgTasksPage } from './pages/organization/TasksPage';
+import { OrgAnnouncementsPollsPage } from './pages/organization/AnnouncementsPolls';
 
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
@@ -205,6 +206,8 @@ function App() {
         <Route path="/organization/messages" element={<><Header /><OrgMessagesPage /><Footer /><ActionBar /></>} />
         <Route path="/organization/events" element={<><Header /><OrgEventsPage /><Footer /><ActionBar /></>} />
         <Route path="/organization/tasks" element={<><Header /><OrgTasksPage /><Footer /><ActionBar /></>} />
+        <Route path="/organization/announcements" element={<><Header /><OrgAnnouncementsPollsPage /><Footer /><ActionBar /></>} />
+        <Route path="/organization/polls" element={<><Header /><OrgAnnouncementsPollsPage /><Footer /><ActionBar /></>} />
         
         <Route path="/search" element={<><Header /><SearchPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/polit-at" element={<><Header /><CreatePolitPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
