@@ -653,6 +653,22 @@ export const admin = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  updatePartyContact: (partyId, data) =>
+    apiCall(`/api/admin/parties/${partyId}/contact`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  updatePartyLeader: (partyId, data) =>
+    apiCall(`/api/admin/parties/${partyId}/leader`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  getPartyStats: (partyId) =>
+    apiCall(`/api/admin/parties/${partyId}/stats`),
+  getPartyMembers: (partyId, params) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/admin/parties/${partyId}/members${query ? `?${query}` : ''}`);
+  },
   deleteParty: (partyId) =>
     apiCall(`/api/admin/parties/${partyId}`, {
       method: 'DELETE',
@@ -768,6 +784,19 @@ export const organization = {
   createPoll: (data) => apiCall('/api/organization/polls', { method: 'POST', body: data }),
   getPollResults: (id) => apiCall(`/api/organization/polls/${id}/results`),
   votePoll: (id, optionIndex) => apiCall(`/api/organization/polls/${id}/vote`, { method: 'POST', body: { optionIndex } }),
+  
+  // Görev atama (direkt)
+  assignDirectTask: (data) => apiCall('/api/organization/tasks/assign-direct', { method: 'POST', body: data }),
+  
+  // Etkinlik davetleri
+  respondToEventInvitation: (id, data) => apiCall(`/api/organization/event-invitations/${id}/respond`, { method: 'PUT', body: data }),
+  getMyEventInvitations: () => apiCall('/api/organization/event-invitations/my'),
+  
+  // Üye listesi
+  getOrganizationMembers: (params) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/api/organization/members${query ? `?${query}` : ''}`);
+  },
 };
 
 // Export default object with all API modules
