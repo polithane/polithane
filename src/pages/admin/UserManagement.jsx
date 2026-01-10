@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Ban, CheckCircle, Eye, Edit, FileText, X, ExternalLink } from 'lucide-react';
+import { Search, Filter, Ban, CheckCircle, Eye, Edit, FileText, X, ExternalLink, Save } from 'lucide-react';
 import { admin as adminApi } from '../../utils/api';
 import { Avatar } from '../../components/common/Avatar';
 
@@ -17,6 +17,18 @@ export const UserManagement = () => {
     is_verified: '',
   });
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
+
+  // Verification Settings
+  const [verificationSettings, setVerificationSettings] = useState({
+    email_verification_enabled: 'false',
+    sms_verification_enabled: 'false',
+  });
+  const [verificationSaving, setVerificationSaving] = useState(false);
+
+  // Password Change Modal
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordChangeSaving, setPasswordChangeSaving] = useState(false);
   
   // Modal State
   const [selectedUser, setSelectedUser] = useState(null);
@@ -47,7 +59,65 @@ export const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchVerificationSettings();
   }, [pagination.page, filters, searchQuery]);
+
+  const fetchVerificationSettings = async () => {
+    try {
+      const response = await adminApi.getMailSettings();
+      if (response?.success) {
+        setVerificationSettings({
+          email_verification_enabled: String(response.data?.email_verification_enabled || 'false'),
+          sms_verification_enabled: String(response.data?.sms_verification_enabled || 'false'),
+        });
+      }
+    } catch (error) {
+      console.error('Verification settings load error:', error);
+    }
+  };
+
+  const handleSaveVerificationSettings = async () => {
+    setVerificationSaving(true);
+    try {
+      const response = await adminApi.updateMailSettings({
+        email_verification_enabled: verificationSettings.email_verification_enabled,
+        sms_verification_enabled: verificationSettings.sms_verification_enabled,
+      });
+      if (!response?.success) throw new Error(response?.error || 'Kaydedilemedi');
+      alert('✅ Doğrulama ayarları kaydedildi!');
+    } catch (error) {
+      alert('❌ Hata: ' + error.message);
+    } finally {
+      setVerificationSaving(false);
+    }
+  };
+
+  const handleOpenPasswordModal = (user) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setIsPasswordModalOpen(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (!selectedUser?.id) return;
+    if (!newPassword || newPassword.length < 6) {
+      alert('❌ Şifre en az 6 karakter olmalı');
+      return;
+    }
+    if (!confirm(`${selectedUser.full_name} için şifreyi değiştirmek istediğinize emin misiniz?`)) return;
+    setPasswordChangeSaving(true);
+    try {
+      const response = await adminApi.changeUserPassword(selectedUser.id, { newPassword });
+      if (!response?.success) throw new Error(response?.error || 'Şifre değiştirilemedi');
+      alert('✅ Şifre başarıyla değiştirildi!');
+      setIsPasswordModalOpen(false);
+      setNewPassword('');
+    } catch (error) {
+      alert('❌ Hata: ' + error.message);
+    } finally {
+      setPasswordChangeSaving(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -239,6 +309,67 @@ export const UserManagement = () => {
         >
           Mükerrerleri Bul
         </button>
+      </div>
+
+      {/* VERIFICATION SETTINGS (Mail/SMS Onayı) */}
+      <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">📧 Kullanıcı Doğrulama Ayarları</h2>
+            <p className="text-sm text-gray-600">Yeni üyelerin email ve SMS doğrulama zorunluluğunu belirleyin.</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveVerificationSettings}
+            disabled={verificationSaving}
+            className="px-4 py-2 rounded-lg bg-primary-blue text-white font-bold hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+          >
+            <Save className="w-5 h-5" />
+            {verificationSaving ? 'Kaydediliyor...' : 'Kaydet'}
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Email Verification */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              📧 Email Doğrulama
+            </label>
+            <select
+              value={verificationSettings.email_verification_enabled}
+              onChange={(e) => setVerificationSettings((p) => ({ ...p, email_verification_enabled: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+            >
+              <option value="false">❌ Kapalı (Mail doğrulamaya gerek yok)</option>
+              <option value="true">✅ Açık (Yeni üyeler mail doğrulamalı)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-2">
+              {verificationSettings.email_verification_enabled === 'true'
+                ? '✅ Yeni üyeler mail adreslerini doğrulayana kadar etkileşim yapamaz (post, beğeni, yorum, mesaj, takip).'
+                : '❌ Yeni üyeler kayıt sonrası hemen tüm özellikleri kullanabilir.'}
+            </p>
+          </div>
+
+          {/* SMS Verification */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              📱 SMS Doğrulama
+            </label>
+            <select
+              value={verificationSettings.sms_verification_enabled}
+              onChange={(e) => setVerificationSettings((p) => ({ ...p, sms_verification_enabled: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue outline-none"
+            >
+              <option value="false">❌ Kapalı (SMS doğrulamaya gerek yok)</option>
+              <option value="true">✅ Açık (Yeni üyeler SMS doğrulamalı)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-2">
+              {verificationSettings.sms_verification_enabled === 'true'
+                ? '✅ Yeni üyeler telefon numaralarını doğrulayana kadar etkileşim yapamaz.'
+                : '❌ SMS doğrulama şu an devre dışı. (Gelecekte eklenecek)'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {dupLoading && (
@@ -840,24 +971,86 @@ export const UserManagement = () => {
               )}
 
               {/* Actions */}
-              <div className="border-t pt-6 flex justify-end gap-3">
-                 {!selectedUser.is_verified && (
-                   <button 
-                     onClick={() => {
+              <div className="border-t pt-6 flex justify-between items-center gap-3">
+                <button 
+                  onClick={() => handleOpenPasswordModal(selectedUser)}
+                  className="px-6 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-colors"
+                >
+                  🔑 Şifre Değiştir
+                </button>
+                <div className="flex gap-3">
+                  {!selectedUser.is_verified && (
+                    <button 
+                      onClick={() => {
                         handleVerifyUser(selectedUser.id, false);
                         handleCloseModal();
-                     }}
-                     className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700"
-                   >
-                     Başvuruyu Onayla
-                   </button>
-                 )}
-                 <button 
-                   onClick={handleCloseModal}
-                   className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
-                 >
-                   Kapat
-                 </button>
+                      }}
+                      className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700"
+                    >
+                      Başvuruyu Onayla
+                    </button>
+                  )}
+                  <button 
+                    onClick={handleCloseModal}
+                    className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Change Modal */}
+      {isPasswordModalOpen && selectedUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900">🔑 Şifre Değiştir</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                <strong>{selectedUser.full_name}</strong> için yeni şifre belirleyin.
+              </p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Yeni Şifre
+                </label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="En az 6 karakter"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  ⚠️ Admin olarak şifre kuralları zorunlu değildir. Kullanıcı istediği şifreyi belirleyebilir.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPasswordModalOpen(false);
+                    setNewPassword('');
+                  }}
+                  className="flex-1 px-4 py-3 rounded-lg border border-gray-300 hover:bg-gray-50 font-bold"
+                  disabled={passwordChangeSaving}
+                >
+                  İptal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleChangePassword}
+                  className="flex-1 px-4 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold disabled:opacity-50"
+                  disabled={passwordChangeSaving || !newPassword}
+                >
+                  {passwordChangeSaving ? 'Kaydediliyor...' : 'Şifreyi Değiştir'}
+                </button>
               </div>
             </div>
           </div>

@@ -218,37 +218,17 @@ export const MailSettings = () => {
               </select>
             </div>
 
-            <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-primary-blue" />
-                <div>
-                  <div className="font-black text-gray-900">E-posta Doğrulama</div>
-                  <div className="text-sm text-gray-600">Login için doğrulama zorunlu olsun</div>
-                </div>
+            <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldCheck className="w-5 h-5 text-yellow-600" />
+                <div className="font-black text-yellow-900">ℹ️ Mail/SMS Doğrulama Ayarları</div>
               </div>
-              <select
-                value={String(settings.email_verification_enabled)}
-                onChange={(e) => setSettings((p) => ({ ...p, email_verification_enabled: e.target.value }))}
-                className="px-3 py-2 rounded-lg border border-gray-200 bg-white font-semibold"
-              >
-                <option value="true">Açık</option>
-                <option value="false">Kapalı</option>
-              </select>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
-              <div>
-                <div className="font-black text-gray-900">Doğrulama Kanalı</div>
-                <div className="text-sm text-gray-600">E-posta veya SMS</div>
-              </div>
-              <select
-                value={String(settings.verification_channel || 'email')}
-                onChange={(e) => setSettings((p) => ({ ...p, verification_channel: e.target.value }))}
-                className="px-3 py-2 rounded-lg border border-gray-200 bg-white font-semibold"
-              >
-                <option value="email">E-posta</option>
-                <option value="sms">SMS (provider gerekli)</option>
-              </select>
+              <p className="text-sm text-yellow-800">
+                <strong>Mail ve SMS doğrulama ayarları</strong> artık <strong>"Kullanıcı Yönetimi"</strong> sayfasına taşındı.
+              </p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Sol menüden "Kullanıcı Yönetimi"ne giderek bu ayarları yapılandırabilirsiniz.
+              </p>
             </div>
 
             <div>

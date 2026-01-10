@@ -8433,6 +8433,29 @@ async function adminDeleteUser(req, res, userId) {
   res.json({ success: true, data: updated?.[0] || null });
 }
 
+async function adminChangeUserPassword(req, res, userId) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const body = await readJsonBody(req);
+  const uid = String(userId || '').trim();
+  if (!uid || !isSafeId(uid)) return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı.' });
+
+  const newPassword = String(body?.newPassword || '').trim();
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ success: false, error: 'Şifre en az 6 karakter olmalı.' });
+  }
+
+  // No password rules for admin password change
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  const updated = await supabaseRestPatch('users', { id: `eq.${uid}` }, { password: hashedPassword });
+  
+  if (!updated || updated.length === 0) {
+    return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+  }
+
+  return res.json({ success: true, message: 'Şifre başarıyla değiştirildi.', data: updated[0] });
+}
+
 async function adminGetPosts(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
@@ -12105,7 +12128,11 @@ export default async function handler(req, res) {
         if (pid && tail === 'chair') return await adminSetPartyChair(req, res, pid);
       }
       if (url.startsWith('/api/admin/users/') && req.method === 'PUT') {
-        const userId = url.split('/api/admin/users/')[1];
+        const parts = url.split('/api/admin/users/')[1].split('/');
+        const userId = parts[0];
+        if (parts[1] === 'password') {
+          return await adminChangeUserPassword(req, res, userId);
+        }
         return await adminUpdateUser(req, res, userId);
       }
       if (url.startsWith('/api/admin/users/') && req.method === 'DELETE') {

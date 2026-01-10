@@ -572,6 +572,12 @@ export const admin = {
       method: 'DELETE',
     }),
 
+  changeUserPassword: (userId, data) =>
+    apiCall(`/api/admin/users/${userId}/password`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   // Posts
   getPosts: (params = {}) => {
     const query = toQueryString(params);
