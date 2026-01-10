@@ -18,8 +18,6 @@ export const HorizontalScroll = ({
   const [screenSize, setScreenSize] = useState('desktop');
   const [currentItemsPerView, setCurrentItemsPerView] = useState(itemsPerView.desktop);
   const [calculatedItemWidth, setCalculatedItemWidth] = useState(null);
-  const itemRefs = useRef([]);
-  const observerRef = useRef(null);
 
   // Ekran boyutunu tespit et ve kart genişliğini hesapla
   useEffect(() => {

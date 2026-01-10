@@ -4418,20 +4418,27 @@ function isSmtpConfigured() {
   return !!(host && user && pass && (from || user));
 }
 
-function emailLayout({ title, bodyHtml }) {
+function emailLayout({ title, bodyHtml, userName = '' }) {
+  const salutation = userName ? `<p style="margin:0 0 12px 0;color:#111827;font-size:15px;">Sayın <strong>${userName}</strong>,</p>` : '';
   return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; background:#f3f4f6; padding:18px;">
-      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#009fd6,#0077b6);padding:18px 20px;color:#fff;">
-          <div style="font-weight:900;font-size:18px;">Polithane</div>
-          <div style="font-size:12px;opacity:.9;">Özgür, açık, şeffaf siyaset, bağımsız medya!</div>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #111827; background:#f3f4f6; padding:20px;">
+      <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 40px rgba(0,159,214,0.15);">
+        <div style="background:linear-gradient(135deg,#009fd6 0%,#0077b6 100%);padding:32px 24px;text-align:center;color:#fff;">
+          <div style="font-weight:900;font-size:28px;letter-spacing:-0.5px;margin-bottom:8px;">Polithane</div>
+          <div style="font-size:13px;opacity:0.92;font-weight:500;">Özgür, açık, şeffaf siyaset, bağımsız medya!</div>
         </div>
-        <div style="padding:20px;">
-          <h2 style="margin:0 0 10px 0;font-size:18px;">${title}</h2>
+        <div style="padding:32px 24px;">
+          ${salutation}
+          <h2 style="margin:0 0 16px 0;font-size:20px;color:#111827;font-weight:700;">${title}</h2>
           ${bodyHtml}
-          <div style="margin-top:18px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:12px;">
-            Bu otomatik bir e-postadır, lütfen yanıtlamayın.
+          <div style="margin-top:24px;padding-top:20px;border-top:2px solid #e5e7eb;font-size:13px;color:#6b7280;line-height:1.5;">
+            <p style="margin:0 0 8px 0;">Bu e-posta <strong style="color:#009fd6;">Polithane</strong> tarafından otomatik olarak gönderilmiştir.</p>
+            <p style="margin:0;font-size:12px;">Lütfen bu e-postayı yanıtlamayın.</p>
           </div>
+        </div>
+        <div style="background:#f8f9fa;padding:20px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;font-size:12px;color:#6b7280;">© 2025 Polithane. Tüm hakları saklıdır.</p>
+          <p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">Özgür, açık, şeffaf siyaset platformu</p>
         </div>
       </div>
     </div>
@@ -4637,29 +4644,44 @@ async function renderEmailTemplate(req, { type, vars, fallbackSubject = '', fall
   return { subject, html, text };
 }
 
-async function sendVerificationEmailForUser(req, { toEmail, token }) {
+async function sendVerificationEmailForUser(req, { toEmail, token, fullName = '' }) {
   const appUrl = getPublicAppUrl(req);
   const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(token)}`;
-  const subject = 'Polithane – E-posta doğrulama';
+  const subject = 'Polithane – E-posta Doğrulama';
+  const userName = String(fullName || '').trim();
   const text =
-    `Merhaba,\n\n` +
+    `Merhaba${userName ? ` ${userName}` : ''},\n\n` +
     `Polithane hesabınızı aktifleştirmek için e-posta adresinizi doğrulayın:\n${verifyUrl}\n\n` +
     `Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n`;
   const html = emailLayout({
-    title: 'E-posta adresinizi doğrulayın',
+    title: 'E-posta Adresinizi Doğrulayın',
+    userName,
     bodyHtml: `
-      <p>Hesabınızı aktifleştirmek için lütfen aşağıdaki butona tıklayın:</p>
-      <p>
-        <a href="${verifyUrl}" style="display:inline-block;padding:12px 18px;background:#009fd6;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
-          E-postamı doğrula
-        </a>
+      <p style="color:#4b5563;font-size:15px;line-height:1.6;margin:0 0 20px 0;">
+        Polithane'ye hoş geldiniz! Hesabınızı aktifleştirmek ve platformun tüm özelliklerinden yararlanmak için e-posta adresinizi doğrulamanız gerekmektedir.
       </p>
-      <p style="font-size:12px;color:#6b7280;">Link çalışmazsa: <span style="color:#009fd6;word-break:break-all;">${verifyUrl}</span></p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${verifyUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#009fd6,#0077b6);color:#fff;text-decoration:none;border-radius:50px;font-weight:700;font-size:15px;box-shadow:0 4px 15px rgba(0,159,214,0.3);transition:transform 0.2s;">
+          E-postamı Doğrula
+        </a>
+      </div>
+      <div style="background:#f0f9ff;border-left:4px solid #009fd6;padding:16px 20px;margin:24px 0;border-radius:8px;">
+        <p style="margin:0;font-size:14px;color:#1e3a8a;"><strong>📧 Aktivasyon Sonrası:</strong></p>
+        <ul style="margin:8px 0 0 0;padding-left:20px;font-size:14px;color:#1e40af;line-height:1.8;">
+          <li>Polit ve Fast paylaşımları yapabilirsiniz</li>
+          <li>Yorum yazıp beğenme yapabilirsiniz</li>
+          <li>Mesajlaşma ve takip edebilirsiniz</li>
+        </ul>
+      </div>
+      <p style="font-size:13px;color:#6b7280;margin:20px 0 0 0;">
+        <strong>Link çalışmıyor mu?</strong> Aşağıdaki bağlantıyı kopyalayıp tarayıcınıza yapıştırabilirsiniz:<br>
+        <span style="color:#009fd6;word-break:break-all;font-size:12px;">${verifyUrl}</span>
+      </p>
     `,
   });
   const rendered = await renderEmailTemplate(req, {
     type: 'email_verification',
-    vars: { verification_link: verifyUrl, app_url: appUrl },
+    vars: { verification_link: verifyUrl, app_url: appUrl, full_name: userName },
     fallbackSubject: subject,
     fallbackHtml: html,
     fallbackText: text,
@@ -4677,19 +4699,45 @@ async function sendVerificationEmailForUser(req, { toEmail, token }) {
 
 async function sendWelcomeEmailToUser(req, { toEmail, fullName }) {
   const appUrl = getPublicAppUrl(req);
-  const subject = 'Polithane – Hoş geldiniz';
+  const userName = String(fullName || '').trim();
+  const subject = 'Polithane – Hoş Geldiniz! 🎉';
   const html = emailLayout({
-    title: 'Hoş geldiniz!',
+    title: '🎊 Hoş Geldiniz!',
+    userName,
     bodyHtml: `
-      <p>Merhaba <strong>${String(fullName || '').trim() || 'kullanıcı'}</strong>,</p>
-      <p>Polithane ailesine katıldığınız için teşekkür ederiz.</p>
-      <p><a href="${appUrl}" style="color:#009fd6;font-weight:700;">Polithane’ye git</a></p>
+      <p style="color:#4b5563;font-size:15px;line-height:1.6;margin:0 0 20px 0;">
+        Polithane ailesine katıldığınız için çok mutluyuz! E-posta doğrulamanızı başarıyla tamamladınız ve artık platformumuzun tüm özelliklerinden faydalanabilirsiniz.
+      </p>
+      <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:12px;padding:24px;margin:24px 0;border:2px solid #bae6fd;">
+        <h3 style="margin:0 0 12px 0;color:#0077b6;font-size:17px;font-weight:700;">✨ Neler Yapabilirsiniz?</h3>
+        <ul style="margin:0;padding-left:20px;font-size:14px;color:#1e40af;line-height:2;">
+          <li><strong>Polit ve Fast</strong> paylaşımları yaparak sesinizhazır duyurabilirsiniz</li>
+          <li>Milletvekillerini ve siyasi figürleri <strong>takip edebilirsiniz</strong></li>
+          <li>Gündemdeki konulara <strong>yorum</strong> yapabilirsiniz</li>
+          <li>Beğendiğiniz içerikleri <strong>beğenip paylaşabilirsiniz</strong></li>
+          <li>Diğer kullanıcılarla <strong>mesajlaşabilirsiniz</strong></li>
+          <li><strong>Polit Puan</strong> kazanarak etkileşiminizi artırabilirsiniz</li>
+        </ul>
+      </div>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${appUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#009fd6,#0077b6);color:#fff;text-decoration:none;border-radius:50px;font-weight:700;font-size:15px;box-shadow:0 4px 15px rgba(0,159,214,0.3);">
+          Polithane'ye Giriş Yap
+        </a>
+      </div>
+      <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:16px 20px;margin:24px 0;border-radius:8px;">
+        <p style="margin:0;font-size:14px;color:#92400e;">
+          <strong>💡 İpucu:</strong> Profilinizi tamamlayarak güvenilirliğinizi artırabilir ve daha fazla etkileşim alabilirsiniz!
+        </p>
+      </div>
+      <p style="color:#6b7280;font-size:14px;line-height:1.6;margin:20px 0 0 0;">
+        Sorularınız veya önerileriniz varsa bizimle iletişime geçmekten çekinmeyin. Polithane ailesinin bir parçası olduğunuz için tekrar teşekkür ederiz!
+      </p>
     `,
   });
-  const text = `Merhaba ${String(fullName || '').trim() || 'kullanıcı'},\n\nPolithane ailesine hoş geldiniz.\n${appUrl}\n`;
+  const text = `Merhaba ${userName || 'değerli kullanıcımız'},\n\nPolithane ailesine hoş geldiniz! E-posta doğrulamanız tamamlandı.\n\nPlatformumuzda polit ve fast paylaşımları yapabilir, yorum yazabilir, mesajlaşabilir ve daha fazlasını keşfedebilirsiniz.\n\n${appUrl}\n\nİyi kullanımlar dileriz!\nPolithane Ekibi`;
   const rendered = await renderEmailTemplate(req, {
     type: 'welcome',
-    vars: { full_name: String(fullName || '').trim() || 'kullanıcı', app_url: appUrl },
+    vars: { full_name: userName || 'kullanıcı', app_url: appUrl },
     fallbackSubject: subject,
     fallbackHtml: html,
     fallbackText: text,
@@ -9512,31 +9560,53 @@ async function authForgotPassword(req, res) {
       if (stored) {
         const appUrl = getPublicAppUrl(req);
         const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
-        const subject = 'Polithane – Şifre sıfırlama';
-        const userName = u.full_name || u.username || 'Değerli Kullanıcı';
+        const subject = 'Polithane – Şifre Sıfırlama';
+        const userName = u.full_name || u.username || '';
         const text =
-          `Sayın ${userName},\n\n` +
+          `Sayın ${userName || 'Değerli Kullanıcımız'},\n\n` +
           `Polithane hesabınız için şifre sıfırlama talebi aldık.\n\n` +
           `Şifrenizi sıfırlamak için 3 saat içinde şu bağlantıya tıklayın:\n${resetUrl}\n\n` +
           `Bu bağlantı 3 saat sonra geçersiz olacaktır.\n\n` +
-          `Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n`;
-        const html = `
-          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-            <p style="margin:0 0 16px 0;">Sayın <strong>${userName}</strong>,</p>
-            <p>Polithane hesabınız için <strong>şifre sıfırlama</strong> talebi aldık.</p>
-            <p>Şifrenizi sıfırlamak için <strong>3 saat</strong> içinde aşağıdaki butona tıklayın:</p>
-            <p>
-              <a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#009fd6;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
-                Şifremi sıfırla
-              </a>
+          `Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n\nPolithane Ekibi`;
+        const html = emailLayout({
+          title: '🔒 Şifre Sıfırlama Talebi',
+          userName,
+          bodyHtml: `
+            <p style="color:#4b5563;font-size:15px;line-height:1.6;margin:0 0 20px 0;">
+              Polithane hesabınız için <strong>şifre sıfırlama talebi</strong> aldık. Şifrenizi değiştirmek için aşağıdaki butona tıklayarak işleminize devam edebilirsiniz.
             </p>
-            <p style="font-size:12px;color:#6b7280;">Bu bağlantı 3 saat sonra geçersiz olacaktır.</p>
-            <p style="font-size:12px;color:#6b7280;">Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>
-          </div>
-        `;
+            <div style="background:#fef2f2;border-left:4px solid #ef4444;padding:16px 20px;margin:20px 0;border-radius:8px;">
+              <p style="margin:0;font-size:14px;color:#991b1b;">
+                <strong>⚠️ Önemli:</strong> Bu bağlantı güvenliğiniz için <strong>sadece 3 saat</strong> geçerlidir.
+              </p>
+            </div>
+            <div style="text-align:center;margin:28px 0;">
+              <a href="${resetUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#009fd6,#0077b6);color:#fff;text-decoration:none;border-radius:50px;font-weight:700;font-size:15px;box-shadow:0 4px 15px rgba(0,159,214,0.3);">
+                🔐 Şifremi Sıfırla
+              </a>
+            </div>
+            <div style="background:#f0f9ff;border-radius:12px;padding:20px;margin:24px 0;">
+              <p style="margin:0 0 12px 0;font-size:14px;color:#1e3a8a;"><strong>🛡️ Güvenlik İpuçları:</strong></p>
+              <ul style="margin:0;padding-left:20px;font-size:14px;color:#1e40af;line-height:1.8;">
+                <li>En az 8 karakter uzunluğunda bir şifre seçin</li>
+                <li>Harf ve rakam kombinasyonu kullanın</li>
+                <li>Kolay tahmin edilebilecek şifrelerden kaçının</li>
+              </ul>
+            </div>
+            <div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:16px 20px;margin:24px 0;border-radius:8px;">
+              <p style="margin:0;font-size:13px;color:#92400e;">
+                <strong>📋 Not:</strong> Bu talebi siz yapmadıysanız, hesap güvenliğiniz için şifrenizi değiştirmenizi ve bu e-postayı yok saymanızı öneririz.
+              </p>
+            </div>
+            <p style="font-size:13px;color:#6b7280;margin:20px 0 0 0;">
+              <strong>Link çalışmıyor mu?</strong> Aşağıdaki bağlantıyı kopyalayıp tarayıcınıza yapıştırabilirsiniz:<br>
+              <span style="color:#009fd6;word-break:break-all;font-size:12px;">${resetUrl}</span>
+            </p>
+          `,
+        });
         const rendered = await renderEmailTemplate(req, {
           type: 'password_reset',
-          vars: { reset_link: resetUrl, app_url: appUrl },
+          vars: { reset_link: resetUrl, app_url: appUrl, full_name: userName },
           fallbackSubject: subject,
           fallbackHtml: html,
           fallbackText: text,
@@ -9686,7 +9756,7 @@ async function authResendVerification(req, res) {
   const body = await readJsonBody(req);
   const email = String(body?.email || '').trim().toLowerCase();
   if (!email) return res.status(400).json({ success: false, error: 'Email gerekli.' });
-  const rows = await supabaseRestGet('users', { select: 'id,email,metadata,email_verified,is_active', email: `eq.${email}`, limit: '1' }).catch(() => []);
+  const rows = await supabaseRestGet('users', { select: 'id,email,full_name,metadata,email_verified,is_active', email: `eq.${email}`, limit: '1' }).catch(() => []);
   const u = rows?.[0] || null;
   if (!u?.id) return res.json({ success: true, message: 'Eğer bu e-posta kayıtlıysa, doğrulama bağlantısı gönderilecektir.' });
   if (u?.is_active === false) return res.json({ success: true, message: 'Eğer bu e-posta kayıtlıysa, doğrulama bağlantısı gönderilecektir.' });
@@ -9704,7 +9774,7 @@ async function authResendVerification(req, res) {
   };
   await safeUserPatch(u.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
   try {
-    await sendVerificationEmailForUser(req, { toEmail: u.email, token: tokenRaw });
+    await sendVerificationEmailForUser(req, { toEmail: u.email, token: tokenRaw, fullName: u.full_name || '' });
     return res.json({ success: true, message: 'Doğrulama e-postası gönderildi.' });
   } catch (e) {
     return res.status(503).json({
@@ -9950,7 +10020,7 @@ async function authRegister(req, res) {
             email_verified: false,
           };
           await safeUserPatch(user.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
-          await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw });
+          await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw, fullName: user.full_name || '' });
         } catch {
           // ignore
         }
@@ -9977,7 +10047,7 @@ async function authRegister(req, res) {
       };
       await safeUserPatch(user.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
       try {
-        await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw });
+        await sendVerificationEmailForUser(req, { toEmail: user.email, token: tokenRaw, fullName: user.full_name || '' });
       } catch (e) {
         // Roll back (so the user can re-register with the same email without "email kayıtlı").
         const errMsg = String(e?.message || 'Doğrulama e-postası gönderilemedi.');
