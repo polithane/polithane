@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, AlertCircle, CheckCircle, Eye, EyeOff, Check, X } from 'lucide-react';
 import { apiCall } from '../../utils/api';
+
+// Şifre kuralları (RegisterPageNew ile aynı)
+const PASSWORD_RULES = [
+  { id: 'length', label: 'En az 8 karakter', validator: (p) => p.length >= 8 },
+  { id: 'max_length', label: 'En fazla 50 karakter', validator: (p) => p.length <= 50 },
+  { id: 'letter', label: 'En az 1 harf', validator: (p) => /[a-zA-Z]/.test(p) },
+  { id: 'number', label: 'En az 1 rakam', validator: (p) => /[0-9]/.test(p) },
+];
 
 export const ResetPasswordPage = () => {
   const navigate = useNavigate();
@@ -26,6 +34,26 @@ export const ResetPasswordPage = () => {
     }
   }, [token]);
 
+  // Şifre kuralları kontrolü (RegisterPageNew ile aynı)
+  const passwordValidation = useMemo(() => {
+    return PASSWORD_RULES.map(rule => ({
+      ...rule,
+      passed: rule.validator(formData.password)
+    }));
+  }, [formData.password]);
+
+  const passwordOk = useMemo(() => {
+    return formData.password && passwordValidation.every(r => r.passed);
+  }, [formData.password, passwordValidation]);
+
+  const passwordMatch = useMemo(() => {
+    return formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
+  }, [formData.password, formData.confirmPassword]);
+
+  const canSubmit = useMemo(() => {
+    return passwordOk && passwordMatch && !loading && token;
+  }, [passwordOk, passwordMatch, loading, token]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -36,19 +64,8 @@ export const ResetPasswordPage = () => {
     e.preventDefault();
     setError('');
 
-    // Validation
-    if (formData.password.length < 8) {
-      setError('Şifre en az 8 karakter olmalıdır.');
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Şifreler eşleşmiyor.');
-      return;
-    }
-
-    if (!token) {
-      setError('Geçersiz token. Lütfen şifre sıfırlama linkini tekrar isteyin.');
+    if (!canSubmit) {
+      setError('Lütfen tüm şartları sağlayın.');
       return;
     }
 
@@ -72,7 +89,7 @@ export const ResetPasswordPage = () => {
         setError(response.error || 'Şifre sıfırlama başarısız.');
       }
     } catch (err) {
-      setError('Bir hata oluştu. Lütfen tekrar deneyin.');
+      setError(err.message || 'Bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
     }
@@ -186,9 +203,12 @@ export const ResetPasswordPage = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="En az 8 karakter"
-                  className="w-full pl-14 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                  className={`w-full pl-14 pr-12 py-3 border rounded-lg focus:ring-2 outline-none transition-all ${
+                    formData.password && passwordOk
+                      ? 'border-green-500 focus:ring-green-500'
+                      : 'border-gray-300 focus:ring-primary-blue focus:border-primary-blue'
+                  }`}
                   required
-                  minLength={8}
                 />
                 <button
                   type="button"
@@ -198,9 +218,23 @@ export const ResetPasswordPage = () => {
                   {showPassword ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Şifreniz en az 8 karakter olmalıdır.
-              </p>
+              {/* Password Rules */}
+              {formData.password && (
+                <div className="mt-2 space-y-1">
+                  {passwordValidation.map(rule => (
+                    <div key={rule.id} className="flex items-center gap-2 text-xs">
+                      {rule.passed ? (
+                        <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <X className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      )}
+                      <span className={rule.passed ? 'text-green-600' : 'text-red-600'}>
+                        {rule.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Confirm Password */}
@@ -216,7 +250,11 @@ export const ResetPasswordPage = () => {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   placeholder="Şifrenizi tekrar girin"
-                  className="w-full pl-14 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-all"
+                  className={`w-full pl-14 pr-12 py-3 border rounded-lg focus:ring-2 outline-none transition-all ${
+                    formData.confirmPassword && passwordMatch
+                      ? 'border-green-500 focus:ring-green-500'
+                      : 'border-gray-300 focus:ring-primary-blue focus:border-primary-blue'
+                  }`}
                   required
                 />
                 <button
@@ -227,13 +265,33 @@ export const ResetPasswordPage = () => {
                   {showConfirmPassword ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
                 </button>
               </div>
+              {/* Password Match Indicator */}
+              {formData.confirmPassword && (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  {passwordMatch ? (
+                    <>
+                      <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <span className="text-green-600">Şifreler eşleşiyor</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <span className="text-red-600">Şifreler eşleşmiyor</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading || !token}
-              className="w-full bg-primary-blue hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+              disabled={!canSubmit}
+              className={`w-full font-bold py-3 rounded-lg transition-all shadow-lg ${
+                canSubmit
+                  ? 'bg-green-600 hover:bg-green-700 text-white hover:shadow-xl'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
               {loading ? 'Şifre Değiştiriliyor...' : 'Şifremi Değiştir'}
             </button>
