@@ -7,11 +7,14 @@ import { apiCall, posts as postsApi } from '../utils/api';
 import { Avatar } from '../components/common/Avatar';
 import { isUiVerifiedUser } from '../utils/titleHelpers';
 import { supabase } from '../services/supabase';
+import { ActivationReminderModal } from '../components/common/ActivationReminderModal';
 
 export const CreatePolitPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, canInteract } = useAuth();
+  
+  const [showActivationReminder, setShowActivationReminder] = useState(false);
 
   const isFastMode = useMemo(() => String(location?.pathname || '') === '/fast-at', [location?.pathname]);
 
@@ -66,6 +69,18 @@ export const CreatePolitPage = () => {
     });
     return out;
   }, [iconBaseUrls]);
+
+  // Check if user can interact (email verification)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    if (!canInteract()) {
+      setShowActivationReminder(true);
+      // Don't navigate away, just show modal
+    }
+  }, [isAuthenticated, canInteract, navigate]);
 
   useEffect(() => {
     try {
@@ -2431,6 +2446,15 @@ export const CreatePolitPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Activation Reminder Modal */}
+      <ActivationReminderModal
+        isOpen={showActivationReminder}
+        onClose={() => {
+          setShowActivationReminder(false);
+          navigate('/');
+        }}
+      />
     </div>
   );
 };
