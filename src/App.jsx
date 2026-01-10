@@ -27,6 +27,7 @@ import { NoAgendaFeedPage } from './pages/NoAgendaFeedPage';
 import { HitFeedPage } from './pages/HitFeedPage';
 import { FastPage } from './pages/FastPage';
 import { FastViewerPage } from './pages/FastViewerPage';
+import { OrganizationPage } from './pages/OrganizationPage';
 
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
@@ -195,6 +196,10 @@ function App() {
         <Route path="/city/:cityCode" element={<><Header /><CityDetailPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         {/* Messages is a full-height app surface; no footer (avoids mobile input hiding behind ActionBar) */}
         <Route path="/messages" element={<><Header /><MessagesPage /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
+        
+        {/* Teşkilat Yönetimi */}
+        <Route path="/organization" element={<><Header /><OrganizationPage /><Footer /><ActionBar /></>} />
+        
         <Route path="/search" element={<><Header /><SearchPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/polit-at" element={<><Header /><CreatePolitPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/test" element={<><Header /><TestPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />

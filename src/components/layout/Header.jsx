@@ -458,6 +458,21 @@ export const Header = () => {
                       <span className="text-sm font-semibold text-gray-700">Ayarlar</span>
                     </Link>
                     
+                    {/* Teşkilat Yönetim Link (Sadece parti üyelerine görünür) */}
+                    {(['party_member', 'party_official', 'mp'].includes(user?.user_type) && user?.party_id) && (
+                      <>
+                        <div className="border-t border-gray-100 my-2"></div>
+                        <Link
+                          to="/organization"
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors bg-gradient-to-r from-blue-50 to-purple-50"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          <span className="text-lg">🏛️</span>
+                          <span className="text-sm font-bold text-primary-blue">Teşkilat Yönetimi</span>
+                        </Link>
+                      </>
+                    )}
+                    
                     {/* Admin Panel Link (Sadece Admin'e görünür) */}
                     {isAdmin() && (
                       <>
