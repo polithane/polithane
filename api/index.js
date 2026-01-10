@@ -119,6 +119,129 @@ function verifyJwtFromRequest(req) {
   }
 }
 
+// Teşkilat Yönetim Route Handler
+async function handleOrganizationRoute(req, res, url) {
+  // Import edilmiş gibi davranıyoruz, fonksiyonlar aşağıda tanımlanacak
+  
+  // Auth kontrolü
+  const auth = verifyJwtFromRequest(req);
+  if (!auth || !auth.id) {
+    return res.status(401).json({ success: false, error: 'Kimlik doğrulama gerekli.' });
+  }
+
+  // Kullanıcı bilgilerini getir
+  const [user] = await sql`SELECT * FROM users WHERE id = ${auth.id} AND is_active = true`;
+  if (!user) {
+    return res.status(401).json({ success: false, error: 'Kullanıcı bulunamadı.' });
+  }
+
+  // Teşkilat modülü erişim kontrolü
+  const allowedUserTypes = ['party_member', 'party_official', 'mp'];
+  if (!allowedUserTypes.includes(user.user_type) || !user.party_id) {
+    return res.status(403).json({ 
+      success: false, 
+      error: 'Teşkilat modülüne erişim yetkiniz yok.' 
+    });
+  }
+
+  // req.user'a kullanıcıyı ekle
+  req.user = user;
+
+  // Route yönlendirme
+  try {
+    // Mesajlaşma
+    if (url === '/api/organization/messages/threads' && req.method === 'GET') {
+      return await orgGetMessageThreads(req, res);
+    }
+    if (url.startsWith('/api/organization/messages/') && req.method === 'GET') {
+      const threadId = url.split('/api/organization/messages/')[1];
+      return await orgGetMessages(req, res, threadId);
+    }
+    if (url === '/api/organization/messages/send' && req.method === 'POST') {
+      return await orgSendMessage(req, res);
+    }
+    if (url === '/api/organization/contacts' && req.method === 'GET') {
+      return await orgGetContacts(req, res);
+    }
+
+    // Etkinlik
+    if (url === '/api/organization/events' && req.method === 'GET') {
+      return await orgGetEvents(req, res);
+    }
+    if (url === '/api/organization/events' && req.method === 'POST') {
+      return await orgCreateEvent(req, res);
+    }
+    if (url.startsWith('/api/organization/events/') && req.method === 'GET') {
+      const eventId = url.split('/api/organization/events/')[1];
+      return await orgGetEventDetail(req, res, eventId);
+    }
+    if (url.startsWith('/api/organization/events/') && req.method === 'PUT') {
+      const eventId = url.split('/api/organization/events/')[1];
+      return await orgUpdateEvent(req, res, eventId);
+    }
+    if (url.startsWith('/api/organization/events/') && req.method === 'DELETE') {
+      const eventId = url.split('/api/organization/events/')[1];
+      return await orgDeleteEvent(req, res, eventId);
+    }
+
+    // Görev
+    if (url === '/api/organization/tasks/my' && req.method === 'GET') {
+      return await orgGetMyTasks(req, res);
+    }
+    if (url === '/api/organization/tasks/assign' && req.method === 'POST') {
+      return await orgAssignTask(req, res);
+    }
+    if (url.match(/^\/api\/organization\/tasks\/\d+\/accept$/) && req.method === 'PUT') {
+      const taskId = url.split('/api/organization/tasks/')[1].split('/accept')[0];
+      return await orgAcceptTask(req, res, taskId);
+    }
+    if (url.match(/^\/api\/organization\/tasks\/\d+\/excuse$/) && req.method === 'POST') {
+      const taskId = url.split('/api/organization/tasks/')[1].split('/excuse')[0];
+      return await orgSubmitExcuse(req, res, taskId);
+    }
+    if (url === '/api/organization/excuses/pending' && req.method === 'GET') {
+      return await orgGetPendingExcuses(req, res);
+    }
+    if (url.match(/^\/api\/organization\/excuses\/\d+\/decide$/) && req.method === 'PUT') {
+      const excuseId = url.split('/api/organization/excuses/')[1].split('/decide')[0];
+      return await orgDecideExcuse(req, res, excuseId);
+    }
+
+    // Duyuru
+    if (url === '/api/organization/announcements' && req.method === 'GET') {
+      return await orgGetAnnouncements(req, res);
+    }
+    if (url === '/api/organization/announcements' && req.method === 'POST') {
+      return await orgCreateAnnouncement(req, res);
+    }
+    if (url.match(/^\/api\/organization\/announcements\/\d+\/read$/) && req.method === 'PUT') {
+      const announcementId = url.split('/api/organization/announcements/')[1].split('/read')[0];
+      return await orgMarkAnnouncementRead(req, res, announcementId);
+    }
+
+    // Anket
+    if (url === '/api/organization/polls' && req.method === 'GET') {
+      return await orgGetPolls(req, res);
+    }
+    if (url === '/api/organization/polls' && req.method === 'POST') {
+      return await orgCreatePoll(req, res);
+    }
+    if (url.match(/^\/api\/organization\/polls\/\d+\/results$/) && req.method === 'GET') {
+      const pollId = url.split('/api/organization/polls/')[1].split('/results')[0];
+      return await orgGetPollResults(req, res, pollId);
+    }
+    if (url.match(/^\/api\/organization\/polls\/\d+\/vote$/) && req.method === 'POST') {
+      const pollId = url.split('/api/organization/polls/')[1].split('/vote')[0];
+      return await orgVotePoll(req, res, pollId);
+    }
+
+    res.status(404).json({ success: false, error: 'Teşkilat endpoint bulunamadı.' });
+  } catch (error) {
+    console.error('Organization route error:', error);
+    res.status(500).json({ success: false, error: 'Sunucu hatası.' });
+  }
+}
+
 async function ensureEmailVerifiedForWrite(req, res, auth) {
   // Returns true if the request is allowed to perform interactions (like/comment/follow/post/message).
   // When email verification is enabled, unverified users can browse but cannot interact.
@@ -9597,7 +9720,7 @@ async function authForgotPassword(req, res) {
               <p style="margin:0;font-size:13px;color:#92400e;">
                 <strong>📋 Not:</strong> Bu talebi siz yapmadıysanız, hesap güvenliğiniz için şifrenizi değiştirmenizi ve bu e-postayı yok saymanızı öneririz.
               </p>
-            </div>
+          </div>
             <p style="font-size:13px;color:#6b7280;margin:20px 0 0 0;">
               <strong>Link çalışmıyor mu?</strong> Aşağıdaki bağlantıyı kopyalayıp tarayıcınıza yapıştırabilirsiniz:<br>
               <span style="color:#009fd6;word-break:break-all;font-size:12px;">${resetUrl}</span>
@@ -9812,7 +9935,7 @@ async function authResendVerification(req, res) {
   await safeUserPatch(u.id, { metadata: nextMeta, email_verified: false }).catch(() => null);
   try {
     await sendVerificationEmailForUser(req, { toEmail: u.email, token: tokenRaw, fullName: u.full_name || '' });
-    return res.json({ success: true, message: 'Doğrulama e-postası gönderildi.' });
+  return res.json({ success: true, message: 'Doğrulama e-postası gönderildi.' });
   } catch (e) {
     return res.status(503).json({
       success: false,
@@ -9990,15 +10113,15 @@ async function authRegister(req, res) {
     // - After verification: show profile reminder (handled in verify endpoint)
     await supabaseInsertNotifications(
       [
-        {
-          user_id: user.id,
-          actor_id: null,
-          type: 'welcome',
-          title: 'Hoş geldiniz',
-          message:
+      {
+        user_id: user.id,
+        actor_id: null,
+        type: 'welcome',
+        title: 'Hoş geldiniz',
+        message:
             'Polithane ailesine katıldığınız için çok mutluyuz. Kısa bir turla başlayalım: amacımız, misyonumuz ve vizyonumuz burada.',
-          is_read: false,
-        },
+        is_read: false,
+      },
         emailVerificationRequired
           ? {
               user_id: user.id,
@@ -10010,14 +10133,14 @@ async function authRegister(req, res) {
               is_read: false,
             }
           : {
-              user_id: user.id,
-              actor_id: null,
-              type: 'profile_reminder',
-              title: 'Profilinizi tamamlayın',
-              message:
-                'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
-              is_read: false,
-            },
+        user_id: user.id,
+        actor_id: null,
+        type: 'profile_reminder',
+        title: 'Profilinizi tamamlayın',
+        message:
+          'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
+        is_read: false,
+      },
       ].filter(Boolean)
     ).catch(() => null);
 
@@ -12338,6 +12461,11 @@ export default async function handler(req, res) {
       if (url.startsWith('/api/admin/comments/') && req.method === 'PUT') {
         const commentId = url.split('/api/admin/comments/')[1] || '';
         return await adminUpdateComment(req, res, commentId);
+      }
+
+      // Teşkilat Yönetim Modülü
+      if (url.startsWith('/api/organization')) {
+        return await handleOrganizationRoute(req, res, url);
       }
 
       // Search
