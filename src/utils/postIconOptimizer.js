@@ -4,7 +4,7 @@
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://nkwgnulilfzrzecwccep.supabase.co';
 
 const ICON_SIZES = {
-  SMALL: 120,
+  SMALL: 150,
   MEDIUM: 250,
   LARGE: 400,
 };
