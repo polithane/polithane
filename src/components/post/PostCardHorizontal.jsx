@@ -14,6 +14,7 @@ import { getProfilePath } from '../../utils/paths';
 import { CITY_CODES } from '../../utils/constants';
 import { posts as postsApi } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { getOptimizedPostIcon } from '../../utils/postIconOptimizer';
 
 const normalizeCityName = (name) =>
   String(name || '')
@@ -46,6 +47,8 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   const { isAuthenticated } = useAuth();
   const postId = post?.post_id ?? post?.id;
   const suppressClickRef = useRef(false);
+  const contentRef = useRef(null);
+  const [contentWidth, setContentWidth] = useState(250); // Default to medium size
 
   const [shareOpen, setShareOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -53,6 +56,20 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
   const [likeCount, setLikeCount] = useState(Number(post?.like_count || 0));
   const [isLiked, setIsLiked] = useState(Boolean(post?.is_liked));
   const [likeBurstTick, setLikeBurstTick] = useState(0);
+
+  // Measure content area width for optimized icon selection
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const updateWidth = () => {
+      if (contentRef.current) {
+        setContentWidth(contentRef.current.clientWidth);
+      }
+    };
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const postUrl = useMemo(() => {
     try {
@@ -341,10 +358,10 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
         {/* Görsel/İkon Alanı - Her zaman KARE (aspect-square) */}
         <div className="relative w-full rounded-lg overflow-hidden mb-2 aspect-square">
           {post.content_type === CONTENT_TYPES.TEXT && (
-            // Yazı içeriği - Supabase'den yüklenen görsel
-            <div className="w-full h-full bg-gray-50 flex items-center justify-center relative">
+            // Yazı içeriği - Supabase'den optimize edilmiş görsel
+            <div className="w-full h-full bg-gray-50 flex items-center justify-center relative" ref={contentRef}>
               <img 
-                src="https://nkwgnulilfzrzecwccep.supabase.co/storage/v1/object/public/icons/250x250metin.png"
+                src={getOptimizedPostIcon('text', contentWidth)}
                 alt="Metin"
                 className="w-full h-full object-cover"
                 loading="lazy"
@@ -457,10 +474,10 @@ export const PostCardHorizontal = ({ post, showCity = false, showPartyLogo = fal
             </>
           )}
           {post.content_type === CONTENT_TYPES.AUDIO && (
-            // Ses içeriği - Supabase'den yüklenen görsel + süre
+            // Ses içeriği - Supabase'den optimize edilmiş görsel + süre
             <div className="w-full h-full bg-gray-50 flex items-center justify-center relative">
               <img 
-                src="https://nkwgnulilfzrzecwccep.supabase.co/storage/v1/object/public/icons/250x250ses.png"
+                src={getOptimizedPostIcon('audio', contentWidth)}
                 alt="Ses"
                 className="w-full h-full object-cover"
                 loading="lazy"

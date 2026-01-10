@@ -98,19 +98,33 @@ function App() {
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
   const [showActivationModal, setShowActivationModal] = useState(false);
 
-  // Show welcome popup for new users (only once)
+  // Show welcome popup for new users (only once, or via notification click)
   useEffect(() => {
-    if (!user) {
+    if (!user?.id) {
       setShowWelcomePopup(false);
       setShowActivationModal(false);
       return;
     }
     
-    const hasSeenWelcome = sessionStorage.getItem('polithane_welcome_shown');
+    // Check if user has seen welcome (localStorage per user)
+    const storageKey = `polithane_welcome_shown_${user.id}`;
+    const hasSeenWelcome = localStorage.getItem(storageKey);
+    
+    // Only show automatically on first visit
     if (!hasSeenWelcome) {
       setShowWelcomePopup(true);
-      sessionStorage.setItem('polithane_welcome_shown', 'true');
+      localStorage.setItem(storageKey, 'true');
     }
+    
+    // Listen for notification click (custom event)
+    const handleWelcomeNotificationClick = () => {
+      setShowWelcomePopup(true);
+    };
+    window.addEventListener('showWelcomePopup', handleWelcomeNotificationClick);
+    
+    return () => {
+      window.removeEventListener('showWelcomePopup', handleWelcomeNotificationClick);
+    };
   }, [user]);
 
   // Show activation reminder if email not verified

@@ -350,8 +350,15 @@ export const Header = () => {
                               onClick={async () => {
                                 if (id) await markAsRead?.(id);
                                 setShowNotifMenu(false);
+                                
+                                // Handle "welcome" notification - show welcome popup
+                                const t = String(n?.type || '');
+                                if (t === 'welcome') {
+                                  window.dispatchEvent(new Event('showWelcomePopup'));
+                                  return;
+                                }
+                                
                                 if (targetPostId) {
-                                  const t = String(n?.type || '');
                                   const isCommentShortcut = t === 'comment' || t === 'comment_like';
                                   navigate(`/post/${targetPostId}${isCommentShortcut ? '?comment=1' : ''}`);
                                   return;
