@@ -12,6 +12,7 @@ import { CONTENT_TYPES } from '../../utils/constants';
 import { getProfilePath } from '../../utils/paths';
 import { posts as postsApi } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { ActivationReminderModal } from '../common/ActivationReminderModal';
 
 export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPosition = false }) => {
   const navigate = useNavigate();
@@ -88,6 +89,11 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
     if (!postId) return;
     if (!isAuthenticated) {
       navigate('/login-new');
+      return;
+    }
+    // Check email verification
+    if (!canInteract()) {
+      setShowActivationReminder(true);
       return;
     }
     const prevLiked = !!isLiked;
@@ -518,6 +524,12 @@ export const PostCard = ({ post, showCity = false, showPartyLogo = false, showPo
           </div>
         </div>
       </Modal>
+
+      {/* Activation Reminder Modal */}
+      <ActivationReminderModal
+        isOpen={showActivationReminder}
+        onClose={() => setShowActivationReminder(false)}
+      />
     </div>
   );
 };

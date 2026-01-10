@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { ActivationReminderModal } from '../components/common/ActivationReminderModal';
 import { useParams, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
 import { Heart, MessageCircle, Share2, Flag, Pencil, X, Check, Eye, TrendingUp, Users, Play, Pause, Music, Volume2, VolumeX, Rewind, FastForward, Plus, Minus, Printer, Maximize2 } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
@@ -448,7 +449,8 @@ export const PostDetailPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const navType = useNavigationType();
-  const { user: currentUser, isAuthenticated } = useAuth();
+  const { user: currentUser, isAuthenticated, isAdmin, canInteract } = useAuth();
+  const [showActivationReminder, setShowActivationReminder] = useState(false);
   const { allowComments } = usePublicSite();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
@@ -829,6 +831,11 @@ export const PostDetailPage = () => {
       navigate('/login-new');
       return;
     }
+    // Check email verification
+    if (!canInteract()) {
+      setShowActivationReminder(true);
+      return;
+    }
     setLikeBurstTick((t) => t + 1);
     try {
       const r = await postsApi.like(uiPost.post_id);
@@ -844,6 +851,11 @@ export const PostDetailPage = () => {
 
   const handleAddComment = async () => {
     if (!uiPost.post_id) return;
+    // Check email verification
+    if (!canInteract()) {
+      setShowActivationReminder(true);
+      return;
+    }
     if (!isAuthenticated) {
       navigate('/login-new');
       return;
@@ -1982,6 +1994,12 @@ export const PostDetailPage = () => {
           </div>
         </div>
       ) : null}
+
+      {/* Activation Reminder Modal */}
+      <ActivationReminderModal
+        isOpen={showActivationReminder}
+        onClose={() => setShowActivationReminder(false)}
+      />
     </div>
   );
 };
