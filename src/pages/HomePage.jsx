@@ -9,6 +9,7 @@ import { PostCardHorizontal } from '../components/post/PostCardHorizontal';
 import { HorizontalScroll } from '../components/common/HorizontalScroll';
 import { MediaSidebar } from '../components/media/MediaSidebar';
 import { Avatar } from '../components/common/Avatar';
+import { PostCardSkeleton } from '../components/common/PostCardSkeleton';
 // NOTE: No mock fallbacks in production. Everything should come from DB.
 import { currentParliamentDistribution, totalSeats } from '../data/parliamentDistribution';
 import { filterConsecutiveTextAudio } from '../utils/postFilters';
@@ -658,22 +659,63 @@ export const HomePage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="container-main py-10">
-          <div className="max-w-xl mx-auto bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center">
-            <div className="flex items-center justify-center mb-4">
-              <Avatar
-                src={isAuthenticated ? (user?.avatar_url || user?.profile_image) : null}
-                alt="Profil"
-                size="84px"
-              />
+        <div className="container-main py-6 animate-pulse">
+          {/* IntroSlider Skeleton */}
+          <div className="bg-gray-200 rounded-2xl h-40 mb-4" />
+          
+          {/* ParliamentBar Skeleton */}
+          <div className="bg-white rounded-lg p-3 mb-4">
+            <div className="flex gap-2">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-12 bg-gray-200 rounded flex-1" />
+              ))}
             </div>
-            <div className="text-xl font-black text-gray-900">Yükleniyor…</div>
-            <div className="text-sm text-gray-600 mt-1">İçerikler hazırlanıyor, lütfen bekleyin.</div>
-            <div className="mt-6 space-y-3">
-              <div className="h-4 bg-gray-100 rounded-full w-4/5 mx-auto animate-pulse" />
-              <div className="h-4 bg-gray-100 rounded-full w-3/5 mx-auto animate-pulse" />
-              <div className="h-24 bg-gray-100 rounded-2xl w-full animate-pulse" />
-            </div>
+          </div>
+
+          {/* StoriesBar Skeleton */}
+          <div className="flex gap-3 overflow-hidden mb-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex-shrink-0 w-20">
+                <div className="w-20 h-20 rounded-full bg-gray-200" />
+                <div className="h-3 bg-gray-200 rounded mt-1 w-16" />
+              </div>
+            ))}
+          </div>
+
+          {/* AgendaBar Skeleton */}
+          <div className="flex gap-2 overflow-hidden mb-6">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-10 bg-gray-200 rounded-full px-6 flex-shrink-0 w-32" />
+            ))}
+          </div>
+
+          {/* Desktop: Categories Skeleton */}
+          <div className="hidden md:block space-y-8">
+            {[...Array(4)].map((_, catIdx) => (
+              <div key={catIdx} className="bg-white rounded-lg p-4">
+                {/* Category header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-7 bg-gray-200 rounded w-48" />
+                  <div className="h-5 bg-gray-200 rounded w-24" />
+                </div>
+                
+                {/* Horizontal cards */}
+                <div className="flex gap-3 overflow-hidden">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex-shrink-0" style={{ width: `calc((100% - 48px) / 5)` }}>
+                      <PostCardSkeleton horizontal />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Mobile: Grid Skeleton */}
+          <div className="md:hidden grid grid-cols-2 gap-3">
+            {[...Array(6)].map((_, i) => (
+              <PostCardSkeleton key={i} />
+            ))}
           </div>
         </div>
       </div>

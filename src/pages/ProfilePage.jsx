@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { ActivationReminderModal } from '../components/common/ActivationReminderModal';
+import { ProfileSkeleton } from '../components/common/ProfileSkeleton';
 import { useLocation, useNavigate, useNavigationType, useParams, Link } from 'react-router-dom';
 import { MoreVertical, Ban, AlertCircle, MessageCircle, Settings, Edit } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
@@ -423,14 +424,7 @@ export const ProfilePage = () => {
   
   // Loading state
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-blue mx-auto mb-4"></div>
-          <p className="text-gray-600">Profil yükleniyor...</p>
-        </div>
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
   
   // Error state
