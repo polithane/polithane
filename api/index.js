@@ -11331,6 +11331,57 @@ function isValidEmailAddress(input) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
+async function adminGetWelcomeContent(req, res) {
+  try {
+    const map = await getSiteSettingsMapCached().catch(() => ({}));
+    const get = (k, fallback = '') => (map && Object.prototype.hasOwnProperty.call(map, k) ? String(map[k] ?? '') : fallback);
+
+    return res.json({
+      success: true,
+      data: {
+        who_we_are: get('welcome_who_we_are', 'Polithane, özgür ve bağımsız bir siyaset platformudur. Vatandaşların, siyasetçilerin ve medya temsilcilerinin bir araya geldiği, şeffaf ve demokratik bir ortam sunuyoruz.'),
+        problem_we_solve: get('welcome_problem_we_solve', 'Siyasette şeffaflık eksikliği, vatandaşların sesinin duyulmaması ve güvenilir bilgiye erişim zorluğu gibi sorunlara çözüm üretiyoruz. Polithane ile herkes eşit şartlarda sesini duyurabilir.'),
+        mission: get('welcome_mission', 'Misyonumuz, Türkiye\'de siyasi katılımı artırmak, şeffaflığı sağlamak ve vatandaşlarla siyasetçiler arasında güçlü bir köprü kurmaktır. Özgür tartışma ortamı yaratarak demokrasiye katkıda bulunmayı hedefliyoruz.'),
+        vision: get('welcome_vision', 'Vizyonumuz, Polithane\'yi Türkiye\'nin en güvenilir ve en çok tercih edilen siyaset platformu haline getirmektir. Gelecekte, her vatandaşın siyasete katılım sağlayabildiği, şeffaf ve hesap verebilir bir ekosistem yaratmak istiyoruz.'),
+      },
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'İçerik yüklenemedi.' });
+  }
+}
+
+async function adminUpdateWelcomeContent(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+
+  const body = await readJsonBody(req);
+  const obj = body && typeof body === 'object' ? body : {};
+
+  const updates = [];
+  if (obj.who_we_are !== undefined) {
+    updates.push({ key: 'welcome_who_we_are', value: String(obj.who_we_are || '').trim() });
+  }
+  if (obj.problem_we_solve !== undefined) {
+    updates.push({ key: 'welcome_problem_we_solve', value: String(obj.problem_we_solve || '').trim() });
+  }
+  if (obj.mission !== undefined) {
+    updates.push({ key: 'welcome_mission', value: String(obj.mission || '').trim() });
+  }
+  if (obj.vision !== undefined) {
+    updates.push({ key: 'welcome_vision', value: String(obj.vision || '').trim() });
+  }
+
+  try {
+    for (const { key, value } of updates) {
+      await upsertSiteSetting(key, value);
+    }
+    invalidateSiteSettingsCache();
+    return res.json({ success: true, message: 'Karşılama içeriği güncellendi.' });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Güncelleme başarısız.' });
+  }
+}
+
 async function adminGetMailSettings(req, res) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
@@ -12097,6 +12148,9 @@ export default async function handler(req, res) {
       if (url === '/api/admin/agendas' && req.method === 'POST') return await adminCreateAgenda(req, res);
       if (url === '/api/admin/parties' && req.method === 'GET') return await adminGetParties(req, res);
       if (url === '/api/admin/parties' && req.method === 'POST') return await adminCreateParty(req, res);
+      // Welcome content (public GET, admin PUT)
+      if (url === '/api/admin/welcome-content' && req.method === 'GET') return await adminGetWelcomeContent(req, res);
+      if (url === '/api/admin/welcome-content' && req.method === 'PUT') return await adminUpdateWelcomeContent(req, res);
       // Mail settings / test (new canonical endpoints)
       if (url === '/api/admin/mail/settings' && req.method === 'GET') return await adminGetMailSettings(req, res);
       if (url === '/api/admin/mail/settings' && req.method === 'PUT') return await adminUpdateMailSettings(req, res);

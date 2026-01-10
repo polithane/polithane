@@ -62,6 +62,7 @@ import { CommentModeration } from './pages/admin/CommentModeration';
 import { MediaManagement } from './pages/admin/MediaManagement';
 import { EmailTemplates } from './pages/admin/EmailTemplates';
 import { MailTest } from './pages/admin/MailTest';
+import { WelcomeContentSettings } from './pages/admin/WelcomeContentSettings';
 import { NotificationRules } from './pages/admin/NotificationRules';
 import { ScrapingManagement } from './pages/admin/ScrapingManagement';
 import { SourceManagement } from './pages/admin/SourceManagement';
@@ -238,6 +239,7 @@ function App() {
           <Route path="site-settings" element={<SiteSettings />} />
           <Route path="theme" element={<ThemeEditor />} />
           <Route path="seo" element={<SEOSettings />} />
+          <Route path="welcome-content" element={<WelcomeContentSettings />} />
           <Route path="email" element={<EmailTemplates />} />
           <Route path="mail-settings" element={<MailTest />} />
           {/* Backward compatible */}

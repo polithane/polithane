@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, FileText, TrendingUp, Settings, Palette, 
   Shield, Search, DollarSign, Megaphone, Bot, BarChart3, Mail, 
-  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark, Wrench, ListChecks
+  Globe, Image, Bell, Database, Code, Zap, Flag, Flame, Send, Landmark, Wrench, ListChecks, PartyPopper
 } from 'lucide-react';
 
 export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) => {
@@ -37,6 +37,7 @@ export const AdminSidebar = ({ onNavigate, onClose, showCloseButton = false }) =
         { path: '/adminyonetim/site-settings', icon: Settings, label: 'Site Ayarları' },
         { path: '/adminyonetim/theme', icon: Palette, label: 'Tasarım & Tema' },
         { path: '/adminyonetim/seo', icon: Search, label: 'SEO Ayarları' },
+        { path: '/adminyonetim/welcome-content', icon: PartyPopper, label: 'Karşılama Sayfası' },
         { path: '/adminyonetim/email', icon: Mail, label: 'E-posta Şablonları' },
         { path: '/adminyonetim/mail-settings', icon: Send, label: 'Mail Ayarları' },
         { path: '/adminyonetim/notifications', icon: Bell, label: 'Bildirim Kuralları' },
