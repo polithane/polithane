@@ -32,7 +32,7 @@ export const getOptimizedPostIcon = (contentType, displayWidth) => {
 
   // Construct the URL (using 'metin' for Turkish text, 'ses' for audio)
   const filename = contentType === 'text' ? `${iconSize}x${iconSize}metin.svg` : `${iconSize}x${iconSize}ses.svg`;
-  return `${SUPABASE_URL}/storage/v1/object/public/icons/${filename}`;
+  return `${SUPABASE_URL}/storage/v1/object/public/ikons/${filename}`;
 };
 
 /**
@@ -47,8 +47,8 @@ export const getAllIconSizes = (contentType) => {
 
   const suffix = contentType === 'text' ? 'metin.svg' : 'ses.svg';
   return [
-    `${SUPABASE_URL}/storage/v1/object/public/icons/${ICON_SIZES.SMALL}x${ICON_SIZES.SMALL}${suffix}`,
-    `${SUPABASE_URL}/storage/v1/object/public/icons/${ICON_SIZES.MEDIUM}x${ICON_SIZES.MEDIUM}${suffix}`,
-    `${SUPABASE_URL}/storage/v1/object/public/icons/${ICON_SIZES.LARGE}x${ICON_SIZES.LARGE}${suffix}`,
+    `${SUPABASE_URL}/storage/v1/object/public/ikons/${ICON_SIZES.SMALL}x${ICON_SIZES.SMALL}${suffix}`,
+    `${SUPABASE_URL}/storage/v1/object/public/ikons/${ICON_SIZES.MEDIUM}x${ICON_SIZES.MEDIUM}${suffix}`,
+    `${SUPABASE_URL}/storage/v1/object/public/ikons/${ICON_SIZES.LARGE}x${ICON_SIZES.LARGE}${suffix}`,
   ];
 };
