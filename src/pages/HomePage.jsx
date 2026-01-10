@@ -835,19 +835,21 @@ export const HomePage = () => {
                   scrollInterval={4000}
                   itemsPerView={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
                   manualScrollItems={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
-                  onAdvance={({ screenSize, by }) => {
+                  onAdvance={({ reason, screenSize, by }) => {
                     if (screenSize !== 'desktop') return;
-                    const inc = Number(by || 0) || 0;
+                    // Otomatik: 1'er yükle (bant genişliği tasarrufu)
+                    // Manuel: by kadar yükle (5'er, hızlı UX)
+                    const inc = reason === 'auto' ? 1 : (Number(by || 0) || 0);
                     if (inc <= 0) return;
                     setDesktopVisible((p) => ({
                       ...p,
-                      hit: Math.min((p.hit || 10) + inc, hitPosts.length),
+                      hit: Math.min((p.hit || 5) + inc, hitPosts.length),
                     }));
-                    const nextVisible = Math.max(10, (desktopVisible.hit || 10) + inc);
+                    const nextVisible = Math.max(5, (desktopVisible.hit || 5) + inc);
                     if (hasMorePosts && !loadingMorePosts && nextVisible >= hitPosts.length - 2) fetchMorePosts();
                   }}
                 >
-                  {hitPosts.slice(0, Math.max(10, desktopVisible.hit)).map(post => (
+                  {hitPosts.slice(0, Math.max(5, desktopVisible.hit)).map(post => (
                     <PostCardHorizontal 
                       key={post.post_id ?? post.id} 
                       post={post}
@@ -871,19 +873,21 @@ export const HomePage = () => {
                 scrollInterval={5000}
                 itemsPerView={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
                 manualScrollItems={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
-                onAdvance={({ screenSize, by }) => {
+                onAdvance={({ reason, screenSize, by }) => {
                   if (screenSize !== 'desktop') return;
-                  const inc = Number(by || 0) || 0;
+                  // Otomatik: 1'er yükle (bant genişliği tasarrufu)
+                  // Manuel: by kadar yükle (5'er, hızlı UX)
+                  const inc = reason === 'auto' ? 1 : (Number(by || 0) || 0);
                   if (inc <= 0) return;
                   setDesktopVisible((p) => ({
                     ...p,
-                    mp: Math.min((p.mp || 10) + inc, mpPostsDesktop.length),
+                    mp: Math.min((p.mp || 5) + inc, mpPostsDesktop.length),
                   }));
-                  const nextVisible = Math.max(10, (desktopVisible.mp || 10) + inc);
+                  const nextVisible = Math.max(5, (desktopVisible.mp || 5) + inc);
                   if (hasMorePosts && !loadingMorePosts && nextVisible >= mpPostsDesktop.length - 2) fetchMorePosts();
                 }}
               >
-                {mpPostsDesktop.slice(0, Math.max(10, desktopVisible.mp)).map(post => (
+                {mpPostsDesktop.slice(0, Math.max(5, desktopVisible.mp)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}
@@ -907,19 +911,21 @@ export const HomePage = () => {
                 scrollInterval={5000}
                 itemsPerView={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
                 manualScrollItems={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
-                onAdvance={({ screenSize, by }) => {
+                onAdvance={({ reason, screenSize, by }) => {
                   if (screenSize !== 'desktop') return;
-                  const inc = Number(by || 0) || 0;
+                  // Otomatik: 1'er yükle (bant genişliği tasarrufu)
+                  // Manuel: by kadar yükle (5'er, hızlı UX)
+                  const inc = reason === 'auto' ? 1 : (Number(by || 0) || 0);
                   if (inc <= 0) return;
                   setDesktopVisible((p) => ({
                     ...p,
-                    org: Math.min((p.org || 10) + inc, organizationPostsDesktop.length),
+                    org: Math.min((p.org || 5) + inc, organizationPostsDesktop.length),
                   }));
-                  const nextVisible = Math.max(10, (desktopVisible.org || 10) + inc);
+                  const nextVisible = Math.max(5, (desktopVisible.org || 5) + inc);
                   if (hasMorePosts && !loadingMorePosts && nextVisible >= organizationPostsDesktop.length - 2) fetchMorePosts();
                 }}
               >
-                {organizationPostsDesktop.slice(0, Math.max(10, desktopVisible.org)).map(post => (
+                {organizationPostsDesktop.slice(0, Math.max(5, desktopVisible.org)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}
@@ -942,19 +948,21 @@ export const HomePage = () => {
                 scrollInterval={5000}
                 itemsPerView={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
                 manualScrollItems={{ desktop: gridSettings?.home_desktop || 5, tablet: 3, mobile: gridSettings?.home_mobile || 2 }}
-                onAdvance={({ screenSize, by }) => {
+                onAdvance={({ reason, screenSize, by }) => {
                   if (screenSize !== 'desktop') return;
-                  const inc = Number(by || 0) || 0;
+                  // Otomatik: 1'er yükle (bant genişliği tasarrufu)
+                  // Manuel: by kadar yükle (5'er, hızlı UX)
+                  const inc = reason === 'auto' ? 1 : (Number(by || 0) || 0);
                   if (inc <= 0) return;
                   setDesktopVisible((p) => ({
                     ...p,
-                    citizen: Math.min((p.citizen || 10) + inc, citizenPostsDesktop.length),
+                    citizen: Math.min((p.citizen || 5) + inc, citizenPostsDesktop.length),
                   }));
-                  const nextVisible = Math.max(10, (desktopVisible.citizen || 10) + inc);
+                  const nextVisible = Math.max(5, (desktopVisible.citizen || 5) + inc);
                   if (hasMorePosts && !loadingMorePosts && nextVisible >= citizenPostsDesktop.length - 2) fetchMorePosts();
                 }}
               >
-                {citizenPostsDesktop.slice(0, Math.max(10, desktopVisible.citizen)).map(post => (
+                {citizenPostsDesktop.slice(0, Math.max(5, desktopVisible.citizen)).map(post => (
                   <PostCardHorizontal 
                     key={post.post_id ?? post.id} 
                     post={post}
