@@ -28,6 +28,7 @@ import { HitFeedPage } from './pages/HitFeedPage';
 import { FastPage } from './pages/FastPage';
 import { FastViewerPage } from './pages/FastViewerPage';
 import { OrganizationPage } from './pages/OrganizationPage';
+import { OrgMessagesPage } from './pages/organization/MessagesPage';
 
 // Auth Pages
 import { LoginPageNew } from './pages/auth/LoginPageNew';
@@ -199,6 +200,7 @@ function App() {
         
         {/* Teşkilat Yönetimi */}
         <Route path="/organization" element={<><Header /><OrganizationPage /><Footer /><ActionBar /></>} />
+        <Route path="/organization/messages" element={<><Header /><OrgMessagesPage /><Footer /><ActionBar /></>} />
         
         <Route path="/search" element={<><Header /><SearchPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
         <Route path="/polit-at" element={<><Header /><CreatePolitPage /><Footer /><ActionBar /><FollowSuggestionsBar limit={8} /></>} />
