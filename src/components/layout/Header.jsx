@@ -97,6 +97,14 @@ export const Header = () => {
     if (t === 'follow' || t.includes('follow')) return 'Takip';
     if (t === 'mention' || t.includes('mention') || t.includes('tag')) return 'Bahsedilme';
     if (t === 'share' || t.includes('share') || t.includes('repost')) return 'Paylaşım';
+    // Teşkilat bildirimleri
+    if (t === 'org_message') return '🏛️ Teşkilat Mesajı';
+    if (t === 'org_event') return '🏛️ Etkinlik';
+    if (t === 'org_task') return '🏛️ Görev';
+    if (t === 'org_excuse') return '🏛️ Mazeret';
+    if (t === 'org_announcement') return '🏛️ Duyuru';
+    if (t === 'org_poll') return '🏛️ Anket';
+    if (t === 'documents_under_review') return '📋 Evrak İnceleme';
     // comment-like must be checked before comment
     if (t === 'comment_like' || (t.includes('comment') && t.includes('like'))) return 'Yorum beğenisi';
     if (t === 'comment' || t.includes('comment') || t.includes('reply')) return 'Yorum';
