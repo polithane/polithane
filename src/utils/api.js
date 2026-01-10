@@ -728,6 +728,48 @@ export const parties = {
   getById: (id) => apiCall(`/api/parties/${id}`),
 };
 
+// ============================================
+// ORGANIZATION (TEŞKILAT) API
+// ============================================
+export const organization = {
+  // Mesajlaşma
+  getMessageThreads: () => apiCall('/api/organization/messages/threads'),
+  getMessages: (threadId) => apiCall(`/api/organization/messages/${threadId}`),
+  sendMessage: (data) => apiCall('/api/organization/messages/send', { method: 'POST', body: data }),
+  getContacts: () => apiCall('/api/organization/contacts'),
+
+  // Etkinlik
+  getEvents: () => apiCall('/api/organization/events'),
+  createEvent: (data) => apiCall('/api/organization/events', { method: 'POST', body: data }),
+  getEventDetail: (id) => apiCall(`/api/organization/events/${id}`),
+  updateEvent: (id, data) => apiCall(`/api/organization/events/${id}`, { method: 'PUT', body: data }),
+  deleteEvent: (id) => apiCall(`/api/organization/events/${id}`, { method: 'DELETE' }),
+
+  // Görev
+  getMyTasks: (status) => {
+    const query = status ? `?status=${status}` : '';
+    return apiCall(`/api/organization/tasks/my${query}`);
+  },
+  assignTask: (data) => apiCall('/api/organization/tasks/assign', { method: 'POST', body: data }),
+  acceptTask: (id) => apiCall(`/api/organization/tasks/${id}/accept`, { method: 'PUT' }),
+  submitExcuse: (id, excuseText) => apiCall(`/api/organization/tasks/${id}/excuse`, { method: 'POST', body: { excuseText } }),
+
+  // Mazeret
+  getPendingExcuses: () => apiCall('/api/organization/excuses/pending'),
+  decideExcuse: (id, data) => apiCall(`/api/organization/excuses/${id}/decide`, { method: 'PUT', body: data }),
+
+  // Duyuru
+  getAnnouncements: () => apiCall('/api/organization/announcements'),
+  createAnnouncement: (data) => apiCall('/api/organization/announcements', { method: 'POST', body: data }),
+  markAnnouncementRead: (id) => apiCall(`/api/organization/announcements/${id}/read`, { method: 'PUT' }),
+
+  // Anket
+  getPolls: () => apiCall('/api/organization/polls'),
+  createPoll: (data) => apiCall('/api/organization/polls', { method: 'POST', body: data }),
+  getPollResults: (id) => apiCall(`/api/organization/polls/${id}/results`),
+  votePoll: (id, optionIndex) => apiCall(`/api/organization/polls/${id}/vote`, { method: 'POST', body: { optionIndex } }),
+};
+
 // Export default object with all API modules
 export default {
   auth,
@@ -737,4 +779,5 @@ export default {
   admin,
   parties,
   notifications,
+  organization,
 };
