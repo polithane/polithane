@@ -4,7 +4,7 @@ import { clsx } from 'clsx';
 import { normalizeAvatarUrl } from '../../utils/avatarUrl';
 
 // Default avatar
-const DEFAULT_AVATAR = '/favicon.ico';
+const DEFAULT_AVATAR = '/uyeresmi.svg';
 
 export const Avatar = ({ 
   src, 
