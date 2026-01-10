@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePublicSite } from '../../contexts/PublicSiteContext';
 import { parties as partiesApi, users as usersApi } from '../../utils/api';
 import { CITY_CODES } from '../../utils/constants';
+import { DISTRICTS } from '../../utils/districts';
 import { isValidEmail, isValidPhone, isValidFileSize, isValidFileType } from '../../utils/validators';
 import { getUserTitle } from '../../utils/titleHelpers';
 
@@ -36,7 +37,6 @@ const MEMBERSHIP_TYPES = [
     id: 'party_member', 
     label: 'Parti Üyesi', 
     desc: 'Parti kimliğinizi doğrulayarak rozet kazanın.',
-    extraDesc: 'İl/İlçe seçimi zorunludur.',
     icon: Users,
     color: 'bg-gradient-to-br from-red-50 to-red-100 text-red-600',
     iconBg: 'bg-gradient-to-br from-red-500 to-red-600 text-white',
@@ -45,8 +45,7 @@ const MEMBERSHIP_TYPES = [
   { 
     id: 'organization', 
     label: 'Teşkilat / Yönetim', 
-    desc: 'İl/İlçe başkanı veya belediye başkanı.',
-    extraDesc: 'İl/İlçe seçimi zorunludur.',
+    desc: 'İl ve İlçe Parti ve Belediye Başkanları',
     icon: Building,
     color: 'bg-gradient-to-br from-orange-50 to-orange-100 text-orange-600',
     iconBg: 'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
@@ -233,7 +232,13 @@ export const RegisterPageNew = () => {
     if (name === 'full_name' && value.length > 50) return;
     if (name === 'district' && value.length > 50) return;
     
-    setFormData(prev => ({ ...prev, [name]: value }));
+    // İl değiştiğinde ilçeyi sıfırla
+    if (name === 'province') {
+      setFormData(prev => ({ ...prev, [name]: value, district: '' }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+    
     setGlobalError('');
     setFieldErrors((prev) => ({ ...prev, [name]: '' }));
 
@@ -654,16 +659,23 @@ export const RegisterPageNew = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               İlçe {(isPartyMember || isTeşkilat) && <span className="text-red-600">*</span>}
             </label>
-            <input
-              type="text"
+            <select
               name="district"
-              className="w-full border border-gray-300 rounded-lg p-3"
+              className="w-full border border-gray-300 rounded-lg p-3 bg-white"
               value={formData.district}
               onChange={handleInputChange}
               required={isPartyMember || isTeşkilat}
-              placeholder={(isPartyMember || isTeşkilat) ? 'Zorunlu alan' : 'Opsiyonel'}
-              maxLength={50}
-            />
+              disabled={!formData.province}
+            >
+              <option value="">
+                {!formData.province 
+                  ? 'Önce il seçiniz' 
+                  : (isPartyMember || isTeşkilat) ? 'İlçe seçiniz...' : 'Opsiyonel'}
+              </option>
+              {formData.province && DISTRICTS[formData.province] && DISTRICTS[formData.province].map(district => (
+                <option key={district} value={district}>{district}</option>
+              ))}
+            </select>
           </div>
           
           <div className="col-span-1 md:col-span-2">
@@ -1060,12 +1072,9 @@ export const RegisterPageNew = () => {
               </div>
                       <div className="flex-1">
                         <h3 className="font-bold text-gray-900 mb-1">{type.label}</h3>
-                        <p className="text-xs text-gray-500">{type.desc}</p>
-                        {type.extraDesc && (
-                          <p className="text-xs font-bold text-red-600 mt-1">
-                            ⚠️ {type.extraDesc}
-                          </p>
-                        )}
+                        <p className={`text-xs ${type.id === 'organization' ? 'text-orange-700 font-bold' : 'text-gray-500'}`}>
+                          {type.desc}
+                        </p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-600 mt-3" />
                     </button>
