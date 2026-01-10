@@ -4423,7 +4423,7 @@ function emailLayout({ title, bodyHtml }) {
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; background:#f3f4f6; padding:18px;">
       <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
         <div style="background:linear-gradient(135deg,#009fd6,#0077b6);padding:18px 20px;color:#fff;">
-          <div style="font-weight:900;font-size:18px;">Polithane.</div>
+          <div style="font-weight:900;font-size:18px;">Polithane</div>
           <div style="font-size:12px;opacity:.9;">Özgür, açık, şeffaf siyaset, bağımsız medya!</div>
         </div>
         <div style="padding:20px;">
@@ -9439,11 +9439,11 @@ async function authForgotPassword(req, res) {
 
     // Layered rate limits (best-effort, per serverless instance)
     // - IP burst: limit total attempts from the same IP
-    // - IP+email burst: limit repeated targeting of a specific email from the same IP
+    // - IP+email burst: limit repeated targeting of a specific email from the same IP (3 per hour)
     // - Email sustained: limit total attempts for the same email across IPs (best-effort)
     const rlIp = rateLimit(`forgot:ip:${ip}`, { windowMs: 60_000, max: 5 });
     const rlEmail = emailLower ? rateLimit(`forgot:email:${emailLower}`, { windowMs: 15 * 60_000, max: 5 }) : { ok: true };
-    const rlIpEmail = emailLower ? rateLimit(`forgot:ip_email:${ip}:${emailLower}`, { windowMs: 60_000, max: 2 }) : { ok: true };
+    const rlIpEmail = emailLower ? rateLimit(`forgot:ip_email:${ip}:${emailLower}`, { windowMs: 60 * 60_000, max: 3 }) : { ok: true };
     if (!rlIp.ok || !rlEmail.ok || !rlIpEmail.ok) {
       return res.status(429).json({ success: false, error: 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyin.' });
     }
@@ -9459,7 +9459,7 @@ async function authForgotPassword(req, res) {
       }
 
       const token = crypto.randomBytes(32).toString('base64url');
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
+      const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3h
       const expiresIso = expiresAt.toISOString();
 
       // Try DB columns first (if present), else fallback to users.metadata.
@@ -9490,21 +9490,24 @@ async function authForgotPassword(req, res) {
         const appUrl = getPublicAppUrl(req);
         const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
         const subject = 'Polithane – Şifre sıfırlama';
+        const userName = u.full_name || u.username || 'Değerli Kullanıcı';
         const text =
-          `Merhaba,\n\n` +
+          `Sayın ${userName},\n\n` +
           `Polithane hesabınız için şifre sıfırlama talebi aldık.\n\n` +
-          `Şifrenizi sıfırlamak için 1 saat içinde şu bağlantıya tıklayın:\n${resetUrl}\n\n` +
+          `Şifrenizi sıfırlamak için 3 saat içinde şu bağlantıya tıklayın:\n${resetUrl}\n\n` +
+          `Bu bağlantı 3 saat sonra geçersiz olacaktır.\n\n` +
           `Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n`;
         const html = `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-            <h2>Şifre sıfırlama</h2>
+            <p style="margin:0 0 16px 0;">Sayın <strong>${userName}</strong>,</p>
             <p>Polithane hesabınız için <strong>şifre sıfırlama</strong> talebi aldık.</p>
-            <p>Şifrenizi sıfırlamak için <strong>1 saat</strong> içinde aşağıdaki butona tıklayın:</p>
+            <p>Şifrenizi sıfırlamak için <strong>3 saat</strong> içinde aşağıdaki butona tıklayın:</p>
             <p>
               <a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#009fd6;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
                 Şifremi sıfırla
               </a>
             </p>
+            <p style="font-size:12px;color:#6b7280;">Bu bağlantı 3 saat sonra geçersiz olacaktır.</p>
             <p style="font-size:12px;color:#6b7280;">Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>
           </div>
         `;

@@ -169,9 +169,9 @@ export const ForgotPasswordPage = () => {
                 <img 
                   src="/logo.png" 
                   alt="Polithane" 
-                  width={96}
-                  height={96}
-                  className="w-24 h-24 object-contain drop-shadow-lg"
+                  width={80}
+                  height={80}
+                  className="w-20 h-20 object-contain drop-shadow-lg"
                   onError={() => setLogoFailed(true)}
                 />
               )}
