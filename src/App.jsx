@@ -1,9 +1,12 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useState, useEffect } from 'react';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { ActionBar } from './components/layout/ActionBar';
 import { FollowSuggestionsBar } from './components/layout/FollowSuggestionsBar';
+import { WelcomePopup } from './components/common/WelcomePopup';
+import { ActivationReminderModal } from './components/common/ActivationReminderModal';
 import { HomePage } from './pages/HomePage';
 import { PostDetailPage } from './pages/PostDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -89,7 +92,38 @@ import { useAuth } from './contexts/AuthContext';
 function App() {
   const location = useLocation();
   const { maintenanceMode } = usePublicSite();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user, emailVerified, requiresEmailVerification } = useAuth();
+  
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
+  const [showActivationModal, setShowActivationModal] = useState(false);
+
+  // Show welcome popup for new users (only once)
+  useEffect(() => {
+    if (!user) {
+      setShowWelcomePopup(false);
+      setShowActivationModal(false);
+      return;
+    }
+    
+    const hasSeenWelcome = sessionStorage.getItem('polithane_welcome_shown');
+    if (!hasSeenWelcome) {
+      setShowWelcomePopup(true);
+      sessionStorage.setItem('polithane_welcome_shown', 'true');
+    }
+  }, [user]);
+
+  // Show activation reminder if email not verified
+  useEffect(() => {
+    if (!user || !requiresEmailVerification) return;
+    if (emailVerified) return;
+    
+    // Show after welcome popup closes
+    const timer = setTimeout(() => {
+      setShowActivationModal(true);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [user, emailVerified, requiresEmailVerification]);
 
   const path = String(location?.pathname || '/');
   const isAuthRoute =
@@ -222,6 +256,19 @@ function App() {
           <Route path="jobs" element={<JobQueue />} />
         </Route>
       </Routes>
+      
+      {/* Welcome Popup (First login) */}
+      <WelcomePopup
+        isOpen={showWelcomePopup}
+        onClose={() => setShowWelcomePopup(false)}
+        userName={user?.full_name}
+      />
+
+      {/* Activation Reminder Modal */}
+      <ActivationReminderModal
+        isOpen={showActivationModal}
+        onClose={() => setShowActivationModal(false)}
+      />
       
       <Toaster position="top-right" />
     </div>
