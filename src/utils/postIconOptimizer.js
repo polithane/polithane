@@ -31,7 +31,7 @@ export const getOptimizedPostIcon = (contentType, displayWidth) => {
   }
 
   // Construct the URL (using 'metin' for Turkish text, 'ses' for audio)
-  const filename = contentType === 'text' ? `${iconSize}x${iconSize}metin.png` : `${iconSize}x${iconSize}ses.png`;
+  const filename = contentType === 'text' ? `${iconSize}x${iconSize}metin.svg` : `${iconSize}x${iconSize}ses.svg`;
   return `${SUPABASE_URL}/storage/v1/object/public/icons/${filename}`;
 };
 
@@ -45,7 +45,7 @@ export const getAllIconSizes = (contentType) => {
     return [];
   }
 
-  const suffix = contentType === 'text' ? 'metin.png' : 'ses.png';
+  const suffix = contentType === 'text' ? 'metin.svg' : 'ses.svg';
   return [
     `${SUPABASE_URL}/storage/v1/object/public/icons/${ICON_SIZES.SMALL}x${ICON_SIZES.SMALL}${suffix}`,
     `${SUPABASE_URL}/storage/v1/object/public/icons/${ICON_SIZES.MEDIUM}x${ICON_SIZES.MEDIUM}${suffix}`,
