@@ -797,17 +797,18 @@ export const HomePage = () => {
                   <div
                     className="grid gap-3"
                     style={{
-                      gridTemplateColumns: `repeat(${gridSettings?.home_mobile || 2}, 1fr)`
+                      gridTemplateColumns: `repeat(${gridSettings?.home_mobile || 2}, minmax(0, 1fr))`
                     }}
                   >
                     {activeTab.posts.slice(0, mobileVisibleCount).map(post => (
-                      <PostCardHorizontal 
-                        key={post.post_id ?? post.id} 
-                        post={post}
-                        showCity={activeTab.id === 'mps' || activeTab.id === 'all'}
-                        showPartyLogo={activeTab.id !== 'citizens'}
-                        fullWidth={true}
-                      />
+                      <div key={post.post_id ?? post.id} className="min-w-0">
+                        <PostCardHorizontal 
+                          post={post}
+                          showCity={activeTab.id === 'mps' || activeTab.id === 'all'}
+                          showPartyLogo={activeTab.id !== 'citizens'}
+                          fullWidth={true}
+                        />
+                      </div>
                     ))}
                   </div>
                   <div ref={mobileSentinelRef} className="h-8" />

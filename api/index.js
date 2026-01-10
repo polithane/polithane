@@ -9699,7 +9699,7 @@ async function authVerifyEmail(req, res) {
 
   // Try metadata-based storage
   const rows = await supabaseRestGet('users', {
-    select: 'id,email,full_name,metadata,email_verified',
+    select: 'id,email,full_name,metadata,email_verified,user_type',
     'metadata->>email_verification_token_hash': `eq.${tokenHash}`,
     limit: '1',
   }).catch(() => []);
@@ -9710,46 +9710,83 @@ async function authVerifyEmail(req, res) {
   if (!exp || !Number.isFinite(exp.getTime()) || exp.getTime() < Date.now()) {
     return res.status(400).json({ success: false, error: 'Doğrulama linkinin süresi dolmuş.' });
   }
+  
+  // Özel üyelikler için onay gerekir
+  const specialMembershipTypes = ['party_member', 'party_official', 'mp', 'media'];
+  const requiresApproval = specialMembershipTypes.includes(u.user_type);
+  
   const nextMeta = {
     ...meta,
     email_verified: true,
     email_verification_token_hash: null,
     email_verification_expires_at: null,
     email_verified_at: new Date().toISOString(),
+    ...(requiresApproval ? { 
+      approval_status: 'pending',
+      approval_requested_at: new Date().toISOString() 
+    } : {}),
   };
   await safeUserPatch(u.id, { metadata: nextMeta, email_verified: true }).catch(() => null);
 
   // After verification:
   // - remove "verify email" notification
-  // - add "profile reminder" notification (so onboarding continues)
+  // - add appropriate next notification
   try {
     await supabaseRestDelete('notifications', { user_id: `eq.${u.id}`, type: 'eq.email_verification_required' }).catch(() => null);
     // After verification, keep onboarding focused: remove welcome notification (user can still access /welcome anytime).
     await supabaseRestDelete('notifications', { user_id: `eq.${u.id}`, type: 'eq.welcome' }).catch(() => null);
-    const existing = await supabaseRestGet('notifications', {
-      select: 'id',
-      user_id: `eq.${u.id}`,
-      type: 'eq.profile_reminder',
-      limit: '1',
-    }).catch(() => []);
-    if (!Array.isArray(existing) || existing.length === 0) {
-      await supabaseInsertNotifications([
-        {
-          user_id: u.id,
-          actor_id: null,
-          type: 'profile_reminder',
-          title: 'Profilinizi tamamlayın',
-          message: 'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
-          is_read: false,
-        },
-      ]).catch(() => null);
+    
+    if (requiresApproval) {
+      // Özel üyelikler: Evrak inceleme bildirimi
+      const existingApproval = await supabaseRestGet('notifications', {
+        select: 'id',
+        user_id: `eq.${u.id}`,
+        type: 'eq.documents_under_review',
+        limit: '1',
+      }).catch(() => []);
+      if (!Array.isArray(existingApproval) || existingApproval.length === 0) {
+        await supabaseInsertNotifications([
+          {
+            user_id: u.id,
+            actor_id: null,
+            type: 'documents_under_review',
+            title: 'EVRAKLARINIZ İNCELENİYOR!',
+            message: 'Mail aktivasyonu için teşekkürler! Belgeleriniz ekibimiz tarafından özenle inceleniyor. Hızla incelemeyi bitireceğiz ve size mail/SMS ile bilgi vereceğiz.',
+            is_read: false,
+          },
+        ]).catch(() => null);
+      }
+    } else {
+      // Normal vatandaş: Profil tamamlama
+      const existing = await supabaseRestGet('notifications', {
+        select: 'id',
+        user_id: `eq.${u.id}`,
+        type: 'eq.profile_reminder',
+        limit: '1',
+      }).catch(() => []);
+      if (!Array.isArray(existing) || existing.length === 0) {
+        await supabaseInsertNotifications([
+          {
+            user_id: u.id,
+            actor_id: null,
+            type: 'profile_reminder',
+            title: 'Profilinizi tamamlayın',
+            message: 'Eksik profil bilgilerinizi doldurmanızı rica ederiz. Bu, doğrulama ve görünürlük açısından önemlidir.',
+            is_read: false,
+          },
+        ]).catch(() => null);
+      }
     }
   } catch {
     // ignore
   }
 
   await sendWelcomeEmailToUser(req, { toEmail: u.email, fullName: u.full_name }).catch(() => null);
-  return res.json({ success: true, message: 'E-posta doğrulandı.' });
+  return res.json({ 
+    success: true, 
+    message: 'E-posta doğrulandı.',
+    requiresApproval: requiresApproval 
+  });
 }
 
 async function authResendVerification(req, res) {

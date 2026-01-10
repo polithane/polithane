@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Eye, EyeOff, Check, X, ChevronRight, AlertCircle, Search, 
-  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, CheckCircle, Mail, Lock
+  User, Users, Building, Award, Mic, ArrowLeft, ShieldCheck, Upload, FileText, CheckCircle, Mail, Lock, Plus, Trash2
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Avatar } from '../../components/common/Avatar';
@@ -36,6 +36,7 @@ const MEMBERSHIP_TYPES = [
     id: 'party_member', 
     label: 'Parti Üyesi', 
     desc: 'Parti kimliğinizi doğrulayarak rozet kazanın.',
+    extraDesc: 'İl/İlçe seçimi zorunludur.',
     icon: Users,
     color: 'bg-gradient-to-br from-red-50 to-red-100 text-red-600',
     iconBg: 'bg-gradient-to-br from-red-500 to-red-600 text-white',
@@ -45,6 +46,7 @@ const MEMBERSHIP_TYPES = [
     id: 'organization', 
     label: 'Teşkilat / Yönetim', 
     desc: 'İl/İlçe başkanı veya belediye başkanı.',
+    extraDesc: 'İl/İlçe seçimi zorunludur.',
     icon: Building,
     color: 'bg-gradient-to-br from-orange-50 to-orange-100 text-orange-600',
     iconBg: 'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
@@ -119,6 +121,11 @@ export const RegisterPageNew = () => {
     previous_roles: '',
     bio: ''
   });
+  
+  // Medya için çoklu kurumlar
+  const [mediaOrganizations, setMediaOrganizations] = useState([
+    { id: 1, outlet: '', title: '', isActive: true }
+  ]);
   
   const [file, setFile] = useState(null);
 
@@ -244,6 +251,22 @@ export const RegisterPageNew = () => {
     }
   };
 
+  // Medya kurumları yönetimi
+  const addMediaOrganization = () => {
+    const newId = mediaOrganizations.length > 0 ? Math.max(...mediaOrganizations.map(o => o.id)) + 1 : 1;
+    setMediaOrganizations([...mediaOrganizations, { id: newId, outlet: '', title: '', isActive: true }]);
+  };
+
+  const removeMediaOrganization = (id) => {
+    setMediaOrganizations(mediaOrganizations.filter(o => o.id !== id));
+  };
+
+  const updateMediaOrganization = (id, field, value) => {
+    setMediaOrganizations(mediaOrganizations.map(o => 
+      o.id === id ? { ...o, [field]: value } : o
+    ));
+  };
+
   // Search Profile
   const handleSearch = async (query) => {
     if (query.length < 3) {
@@ -308,6 +331,14 @@ export const RegisterPageNew = () => {
       return;
     }
 
+    // İlçe zorunluluğu kontrolü
+    const isPartyMember = formData.membership_type === 'party_member';
+    const isTeşkilat = formData.membership_type === 'organization';
+    if ((isPartyMember || isTeşkilat) && !formData.district) {
+      setGlobalError('Parti üyesi ve teşkilat üyelikleri için ilçe seçimi zorunludur.');
+      return;
+    }
+
     setLoading(true);
     setGlobalError('');
 
@@ -366,6 +397,7 @@ export const RegisterPageNew = () => {
             media_outlet: formData.media_outlet,
             media_website: formData.media_website,
             media_bio: formData.media_bio,
+            media_organizations: formData.membership_type === 'media' ? mediaOrganizations : undefined,
             org_position: formData.org_position,
             start_date: formData.start_date,
             previous_roles: formData.previous_roles,
@@ -468,10 +500,6 @@ export const RegisterPageNew = () => {
     );
   }
 
-  // Helper renderers omitted for brevity, will include full content in Write.
-  // ...
-  // Same logic for choice, search, type selection.
-  
   // 3. Registration Form
   const renderForm = () => {
     const isTeşkilat = formData.membership_type === 'organization';
@@ -480,11 +508,12 @@ export const RegisterPageNew = () => {
     const isPartyMember = formData.membership_type === 'party_member' || isTeşkilat || isPolitician;
     
     const isDistrictRole = formData.role_type === 'district_chair' || formData.role_type === 'district_mayor';
+    const requiresApproval = isPartyMember || isMedia || isPolitician;
 
     return (
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex items-center mb-6">
-          <button onClick={() => setStep(claimUser ? 1 : 2)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
+          <button type="button" onClick={() => setStep(claimUser ? 1 : 2)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
             <ArrowLeft className="w-6 h-6 text-gray-600" />
           </button>
           <div>
@@ -604,7 +633,9 @@ export const RegisterPageNew = () => {
           )}
 
           <div className="col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">İl</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              İl {(isPartyMember || isTeşkilat) && <span className="text-red-600">*</span>}
+            </label>
             <select
               name="province"
               className="w-full border border-gray-300 rounded-lg p-3 bg-white"
@@ -620,15 +651,17 @@ export const RegisterPageNew = () => {
           </div>
 
           <div className="col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">İlçe</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              İlçe {(isPartyMember || isTeşkilat) && <span className="text-red-600">*</span>}
+            </label>
             <input
               type="text"
               name="district"
               className="w-full border border-gray-300 rounded-lg p-3"
               value={formData.district}
               onChange={handleInputChange}
-              required={isDistrictRole}
-              placeholder={isDistrictRole ? 'Zorunlu alan' : 'Opsiyonel'}
+              required={isPartyMember || isTeşkilat}
+              placeholder={(isPartyMember || isTeşkilat) ? 'Zorunlu alan' : 'Opsiyonel'}
               maxLength={50}
             />
           </div>
@@ -649,33 +682,88 @@ export const RegisterPageNew = () => {
             {fieldErrors.phone && <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>}
           </div>
 
-          {/* Media Specific */}
+          {/* Media Specific - Çoklu Kurumlar */}
           {isMedia && (
             <div className="col-span-1 md:col-span-2 bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
-              <h4 className="font-bold text-gray-900 flex items-center"><Mic className="w-6 h-6 sm:w-5 sm:h-5 mr-2"/> Medya Bilgileri</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kurum Adı</label>
-                  <input type="text" name="media_outlet" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} maxLength={100} placeholder="Opsiyonel" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ünvan</label>
-                  <input type="text" name="media_title" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} maxLength={50} placeholder="Opsiyonel" />
-                </div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-bold text-gray-900 flex items-center">
+                  <Mic className="w-6 h-6 sm:w-5 sm:h-5 mr-2"/> 
+                  Çalıştığınız Kurumlar
+                </h4>
+                <button
+                  type="button"
+                  onClick={addMediaOrganization}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-semibold"
+                >
+                  <Plus className="w-4 h-4" />
+                  Ekle
+                </button>
               </div>
-              <div>
+              {mediaOrganizations.map((org, idx) => (
+                <div key={org.id} className="bg-white p-3 rounded-lg border border-gray-200 space-y-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-gray-600">Kurum {idx + 1}</span>
+                    {mediaOrganizations.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeMediaOrganization(org.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kurum Adı</label>
+                      <input 
+                        type="text" 
+                        value={org.outlet}
+                        onChange={(e) => updateMediaOrganization(org.id, 'outlet', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm" 
+                        maxLength={100} 
+                        placeholder="Örn: CNN Türk" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ünvan</label>
+                      <input 
+                        type="text" 
+                        value={org.title}
+                        onChange={(e) => updateMediaOrganization(org.id, 'title', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm" 
+                        maxLength={50} 
+                        placeholder="Örn: Editör" 
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id={`active-${org.id}`}
+                      checked={org.isActive}
+                      onChange={(e) => updateMediaOrganization(org.id, 'isActive', e.target.checked)}
+                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    />
+                    <label htmlFor={`active-${org.id}`} className="text-sm text-gray-700 font-medium">
+                      Devam Ediyor
+                    </label>
+                  </div>
+                </div>
+              ))}
+              <div className="mt-3">
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Web Sitesi</label>
-                <input type="url" name="media_website" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} maxLength={200} />
+                <input type="url" name="media_website" className="w-full border border-gray-300 rounded-lg p-2" onChange={handleInputChange} maxLength={200} placeholder="Opsiyonel" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kısa Biyografi</label>
-                <textarea name="media_bio" className="w-full border border-gray-300 rounded-lg p-2" rows="2" onChange={handleInputChange} maxLength={500}></textarea>
+                <textarea name="media_bio" className="w-full border border-gray-300 rounded-lg p-2" rows="2" onChange={handleInputChange} maxLength={500} placeholder="Opsiyonel"></textarea>
               </div>
             </div>
           )}
 
           {/* Dosya Yükleme (Belge) */}
-          {(isPartyMember || isTeşkilat || isPolitician) && (
+          {(isPartyMember || isTeşkilat || isPolitician || isMedia) && (
             <div className="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
               <label className="block text-sm font-bold text-blue-900 mb-2 flex items-center">
                 <FileText className="w-6 h-6 sm:w-5 sm:h-5 mr-2"/> 
@@ -686,6 +774,7 @@ export const RegisterPageNew = () => {
                 {formData.role_type && formData.role_type.includes('chair') && 'Lütfen mazbatanızın veya atama yazınızın fotoğrafını yükleyiniz.'}
                 {formData.role_type === 'party_official' && 'Lütfen görevlendirme yazınızı yükleyiniz.'}
                 {formData.membership_type === 'party_member' && 'Lütfen E-Devlet üzerinden alacağınız parti üyelik belgesini yükleyiniz.'}
+                {isMedia && 'Lütfen basın kartınızın veya çalıştığınız kuruluştan resmi belgenizin fotoğrafını yükleyiniz.'}
               </p>
               <div className="flex items-center gap-2">
                 <input 
@@ -711,6 +800,16 @@ export const RegisterPageNew = () => {
                   }}
                   required
                 />
+              </div>
+              
+              {/* Bilgilendirme Mesajı */}
+              <div className="mt-4 bg-white p-3 rounded-lg border border-blue-200">
+                <p className="text-xs text-gray-700 leading-relaxed">
+                  <strong className="text-blue-900">ℹ️ Önemli Bilgilendirme:</strong> Başvurunuzda herhangi bir sorun yaşıyorsanız veya ek bilgiye ihtiyaç duyuyorsanız, lütfen bizimle iletişime geçmekten çekinmeyin. E-posta adresimiz:{' '}
+                  <a href="mailto:bilgi@polithane.com" className="text-primary-blue font-semibold hover:underline">
+                    bilgi@polithane.com
+                  </a>
+                </p>
               </div>
             </div>
           )}
@@ -962,6 +1061,11 @@ export const RegisterPageNew = () => {
                       <div className="flex-1">
                         <h3 className="font-bold text-gray-900 mb-1">{type.label}</h3>
                         <p className="text-xs text-gray-500">{type.desc}</p>
+                        {type.extraDesc && (
+                          <p className="text-xs font-bold text-red-600 mt-1">
+                            ⚠️ {type.extraDesc}
+                          </p>
+                        )}
                       </div>
                       <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-600 mt-3" />
                     </button>

@@ -857,11 +857,11 @@ export const ProfilePage = () => {
         
         {/* Tab İçerikleri */}
         {activeTab === 'posts' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
             {userPosts.map((post) => {
               const pid = post?.post_id ?? post?.id;
               return (
-                <div key={pid ?? post.post_id ?? post.id} className="space-y-2">
+                <div key={pid ?? post.post_id ?? post.id} className="space-y-2 min-w-0">
                   <PostCardHorizontal post={post} fullWidth={true} />
                   {isOwnProfile && pid && !post?.is_deleted && (
                     <div className="flex items-center justify-end gap-2">
@@ -926,9 +926,11 @@ export const ProfilePage = () => {
             ) : likedPosts.length === 0 ? (
               <div className="text-center text-gray-500 py-8">Henüz beğeni yok.</div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
                 {likedPosts.map((p) => (
-                  <PostCardHorizontal key={p.post_id ?? p.id} post={p} fullWidth={true} />
+                  <div key={p.post_id ?? p.id} className="min-w-0">
+                    <PostCardHorizontal post={p} fullWidth={true} />
+                  </div>
                 ))}
               </div>
             )}

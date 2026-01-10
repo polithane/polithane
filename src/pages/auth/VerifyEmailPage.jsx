@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import { apiCall } from '../../utils/api';
+import { DocumentsReviewModal } from '../../components/common/DocumentsReviewModal';
 
 export const VerifyEmailPage = () => {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ export const VerifyEmailPage = () => {
   const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState(false);
   const [error, setError] = useState('');
+  const [requiresApproval, setRequiresApproval] = useState(false);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,6 +31,11 @@ export const VerifyEmailPage = () => {
         const r = await apiCall(`/api/auth/verify-email?token=${encodeURIComponent(token)}`).catch(() => null);
         if (!cancelled && r?.success) {
           setOk(true);
+          if (r?.requiresApproval) {
+            setRequiresApproval(true);
+            // Show modal after a brief delay so user sees success first
+            setTimeout(() => setShowApprovalModal(true), 1500);
+          }
         } else if (!cancelled) {
           setOk(false);
           setError(r?.error || 'Doğrulama başarısız.');
@@ -78,13 +86,23 @@ export const VerifyEmailPage = () => {
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
               <h2 className="text-2xl font-black text-gray-900 mb-2">E-posta doğrulandı</h2>
-              <p className="text-gray-600 mb-6">Artık giriş yapabilirsiniz.</p>
+              <p className="text-gray-600 mb-6">
+                {requiresApproval 
+                  ? 'Belgeleriniz inceleniyor. Size kısa sürede dönüş yapacağız.' 
+                  : 'Artık giriş yapabilirsiniz.'}
+              </p>
               <button
                 onClick={() => navigate('/login-new')}
                 className="w-full bg-primary-blue hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-all shadow-lg hover:shadow-xl"
               >
                 Giriş Yap
               </button>
+              
+              {/* Approval Modal */}
+              <DocumentsReviewModal 
+                isOpen={showApprovalModal} 
+                onClose={() => setShowApprovalModal(false)} 
+              />
             </div>
           )}
 
