@@ -715,7 +715,6 @@ export const PostDetailPage = () => {
   }, [isReady, location.search]);
 
   const isOwnPost = isAuthenticated && currentUser?.id && String(uiPost.user_id) === String(currentUser.id);
-  const isAdmin = isAuthenticated && currentUser?.is_admin;
   const canManagePost = isOwnPost || isAdmin;
 
   // IMPORTANT: don't use hooks after early returns (React error #310).
